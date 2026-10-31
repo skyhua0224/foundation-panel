@@ -144,7 +144,6 @@ fn main() {
     .expect("valid component compatibility manifest");
     assert_eq!(compatibility["schema"], 1);
     for (name, value) in [
-        ("USBIP_POLICY", &compatibility["usbip"]["policy"]),
         ("USBIP_VERSION", &compatibility["usbip"]["version"]),
         ("USBIP_URL", &compatibility["usbip"]["installer_url"]),
         ("USBIP_SHA256", &compatibility["usbip"]["installer_sha256"]),

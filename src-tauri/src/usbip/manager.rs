@@ -11,7 +11,6 @@ pub(crate) const PINNED_VERSION: &str = env!("SUNSHINE_USBIP_VERSION");
 pub(super) const REQUIRED_VERSION: &str = PINNED_VERSION;
 pub(crate) const INSTALLER_URL: &str = env!("SUNSHINE_USBIP_URL");
 pub(crate) const INSTALLER_SHA256: &str = env!("SUNSHINE_USBIP_SHA256");
-pub(crate) const TRANSPORT_POLICY: &str = env!("SUNSHINE_USBIP_POLICY");
 
 /// Rejects missing or replaced transport binaries using the contract's SHA-256.
 #[cfg(target_os = "windows")]

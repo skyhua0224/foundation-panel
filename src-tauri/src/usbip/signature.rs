@@ -64,12 +64,9 @@ pub(super) fn parse_signature_report(output: &str) -> DriverSignature {
 const PROBE_SCRIPT: &str = "$s = Get-AuthenticodeSignature -LiteralPath $env:ALK_SIGNATURE_TARGET; \
 [pscustomobject]@{ status = [string]$s.Status; signer = if ($s.SignerCertificate) { $s.SignerCertificate.Subject } else { '' } } | ConvertTo-Json -Compress";
 
-/// Reads the signature of the driver the system has registered for the transport.
+/// Reads the Authenticode state of one file through PowerShell.
 #[cfg(target_os = "windows")]
-pub(crate) async fn driver_signature() -> DriverSignature {
-    let Ok(path) = super::manager::registered_driver_path() else {
-        return unknown();
-    };
+async fn signature_of(path: &std::path::Path) -> DriverSignature {
     let mut command = tokio::process::Command::new(crate::elevation::system_binary(
         r"WindowsPowerShell\v1.0\powershell.exe",
     ));
@@ -85,6 +82,15 @@ pub(crate) async fn driver_signature() -> DriverSignature {
             parse_signature_report(&String::from_utf8_lossy(&output.stdout))
         }
         _ => unknown(),
+    }
+}
+
+/// Reads the signature of the driver the system has registered for the transport.
+#[cfg(target_os = "windows")]
+pub(crate) async fn driver_signature() -> DriverSignature {
+    match super::manager::registered_driver_path() {
+        Ok(path) => signature_of(&path).await,
+        Err(_) => unknown(),
     }
 }
 
@@ -125,5 +131,26 @@ mod tests {
         for output in ["", "not json", r#"{"status":"UnknownError"}"#, "{}"] {
             assert_eq!(parse_signature_report(output).state, "unknown", "{output:?}");
         }
+    }
+
+    #[cfg(target_os = "windows")]
+    #[tokio::test]
+    async fn a_signed_system_file_reads_as_signed() {
+        let root = std::env::var_os("SystemRoot").unwrap_or_else(|| "C:\\Windows".into());
+        let file = std::path::Path::new(&root).join("System32").join("kernel32.dll");
+        let signature = signature_of(&file).await;
+        assert_eq!(signature.state, "signed", "{signature:?}");
+        assert!(!signature.signer.is_empty());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[tokio::test]
+    async fn an_unsigned_script_and_a_missing_file_are_not_called_signed() {
+        let directory = tempfile::tempdir().unwrap();
+        let script = directory.path().join("plain.ps1");
+        std::fs::write(&script, "Write-Output 1\r\n").unwrap();
+        assert_eq!(signature_of(&script).await.state, "unsigned");
+        let missing = signature_of(&directory.path().join("absent.sys")).await;
+        assert!(matches!(missing.state.as_str(), "unknown" | "invalid"), "{missing:?}");
     }
 }

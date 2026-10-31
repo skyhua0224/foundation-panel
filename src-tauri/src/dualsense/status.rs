@@ -248,4 +248,13 @@ mod tests {
         assert!(ok.reachable && ok.tuning_available && ok.native_compiled && ok.native_active);
         assert_eq!((ok.active_controllers, ok.revision), (2, 4));
     }
+
+    #[cfg(target_os = "windows")]
+    #[tokio::test]
+    #[ignore = "reads the real usbip-win2 installation of this Windows host"]
+    async fn transport_status_reads_the_installed_driver() {
+        let status = transport_status().await;
+        println!("{status:?}");
+        assert_eq!(status.pinned_version, crate::usbip::USBIP_VERSION);
+    }
 }
