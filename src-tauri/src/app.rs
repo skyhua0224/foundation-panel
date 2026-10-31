@@ -56,8 +56,6 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
     let mut tasks = BackgroundTasks(vec![windows::lifecycle::start_monitor(app_handle.clone())]);
     #[cfg(target_os = "windows")]
     crate::vdd::start_hardware_cursor_migration();
-    #[cfg(target_os = "windows")]
-    crate::dualsense::start_installed_component_update(app_handle.clone());
     let start_minimized = explicit_minimized || desktop_settings.start_minimized;
 
     // Agent-only startup keeps tray and session services alive without

@@ -11,7 +11,7 @@
 //! protocols and operations stay with each stack.
 
 /// Pipe name for one elevated invocation. `stack` names the calling feature
-/// (e.g. "usbip", "dualsense") so concurrent stacks never collide.
+/// (e.g. "usbip") so concurrent stacks never collide.
 pub(crate) fn pipe_name(stack: &str, token: uuid::Uuid) -> String {
     format!(r"\\.\pipe\sunshine-{stack}-{token}")
 }

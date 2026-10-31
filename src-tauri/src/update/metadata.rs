@@ -11,7 +11,6 @@ use std::cmp::Ordering;
 use std::time::Duration;
 use tokio::time::{Instant, sleep, timeout};
 
-use crate::github_download::DownloadCandidate;
 
 const METADATA_COM_URL: &str =
     "https://www.alkaidlab.com/release-metadata/foundation-sunshine.json";
@@ -337,8 +336,6 @@ fn known_asset_type(asset_type: &str) -> bool {
         asset_type,
         "windows-x64-installer"
             | "windows-x64-portable"
-            | "dualsense-sidecar-zip"
-            | "dualsense-sidecar-manifest"
             | "checksum-json"
             | "checksum-text"
     )
@@ -359,12 +356,6 @@ fn classify_asset_name(name: &str) -> Option<&'static str> {
     }
     if lower.starts_with("sunshine") && lower.contains("portable") && lower.ends_with(".zip") {
         return Some("windows-x64-portable");
-    }
-    if lower.contains("ds5sidecar") && lower.ends_with(".zip") {
-        return Some("dualsense-sidecar-zip");
-    }
-    if lower.contains("ds5sidecar") && lower.ends_with(".manifest.json") {
-        return Some("dualsense-sidecar-manifest");
     }
     if lower == "checksums.json" {
         return Some("checksum-json");
@@ -394,17 +385,6 @@ fn encoded_download_url(tag: &str, name: &str) -> String {
     url.to_string()
 }
 
-fn encoded_cnb_download_url(tag: &str, name: &str) -> String {
-    let mut url =
-        Url::parse("https://cnb.cool/AlkaidLab/foundation-sunshine-release/-/releases/download")
-            .expect("built-in CNB download URL must be valid");
-    url.path_segments_mut()
-        .expect("CNB download URL must be a base URL")
-        .push(tag)
-        .push(name);
-    url.to_string()
-}
-
 pub(crate) fn decode_segment(value: &str) -> Result<String, String> {
     let bytes = value.as_bytes();
     let mut output = Vec::with_capacity(bytes.len());
@@ -428,34 +408,6 @@ pub(crate) fn decode_segment(value: &str) -> Result<String, String> {
         }
     }
     String::from_utf8(output).map_err(|_| "URL 编码不是合法 UTF-8".to_string())
-}
-
-fn github_release_download_tag(url: &str, name: &str) -> Result<String, String> {
-    let parsed = Url::parse(url).map_err(|error| format!("下载地址无效: {error}"))?;
-    if parsed.scheme() != "https"
-        || parsed.host_str() != Some("github.com")
-        || parsed.port().is_some_and(|port| port != 443)
-        || !parsed.username().is_empty()
-        || parsed.password().is_some()
-        || parsed.query().is_some()
-        || parsed.fragment().is_some()
-    {
-        return Err("组件下载地址必须是无凭据的 GitHub HTTPS 地址".to_string());
-    }
-    let segments = parsed
-        .path_segments()
-        .ok_or_else(|| "组件下载地址缺少路径".to_string())?
-        .collect::<Vec<_>>();
-    if segments.len() != 6
-        || segments[0] != GITHUB_OWNER
-        || segments[1] != GITHUB_REPOSITORY
-        || segments[2] != "releases"
-        || segments[3] != "download"
-        || decode_segment(segments[5])? != name
-    {
-        return Err("组件下载地址不是 Foundation Sunshine Release 资产".to_string());
-    }
-    decode_segment(segments[4])
 }
 
 fn validate_release_download_url(url: &str, tag: &str, name: &str) -> Result<(), String> {
@@ -1038,65 +990,6 @@ pub(crate) async fn resolve_catalog(channel: UpdateChannel) -> Result<ReleaseCat
     fetch_github_catalog(channel).await
 }
 
-/// Resolve mirror candidates for a component whose exact release identity is
-/// pinned by its installed manifest. Metadata is only used when it describes
-/// the same asset and SHA-256; otherwise the tag from the canonical GitHub URL
-/// is used to derive the CNB and GitHub candidates directly.
-pub(crate) async fn resolve_component_download_candidates(
-    asset_type: &str,
-    asset_name: &str,
-    expected_sha256: &str,
-    canonical_url: &str,
-) -> Result<Vec<DownloadCandidate>, String> {
-    let expected_sha256 = normalize_sha256(expected_sha256)
-        .ok_or_else(|| "组件 manifest 的 SHA-256 无效".to_string())?;
-    let tag = github_release_download_tag(canonical_url, asset_name)?;
-    let canonical_url = encoded_download_url(&tag, asset_name);
-    let mut candidates = Vec::new();
-
-    let mut add_candidate = |name: &'static str, url: String| {
-        let Ok(parsed) = Url::parse(&url) else {
-            return;
-        };
-        if parsed.scheme() != "https"
-            || candidates
-                .iter()
-                .any(|item: &DownloadCandidate| item.url == url)
-        {
-            return;
-        }
-        candidates.push(DownloadCandidate { name, url });
-    };
-
-    if current_locale_is_chinese().await {
-        // The normal metadata path already implements .com/.cn priority and
-        // CNB/GitHub fallback. Do not accept a newer or different component:
-        // Sidecar must match the installed Sunshine manifest exactly.
-        if let Ok(catalog) = resolve_catalog(UpdateChannel::StableOnly).await {
-            if let Some(release) = catalog.latest {
-                for asset in release.assets.into_iter().filter(|asset| {
-                    asset.asset_type == asset_type
-                        && asset.name == asset_name
-                        && asset.sha256.eq_ignore_ascii_case(&expected_sha256)
-                }) {
-                    add_candidate("official metadata", asset.url);
-                    if let Some(fallback) = asset.fallback_url {
-                        add_candidate("metadata fallback", fallback);
-                    }
-                }
-            }
-        }
-
-        add_candidate("CNB", encoded_cnb_download_url(&tag, asset_name));
-    }
-
-    add_candidate("GitHub", canonical_url);
-    if candidates.is_empty() {
-        return Err("没有可用的组件下载地址".to_string());
-    }
-    Ok(candidates)
-}
-
 pub(crate) fn select_candidate(
     catalog: &ReleaseCatalog,
     channel: UpdateChannel,
@@ -1201,27 +1094,6 @@ mod tests {
         assert!(asset.contains("%E5%AE%89%E8%A3%85%E5%8C%85.exe"));
         assert!(!page.contains("/tag//"));
         assert!(!asset.contains("/download//"));
-    }
-
-    #[test]
-    fn component_mirror_url_preserves_release_tag_and_asset_name() {
-        let github = encoded_download_url("v2026.925.152547.杂鱼", "Sunshine.Ds5Sidecar.x64.zip");
-        let tag = github_release_download_tag(&github, "Sunshine.Ds5Sidecar.x64.zip").unwrap();
-        let cnb = encoded_cnb_download_url(&tag, "Sunshine.Ds5Sidecar.x64.zip");
-        assert!(cnb.contains("cnb.cool/AlkaidLab/foundation-sunshine-release"));
-        assert!(cnb.contains("%E6%9D%82%E9%B1%BC"));
-        assert!(cnb.ends_with("Sunshine.Ds5Sidecar.x64.zip"));
-    }
-
-    #[test]
-    fn component_mirror_url_rejects_another_repository() {
-        assert!(
-            github_release_download_tag(
-                "https://github.com/other/project/releases/download/v1/Sunshine.Ds5Sidecar.x64.zip",
-                "Sunshine.Ds5Sidecar.x64.zip",
-            )
-            .is_err()
-        );
     }
 
     #[test]

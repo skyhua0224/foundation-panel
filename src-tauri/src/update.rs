@@ -18,7 +18,6 @@ mod preferences;
 
 pub(crate) use preferences::{include_prerelease as get_include_prerelease, save_last_check_time};
 
-pub(crate) use metadata::resolve_component_download_candidates;
 
 use metadata::{
     ReleaseAsset, ReleaseCandidate, ReleaseCatalog, UpdateChannel, candidate_is_newer_than,
@@ -1564,7 +1563,6 @@ fn validate_download_file_identity(
         .map_err(|error| format!("读取文件头失败: {error}"))?;
     let valid_type = match asset_type {
         Some("windows-x64-installer") => count >= 2 && &header[..2] == b"MZ",
-        Some("dualsense-sidecar-zip") => count >= 2 && &header[..2] == b"PK",
         Some("checksum-json") | Some("checksum-text") | None => true,
         Some(other) => return Err(format!("不支持的下载资产类型: {other}")),
     };

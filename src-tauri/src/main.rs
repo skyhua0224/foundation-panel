@@ -128,11 +128,6 @@ fn main() {
     utils::wait_for_elevated_restart_handoff();
 
     #[cfg(target_os = "windows")]
-    if let Some(exit_code) = dualsense::try_handle_elevated_command() {
-        std::process::exit(exit_code);
-    }
-
-    #[cfg(target_os = "windows")]
     if let Some(exit_code) = usbip::try_handle_elevated_command() {
         std::process::exit(exit_code);
     }
@@ -271,12 +266,8 @@ fn main() {
             vigem::install_vigem_driver,
             vigem::uninstall_vigem_driver,
             dualsense::dualsense_get_status,
-            dualsense::dualsense_log_panel_opened,
-            dualsense::dualsense_install,
-            dualsense::dualsense_uninstall,
-            dualsense::dualsense_set_config,
-            dualsense::dualsense_set_haptics_tuning,
-            dualsense::dualsense_self_test,
+            dualsense::dualsense_get_tuning,
+            dualsense::dualsense_set_tuning,
             usbip::usbip_get_status,
             usbip::usbip_get_forwarding_config,
             usbip::usbip_save_forwarding_config,
