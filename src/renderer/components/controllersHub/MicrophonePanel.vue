@@ -11,9 +11,6 @@
       </div>
       <p class="chub-hint">{{ text.intro }}</p>
       <p>{{ text.summaries[state] }}</p>
-      <div v-if="state === 'missing'" class="chub-card-actions">
-        <el-button size="small" type="primary" @click="emit('manage-components')">{{ text.prepareComponents }}</el-button>
-      </div>
       <div class="chub-runtime-grid">
         <div><span>{{ text.configuredBackend }}</span><strong>{{ backendLabel(status.configured_backend) }}</strong></div>
         <div><span>{{ text.activeBackend }}</span><strong>{{ backendLabel(status.active_backend) }}</strong></div>
@@ -35,7 +32,6 @@
       <div class="chub-context-note"><strong>{{ text.experimentalTitle }}</strong><span>{{ text.experimentalHint }}</span></div>
       <template v-if="!loadError && experimentalSelected">
         <p>{{ text.component }}: {{ status.component_available ? t.deviceHub.available : t.deviceHub.unavailable }}</p>
-        <div v-if="state !== 'missing'" class="chub-card-actions"><el-button size="small" @click="emit('manage-components')">{{ t.deviceHub.components.manage }}</el-button></div>
       </template>
       <details v-if="!loadError && usesUsbip" class="chub-diagnostics-details">
         <summary>{{ text.diagnostics }}</summary>
@@ -60,7 +56,6 @@ import { micStatusChannel } from '../../composables/deviceStatusStore.js'
 import { canTestMicrophone, microphoneOverviewState, microphoneStatusTone, microphoneUsesUsbip } from '../../composables/deviceHubStatus.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
-const emit = defineEmits(['manage-components'])
 const { t } = useI18n()
 const text = computed(() => t.value.deviceHub.microphone)
 const loading = ref(true)

@@ -4,7 +4,7 @@ import { dualsenseStatusChannel, micStatusChannel, usbipStatusChannel } from './
 // Overview status is scoped to its mounted tab; coalesce concurrent refreshes.
 export function useDeviceRuntime() {
   const runtime = reactive({
-    ds: { verified: false, usbip_available: false, usbip_version: '', component_version: '', runtime_version: '' },
+    ds: { state: '' },
     mic: { component_available: false },
     usb: { ready: false, version: '' },
   })

@@ -2,25 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   canTestMicrophone,
-  dualSenseComponentAction,
-  dualSenseComponentOperational,
   microphoneOverviewState,
   microphoneStatusTone,
   microphoneUsesUsbip,
-  usbTransportPlan,
 } from './deviceHubStatus.js'
-
-test('DualSense actions distinguish repair from a compatible update', () => {
-  assert.equal(dualSenseComponentAction({ installed: false }), 'install')
-  assert.equal(dualSenseComponentAction({ installed: true, verified: false, update_available: true }), 'repair')
-  assert.equal(dualSenseComponentAction({ installed: true, verified: true, update_available: true }), 'update')
-  assert.equal(dualSenseComponentAction({ installed: true, verified: true }), '')
-})
-
-test('DualSense settings remain available for verified components with an update', () => {
-  assert.equal(dualSenseComponentOperational({ verified: true, update_available: true }), true)
-  assert.equal(dualSenseComponentOperational({ verified: false, update_available: true }), false)
-})
 
 test('microphone status prioritizes faults over an old online flag', () => {
   const usb = { configured_backend: 'usbip_experimental', component_available: true }
@@ -46,7 +31,7 @@ test('microphone overview distinguishes missing, waiting, idle and capturing', (
   assert.equal(microphoneOverviewState({ ...usb, component_available: true, device_created: true, host_streaming: true }), 'capturing')
 })
 
-test('VB-Cable and automatic fallback remain testable without Sidecar', () => {
+test('VB-Cable and automatic fallback remain testable without the experimental component', () => {
   for (const backend of ['vb_cable', 'auto']) {
     const status = { configured_backend: backend, component_available: false }
     assert.equal(canTestMicrophone(status), true)
@@ -58,14 +43,4 @@ test('VB-Cable and automatic fallback remain testable without Sidecar', () => {
   }
   assert.equal(microphoneOverviewState({ configured_backend: 'disabled', device_created: true }), 'disabled')
   assert.equal(canTestMicrophone({ configured_backend: 'vb_cable', state: 'unsupported' }), false)
-})
-
-test('transport maintenance distinguishes reuse, installation, shared cleanup and repair', () => {
-  assert.equal(usbTransportPlan({ installed: true, version_valid: true, ready: true }), 'reuse')
-  assert.equal(usbTransportPlan({}), 'install')
-  assert.equal(usbTransportPlan({ installed: true, version_valid: false }), 'cleanup')
-  assert.equal(usbTransportPlan({ vhci_residual: true }), 'cleanup')
-  assert.equal(usbTransportPlan({ installed: true, version_valid: true }), 'repair')
-  assert.equal(usbTransportPlan({ installed: true, version_valid: true, error_code: 'USBIP-EXEC-006' }), 'cleanup')
-  assert.equal(usbTransportPlan({ installed: true, version_valid: true, detail: 'USBIP-EXEC-007: access denied' }), 'repair')
 })

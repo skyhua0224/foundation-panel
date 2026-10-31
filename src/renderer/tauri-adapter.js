@@ -122,19 +122,8 @@ export const virtualMicrophone = {
 
 export const dualsense = {
   getStatus: () => wrapResult('dualsense_get_status'),
-  logPanelOpened: () => wrapResult('dualsense_log_panel_opened'),
-  install: (packagePaths = []) => wrapResult('dualsense_install', { packagePaths }),
-  uninstall: () => wrapResult('dualsense_uninstall'),
-  setConfig: (audioHaptics, genshinCompatibility) => wrapResult('dualsense_set_config', {
-    audioHaptics: !!audioHaptics,
-    genshinCompatibility: !!genshinCompatibility,
-  }),
-  setHapticsTuning: (strength, curve, noiseGate) => wrapResult('dualsense_set_haptics_tuning', {
-    strength,
-    curve,
-    noiseGate,
-  }),
-  selfTest: (profile) => wrapResult('dualsense_self_test', { profile }),
+  getTuning: () => wrapResult('dualsense_get_tuning'),
+  setTuning: (values) => wrapResult('dualsense_set_tuning', { values }),
 }
 
 export const usbip = {

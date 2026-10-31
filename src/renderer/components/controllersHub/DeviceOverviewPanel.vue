@@ -8,7 +8,7 @@
     <div v-if="!loaded" class="chub-cards"><el-skeleton :rows="4" animated /></div>
     <div v-else class="chub-cards chub-overview-cards">
       <article class="chub-card">
-        <div class="chub-card-head"><strong>{{ t.deviceHub.overview.controllers }}</strong><el-tag size="small" :type="runtime.ds.verified && !probeFailed.ds ? 'success' : 'info'" effect="plain">{{ probeFailed.ds ? t.deviceHub.probeUnavailable : runtime.ds.verified ? t.deviceHub.available : t.deviceHub.components.optional }}</el-tag></div>
+        <div class="chub-card-head"><strong>{{ t.deviceHub.overview.controllers }}</strong><el-tag size="small" :type="dsReady ? 'success' : 'info'" effect="plain">{{ probeFailed.ds ? t.deviceHub.probeUnavailable : t.dualSense.status.states[runtime.ds.state] || t.deviceHub.components.optional }}</el-tag></div>
         <p class="chub-hint">{{ t.deviceHub.overview.controllersHint }}</p>
         <div class="chub-card-actions"><el-button size="small" type="primary" @click="emit('navigate', 'controllers')">{{ t.deviceHub.overview.manageControllers }}</el-button></div>
       </article>
@@ -35,6 +35,7 @@ import { useI18n } from '../../desktop/i18n/index.js'
 const emit = defineEmits(['navigate'])
 const { t } = useI18n()
 const { runtime, loading, loaded, loadError, probeFailed, refresh } = useDeviceRuntime()
+const dsReady = computed(() => !probeFailed.ds && ['ready', 'active'].includes(runtime.ds.state))
 const microphoneState = computed(() => probeFailed.mic ? 'unknown' : microphoneOverviewState(runtime.mic))
 onMounted(() => refresh())
 // KeepAlive 重新显示时静默校准（状态通道会合并/复用近期探测）。

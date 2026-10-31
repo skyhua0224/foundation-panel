@@ -1,6 +1,6 @@
 // ========================================
 // 控制器中心（Controllers Hub）— 像素风样式
-// 视觉语言与 DualSenseSettings.less 保持一致：
+// 视觉语言：
 // 像素窗锚点 + ◈ 分区标题 + 投影大按钮 / [ 方括号 ] 小按钮 + 方角控件。
 // 本文件经非 scoped <style> 引入，前缀 chub- 全局唯一。
 // ========================================
@@ -38,20 +38,17 @@
 
 // 大屏放开页面上限，卡片网格随可用宽度增列。
 @media (min-width: 1600px) {
-  .chub-page,
-  .chub-page .ds5-page {
+  .chub-page {
     max-width: 1400px;
   }
 }
 
 // ============================================
-// 设计语言（与 DualSenseSettings.less 共享 pixel-language.less 中的定义）
+// 设计语言（pixel-language.less 中的定义）
 // 词汇表：
 //   大按钮   = 方角 + 2px 边 + 硬投影按压手感（主操作）
 //   小按钮   = [ 方括号 ] 文本操作（块内低权重动作）
 //   方角控件 = 标签 / 输入 / 步进器 / 复选框 / 开关 / 进度条 一律直角
-// 本层同时覆盖内嵌 ds5-page：ds5 仅在 .chub-page 内渲染，
-// 自身不再重复按钮与方角规则（text 模式的 .ds5-action 除外）。
 // ============================================
 
 .chub-page .el-button:not(.el-button--small):not(.is-text):not(.is-link) {
@@ -183,7 +180,7 @@
   line-height: 1.55;
 }
 
-// ============ Tab 栏（文件夹页签，复用 ds5-window-tab 语汇） ============
+// ============ Tab 栏（文件夹页签） ============
 // 搁板 = 容器自身 border-bottom，恒定 2px；页签用负 margin 岔进搁板，
 // 未选中页签底边与搁板同色融合，选中页签底边为窗底填充遮断搁板并向上投像素阴影。
 .chub-tabs {
@@ -243,21 +240,11 @@
 .chub-pane {
   margin-top: 26px;
 }
-.chub-pane > .ds5-page {
-  margin-top: 28px;
-}
-
-// 内嵌 DualSense 页时由 .chub-page 统一控制列宽和留白。
-.chub-pane .ds5-page {
-  max-width: none;
-  margin-inline: 0;
-  padding: 0;
-}
 // 面板按根节点排版，包含 Vue 子组件的根节点。
-.chub-panel > :is(.chub-section, .chub-window, .chub-panel, .ds5-page) + :is(.chub-section, .chub-window, .chub-panel, .ds5-page) {
+.chub-panel > :is(.chub-section, .chub-window, .chub-panel) + :is(.chub-section, .chub-window, .chub-panel) {
   margin-top: @pixel-section-gap;
 }
-.chub-panel > :is(.chub-section, .ds5-page) + .chub-panel {
+.chub-panel > .chub-section + .chub-panel {
   margin-top: @pixel-floating-window-gap;
 }
 .chub-panel > .chub-window + .chub-notice {
