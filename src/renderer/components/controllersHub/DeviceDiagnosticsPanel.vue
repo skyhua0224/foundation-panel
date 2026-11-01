@@ -1,62 +1,22 @@
 <template>
-  <section class="chub-panel">
-    <div class="chub-section">
-      <div class="chub-section-head">
-        <span class="chub-section-label">◈ {{ t.deviceHub.tabs.tools }}</span>
-        <span class="chub-section-rule"></span>
-        <el-button size="small" :loading="refreshing" @click="refreshAll">{{ t.deviceHub.refresh }}</el-button>
-      </div>
-
-      <div v-if="!initialized" class="chub-cards" aria-live="polite">
-        <article v-for="index in 2" :key="index" class="chub-card chub-card-placeholder">
-          <el-skeleton :rows="3" animated />
-        </article>
-      </div>
-      <div v-else class="chub-cards">
-        <!-- ControllerMeta -->
-        <article class="chub-card">
-          <div class="chub-card-head">
-            <strong>{{ t.controllersHub.peripherals.meta.title }}</strong>
-            <el-tag
-              size="small"
-              :type="!probeFailed && metaStatus.installed ? 'success' : 'info'"
-              effect="plain"
-            >{{ probeFailed ? t.deviceHub.probeUnavailable : (metaStatus.installed
-              ? (metaStatus.version ? `v${metaStatus.version}` : t.controllersHub.peripherals.installed)
-              : t.controllersHub.peripherals.notInstalled) }}</el-tag>
-          </div>
-          <p class="chub-hint">{{ t.controllersHub.peripherals.meta.hint }}</p>
-          <div class="chub-card-actions">
-            <el-button
-              size="small"
-              type="primary"
-              :disabled="refreshing || probeFailed"
-              @click="emit('open-controller-meta')"
-            >{{ t.controllersHub.peripherals.meta.launch }}</el-button>
-          </div>
-        </article>
-
-        <!-- 手写笔输入检测 -->
-        <article class="chub-card">
-          <div class="chub-card-head">
-            <strong>{{ t.controllersHub.peripherals.stylus.title }}</strong>
-          </div>
-          <p class="chub-hint">{{ t.controllersHub.peripherals.stylus.hint }}</p>
-          <div class="chub-card-actions">
-            <el-button
-              size="small"
-              type="primary"
-              :disabled="refreshing"
-              @click="emit('open-stylus-input-probe')"
-            >{{ t.controllersHub.peripherals.stylus.launch }}</el-button>
-          </div>
-        </article>
-      </div>
-    </div>
-  </section>
+  <MSection :title="t.deviceHub.tabs.tools">
+    <MSkeleton v-if="!initialized" :rows="2" />
+    <MGroup v-else>
+      <MItem icon="sports_esports" :title="t.controllersHub.peripherals.meta.title" :text="t.controllersHub.peripherals.meta.hint">
+        <template #trail>
+          <MChip :tone="!probeFailed && metaStatus.installed ? 'ok' : 'neutral'">{{ probeFailed ? t.deviceHub.probeUnavailable : (metaStatus.installed ? (metaStatus.version ? 'v' + metaStatus.version : t.controllersHub.peripherals.installed) : t.controllersHub.peripherals.notInstalled) }}</MChip>
+          <MButton size="sm" :disabled="refreshing || probeFailed" @click="emit('open-controller-meta')">{{ t.controllersHub.peripherals.meta.launch }}</MButton>
+        </template>
+      </MItem>
+      <MItem icon="edit" :title="t.controllersHub.peripherals.stylus.title" :text="t.controllersHub.peripherals.stylus.hint">
+        <template #trail><MButton size="sm" :disabled="refreshing" @click="emit('open-stylus-input-probe')">{{ t.controllersHub.peripherals.stylus.launch }}</MButton></template>
+      </MItem>
+    </MGroup>
+  </MSection>
 </template>
 
 <script setup>
+import { MSection, MGroup, MItem, MChip, MButton, MSkeleton } from 'foundation-ui/vue'
 import { onMounted, reactive, ref } from 'vue'
 import { controllerMeta } from '../../tauri-adapter.js'
 import { useI18n } from '../../desktop/i18n/index.js'

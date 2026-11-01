@@ -1,57 +1,27 @@
 <template>
-  <div class="chub-subsection">
-    <div class="chub-section-head">
-      <span class="chub-section-label">◈ {{ t.controllersHub.emulation.dsuTitle }}</span>
-      <span class="chub-section-rule"></span>
-    </div>
-    <p class="chub-hint">{{ t.controllersHub.emulation.dsuHint }}</p>
-    <div class="chub-dsu-row">
-      <el-checkbox
-        :model-value="config.enable_dsu_server"
-        :disabled="busyKey !== ''"
-        @change="(v) => saveKey('enable_dsu_server', v)"
-      >{{ t.controllersHub.emulation.dsuEnable }}</el-checkbox>
-      <label class="chub-dsu-port">
-        <span>{{ t.controllersHub.emulation.dsuPort }}</span>
-        <el-input-number
-          :model-value="config.dsu_server_port"
-          :min="1024"
-          :max="65535"
-          :disabled="!config.enable_dsu_server || busyKey !== ''"
-          size="small"
-          @change="(v) => saveKey('dsu_server_port', v)"
-        />
-      </label>
-    </div>
-
-    <div class="chub-subsection" style="margin-top: 20px">
-      <div class="chub-section-head">
-        <span class="chub-section-label">◈ {{ t.controllersHub.emulation.ds4Title }}</span>
-        <span class="chub-section-rule"></span>
-      </div>
-      <p class="chub-hint">{{ t.controllersHub.emulation.ds4Hint }}</p>
-      <div class="chub-check-list">
-        <el-checkbox
-          :model-value="config.ds4_back_as_touchpad_click"
-          :disabled="busyKey !== ''"
-          @change="(v) => saveKey('ds4_back_as_touchpad_click', v)"
-        >{{ t.controllersHub.emulation.backAsTouchpadClick }}</el-checkbox>
-        <el-checkbox
-          :model-value="config.motion_as_ds4"
-          :disabled="busyKey !== ''"
-          @change="(v) => saveKey('motion_as_ds4', v)"
-        >{{ t.controllersHub.emulation.motionAsDs4 }}</el-checkbox>
-        <el-checkbox
-          :model-value="config.touchpad_as_ds4"
-          :disabled="busyKey !== ''"
-          @change="(v) => saveKey('touchpad_as_ds4', v)"
-        >{{ t.controllersHub.emulation.touchpadAsDs4 }}</el-checkbox>
-      </div>
-    </div>
+  <div class="m-advanced">
+    <MSection :title="t.controllersHub.emulation.dsuTitle" :description="t.controllersHub.emulation.dsuHint">
+      <MGroup>
+        <MSwitchItem :model-value="config.enable_dsu_server" icon="sensors" :title="t.controllersHub.emulation.dsuEnable" :disabled="busyKey !== ''" @update:model-value="(v) => saveKey('enable_dsu_server', v)" />
+        <MItem icon="settings_ethernet" :title="t.controllersHub.emulation.dsuPort" :disabled="!config.enable_dsu_server || busyKey !== ''">
+          <template #trail>
+            <md-outlined-text-field class="m-port-field" type="number" min="1024" max="65535" :value="config.dsu_server_port" :disabled="!config.enable_dsu_server || busyKey !== ''" @change="(e) => saveKey('dsu_server_port', Number(e.target.value))" />
+          </template>
+        </MItem>
+      </MGroup>
+    </MSection>
+    <MSection :title="t.controllersHub.emulation.ds4Title" :description="t.controllersHub.emulation.ds4Hint">
+      <MGroup>
+        <MSwitchItem :model-value="config.ds4_back_as_touchpad_click" icon="touch_app" :title="t.controllersHub.emulation.backAsTouchpadClick" :disabled="busyKey !== ''" @update:model-value="(v) => saveKey('ds4_back_as_touchpad_click', v)" />
+        <MSwitchItem :model-value="config.motion_as_ds4" icon="sensors" :title="t.controllersHub.emulation.motionAsDs4" :disabled="busyKey !== ''" @update:model-value="(v) => saveKey('motion_as_ds4', v)" />
+        <MSwitchItem :model-value="config.touchpad_as_ds4" icon="touch_app" :title="t.controllersHub.emulation.touchpadAsDs4" :disabled="busyKey !== ''" @update:model-value="(v) => saveKey('touchpad_as_ds4', v)" />
+      </MGroup>
+    </MSection>
   </div>
 </template>
 
 <script setup>
+import { MSection, MGroup, MItem, MSwitchItem } from 'foundation-ui/vue'
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useControllerHubConfig } from '../../composables/useControllerHubConfig.js'

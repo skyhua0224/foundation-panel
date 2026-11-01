@@ -1116,6 +1116,18 @@ Output only one short sentence, no explanation. Reply in English.`,
   hdrEnhanced: {
     open: 'Manage image enhancement',
   },
+  m3e: {
+    nav: { overview: 'Overview', stream: 'Stream', input: 'Input & devices', display: 'Display', system: 'System', settings: 'Panel settings', help: 'Help & about', main: 'Main navigation' },
+    back: 'Back',
+    stream: {
+      title: 'Stream', lead: 'Clients, apps and stream settings.',
+      clients: ['Clients', 'Pair clients and see paired devices'], apps: ['Apps', 'Manage the apps you can stream'],
+      settings: ['Stream settings', 'Encoder, network, audio and other host settings'], downloads: ['Download clients', 'Get a client for each platform'],
+    },
+    input: { title: 'Input & devices', lead: 'Devices the client brings: controller, microphone and USB devices.', gamepad: 'Controller', microphone: 'Microphone', usb: 'USB devices', usbNote: 'USB/IP transport and mounted devices', gamepadNote: 'Controller type and DualSense tuning', micNote: 'Send the client microphone to this host' },
+    display: { title: 'Display', lead: 'Virtual display and picture quality.', vdd: 'Virtual display', vddNote: 'A stable virtual display for each client, with HDR calibration', quality: 'Picture enhancement', qualityNote: 'RTX HDR and DLSS NR' },
+    system: { title: 'System', lead: 'Driver components, diagnostics and assistant.', components: 'Components', componentsNote: 'Virtual controller bus, USB/IP transport and other drivers', diagnostics: 'Diagnostic tools', diagnosticsNote: 'Controller test, stylus probe, stream timer, latency test', assistant: 'AI assistant', assistantNote: 'Helps you find the cause of a problem' },
+  },
   deviceHub: {
     eyebrow: 'MANAGE / DEVICE HUB',
     title: 'Device Hub',

@@ -1,0 +1,23 @@
+/*
+  Compatibility layer for the panel pages that keep their own markup (virtual display, AI assistant, picture
+  enhancement, welcome): they get the shared colour, shape and type, and the same centred column.
+  Their layout is not rebuilt; see docs/redesign/m3e-status.md for what is still pending per page.
+*/
+.panel-route > .vdd-settings-wrapper, .panel-route > .ai-assistant, .panel-route > .quality-manager, .panel-route > div:not(.m-page) { background: transparent !important; }
+.panel-route .vdd-content, .panel-route .quality-page, .panel-route .ai-container { width: min(100%, 880px); max-width: none !important; margin: 0 auto !important; padding: 64px 24px 96px !important; }
+.panel-route :is(.section-card, .overview-card, .info-card, .quality-card, .component-card, .ai-card, .settings-card, .config-card):not([class*='m-']) {
+  background: var(--m-card) !important; border: 0 !important; border-radius: 28px !important; box-shadow: none !important; color: var(--md-sys-color-on-surface) !important;
+}
+.panel-route :is(h1, h2, h3, h4) { color: var(--md-sys-color-on-surface) !important; }
+.panel-route :is(.vdd-page-header, .quality-header, .ai-header, .component-page-header) { background: transparent !important; border: 0 !important; box-shadow: none !important; padding-top: 8px; }
+.panel-route :is(.vdd-page-header h2, .quality-header h1, .ai-header h2) { font: var(--m-headline-medium-emphasized) !important; }
+.panel-route :is(.page-title-icon) { background: var(--md-sys-color-secondary-container) !important; color: var(--md-sys-color-on-secondary-container) !important; border: 0 !important; border-radius: 20px 28px 20px 28px !important; }
+.panel-route .vdd-section-tabs, .panel-route .quality-tabs { display: flex; gap: 2px; padding: 0 !important; background: transparent !important; border: 0 !important; flex-wrap: wrap; }
+.panel-route :is(.vdd-section-tab, .quality-tab) { border: 0 !important; border-radius: 8px !important; background: var(--md-sys-color-surface-container-highest) !important; color: var(--md-sys-color-on-surface-variant) !important; font: var(--m-label-large) !important; height: 40px; padding: 0 18px !important; transition: border-radius var(--m-spring-default-spatial-duration) var(--m-spring-default-spatial), background-color var(--m-spring-default-effects-duration) var(--m-spring-default-effects); }
+.panel-route :is(.vdd-section-tab, .quality-tab):first-child { border-radius: 20px 8px 8px 20px !important; } .panel-route :is(.vdd-section-tab, .quality-tab):last-child { border-radius: 8px 20px 20px 8px !important; }
+.panel-route :is(.vdd-section-tab.active, .quality-tab.active, .quality-tab.is-active) { background: var(--md-sys-color-primary) !important; color: var(--md-sys-color-on-primary) !important; border-radius: 20px !important; }
+.panel-route .vdd-settings-wrapper { color: var(--md-sys-color-on-surface); font-family: var(--md-ref-typeface-brand); }
+.panel-route .vdd-settings-wrapper :is(p, span, label, small, dt, dd) { color: inherit; }
+.panel-route .vdd-settings-wrapper :is(.overview-label, .header-subtitle, .section-header p, .overview-hint, .form-tip, .page-header-meta) { color: var(--md-sys-color-on-surface-variant) !important; }
+.panel-route .vdd-settings-wrapper :is(.overview-value) { color: var(--md-sys-color-on-surface) !important; }
+.panel-route .page-header-actions { padding-right: 112px; }

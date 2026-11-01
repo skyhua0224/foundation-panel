@@ -1,76 +1,70 @@
-<!--
-  One setting row: label, control, and a reset button that only shows once the
-  value differs from the host's default. Sliders keep their value readout at the
-  end of the row. The control kind follows the host descriptor (slider, toggle,
-  segmented, menu, curve, chips); slider semantics stay on the native range input.
--->
 <template>
   <div
-    class="ds5t-row"
-    :class="['kind-' + kind, { 'is-disabled': disabled, 'is-modified': modified }]"
+    class="m-item m-tuning"
+    :class="['kind-' + kind, { 'm-item--stack': stacked, 'm-item--plain': true, 'is-disabled': disabled, 'is-modified': modified }]"
     :title="disabled ? tr('pending.reason') : null"
   >
-    <label :id="labelId" :for="hasInput ? fieldId : null" class="ds5t-row-label">
-      <span>{{ fieldLabel }}</span>
-      <span v-if="descriptor.expert" class="ds5t-tag">{{ tr('expert') }}</span>
-    </label>
-
-    <div class="ds5t-row-control">
-      <div v-if="kind === 'slider'" class="ds5t-slider">
-        <input
-          :id="fieldId"
-          class="ds5t-range"
-          type="range"
-          :min="sliderMin"
-          :max="sliderMax"
-          :step="sliderStep"
-          :value="sliderValue"
-          :style="{ '--p': sliderPercent + '%' }"
-          :disabled="disabled"
-          @input="onSliderInput"
-          @dblclick="$emit('reset')"
-        />
-        <output class="ds5t-value" :for="fieldId">{{ displayValue }}</output>
-      </div>
-
-      <input
+    <div class="m-item__body">
+      <label :id="labelId" :for="hasInput ? fieldId : null" class="m-item__title">
+        <span>{{ fieldLabel }}</span>
+        <span v-if="descriptor.expert" class="m-chip m-chip--warn m-tuning__tag">{{ tr('expert') }}</span>
+      </label>
+    </div>
+    <div class="m-item__trail">
+      <output v-if="kind === 'slider'" class="m-slider-value" :for="fieldId">{{ displayValue }}</output>
+      <md-switch
         v-else-if="kind === 'toggle'"
         :id="fieldId"
-        class="ds5t-switch"
-        type="checkbox"
-        role="switch"
-        :checked="modelValue === true"
+        :selected="modelValue === true"
         :disabled="disabled"
-        @change="$emit('update:modelValue', $event.target.checked)"
+        :aria-labelledby="labelId"
+        @change="$emit('update:modelValue', $event.target.selected)"
       />
-
-      <div v-else-if="kind === 'segmented'" class="ds5t-segmented" role="radiogroup" :aria-labelledby="labelId">
-        <button
-          v-for="option in descriptor.enum_names"
-          :key="option"
-          type="button"
-          class="ds5t-segment"
-          :class="{ selected: isSelected(option) }"
-          role="radio"
-          :aria-checked="isSelected(option)"
-          :disabled="disabled"
-          @click="selectValue(option)"
-        >
-          {{ optionLabel(option) }}
-        </button>
-      </div>
-
-      <select
+      <md-outlined-select
         v-else-if="kind === 'select'"
         :id="fieldId"
-        class="ds5t-select"
+        class="m-tuning__select"
         :value="selectedOption"
         :disabled="disabled"
+        :aria-labelledby="labelId"
         @change="selectValue($event.target.value)"
       >
-        <option v-for="option in descriptor.enum_names" :key="option" :value="option">{{ optionLabel(option) }}</option>
-      </select>
-
+        <md-select-option v-for="option in descriptor.enum_names" :key="option" :value="option" :selected="option === selectedOption">
+          <div slot="headline">{{ optionLabel(option) }}</div>
+        </md-select-option>
+      </md-outlined-select>
+      <button
+        type="button"
+        class="m-icon-btn m-tuning__reset"
+        :class="{ shown: modified && !disabled }"
+        :title="tr('reset_key')"
+        :aria-label="tr('reset_key')"
+        :tabindex="modified && !disabled ? 0 : -1"
+        @click="$emit('reset')"
+      ><MIcon name="restart_alt" /></button>
+    </div>
+    <div v-if="stacked" class="m-item__control">
+      <md-slider
+        v-if="kind === 'slider'"
+        :id="fieldId"
+        :min="sliderMin"
+        :max="sliderMax"
+        :step="sliderStep"
+        :value="sliderValue"
+        :disabled="disabled"
+        :aria-labelledby="labelId"
+        @input="onSliderInput"
+        @dblclick="$emit('reset')"
+      />
+      <MSeg
+        v-else-if="kind === 'segmented'"
+        block
+        :label="fieldLabel"
+        :model-value="selectedOption"
+        :options="descriptor.enum_names.map((name) => ({ value: name, label: optionLabel(name) }))"
+        :disabled="disabled"
+        @update:model-value="selectValue"
+      />
       <TuningCurve
         v-else-if="kind === 'curve'"
         :model-value="String(modelValue)"
@@ -78,38 +72,23 @@
         :disabled="disabled"
         @update:model-value="$emit('update:modelValue', $event)"
       />
-
-      <div v-else-if="kind === 'chips'" class="ds5t-chips" role="group" :aria-labelledby="labelId">
+      <div v-else-if="kind === 'chips'" class="m-tuning__chips" role="group" :aria-labelledby="labelId">
         <button
           v-for="chip in chips"
           :key="chip.name"
           type="button"
-          class="ds5t-chip"
-          :class="{ selected: chip.checked }"
+          class="m-tuning__chip"
           :aria-pressed="chip.checked"
           :disabled="disabled"
           @click="toggleChip(chip)"
-        >
-          {{ optionLabel(chip.name) }}
-        </button>
+        >{{ optionLabel(chip.name) }}</button>
       </div>
     </div>
-
-    <button
-      type="button"
-      class="ds5t-row-reset"
-      :class="{ shown: modified && !disabled }"
-      :title="tr('reset_key')"
-      :aria-label="tr('reset_key')"
-      :tabindex="modified && !disabled ? 0 : -1"
-      @click="$emit('reset')"
-    >
-      <el-icon><RefreshLeft /></el-icon>
-    </button>
   </div>
 </template>
 
 <script setup>
+import { MIcon, MSeg } from 'foundation-ui/vue'
 import { computed } from 'vue'
 import { RefreshLeft } from '@element-plus/icons-vue'
 import TuningCurve from './TuningCurve.vue'
@@ -164,6 +143,7 @@ const kind = computed(() => {
 })
 const hasInput = computed(() => ['slider', 'toggle', 'select'].includes(kind.value))
 
+const stacked = computed(() => ['slider', 'segmented', 'curve', 'chips'].includes(kind.value))
 const displayValue = computed(() => formatValue(props.descriptor, props.modelValue))
 const modified = computed(() => isModified(props.descriptor, props.modelValue))
 
@@ -240,293 +220,4 @@ const toggleChip = (chip) => {
 }
 </script>
 
-<style scoped>
-.ds5t-row {
-  display: grid;
-  grid-template-columns: var(--ds5t-row-cols);
-  align-items: center;
-  column-gap: var(--ds5t-row-gap);
-  min-height: var(--ds5t-row-height);
-  padding: var(--ds5t-row-pad) 0;
-}
 
-.ds5t-row-label {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  margin: 0;
-  color: var(--ds5t-text);
-  font-size: 0.875rem;
-  font-weight: 500;
-  line-height: 1.3;
-}
-
-.ds5t-tag {
-  border-radius: 999px;
-  background: var(--ds5t-danger-soft);
-  color: var(--ds5t-danger-text);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  line-height: 1;
-  padding: 0.2rem 0.4rem;
-  white-space: nowrap;
-}
-
-.ds5t-row-control {
-  display: flex;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
-.ds5t-row-reset {
-  display: grid;
-  place-items: center;
-  width: 1.5rem;
-  height: 1.5rem;
-  padding: 0;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ds5t-muted);
-  font-size: 0.8125rem;
-  opacity: 0;
-  pointer-events: none;
-  cursor: pointer;
-  transition: opacity 120ms ease, background-color 120ms ease, color 120ms ease;
-}
-
-.ds5t-row-reset.shown {
-  opacity: 1;
-  pointer-events: auto;
-}
-
-.ds5t-row-reset:hover,
-.ds5t-row-reset:focus-visible {
-  background: var(--ds5t-hover);
-  color: var(--ds5t-text);
-}
-
-.ds5t-row-reset:focus-visible,
-.ds5t-range:focus-visible,
-.ds5t-switch:focus-visible,
-.ds5t-segment:focus-visible,
-.ds5t-chip:focus-visible,
-.ds5t-select:focus-visible {
-  outline: 2px solid var(--ds5t-accent);
-  outline-offset: 2px;
-}
-
-/* Slider */
-.ds5t-slider {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--ds5t-value-w);
-  align-items: center;
-  column-gap: 0.75rem;
-  width: 100%;
-}
-
-.ds5t-value {
-  color: var(--ds5t-text);
-  font-size: 0.8125rem;
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
-}
-
-.ds5t-range {
-  appearance: none;
-  width: 100%;
-  height: 1.25rem;
-  margin: 0;
-  background: transparent;
-  cursor: pointer;
-}
-
-.ds5t-range::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 999px;
-  background: linear-gradient(to right, var(--ds5t-accent) var(--p, 0%), var(--ds5t-track) var(--p, 0%));
-}
-
-.ds5t-range::-webkit-slider-thumb {
-  appearance: none;
-  width: 14px;
-  height: 14px;
-  margin-top: -5px;
-  border: 1.5px solid var(--ds5t-accent);
-  border-radius: 50%;
-  background: var(--ds5t-thumb);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
-}
-
-/* Switch */
-.ds5t-switch {
-  appearance: none;
-  position: relative;
-  flex: none;
-  width: 2.25rem;
-  height: 1.3125rem;
-  margin: 0;
-  border-radius: 999px;
-  background: var(--ds5t-track);
-  cursor: pointer;
-  transition: background-color 140ms ease;
-}
-
-.ds5t-switch::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: calc(1.3125rem - 4px);
-  height: calc(1.3125rem - 4px);
-  border-radius: 50%;
-  background: var(--ds5t-thumb);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
-  transition: transform 140ms ease;
-}
-
-.ds5t-switch:checked {
-  background: var(--ds5t-accent);
-}
-
-.ds5t-switch:checked::after {
-  transform: translateX(0.9375rem);
-}
-
-/* Segmented control */
-.ds5t-segmented {
-  display: inline-flex;
-  max-width: 100%;
-  padding: 2px;
-  border-radius: var(--ds5t-control-radius);
-  background: var(--ds5t-segment-bg);
-}
-
-.ds5t-segment {
-  min-width: 3.25rem;
-  height: 1.75rem;
-  padding: 0 0.75rem;
-  border: 0;
-  border-radius: calc(var(--ds5t-control-radius) - 2px);
-  background: transparent;
-  color: var(--ds5t-muted);
-  font-size: 0.8125rem;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background-color 120ms ease, color 120ms ease;
-}
-
-.ds5t-segment:hover:not(:disabled):not(.selected) {
-  color: var(--ds5t-text);
-}
-
-.ds5t-segment.selected {
-  background: var(--ds5t-accent);
-  color: var(--ds5t-on-accent);
-}
-
-/* Select */
-.ds5t-select {
-  height: 2rem;
-  min-width: 9rem;
-  max-width: 100%;
-  padding: 0 1.75rem 0 0.7rem;
-  border: 1px solid var(--ds5t-border);
-  border-radius: var(--ds5t-control-radius);
-  background-color: var(--ds5t-input-bg);
-  color: var(--ds5t-text);
-  font-size: 0.8125rem;
-}
-
-/* Chips */
-.ds5t-chips {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 0.35rem;
-}
-
-.ds5t-chip {
-  height: 1.75rem;
-  padding: 0 0.7rem;
-  border: 1px solid var(--ds5t-border);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ds5t-muted);
-  font-size: 0.8125rem;
-  cursor: pointer;
-}
-
-.ds5t-chip.selected {
-  border-color: var(--ds5t-accent);
-  background: var(--ds5t-accent);
-  color: var(--ds5t-on-accent);
-}
-
-/* Unavailable rows read as quiet, not as errors. */
-.is-disabled .ds5t-row-label {
-  color: var(--ds5t-muted);
-}
-
-.is-disabled .ds5t-row-control {
-  opacity: 0.55;
-}
-
-.is-disabled .ds5t-range,
-.is-disabled .ds5t-switch,
-.is-disabled .ds5t-segment,
-.is-disabled .ds5t-chip,
-.is-disabled .ds5t-select {
-  cursor: default;
-}
-
-/* Blocks that need the full width sit under their label. */
-.kind-curve,
-.kind-chips {
-  grid-template-areas:
-    'label reset'
-    'control control';
-  grid-template-columns: minmax(0, 1fr) 1.5rem;
-  row-gap: 0.5rem;
-}
-
-.kind-curve .ds5t-row-label,
-.kind-chips .ds5t-row-label {
-  grid-area: label;
-}
-
-.kind-curve .ds5t-row-control,
-.kind-chips .ds5t-row-control {
-  grid-area: control;
-  justify-content: flex-start;
-}
-
-.kind-curve .ds5t-row-reset,
-.kind-chips .ds5t-row-reset {
-  grid-area: reset;
-}
-
-/* A narrow card puts the control under the label. */
-@container ds5t-card (max-width: 26rem) {
-  .ds5t-row {
-    grid-template-areas:
-      'label reset'
-      'control control';
-    grid-template-columns: minmax(0, 1fr) 1.5rem;
-    row-gap: 0.4rem;
-  }
-
-  .ds5t-row-label { grid-area: label; }
-  .ds5t-row-control { grid-area: control; justify-content: flex-start; }
-  .ds5t-row-reset { grid-area: reset; }
-  .kind-toggle {
-    grid-template-areas: 'label control reset';
-    grid-template-columns: minmax(0, 1fr) auto 1.5rem;
-    column-gap: var(--ds5t-row-gap);
-  }
-
-  .kind-toggle .ds5t-row-control { justify-content: flex-end; }
-}
-</style>

@@ -10,6 +10,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 const rendererSrcPath = join(__dirname, 'src', 'renderer')
+const foundationUi = process.env.FOUNDATION_UI_DIR || join(__dirname, '..', 'ds5-ui-m3e')
 
 /**
  * https://vitejs.dev/config
@@ -51,7 +52,7 @@ export default defineConfig(() => ({
     },
   },
   plugins: [
-    vuePlugin(),
+    vuePlugin({ template: { compilerOptions: { isCustomElement: (tag) => tag.startsWith('md-') } } }),
     Components({
       dts: false,
       resolvers: [
@@ -62,9 +63,15 @@ export default defineConfig(() => ({
     }),
   ],
   resolve: {
-    alias: {
-      '@': rendererSrcPath,
-    },
+    // foundation-ui is the shared Material 3 Expressive package (sibling checkout); Vue must stay a single copy.
+    dedupe: ['vue'],
+    alias: [
+      { find: '@', replacement: rendererSrcPath },
+      { find: /^foundation-ui\/vue$/, replacement: join(foundationUi, 'src/vue/index.js') },
+      { find: /^foundation-ui\/all\.css$/, replacement: join(foundationUi, 'src/css/all.css') },
+      { find: /^foundation-ui\/(.*)$/, replacement: join(foundationUi, 'src/$1') },
+      { find: /^vue$/, replacement: join(__dirname, 'node_modules/vue/dist/vue.runtime.esm-bundler.js') },
+    ],
   },
   define: {
     // 根据构建模式设置环境变量

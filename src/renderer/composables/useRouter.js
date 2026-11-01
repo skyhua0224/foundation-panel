@@ -15,6 +15,16 @@ export const ROUTES = {
   TOOLBOX: 'toolbox',
   PANEL_SETTINGS: 'panel-settings',
   HELP: 'help',
+  // Task-based destinations (see docs/redesign): four categories and the pages below them.
+  CAT_STREAM: 'cat-stream',
+  CAT_INPUT: 'cat-input',
+  CAT_DISPLAY: 'cat-display',
+  CAT_SYSTEM: 'cat-system',
+  GAMEPAD: 'gamepad',
+  MICROPHONE: 'microphone',
+  USB: 'usb',
+  COMPONENTS: 'components',
+  DIAGNOSTICS: 'diagnostics',
 }
 
 /**
@@ -59,6 +69,15 @@ const routeConfig = {
   [ROUTES.TOOLBOX]: { name: ROUTES.TOOLBOX, component: 'ControlPanelPage', titleKey: 'toolbox' },
   [ROUTES.PANEL_SETTINGS]: { name: ROUTES.PANEL_SETTINGS, component: 'ControlPanelPage', titleKey: 'panelSettings' },
   [ROUTES.HELP]: { name: ROUTES.HELP, component: 'ControlPanelPage', titleKey: 'helpAbout' },
+  [ROUTES.CAT_STREAM]: { name: ROUTES.CAT_STREAM, component: 'CategoryPage', titleKey: 'stream' },
+  [ROUTES.CAT_INPUT]: { name: ROUTES.CAT_INPUT, component: 'CategoryPage', titleKey: 'deviceHub' },
+  [ROUTES.CAT_DISPLAY]: { name: ROUTES.CAT_DISPLAY, component: 'CategoryPage', titleKey: 'virtualDisplay' },
+  [ROUTES.CAT_SYSTEM]: { name: ROUTES.CAT_SYSTEM, component: 'CategoryPage', titleKey: 'toolbox' },
+  [ROUTES.GAMEPAD]: { name: ROUTES.GAMEPAD, component: 'GamepadPage', titleKey: 'deviceHub' },
+  [ROUTES.MICROPHONE]: { name: ROUTES.MICROPHONE, component: 'MicrophonePage', titleKey: 'deviceHub' },
+  [ROUTES.USB]: { name: ROUTES.USB, component: 'UsbPage', titleKey: 'deviceHub' },
+  [ROUTES.COMPONENTS]: { name: ROUTES.COMPONENTS, component: 'ComponentsPage', titleKey: 'deviceHub' },
+  [ROUTES.DIAGNOSTICS]: { name: ROUTES.DIAGNOSTICS, component: 'DiagnosticsPage', titleKey: 'toolbox' },
 }
 
 /**

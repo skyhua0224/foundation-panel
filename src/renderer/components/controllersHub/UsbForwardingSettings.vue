@@ -1,44 +1,34 @@
 <template>
-  <div class="chub-section usb-forwarding-settings">
-    <div class="chub-section-head">
-      <span class="chub-section-label">◈ {{ text.forwardingTitle }}</span>
-      <span class="chub-section-rule"></span>
-    </div>
-    <p class="chub-hint">{{ text.forwardingHint }}</p>
-    <div v-if="loading" role="status" :aria-label="text.loadingConfig">
-      <el-skeleton :rows="2" animated />
-    </div>
-    <template v-else-if="loadError">
-      <el-alert class="chub-notice" type="error" :closable="false" :title="text.loadConfigFailed" />
-      <el-button size="small" @click="load">{{ text.retryLoad }}</el-button>
-    </template>
-    <el-alert v-else-if="!supported" class="chub-notice" type="info" :closable="false" :title="text.updateHost" />
+  <MSection :title="text.forwardingTitle" :description="text.forwardingHint">
+    <MSkeleton v-if="loading" :rows="2" role="status" :aria-label="text.loadingConfig" />
+    <MNotice v-else-if="loadError" tone="error" :title="text.loadConfigFailed">
+      <template #action><MButton size="sm" @click="load">{{ text.retryLoad }}</MButton></template>
+    </MNotice>
+    <MNotice v-else-if="!supported">{{ text.updateHost }}</MNotice>
     <template v-else>
-      <div class="forwarding-row">
-        <label for="usb-forwarding-enabled">{{ text.allowClients }}</label>
-        <el-switch id="usb-forwarding-enabled" v-model="enabled" :disabled="saving" :aria-label="text.allowClients" />
+      <MGroup>
+        <MSwitchItem v-model="enabled" icon="usb" :title="text.allowClients" :text="enabled && !transportReady ? text.prepareTransport : ''" :disabled="saving" />
+        <MItem action icon="settings_ethernet" :title="text.advancedPort" :text="portOpen ? '' : (port ? String(port) : text.autoPortHint)" @click="portOpen = !portOpen">
+          <template #trail><MIcon :name="portOpen ? 'keyboard_arrow_up' : 'keyboard_arrow_down'" /></template>
+        </MItem>
+        <MItem v-if="portOpen" plain :title="text.forwardingPort" :text="validPort ? text.autoPortHint : ''">
+          <template #trail>
+            <md-outlined-text-field class="m-port-field" type="number" min="0" max="65535" :value="port" :error="!validPort" :disabled="saving" :aria-label="text.forwardingPort" @input="port = Number($event.target.value)" />
+          </template>
+        </MItem>
+      </MGroup>
+      <p v-if="!validPort" aria-live="polite" class="m-section__desc" style="color: var(--md-sys-color-error)">{{ text.invalidForwardingPort }}</p>
+      <MNotice v-if="saveError" tone="error" :title="text.saveConfigFailed" />
+      <div class="m-actions-row">
+        <MButton :loading="saving" :disabled="!dirty || !validPort || saving" @click="save">{{ text.saveConfig }}</MButton>
+        <span class="m-muted m-small">{{ text.restartHint }}</span>
       </div>
-      <p v-if="enabled && !transportReady" class="chub-hint">{{ text.prepareTransport }}</p>
-      <details class="chub-disclosure chub-disclosure--inline">
-        <summary>{{ text.advancedPort }}<span class="chub-disclosure-mark" aria-hidden="true">▸</span></summary>
-        <label class="forwarding-row" for="usb-forwarding-port">
-          <span>{{ text.forwardingPort }}</span>
-          <el-input-number id="usb-forwarding-port" v-model="port" :min="0" :max="65535"
-            :controls="false" :disabled="saving" :aria-label="text.forwardingPort" />
-        </label>
-        <p class="chub-hint">{{ text.autoPortHint }}</p>
-      </details>
-      <p v-if="!validPort" aria-live="polite" class="chub-status-error">{{ text.invalidForwardingPort }}</p>
-      <div class="forwarding-actions">
-        <el-button type="primary" :loading="saving" :disabled="!dirty || !validPort || saving" @click="save">{{ text.saveConfig }}</el-button>
-        <span class="chub-hint">{{ text.restartHint }}</span>
-      </div>
-      <el-alert v-if="saveError" class="chub-notice" type="error" :closable="false" :title="text.saveConfigFailed" />
     </template>
-  </div>
+  </MSection>
 </template>
 
 <script setup>
+import { MSection, MGroup, MItem, MSwitchItem, MNotice, MButton, MIcon, MSkeleton } from 'foundation-ui/vue'
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { usbip } from '../../tauri-adapter.js'
@@ -53,6 +43,7 @@ const supported = ref(false)
 const saving = ref(false)
 const saveError = ref(false)
 const enabled = ref(false)
+const portOpen = ref(false)
 const port = ref(0)
 const baseline = ref({ enabled: false, port: 0 })
 const dirty = computed(() => enabled.value !== baseline.value.enabled || port.value !== baseline.value.port)
@@ -93,7 +84,3 @@ async function save() {
 onMounted(load)
 </script>
 
-<style scoped>
-.forwarding-row, .forwarding-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 12px 0; }
-.forwarding-actions { justify-content: flex-start; }
-</style>

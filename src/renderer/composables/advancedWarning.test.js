@@ -82,10 +82,10 @@ test('both advanced entries ask first and never restore past the warning', async
   assert.equal((settings.match(/advancedOpen\.value = true/g) ?? []).length, 2)
   assert.match(settings, /<AdvancedWarningDialog[\s\S]*?@confirm="confirmAdvancedWarning"/)
 
-  const pane = await readFile(new URL('../components/controllersHub/ControllersPane.vue', import.meta.url), 'utf8')
-  assert.match(pane, /<AdvancedWarningDialog[\s\S]*?scope="emulation"/)
-  assert.match(pane, /isAdvancedWarningHidden/)
-  // el-collapse opens itself on click, so the gate has to be its before-collapse hook.
-  assert.match(pane, /:before-collapse="beforeAdvancedToggle"/)
-  assert.match(pane, /function beforeAdvancedToggle\(\) \{[\s\S]*?return false\n\}/)
+  const page = await readFile(new URL('../components/m3e/GamepadPage.vue', import.meta.url), 'utf8')
+  assert.match(page, /<AdvancedWarningDialog[\s\S]*?scope="emulation"/)
+  const emulationToggle = page.match(/function toggleEmulation\(\) \{[\s\S]*?\n\}\n/)?.[0] ?? ''
+  assert.ok(emulationToggle.indexOf('isAdvancedWarningHidden') > 0)
+  assert.ok(emulationToggle.indexOf('isAdvancedWarningHidden') < emulationToggle.indexOf('advancedOpen.value = true'))
+  assert.match(emulationToggle, /warningOpen\.value = true/)
 })

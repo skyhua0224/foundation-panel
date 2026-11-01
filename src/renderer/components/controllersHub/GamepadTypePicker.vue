@@ -1,88 +1,49 @@
 <template>
-  <div class="chub-type-picker">
-    <p class="chub-question">{{ t.controllersHub.emulation.typeQuestion }}</p>
-
-    <el-alert
-      v-if="unreachable"
-      class="chub-notice"
-      type="error"
-      :title="t.controllersHub.emulation.sunshineUnreachable"
-      show-icon
-      :closable="false"
-    >
-      <el-button size="small" type="primary" :loading="loading" @click="loadConfig">
-        {{ t.controllersHub.emulation.retry }}
-      </el-button>
-    </el-alert>
-
-    <div v-else v-loading="loading" class="chub-picker-row">
-      <div class="chub-mode-list" role="radiogroup" :aria-label="t.controllersHub.emulation.typeQuestion">
-        <button
+  <MSection :title="t.controllersHub.emulation.typeQuestion">
+    <MNotice v-if="unreachable" tone="error" :title="t.controllersHub.emulation.sunshineUnreachable">
+      <template #action><MButton size="sm" :loading="loading" @click="loadConfig">{{ t.controllersHub.emulation.retry }}</MButton></template>
+    </MNotice>
+    <template v-else>
+      <MSkeleton v-if="loading && !config" :rows="4" />
+      <MGroup v-else role="radiogroup" :aria-label="t.controllersHub.emulation.typeQuestion">
+        <MItem
           v-for="option in modeOptions"
           :key="option.value"
-          type="button"
-          class="chub-mode-option"
-          :class="{ 'is-selected': selectedMode === option.value }"
-          role="radio"
-          :aria-checked="selectedMode === option.value"
+          action
+          :selected="selectedMode === option.value"
           :disabled="busyKey !== ''"
+          :icon="MODE_ICON[option.value]"
+          :title="option.label"
+          :text="option.hint"
+          role="radio"
           @click="selectedMode = option.value"
-        >
-          <span class="chub-mode-cursor" aria-hidden="true">●</span>
-          <span class="chub-mode-body">
-            <strong>{{ option.label }}</strong>
-            <small>{{ option.hint }}</small>
-          </span>
-        </button>
-      </div>
-    </div>
-
-    <el-collapse v-if="!unreachable" class="chub-advanced">
-      <el-collapse-item
-        name="perGame"
-        :title="t.controllersHub.emulation.perAppTitle"
-      >
-        <p class="chub-hint">{{ t.controllersHub.emulation.perAppHint }}</p>
-        <el-alert
-          v-if="appsError"
-          class="chub-notice"
-          type="error"
-          :title="t.controllersHub.emulation.appLoadFailed"
-          show-icon
-          :closable="false"
-        >
-          <el-button size="small" :loading="appsLoading" @click="loadApps">
-            {{ t.controllersHub.emulation.retry }}
-          </el-button>
-        </el-alert>
-        <div v-else v-loading="appsLoading" class="chub-app-list">
-          <div v-for="(app, index) in apps" :key="app.name + index" class="chub-app-row">
-            <span class="chub-app-name">{{ app.name }}</span>
-            <el-select
-              :model-value="app.gamepad || ''"
-              size="small"
-              class="chub-app-select"
-              :disabled="appSavingIndex === index"
-              @change="(value) => saveAppGamepad(index, value)"
-            >
-              <el-option
-                v-for="opt in appModeOptions"
-                :key="opt.value"
-                :value="opt.value"
-                :label="opt.label"
-              />
-            </el-select>
-          </div>
-          <p v-if="!appsLoading && apps.length === 0" class="chub-hint">
-            {{ t.controllersHub.emulation.noApps }}
-          </p>
-        </div>
-      </el-collapse-item>
-    </el-collapse>
-  </div>
+        />
+      </MGroup>
+      <MGroup>
+        <MItem action icon="tune" :title="t.controllersHub.emulation.perAppTitle" :text="t.controllersHub.emulation.perAppHint" :aria-expanded="perAppOpen" @click="togglePerApp">
+          <template #trail><MIcon :name="perAppOpen ? 'keyboard_arrow_up' : 'keyboard_arrow_down'" /></template>
+        </MItem>
+        <template v-if="perAppOpen">
+          <MItem v-if="appsError" plain :title="t.controllersHub.emulation.appLoadFailed">
+            <template #trail><MButton size="sm" :loading="appsLoading" @click="loadApps">{{ t.controllersHub.emulation.retry }}</MButton></template>
+          </MItem>
+          <MItem v-else-if="appsLoading" plain :title="t.controllersHub.emulation.perAppTitle"><template #trail><MLoading size="28px" /></template></MItem>
+          <MItem v-else-if="apps.length === 0" plain :title="t.controllersHub.emulation.noApps" />
+          <MItem v-for="(app, index) in apps" :key="app.name + index" plain :title="app.name">
+            <template #trail>
+              <md-outlined-select class="m-tuning__select" :value="app.gamepad || ''" :disabled="appSavingIndex === index" @change="saveAppGamepad(index, $event.target.value)">
+                <md-select-option v-for="opt in appModeOptions" :key="opt.value" :value="opt.value" :selected="opt.value === (app.gamepad || '')"><div slot="headline">{{ opt.label }}</div></md-select-option>
+              </md-outlined-select>
+            </template>
+          </MItem>
+        </template>
+      </MGroup>
+    </template>
+  </MSection>
 </template>
 
 <script setup>
+import { MSection, MGroup, MItem, MNotice, MButton, MIcon, MLoading, MSkeleton } from 'foundation-ui/vue'
 import { computed, onMounted, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { sunshine } from '../../tauri-adapter.js'
@@ -104,6 +65,9 @@ let proxyUrl = ''
 let appsRequestId = 0
 
 const busyKey = ref('')
+const MODE_ICON = { auto: 'wand_stars', x360: 'sports_esports', ds4: 'sports_esports', ds5: 'sports_esports' }
+const perAppOpen = ref(false)
+const togglePerApp = () => { perAppOpen.value = !perAppOpen.value; if (perAppOpen.value && !apps.value.length && !appsLoading.value) loadApps() }
 
 const modeOptions = computed(() => {
   const e = t.value.controllersHub.emulation

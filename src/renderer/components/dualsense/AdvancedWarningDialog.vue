@@ -1,34 +1,18 @@
-<!--
-  Warning before an advanced controller section opens: says plainly what a wrong
-  value can do, keeps the confirm button locked for a few seconds, and offers a
-  per-panel opt-out. The caller supplies the sentences for its own section.
--->
 <template>
-  <el-dialog
-    :model-value="show"
-    :title="warning.title"
-    width="min(540px, 92vw)"
-    class="ds5t-warning"
-    align-center
-    append-to-body
-    @update:model-value="(open) => { if (!open) emit('cancel') }"
-  >
-    <p class="ds5t-warning-intro">{{ copy.intro }}</p>
-    <ul class="ds5t-warning-list">
-      <li v-for="risk in copy.risks" :key="risk">{{ risk }}</li>
-    </ul>
-    <p class="ds5t-warning-outro">{{ copy.outro }}</p>
-    <el-checkbox v-model="dontShow">{{ warning.dont_show }}</el-checkbox>
-    <template #footer>
-      <el-button @click="emit('cancel')">{{ t.common.cancel }}</el-button>
-      <el-button type="warning" :disabled="!ready" @click="confirm">
-        {{ ready ? warning.confirm : formatText(warning.confirm_wait, { seconds }) }}
-      </el-button>
+  <MDialog :model-value="show" :title="warning.title" icon="warning" @update:model-value="(open) => { if (!open) emit('cancel') }" @cancel="emit('cancel')">
+    <p>{{ copy.intro }}</p>
+    <ul><li v-for="risk in copy.risks" :key="risk">{{ risk }}</li></ul>
+    <p>{{ copy.outro }}</p>
+    <label class="m-dialog__check"><md-checkbox touch-target="wrapper" :checked="dontShow" @change="dontShow = $event.target.checked" />{{ warning.dont_show }}</label>
+    <template #actions>
+      <MButton variant="text" @click="emit('cancel')">{{ t.common.cancel }}</MButton>
+      <MButton variant="warning" :disabled="!ready" @click="confirm">{{ ready ? warning.confirm : formatText(warning.confirm_wait, { seconds }) }}</MButton>
     </template>
-  </el-dialog>
+  </MDialog>
 </template>
 
 <script setup>
+import { MDialog, MButton } from 'foundation-ui/vue'
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from '../../desktop/i18n/index.js'
 import { formatText } from '../../composables/dualsenseText.js'
@@ -80,28 +64,3 @@ const confirm = () => {
 }
 </script>
 
-<style lang="less">
-.ds5t-warning {
-  .ds5t-warning-intro,
-  .ds5t-warning-list,
-  .ds5t-warning-outro {
-    color: var(--el-text-color-primary);
-  }
-
-  .ds5t-warning-intro,
-  .ds5t-warning-outro {
-    margin: 0 0 0.75rem;
-    line-height: 1.6;
-  }
-
-  .ds5t-warning-list {
-    margin: 0 0 0.75rem;
-    padding-left: 1.25rem;
-    line-height: 1.6;
-
-    li + li {
-      margin-top: 0.4rem;
-    }
-  }
-}
-</style>

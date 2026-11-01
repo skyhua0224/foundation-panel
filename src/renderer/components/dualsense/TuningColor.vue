@@ -3,7 +3,7 @@
   row edits them together through swatches, the system colour picker or a hex code.
 -->
 <template>
-  <div class="ds5t-row ds5t-color-row" :class="{ 'is-quiet': mode !== 'fixed' }">
+  <div class="m-item m-item--plain ds5t-color-row" :class="{ 'is-quiet': mode !== 'fixed' }">
     <span :id="labelId" class="ds5t-row-label">{{ tr('color.label') }}</span>
 
     <div v-if="mode === 'fixed'" class="ds5t-row-control">
