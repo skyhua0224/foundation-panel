@@ -43,7 +43,7 @@ const modeLabel = computed(() => pad.modeOptions.value.find((o) => o.value === (
 const micBackend = ref('')
 const micConfigured = computed(() => micBackend.value || props.runtime.mic?.configured_backend || '')
 const micEnabled = computed(() => micConfigured.value !== 'disabled')
-const vddKeep = computed((() => state.config?.vdd_keep_enabled === 'enabled')
+const vddKeep = computed(() => state.config?.vdd_keep_enabled === 'enabled')
 const vddReady = computed(() => !!state.vdd && (state.vdd.installed !== false))
 
 const coverOf = (a) => {
