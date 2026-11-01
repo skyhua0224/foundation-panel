@@ -254,7 +254,8 @@ export const zh = {
     gamepadCursor: '手柄光标模式',
     gamepadCursorDesc: '按左摇杆键用左摇杆驱动虚拟指针，覆盖尚未适配空间导航的页面',
     oskAutoOpen: '自动弹出屏幕键盘',
-    oskAutoOpenDesc: '焦点在文本框上按 A 时打开屏幕键盘',
+    oskAutoOpenDesc: '焦点在文本框上按 A 时打开屏幕键盘',
+
     navSounds: '手柄导航音效',
     navSoundsDesc: '焦点移动和确认/返回时的轻微提示音',
     launchAssistant: '启动助手',
@@ -1334,7 +1335,7 @@ export const zh = {
       inputDrivers: '其他输入驱动',
       transportTitle: '共享 USB 驱动',
       transportHint: 'USB/IP 供 DualSense 原生通道和 USB 透传共用。已有兼容版本会直接复用，控制面板只在你确认后安装。',
-      managementHint: '这里管理 USB/IP 传输和其他输入驱动。DualSense 已内置在 Sunshine 中，无需安装模拟组件。',
+      managementHint: '这里管理 USB/IP 传输和其他输入驱动。DualSense 已内置在 Sunshine 中。',
       manage: '管理传输与驱动',
       manageTransport: '安装或修复共享 USB 驱动',
       optional: '尚未就绪',
@@ -1357,7 +1358,7 @@ export const zh = {
     "refresh": "刷新",
     "status": {
       "heading": "原生 DualSense",
-      "intro": "Sunshine 已把 DualSense 支持内置到主机里，不再需要单独安装模拟组件。这里显示的是主机和系统的实际状态。",
+      "intro": "DualSense 支持已内置在 Sunshine 主机中。这里显示的是主机和系统的实际状态。",
       "loading": "正在读取状态…",
       "states": {
         "ready": "已就绪",
