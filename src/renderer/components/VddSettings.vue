@@ -1024,7 +1024,7 @@ onUnmounted(() => {
 
 <style>
 .m-vdd-badges { display: flex; flex-wrap: wrap; gap: 8px; }
-.m-tiles--static { --m-cols: 2; grid-auto-rows: minmax(104px, auto); }
+.m-tiles--static { --m-cols: 2; grid-auto-rows: minmax(104px, auto); min-height: 0; max-height: none; }
 .m-chips-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .m-chips-edit--suggest { margin-top: 8px; }
 .m-chip--x { padding-right: 4px; } .m-chip--x button { display: inline-grid; place-items: center; width: 20px; height: 20px; border: 0; border-radius: 50%; padding: 0; background: transparent; color: inherit; cursor: pointer; font-size: 14px; } .m-chip--x button:hover { background: color-mix(in srgb, currentColor 14%, transparent); }
