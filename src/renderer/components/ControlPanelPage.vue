@@ -55,6 +55,7 @@
       <MSection>
         <MGroup>
           <MItem action icon="public" :title="t.sidebar.officialWebsite" text="AlkaidLab" @click="actions.openUrl('https://www.alkaidlab.com/')"><template #trail><MIcon name="open_in_new" /></template></MItem>
+          <MItem action icon="checklist" :title="startText.guideTitle" :text="startText.guideSub" @click="startCard.reopen()" />
           <MItem action icon="bug_report" :title="t.sidebar.diagnostics" :text="t.sidebar.diagnosticsDescription" @click="emit('webui-navigate', '/troubleshooting')" />
         </MGroup>
         <MFooter>Foundation Sunshine · {{ currentVersion }}</MFooter>
@@ -70,7 +71,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MPromo, MFooter, MSheet, guideTexts } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MPromo, MFooter, MSheet, guideTexts, homeTexts, useGuideCard } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { ROUTES } from '../composables/useRouter.js'
@@ -89,6 +90,9 @@ const emit = defineEmits(['theme-change', 'locale-change', 'channel-change', 'we
 const { t } = useI18n()
 // The guided first run can be opened again from here; its texts come with the package (zh and en)
 const guide = computed(() => guideTexts(props.locale))
+// the get started card of the overview comes back from here
+const startText = computed(() => homeTexts(props.locale))
+const startCard = useGuideCard('panel-home', () => [])
 const heading = computed(() => {
   const s = t.value.sidebar
   if (props.page === ROUTES.TOOLBOX) return { title: s.toolbox, description: s.toolboxDescription }
