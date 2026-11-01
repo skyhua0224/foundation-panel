@@ -66,7 +66,7 @@
         />
       </template>
       <template #overlay>
-        <PanelWebHost><slot /></PanelWebHost>
+        <PanelWebHost :sub="frameSub"><slot /></PanelWebHost>
       </template>
     </MScene>
     </div>
@@ -214,13 +214,15 @@ const openSettingsRoute = (item) => {
   else if (item.route === 'config') openConfig(item.params)
   else if (item.route === 'dualsense') router.navigate(ROUTES.CFG_DUALSENSE, item.params)
   else if (item.route === 'password') openRoute(ROUTES.WEB_PASSWORD)
-  else router.navigate(item.route || item.id)
+  else openRoute(item.route || item.id)
 }
-const onListNavigate = (item) => (item.route ? openSettingsRoute(item) : router.navigate(item.id))
+const onListNavigate = (item) => (item.route ? openSettingsRoute(item) : openRoute(item.id))
 
 const sceneTexts = computed(() => ({ resize: t.value.m3e.resize, main: t.value.m3e.nav.main, shortcuts: t.value.m3e.shortcuts, back: t.value.m3e.back, search: t.value.m3e.search, help: t.value.m3e.shortcutHelp, section: t.value.m3e.section, close: t.value.m3e.clear }))
 const onRail = (item) => {
   if (item.id === 'config') { loadHostData(); openConfig({ tab: 'general' }); router.navigate(ROUTES.CAT_CONFIG); return }
+  // the stream rail opens on its first page: the frame has to show it
+  if (item.id === 'stream') { emit('webui-navigate', webPathOf(ROUTES.WEB_CLIENTS)); router.navigate(ROUTES.CAT_STREAM); return }
   router.navigate({ overview: ROUTES.HOME, settings: ROUTES.PANEL_SETTINGS, help: ROUTES.HELP, stream: ROUTES.CAT_STREAM, input: ROUTES.CAT_INPUT, display: ROUTES.CAT_DISPLAY, system: ROUTES.CAT_SYSTEM }[item.id])
 }
 const onSearch = (item) => {
@@ -228,10 +230,12 @@ const onSearch = (item) => {
   openSettingsRoute(item)
 }
 // A setting changed in the frame joins the recently used list
+const frameSub = ref(false)
 const onFrameMessage = (event) => {
   const data = event.data
   if (![...document.querySelectorAll('iframe')].some((frame) => frame.contentWindow === event.source)) return
-  if (data?.type === 'foundation-settings-recent' && typeof data.key === 'string') settingsList.remember(data.key)
+  if (data?.type === 'foundation-subpage') frameSub.value = data.open === true
+  else if (data?.type === 'foundation-settings-recent' && typeof data.key === 'string') settingsList.remember(data.key)
   // a page of the frame that the panel shows natively (the DualSense tuning, opened from the gamepad rows of 输入)
   else if (data?.type === 'foundation-open' && data.page === 'dualsense') router.navigate(ROUTES.CFG_DUALSENSE)
 }
