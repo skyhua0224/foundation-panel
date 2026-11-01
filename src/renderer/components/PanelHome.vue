@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, MHomeGuide, useAnnouncements, useGuideCard, buildHomeModel, buildGuideSteps, guidePlatforms, guideRecommended, homeTexts } from 'foundation-ui/vue'
+import { MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, MHomeGuide, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, guidePlatforms, guideRecommended, homeTexts } from 'foundation-ui/vue'
 import { usePanelHome } from '../composables/usePanelHome.js'
 import { useGamepadType } from '../composables/useGamepadType.js'
 import { SPONSORS } from '../config/sponsors.js'
@@ -25,7 +25,7 @@ const T = computed(() => homeTexts(locale.value))
 const SEEN_KEY = 'foundation-ui.guide.panel-home.sessionSeen'
 const sessionSeen = ref(localStorage.getItem(SEEN_KEY) === '1')
 watch(() => !!session.value || (state.recent?.length || 0) > 0, (v) => { if (v && !sessionSeen.value) { sessionSeen.value = true; try { localStorage.setItem(SEEN_KEY, '1') } catch { /* storage unavailable */ } } }, { immediate: true })
-const guide = useGuideCard('panel-home', () => (state.loaded ? buildGuideSteps(T.value, { paired: state.clientsTotal, sessionSeen: sessionSeen.value, apps: state.apps }) : []))
+const guide = useGuideCard('panel-home', () => (state.loaded ? buildStartSteps(T.value, { paired: state.clientsTotal, sessionSeen: sessionSeen.value, apps: state.apps }) : []))
 const guideTexts = computed(() => ({ title: T.value.guideTitle, sub: T.value.guideSub, continue: T.value.guideContinue, dismiss: T.value.guideDismiss, downloadTitle: T.value.downloadTitle }))
 const STEP_TARGET = { download: 'downloads', pair: 'clients', game: 'apps' }
 const onGuideStep = (s) => { if (STEP_TARGET[s.id]) emit('open', STEP_TARGET[s.id]); else guide.toggle(s.id) }
