@@ -49,6 +49,7 @@
       </MSection>
     </template>
     <template v-else>
+      <MPromo :title="guide.guide" :text="guide.helpRow" icon="rocket_launch" tone="secondary" @click="emit('open-guide')" />
       <MPromo :title="t.sidebar.clientDownloads" text="Moonlight / VoidLink" icon="download" @click="emit('webui-navigate', '/downloads')" />
       <MPromo :title="t.m3e.home.sponsor" :text="t.m3e.home.sponsorTitle" icon="favorite" tone="primary" @click="sponsorOpen = true" />
       <MSection>
@@ -69,7 +70,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MPromo, MFooter, MSheet } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MPromo, MFooter, MSheet, guideTexts } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { ROUTES } from '../composables/useRouter.js'
@@ -84,8 +85,10 @@ const props = defineProps({
   isAdmin: Boolean,
   actions: { type: Object, required: true },
 })
-const emit = defineEmits(['theme-change', 'locale-change', 'channel-change', 'webui-navigate'])
+const emit = defineEmits(['theme-change', 'locale-change', 'channel-change', 'webui-navigate', 'open-guide'])
 const { t } = useI18n()
+// The guided first run can be opened again from here; its texts come with the package (zh and en)
+const guide = computed(() => guideTexts(props.locale))
 const heading = computed(() => {
   const s = t.value.sidebar
   if (props.page === ROUTES.TOOLBOX) return { title: s.toolbox, description: s.toolboxDescription }

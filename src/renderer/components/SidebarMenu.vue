@@ -23,7 +23,7 @@
       </template>
       <template #detail="{ entry }">
         <PanelHome v-if="entry.id === ROUTES.HOME" :runtime="runtime" :update-available="!!updateInfo" @open="openDestination" @webui-navigate="openWebUi" />
-        <Welcome v-else-if="entry.id === ROUTES.WELCOME" @close="goHome" />
+        <Welcome v-else-if="entry.id === ROUTES.WELCOME" @close="goHome" @webui-navigate="openWebUi" />
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
@@ -53,6 +53,7 @@
           @locale-change="locale = $event"
           @channel-change="setIncludePrerelease"
           @webui-navigate="openWebUi"
+          @open-guide="openWelcome"
         />
       </template>
       <template #overlay>
@@ -90,6 +91,7 @@ import ComponentsPage from './m3e/ComponentsPage.vue'
 import DiagnosticsPage from './m3e/DiagnosticsPage.vue'
 import { microphoneOverviewState } from '../composables/deviceHubStatus.js'
 import { useDeviceRuntime } from '../composables/useDeviceRuntime.js'
+import { useGuideAutoOpen } from '../composables/useGuideAutoOpen.js'
 import { useSidebarState } from '../composables/useSidebarState.js'
 import { useWindowControls } from '../composables/useWindowControls.js'
 import { useTools } from '../composables/useTools.js'
@@ -114,6 +116,8 @@ const {
   showClipboardSyncStatus, initClipboardSyncStatus, clipboardSyncEnabled,
 } = useTools()
 const { runtime, refresh: refreshRuntime } = useDeviceRuntime()
+// First run: the guide opens by itself when the host has no setup and no paired client
+useGuideAutoOpen(openWelcome)
 onMounted(() => {
   initClipboardSyncStatus()
   refreshRuntime()

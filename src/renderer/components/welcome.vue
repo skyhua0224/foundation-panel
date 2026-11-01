@@ -1,130 +1,102 @@
 <template>
-  <MWelcome :title="t('greeting')" icon="shield" :rows="[{ icon: 'warning', tone: 'tertiary', text: t('create_creds_alert') }]">
-    <template #top>
-      <label class="welcome-lang">
-        <MIcon name="language" />
-        <select v-model="currentLocale" :aria-label="supportedLocales.find((l) => l.code === currentLocale)?.name" @change="handleLocaleChange">
-          <option v-for="loc in supportedLocales" :key="loc.code" :value="loc.code">{{ loc.name }}</option>
-        </select>
-      </label>
-    </template>
-    <template #intro><p class="welcome-sub">{{ t('create_creds') }}</p></template>
-
-    <form id="panel-welcome-form" class="welcome-form" @submit.prevent="handleSubmit">
-      <MGroup>
-        <MFieldItem v-model="formData.username" :label="t('username')" autocomplete="username" />
-        <MFieldItem v-model="formData.password" type="password" :label="t('password')" autocomplete="new-password" required />
-        <MFieldItem v-model="formData.confirmPassword" type="password" :label="t('confirm_password')" autocomplete="new-password" required :error="showPasswordError ? t('password_mismatch') : ''" :supporting="showPasswordSuccess ? t('password_match') : ''" />
-      </MGroup>
-    </form>
-    <MBanner v-if="errorMessage" tone="error" icon="error">{{ errorMessage }}</MBanner>
-    <MBanner v-if="successMessage" tone="info" icon="check_circle">{{ successMessage }}</MBanner>
-
-    <template #actions>
-      <MButton type="submit" form="panel-welcome-form" size="lg" icon="login" :loading="loading" :disabled="loading || !isFormValid">{{ t('login') }}</MButton>
-    </template>
-  </MWelcome>
+  <div class="panel-guide">
+    <MLoading v-if="state.account.exists === null" class="panel-guide__loading" />
+    <MGuideFlow
+      v-else
+      :steps="steps"
+      :state="state"
+      :callbacks="callbacks"
+      :locale="locale"
+      :texts="accountTexts"
+      :storage-key="GUIDE_STORAGE_KEY"
+      :qr="qrMatrix"
+      :required="state.account.exists ? [] : ['account']"
+      @close="closeGuide"
+      @finish="closeGuide"
+    >
+      <template #top>
+        <label class="welcome-lang">
+          <MIcon name="language" />
+          <select v-model="currentLocale" :aria-label="supportedLocales.find((l) => l.code === currentLocale)?.name" @change="handleLocaleChange">
+            <option v-for="loc in supportedLocales" :key="loc.code" :value="loc.code">{{ loc.name }}</option>
+          </select>
+        </label>
+      </template>
+    </MGuideFlow>
+  </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import QRCode from 'qrcode'
+import { invoke } from '@tauri-apps/api/core'
+import { MGuideFlow, MIcon, MLoading, buildGuideSteps } from 'foundation-ui/vue'
 import { supportedLocales, setLocale as setI18nLocale, getDefaultLocale, useWelcomeI18n } from '../../i18n/index.js'
-import { sunshine } from '../tauri-adapter.js'
-import { MWelcome, MGroup, MFieldItem, MBanner, MButton, MIcon } from 'foundation-ui/vue'
+import { openExternalUrl, sunshine } from '../tauri-adapter.js'
+import { GUIDE_DISMISSED_KEY, GUIDE_STORAGE_KEY, createGuideData } from '../composables/guideData.js'
 
-const REDIRECT_DELAY = 2000
-
+// The guided first run of the panel. It opens by itself on a first run, when the host serves its account page (no account yet), and from
+// the help page. The account step is part of the flow only while the host has no account.
+const emit = defineEmits(['close', 'webui-navigate'])
 const { t, locale } = useWelcomeI18n()
 
 const currentLocale = ref(locale.value)
-const formData = ref({ username: 'sunshine', password: '', confirmPassword: '' })
-const loading = ref(false)
-const errorMessage = ref('')
-const successMessage = ref('')
-
-const passwordsMatch = computed(() => {
-  const { password, confirmPassword } = formData.value
-  return !password || !confirmPassword || password === confirmPassword
-})
-
-const showPasswordError = computed(() => !passwordsMatch.value && formData.value.confirmPassword)
-
-const showPasswordSuccess = computed(() => 
-  passwordsMatch.value && formData.value.confirmPassword && formData.value.password
-)
-
-const isFormValid = computed(() => {
-  const { username, password, confirmPassword } = formData.value
-  return username && password && confirmPassword && passwordsMatch.value
-})
-
 watch(locale, (val) => { currentLocale.value = val })
-
 watch(currentLocale, (val) => {
   if (locale.value !== val) {
     setI18nLocale(val)
     locale.value = val
   }
 })
-
 const handleLocaleChange = () => setI18nLocale(currentLocale.value)
 
-const handleSubmit = async () => {
-  errorMessage.value = ''
-  successMessage.value = ''
+const data = createGuideData({
+  proxyUrl: () => sunshine.getProxyUrl(),
+  vddStatus: () => invoke('get_vdd_status'),
+  activeSessions: () => sunshine.getActiveSessions(),
+  openUrl: (url) => openExternalUrl(url),
+  copy: (text) => navigator.clipboard.writeText(text),
+  // The apps page of the Web UI takes the request from the address (#guide-scan, #guide-add, #guide-restore)
+  openApps: (mode) => emit('webui-navigate', `/apps#guide-${mode}`),
+  navigate: (to) => { window.location.href = to },
+})
+const { state, probeAccount } = data
+const callbacks = { ...data.callbacks, createAccount: data.createAccount(t) }
+const steps = computed(() => buildGuideSteps({ skip: state.account.exists ? ['account'] : [] }))
+const qrMatrix = (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules
 
-  if (!passwordsMatch.value) {
-    errorMessage.value = t('password_mismatch')
-    return
+// The credential form keeps the texts of the welcome page, in every language it has
+const accountTexts = computed(() => {
+  void locale.value
+  return {
+    titles: { account: t('greeting') },
+    leads: { account: t('create_creds') },
+    account: {
+      username: t('username'), password: t('password'), confirm: t('confirm_password'), create: t('login'),
+      mismatch: t('password_mismatch'), match: t('password_match'), note: t('create_creds_alert'), local: t('creds_local_only'),
+      done: `${t('success')} ${t('welcome_success')}`,
+    },
   }
+})
 
-  const { username, password, confirmPassword } = formData.value
-  if (!username || !password || !confirmPassword) {
-    errorMessage.value = `${t('error')} ${t('create_creds')}`
-    return
-  }
-
-  loading.value = true
-
-  try {
-    const proxyUrl = await sunshine.getProxyUrl()
-    const response = await fetch(`${proxyUrl}/api/password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        newUsername: username, 
-        newPassword: password, 
-        confirmNewPassword: confirmPassword 
-      }),
-    })
-
-    const result = await response.json()
-
-    if (result.status?.toString() === 'true') {
-      successMessage.value = `${t('success')} ${t('welcome_success')}`
-      setTimeout(() => {
-        window.location.href = `${proxyUrl}/`
-      }, REDIRECT_DELAY)
-    } else {
-      errorMessage.value = `${t('error')} ${result.error || t('server_error')}`
-    }
-  } catch (err) {
-    console.error('Failed to save password:', err)
-    errorMessage.value = `${t('error')} ${err.message || t('network_error')}`
-  } finally {
-    loading.value = false
-  }
+const closeGuide = () => {
+  try { window.sessionStorage.setItem(GUIDE_DISMISSED_KEY, '1') } catch { /* not remembered */ }
+  emit('close')
 }
 
-onMounted(() => {
+onMounted(async () => {
   const defaultLocale = getDefaultLocale()
   currentLocale.value = defaultLocale
   setI18nLocale(defaultLocale)
+  await probeAccount()
 })
 </script>
 
 <style>
 .welcome-lang { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 14px; border-radius: 20px; background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); }
 .welcome-lang select { border: 0; outline: 0; background: transparent; color: var(--md-sys-color-on-surface); font: var(--m-label-large); cursor: pointer; }
-.welcome-sub { margin: 0; text-align: center; color: var(--md-sys-color-on-surface-variant); font: var(--m-body-medium); }
+.panel-guide { min-height: 100dvh; }
+.panel-guide .m-guide { min-height: 100dvh; }
+.panel-guide .m-guide__bar { padding-inline-end: 144px; }
+.panel-guide__loading { margin: 120px auto; }
 </style>
