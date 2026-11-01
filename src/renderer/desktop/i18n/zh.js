@@ -1575,7 +1575,7 @@ export const zh = {
         "right": "右扳机"
       },
       "title": "DualSense 手柄调校",
-      "wired": "{total} 项设置中 {wired} 项可用"
+      "wired": "{wired} 项可调 · {pending} 项本版本尚未接入"
     }
   },
 

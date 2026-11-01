@@ -16,7 +16,7 @@
     </MNotice>
 
     <template v-else-if="tuning.snapshot.value">
-      <MSection :title="tr('title')" :description="tr('wired', { wired: tuning.implementedTotal.value, total: tuning.keyTotal.value })">
+      <MSection :title="tr('title')" :description="tr('wired', { wired: tuning.implementedTotal.value, pending: tuning.keyTotal.value - tuning.implementedTotal.value })">
         <template #action>
           <div class="m-section__actions">
             <MButton variant="text" size="sm" icon="stethoscope" @click="emit('open-controller-meta')">{{ tr('open_meta') }}</MButton>

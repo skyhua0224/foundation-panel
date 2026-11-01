@@ -1575,7 +1575,7 @@ Output only one short sentence, no explanation. Reply in English.`,
         "white": "White"
       },
       "title": "DualSense tuning",
-      "wired": "{wired} of {total} options available"
+      "wired": "{wired} adjustable · {pending} not connected in this build yet"
     }
   },
 
