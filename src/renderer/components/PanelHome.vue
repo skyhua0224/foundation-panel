@@ -62,6 +62,7 @@ const model = computed(() => {
     host: { name: state.config?.sunshine_name || 'Sunshine', version: state.version, uptimeMs: uptimeMs.value, running: state.loaded, update: props.updateAvailable ? h.value.update : '' },
     session: s ? { ...s, fpsMeasured: perfSession.value?.frame_rates?.encoded?.fps ?? perfSession.value?.host_latency?.recent_fps, latencyMs: perfSession.value?.host_latency?.avg_ms } : null,
     series: state.series, sys, encoder: state.config?.active_encoder || '',
+    codecModes: state.config && state.config.hevc_mode !== undefined ? { hevc: state.config.hevc_mode, av1: state.config.av1_mode } : null,
     pads: { text: [modeLabel.value, dsLabel.value].filter(Boolean).join(' · ') || '–' },
     mic: micText.value ? { text: micText.value } : null,
     clients: state.clients ? state.clients.map((c) => ({ ...c, icon: 'devices' })) : null,
