@@ -4,7 +4,7 @@ import { MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, 
 import { usePanelHome } from '../composables/usePanelHome.js'
 import { useGamepadType } from '../composables/useGamepadType.js'
 import { SPONSORS } from '../config/sponsors.js'
-import { openExternalUrl, vdd as vddApi } from '../tauri-adapter.js'
+import { openExternalUrl, vdd as vddApi, virtualMicrophone } from '../tauri-adapter.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
 const props = defineProps({
@@ -39,7 +39,11 @@ const stripBusy = ref(false)
 const dsLabel = computed(() => { const s = props.runtime.ds?.state; return s ? (t.value.dualSense.status.states[s] || s) : '' })
 const micText = computed(() => ({ active: h.value.micOn, streaming: h.value.micOn, capturing: h.value.micOn, idle: h.value.ready, waiting: h.value.ready }[props.runtime.mic?.state] ?? ''))
 const modeLabel = computed(() => pad.modeOptions.value.find((o) => o.value === (pad.selectedMode.value || 'auto'))?.label || '')
-const vddKeep = computed(() => state.config?.vdd_keep_enabled === 'enabled')
+// the microphone switch: the host's backend choice, saved at once like on the microphone page ('disabled' off, 'auto' on)
+const micBackend = ref('')
+const micConfigured = computed(() => micBackend.value || props.runtime.mic?.configured_backend || '')
+const micEnabled = computed(() => micConfigured.value !== 'disabled')
+const vddKeep = computed((() => state.config?.vdd_keep_enabled === 'enabled')
 const vddReady = computed(() => !!state.vdd && (state.vdd.installed !== false))
 
 const coverOf = (a) => {
@@ -69,16 +73,21 @@ const model = computed(() => {
   base.strip = {
     label: h.value.gamepadType, icon: 'sports_esports', value: pad.selectedMode.value || 'auto', busy: stripBusy.value || !!pad.busyKey.value,
     options: pad.modeOptions.value.map((o) => ({ value: o.value, label: h.value.pad[o.value] || o.label })),
-    switches: vddReady.value ? [{ id: 'vdd-keep', label: h.value.vddKeep, sub: h.value.vddKeepSub, value: vddKeep.value, busy: stripBusy.value }] : [],
+    switches: [
+      ...(vddReady.value ? [{ id: 'vdd-keep', label: h.value.vddKeep, sub: h.value.vddKeepSub, value: vddKeep.value, busy: stripBusy.value }] : []),
+      ...(micConfigured.value ? [{ id: 'mic', label: h.value.mic, sub: micEnabled.value ? (micText.value || h.value.ready) : h.value.off, value: micEnabled.value, busy: stripBusy.value }] : []),
+    ],
   }
   return base
 })
 
 async function onStripGroup(v) { pad.selectedMode.value = v }
 async function onStripSwitch({ id, value }) {
-  if (id !== 'vdd-keep') return
   stripBusy.value = true
-  try { const r = await vddApi.setKeepEnabled(value); if (r?.success && state.config) state.config = { ...state.config, vdd_keep_enabled: value ? 'enabled' : 'disabled' } } finally { stripBusy.value = false }
+  try {
+    if (id === 'vdd-keep') { const r = await vddApi.setKeepEnabled(value); if (r?.success && state.config) state.config = { ...state.config, vdd_keep_enabled: value ? 'enabled' : 'disabled' } }
+    else if (id === 'mic') { const r = await virtualMicrophone.saveBackend(value ? 'auto' : 'disabled'); if (r?.success) micBackend.value = value ? 'auto' : 'disabled' }
+  } finally { stripBusy.value = false }
 }
 function onHero() { if (session.value) confirmStop.value = true; else confirmRestart.value = true }
 const doRestart = async () => { confirmRestart.value = false; busy.value = true; try { await restart() } finally { busy.value = false } }
