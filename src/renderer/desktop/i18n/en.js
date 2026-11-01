@@ -1119,6 +1119,7 @@ Output only one short sentence, no explanation. Reply in English.`,
   m3e: {
     nav: { overview: 'Overview', stream: 'Stream', input: 'Input & devices', display: 'Display', system: 'System', settings: 'Panel settings', help: 'Help & about', main: 'Main navigation' },
     search: 'Search', noResults: 'No results', clear: 'Clear', resize: 'Resize list', shortcuts: 'Keyboard shortcuts', shortcutHelp: 'Show shortcuts', section: 'Go to section',
+    micFlow: { client: 'Client microphone', host: 'Host', device: 'Virtual device', apps: 'Apps', buffer: 'Buffer' },
     home: { pad: { auto: 'Auto', x360: 'Xbox 360', ds4: 'DualShock 4', ds5: 'DualSense' }, gamepadType: 'Gamepad type', vddKeep: 'Keep virtual display', vddKeepSub: 'Stay after streaming ends', download: 'Download clients', star: 'Star on GitHub', qq: 'QQ group', edit: 'Edit tiles', done: 'Done', add: 'Add tile', reset: 'Reset to default', remove: 'Remove', resize: 'Change size', earlier: 'Move earlier', later: 'Move later', addTitle: 'Add a tile', nothing: 'All tiles are on the page',
       cpu: 'CPU', gpuLoad: 'GPU', loss: 'Packet loss', notReported: 'Not reported by the client', dropped: 'frames dropped', micOn: 'In use',
       host: 'Host', uptime: 'Up', update: 'Update available', session: 'Streaming session', idle: 'Idle', clients: 'Clients', paired: 'Paired', apps: 'Apps', bitrate: 'Bitrate', latency: 'Host latency', encoder: 'Encoder', hdr: 'HDR', hdrOn: 'On', hdrOff: 'Off',

@@ -58,6 +58,13 @@
       <!-- Display: resolutions, refresh rates, GPU, colour -->
       <template v-else-if="activeSection === 'display'">
         <MSection :title="t.vddSettings.displaySection">
+          <div v-if="previewScreens.length" class="vdd-preview" role="img" :aria-label="t.vddSettings.resolutionPresets">
+            <div v-for="screen in previewScreens" :key="screen.key" class="vdd-preview__item">
+              <span class="m-dinfo__display" :class="{ 'is-hdr': previewHdr }" :style="{ aspectRatio: `${screen.w} / ${screen.h}`, width: `${screen.px}px` }"><i>{{ screen.w }}×{{ screen.h }}</i></span>
+              <span class="m-dinfo__stand" :style="{ width: `${Math.round(screen.px * 0.3)}px` }" />
+            </div>
+            <span class="vdd-preview__note">{{ previewRefresh }} Hz{{ previewHdr ? ' · HDR' : '' }}</span>
+          </div>
           <MGroup>
             <MItem icon="aspect_ratio" :title="t.vddSettings.resolutionPresets" stack>
               <template #control>
@@ -430,6 +437,10 @@ const presetSummary = computed(() => getVddText('presetsSummary', {
 }))
 const traceDisplayPath = computed(() => traceStatus.value.latest_file || t.value.vddSettings.vddTraceNoFile)
 const hasCustomEdidIssue = computed(() => settings.edid.CustomEdid && !edidFileExists.value)
+// the configured resolutions drawn as displays in their real proportions (the widest is 168 px), with the highest refresh rate and the colour profile
+const previewScreens = computed(() => sortedResolutionOptions.value.map((res) => { const m = /^(\d{3,5})\s*[x×]\s*(\d{3,5})/i.exec(String(res)); return m ? { key: res, w: Number(m[1]), h: Number(m[2]) } : null }).filter(Boolean).slice(0, 6).map((x, _i, all) => ({ ...x, px: Math.max(56, Math.round((x.w / Math.max(...all.map((a) => a.w))) * 168)) })))
+const previewRefresh = computed(() => Math.max(...sortedRefreshRateOptions.value.map(Number).filter(Number.isFinite), 0))
+const previewHdr = computed(() => !!settings.colour.HDRPlus)
 const isColorDepthConflict = computed(() => settings.colour.SDR10bit && settings.colour.HDRPlus)
 const colorDepthProfile = computed({
   get() {
@@ -1023,6 +1034,9 @@ onUnmounted(() => {
 </script>
 
 <style>
+.vdd-preview { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 14px; padding: 18px 20px; border-radius: 28px; background: var(--m-card); margin-bottom: 8px; }
+.vdd-preview__item { display: flex; flex-direction: column; align-items: center; } .vdd-preview .m-dinfo__display { max-height: none; }
+.vdd-preview__note { margin-left: auto; align-self: center; font: var(--m-label-large); color: var(--md-sys-color-on-surface-variant); font-variant-numeric: tabular-nums; }
 .m-vdd-badges { display: flex; flex-wrap: wrap; gap: 8px; }
 .m-tiles--static { --m-cols: 2; grid-auto-rows: minmax(104px, auto); min-height: 0; max-height: none; }
 .m-chips-edit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }

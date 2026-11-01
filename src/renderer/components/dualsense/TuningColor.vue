@@ -43,11 +43,13 @@
     </div>
 
     <span class="ds5t-row-reset" aria-hidden="true"></span>
+    <MLightbar class="ds5t-lightbar" :mode="mode === 'off' ? 'off' : mode === 'fixed' ? 'fixed' : 'game'" :color="hex" :label="mode === 'off' ? tr('color.is_off') : mode === 'fixed' ? hex : tr('color.by_game')" />
   </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
+import { MLightbar } from 'foundation-ui/vue'
 import { useDualSenseText } from '../../composables/useDualSenseText.js'
 
 const props = defineProps({
@@ -225,4 +227,8 @@ const onHexInput = (event) => {
   .ds5t-row-control { grid-area: control; justify-content: flex-start; }
   .ds5t-row-reset { grid-area: reset; }
 }
+</style>
+
+<style>
+.ds5t-color-row { flex-wrap: wrap; } .ds5t-lightbar { flex: 1 0 100%; margin-top: 8px; }
 </style>

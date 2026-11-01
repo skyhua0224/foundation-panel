@@ -9,6 +9,15 @@
       </template>
     </MStatusPill>
 
+    <!-- the path of the sound, lit by the host's real state -->
+    <div v-if="!loadError && status.configured_backend" class="mic-flow" role="img" :aria-label="t.m3e.micFlow.client + ' → ' + t.m3e.micFlow.apps">
+      <template v-for="(node, i) in flow" :key="node.id">
+        <i v-if="i" class="mic-flow__link" :class="{ 'is-on': node.on && flow[i - 1].on }" />
+        <span class="mic-flow__node" :class="{ 'is-on': node.on }"><span class="mic-flow__shape"><MIcon :name="node.icon" /></span><b>{{ node.label }}</b></span>
+      </template>
+      <span v-if="status.buffered_bytes != null" class="mic-flow__buffer"><MProgress :value="Math.min(1, bufferedMs / 200)" :label="t.m3e.micFlow.buffer" /><small>{{ t.m3e.micFlow.buffer }} {{ Math.round(bufferedMs) }} ms</small></span>
+    </div>
+
     <MBanner v-if="!loadError && componentMissing" tone="warn" icon="warning">
       <b>{{ text.missingTitle }}</b><br>{{ status.configured_backend === 'auto' ? text.missingHintAuto : text.missingHintUsb }}
       <template #actions>
@@ -55,7 +64,7 @@
 <script setup>
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MPage, MSection, MGroup, MItem, MChip, MStatusPill, MBanner, MFooter, MSeg, MNotice, MButton, MIconButton, MSkeleton } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MChip, MStatusPill, MBanner, MFooter, MSeg, MNotice, MButton, MIconButton, MSkeleton, MIcon, MProgress } from 'foundation-ui/vue'
 import { virtualMicrophone } from '../../tauri-adapter.js'
 import { micStatusChannel } from '../../composables/deviceStatusStore.js'
 import {
@@ -77,6 +86,12 @@ let pending = false
 const state = computed(() => loadError.value || !status.configured_backend ? 'unknown' : microphoneOverviewState(status))
 const statusTone = computed(() => loadError.value ? 'state-error' : microphoneStatusTone(status))
 const canTest = computed(() => !loadError.value && canTestMicrophone(status, loading.value))
+const flow = computed(() => [
+  { id: 'client', icon: 'mic', label: t.value.m3e.micFlow.client, on: !!status.host_streaming },
+  { id: 'host', icon: 'dns', label: t.value.m3e.micFlow.host, on: !!status.host_streaming },
+  { id: 'device', icon: 'settings_input_component', label: t.value.m3e.micFlow.device, on: !!status.device_created },
+  { id: 'apps', icon: 'apps', label: t.value.m3e.micFlow.apps, on: !!status.online },
+])
 const usesUsbip = computed(() => microphoneUsesUsbip(status))
 const componentMissing = computed(() => microphoneComponentMissing(status))
 const bufferedMs = computed(() => microphoneBufferedMs(status))

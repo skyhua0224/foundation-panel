@@ -1119,6 +1119,7 @@ export const zh = {
   m3e: {
     nav: { overview: '概览', stream: '串流', input: '输入与外设', display: '显示', system: '系统', settings: '面板设置', help: '帮助与关于', main: '主导航' },
     search: '搜索', noResults: '没有结果', clear: '清除', resize: '调整列表宽度', shortcuts: '键盘快捷键', shortcutHelp: '显示快捷键', section: '切换栏目',
+    micFlow: { client: '客户端麦克风', host: '主机', device: '虚拟设备', apps: '应用', buffer: '缓冲' },
     home: { pad: { auto: '自动', x360: 'Xbox 360', ds4: 'DualShock 4', ds5: 'DualSense' }, gamepadType: '手柄类型', vddKeep: '保持虚拟显示器', vddKeepSub: '串流结束后保留', download: '下载客户端', star: '在 GitHub 点 Star', qq: 'QQ 交流群', edit: '编辑磁贴', done: '完成', add: '添加磁贴', reset: '恢复默认', remove: '移除', resize: '更改大小', earlier: '前移', later: '后移', addTitle: '添加磁贴', nothing: '所有磁贴都已在页面上',
       cpu: 'CPU', gpuLoad: 'GPU', loss: '丢包', notReported: '客户端未上报', dropped: '帧被丢弃', micOn: '使用中',
       host: '主机', uptime: '已运行', update: '有更新', session: '串流会话', idle: '空闲', clients: '客户端', paired: '已配对', apps: '应用', bitrate: '码率', latency: '主机延迟', encoder: '编码器', hdr: 'HDR', hdrOn: '已开启', hdrOff: '关闭',
