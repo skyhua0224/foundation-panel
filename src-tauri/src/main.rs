@@ -35,6 +35,8 @@ mod nr_overlay;
 mod shell_context_menu;
 mod sunshine;
 mod system;
+mod system_load;
+mod system_load_core;
 #[cfg(target_os = "windows")]
 mod text_context;
 mod toolbar;
@@ -223,6 +225,7 @@ fn main() {
             system::get_monitors,
             system::get_system_info,
             system::get_process_memory_info,
+            system_load::system_load,
             system::get_sunshine_start_time,
             sunshine::get_sunshine_install_path,
             sunshine::get_sunshine_version,

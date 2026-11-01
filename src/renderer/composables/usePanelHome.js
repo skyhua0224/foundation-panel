@@ -15,7 +15,9 @@ export function usePanelHome() {
   const state = reactive({
     version: '', startMs: 0, now: Date.now(), sessions: [], clientsTotal: null, appsTotal: null,
     perf: null, config: null, memory: null, gpus: [], vdd: null, logs: null, loaded: false,
-    hw: { available: false, cpu: null, gpu: null, cpuTemp: null, gpuTemp: null },
+    // CPU and GPU load come from native Windows counters (system_load); temperatures only exist through HWiNFO, if it is running
+    sys: { cpu: null, gpu: null },
+    hw: { available: false, cpuTemp: null, gpuTemp: null },
     series: { bitrate: [], latency: [], cpu: [], gpu: [], memory: [] },
   })
   const proxy = ref('')
@@ -44,11 +46,11 @@ export function usePanelHome() {
       const ps = perf?.sessions?.find((x) => x.active) || perf?.sessions?.[0]
       push(state.series.latency, ps?.host_latency?.avg_ms)
     } else { state.perf = null; state.series.bitrate = []; state.series.latency = [] }
-    if (state.hw.available) {
-      const data = await safe(() => invoke('hwinfo_get_sensors'))
-      const hw = pickHardware(data?.readings)
-      Object.assign(state.hw, hw)
-      push(state.series.cpu, hw.cpu); push(state.series.gpu, hw.gpu)
+    const load = await safe(() => invoke('system_load'))
+    if (load) {
+      state.sys.cpu = typeof load.cpu_percent === 'number' ? load.cpu_percent : null
+      state.sys.gpu = typeof load.gpu_percent === 'number' ? load.gpu_percent : null
+      push(state.series.cpu, state.sys.cpu); push(state.series.gpu, state.sys.gpu)
     }
     push(state.series.memory, memoryShare(state.memory))
   }
@@ -70,6 +72,12 @@ export function usePanelHome() {
       const lines = logs.split('\n')
       const err = lines.filter((l) => /\]\s*(Error|Fatal):/.test(l))
       state.logs = { errors: err.length, warnings: lines.filter((l) => /\]\s*Warning:/.test(l)).length, last: err[err.length - 1] || '' }
+    }
+    if (state.hw.available) {
+      const data = await safe(() => invoke('hwinfo_get_sensors'))
+      const hw = pickHardware(data?.readings)
+      state.hw.cpuTemp = hw.cpuTemp
+      state.hw.gpuTemp = hw.gpuTemp
     }
     state.loaded = true
   }

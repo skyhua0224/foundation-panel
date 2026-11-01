@@ -15,8 +15,8 @@ const { t } = useI18n()
 const h = computed(() => t.value.m3e.home)
 const { state, session, uptimeMs, perfSession, memoryShare, restart, stopAll, openTool } = usePanelHome()
 
-// Catalogue: only tiles whose data has a real source. CPU and GPU need HWiNFO (shared memory); the loss and codec fields need a host
-// that reports them. A tile without data hides itself instead of showing a placeholder.
+// Catalogue: only tiles whose data has a real source. CPU and GPU load come from native Windows counters (the `system_load` command);
+// temperatures only from HWiNFO when it happens to run; the loss and codec fields need a host that reports them. A tile without data hides itself instead of showing a placeholder.
 const catalogue = [
   { id: 'host', icon: 'dns', sizes: ['2x1', '2x2'], size: '2x1' },
   { id: 'session', icon: 'cast_connected', sizes: ['2x1', '2x2'], size: '2x1' },
@@ -51,8 +51,8 @@ const hasLoss = computed(() => !!session.value && session.value.packet_loss !== 
 const isTileVisible = (tile) => {
   if (LIVE.has(tile.id) && !session.value) return false
   if (tile.id === 'loss') return hasLoss.value
-  if (tile.id === 'cpu') return state.hw.available && state.hw.cpu !== null
-  if (tile.id === 'gpu') return state.hw.available && state.hw.gpu !== null
+  if (tile.id === 'cpu') return state.sys.cpu !== null
+  if (tile.id === 'gpu') return state.sys.gpu !== null
   if (tile.id === 'memory') return memoryShare.value !== null
   return true
 }
@@ -136,15 +136,15 @@ const doStop = async () => { confirmStop.value = false; await stopAll() }
 
         <MTile v-else-if="tile.id === 'memory'" :title="def.title" icon="storage" :size="size">
           <MSparkline v-if="size !== '1x1' && state.series.memory.length > 1" class="m-tile__spark" :points="state.series.memory.map((v) => v * 100)" :width="300" :height="44" />
-          <MBar :value="memoryShare ?? 0" icon="storage" :text="size === '1x1' ? '' : memLine" :label="def.title" />
+          <MBar :value="memoryShare ?? 0" :text="size === '1x1' ? '' : memLine" :label="def.title" />
         </MTile>
         <MTile v-else-if="tile.id === 'cpu'" :title="def.title" icon="memory" :size="size">
           <MSparkline v-if="size !== '1x1' && state.series.cpu.length > 1" class="m-tile__spark" :points="state.series.cpu" :width="300" :height="44" />
-          <MBar :value="(state.hw.cpu ?? 0) / 100" icon="memory" :text="state.hw.cpuTemp != null ? `${Math.round(state.hw.cpuTemp)} °C` : ''" :label="def.title" />
+          <MBar :value="(state.sys.cpu ?? 0) / 100" :text="state.hw.cpuTemp != null ? `${Math.round(state.hw.cpuTemp)} °C` : ''" :label="def.title" />
         </MTile>
         <MTile v-else-if="tile.id === 'gpu'" :title="def.title" icon="developer_board" :size="size">
           <MSparkline v-if="size !== '1x1' && state.series.gpu.length > 1" class="m-tile__spark" :points="state.series.gpu" :width="300" :height="44" />
-          <MBar :value="(state.hw.gpu ?? 0) / 100" icon="developer_board" :text="state.hw.gpuTemp != null ? `${Math.round(state.hw.gpuTemp)} °C` : ''" :label="def.title" />
+          <MBar :value="(state.sys.gpu ?? 0) / 100" :text="state.hw.gpuTemp != null ? `${Math.round(state.hw.gpuTemp)} °C` : ''" :label="def.title" />
           <template v-if="state.gpus.length" #foot>{{ state.gpus[0] }}</template>
         </MTile>
 
