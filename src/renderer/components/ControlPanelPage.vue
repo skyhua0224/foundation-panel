@@ -1,11 +1,9 @@
 <template>
   <MPage :title="heading.title">
     <template v-if="page === ROUTES.PANEL_SETTINGS">
-      <MSection :title="t.sidebar.appearanceLanguage">
+      <MSection :title="locale && String(locale).startsWith('zh') ? '个性化' : 'Personalise'"><MAppearance :locale="locale" /></MSection>
+      <MSection :title="t.sidebar.language">
         <MGroup>
-          <MItem icon="palette" :title="t.sidebar.theme" stack>
-            <template #control><MSeg block :label="t.sidebar.theme" :model-value="themeMode" :options="themeOptions" @update:model-value="emit('theme-change', $event)" /></template>
-          </MItem>
           <MItem icon="language" :title="t.sidebar.language" stack>
             <template #control><MSeg block :label="t.sidebar.language" :model-value="locale" :options="localeOptions" @update:model-value="emit('locale-change', $event)" /></template>
           </MItem>
@@ -71,7 +69,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MPromo, MFooter, MSheet, guideTexts, homeTexts, useGuideCard } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MPromo, MFooter, MSheet, guideTexts, homeTexts, useGuideCard, MAppearance } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { ROUTES } from '../composables/useRouter.js'
