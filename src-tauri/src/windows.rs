@@ -609,7 +609,7 @@ fn create_main_window_internal<R: Runtime>(
     )
     .title("Sunshine Control Panel")
     .inner_size(1280.0, 800.0)
-    .min_inner_size(1024.0, 600.0)
+    .min_inner_size(480.0, 560.0)
     .center()
     .decorations(false)
     // DWM clips the native window to rounded corners. Keeping WebView2
