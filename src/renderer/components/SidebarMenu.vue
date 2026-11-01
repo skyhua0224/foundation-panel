@@ -18,6 +18,7 @@
           :label="railLabel(entry.rail)"
           @navigate="(item) => router.navigate(item.id)"
           @search="onSearch"
+          @context="onRowContext"
         />
       </template>
       <template #detail="{ entry }">
@@ -61,6 +62,7 @@
         <PanelWebHost><slot /></PanelWebHost>
       </template>
     </MScene>
+    <MContextMenu ref="contextMenu" @select="onContextSelect" />
     <UpdateDialog
       v-if="showUpdateDialog"
       v-model="showUpdateDialog"
@@ -73,8 +75,9 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, toRef, watch, onMounted } from 'vue'
-import { MScene, MNavList, MIconButton } from 'foundation-ui/vue'
+import { computed, defineAsyncComponent, ref, toRef, watch, onMounted } from 'vue'
+import { sunshine } from '../tauri-adapter.js'
+import { MScene, MNavList, MIconButton, MContextMenu } from 'foundation-ui/vue'
 import PanelHome from './PanelHome.vue'
 import GamepadState from './m3e/GamepadState.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -156,6 +159,20 @@ const searchItems = computed(() => Object.keys(PAGES)
 const sceneTexts = computed(() => ({ resize: t.value.m3e.resize, main: t.value.m3e.nav.main, shortcuts: t.value.m3e.shortcuts, back: t.value.m3e.back, search: t.value.m3e.search, help: t.value.m3e.shortcutHelp, section: t.value.m3e.section, close: t.value.m3e.clear }))
 const onRail = (item) => router.navigate({ overview: ROUTES.HOME, settings: ROUTES.PANEL_SETTINGS, help: ROUTES.HELP, stream: ROUTES.CAT_STREAM, input: ROUTES.CAT_INPUT, display: ROUTES.CAT_DISPLAY, system: ROUTES.CAT_SYSTEM }[item.id])
 const onSearch = (item) => router.navigate(item.route || item.id)
+const contextMenu = ref(null)
+const onRowContext = (event, item) => {
+  const items = [{ id: 'open', label: t.value.m3e.ctx.open, icon: 'open_in_new' }]
+  if (webPathOf(item.id)) items.push({ id: 'browser', label: t.value.m3e.ctx.browser, icon: 'public' })
+  contextMenu.value?.show(event, items, item)
+}
+const onContextSelect = (entry, item) => {
+  if (entry.id === 'open') router.navigate(item.id)
+  else if (entry.id === 'browser') actions_openUrl(item)
+}
+const actions_openUrl = async (item) => {
+  const base = String((await sunshine.getUrl()) || '').replace(/\/$/, '')
+  if (base) toolsCtx.openUrl(base + webPathOf(item.id))
+}
 // Old call sites speak in short ids; each maps to a destination.
 const openDestination = (id) => {
   const web = { clients: ROUTES.WEB_CLIENTS, apps: ROUTES.WEB_APPS, settings: ROUTES.WEB_CONFIG, downloads: ROUTES.WEB_DOWNLOADS }

@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue'
-import { MPage, MTileGrid, MTile, MIconButton, MStatusPill, MBar, MRing, MSparkline, MSheet, MItem, MGroup, MDialog, MButton, MIcon, useTiles } from 'foundation-ui/vue'
+import { MPage, MTileGrid, MTile, MIconButton, MStatusPill, MBar, MRing, MSparkline, MSheet, MItem, MGroup, MDialog, MButton, MIcon, MContextMenu, useTiles } from 'foundation-ui/vue'
 import { usePanelHome, formatUptime } from '../composables/usePanelHome.js'
 import { SPONSORS } from '../config/sponsors.js'
 import { openExternalUrl } from '../tauri-adapter.js'
@@ -47,6 +47,18 @@ const store = useTiles('panel-home', catalogue, DEFAULTS)
 const edit = ref(false)
 const gridTexts = computed(() => ({ done: h.value.done, add: h.value.add, reset: h.value.reset, remove: h.value.remove, resize: h.value.resize, earlier: h.value.earlier, later: h.value.later, addTitle: h.value.addTitle, nothing: h.value.nothing, edit: h.value.edit }))
 
+const contextMenu = ref(null)
+function onTileMenu(event, tile, def) {
+  const items = [{ id: 'edit', label: h.value.edit, icon: 'edit' }]
+  if (def.sizes.length > 1) items.push({ id: 'resize', label: h.value.resize, icon: 'crop_square' })
+  items.push({ id: 'remove', label: h.value.remove, icon: 'close', danger: true })
+  contextMenu.value?.show(event, items, tile)
+}
+function onTileContext(entry, tile) {
+  if (entry.id === 'edit') edit.value = true
+  else if (entry.id === 'resize') store.resize(tile.id)
+  else if (entry.id === 'remove') store.remove(tile.id)
+}
 const sponsorOpen = ref(false)
 const confirmRestart = ref(false)
 const confirmStop = ref(false)
@@ -74,7 +86,7 @@ const doStop = async () => { confirmStop.value = false; await stopAll() }
       <MIconButton :icon="edit ? 'check' : 'edit'" :label="edit ? h.done : h.edit" @click="edit = !edit" />
     </template>
     <MTileGrid v-model:edit="edit" :store="store" :texts="gridTexts" :label="t.m3e.nav.overview">
-      <template #tile="{ tile, def, size }">
+      <template #tile="{ tile, def, size }"><div class="home-cell" @contextmenu="onTileMenu($event, tile, def)">
         <!-- host -->
         <MTile v-if="tile.id === 'host'" :title="def.title" icon="dns" tone="primary" :size="size" :badge="hostBadge">
           <div class="m-tile__row"><span class="m-num">{{ uptimeMs ? formatUptime(uptimeMs) : '–' }}</span></div>
@@ -150,8 +162,9 @@ const doStop = async () => { confirmStop.value = false; await stopAll() }
         <MTile v-else-if="tile.id === 'logs'" :title="def.title" icon="description" :size="size" action @click="openTool('logs')"><MIcon name="open_in_new" class="m-tile__big" /></MTile>
         <MTile v-else-if="tile.id === 'downloads'" :title="def.title" icon="download" tone="success" :size="size" action @click="emit('open', 'downloads')"><MIcon name="download" class="m-tile__big" /></MTile>
         <MTile v-else-if="tile.id === 'sponsor'" :title="def.title" icon="favorite" tone="tertiary" :size="size" action @click="sponsorOpen = true"><MIcon name="favorite" class="m-tile__big" /></MTile>
-      </template>
+      </div></template>
     </MTileGrid>
+    <MContextMenu ref="contextMenu" @select="onTileContext" />
 
     <MSheet v-model="sponsorOpen" :title="h.sponsorTitle" side="end" :close-label="h.done">
       <MGroup>
@@ -170,3 +183,7 @@ const doStop = async () => { confirmStop.value = false; await stopAll() }
     </MDialog>
   </MPage>
 </template>
+
+<style>
+.home-cell { display: contents; }
+</style>

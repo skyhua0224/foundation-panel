@@ -1123,6 +1123,7 @@ Output only one short sentence, no explanation. Reply in English.`,
       host: 'Host', uptime: 'Up', update: 'Update available', session: 'Streaming session', idle: 'Idle', clients: 'Clients', paired: 'Paired', apps: 'Apps', bitrate: 'Bitrate', latency: 'Host latency', encoder: 'Encoder', hdr: 'HDR', hdrOn: 'On', hdrOff: 'Off',
       memory: 'Memory', gpu: 'Graphics', vdd: 'Virtual display', gamepad: 'Gamepad', mic: 'Microphone', usb: 'USB', ready: 'Ready', errors: 'Errors', warnings: 'warnings', noErrors: 'No errors', pair: 'Pair a client', restart: 'Restart host', logs: 'Logs', downloads: 'Download clients', sponsor: 'Sponsor',
       unavailable: 'No data', on: 'Running', off: 'Stopped', stop: 'Stop streaming', cancel: 'Cancel', sponsorTitle: 'Sponsor the developers', restartTitle: 'Restart Sunshine?', restartText: 'Streaming sessions will be interrupted.', stopTitle: 'Stop streaming?', stopText: 'The running streaming session will end.' },
+    ctx: { open: 'Open', browser: 'Open in browser', resize: 'Change size', remove: 'Remove', edit: 'Edit tiles' },
     padType: 'Controller type',
     back: 'Back',
     stream: {

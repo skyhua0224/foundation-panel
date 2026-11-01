@@ -1123,6 +1123,7 @@ export const zh = {
       host: '主机', uptime: '已运行', update: '有更新', session: '串流会话', idle: '空闲', clients: '客户端', paired: '已配对', apps: '应用', bitrate: '码率', latency: '主机延迟', encoder: '编码器', hdr: 'HDR', hdrOn: '已开启', hdrOff: '关闭',
       memory: '内存', gpu: '显卡', vdd: '虚拟显示器', gamepad: '手柄', mic: '麦克风', usb: 'USB', ready: '已就绪', errors: '错误', warnings: '条警告', noErrors: '没有错误', pair: '配对客户端', restart: '重启主机', logs: '日志', downloads: '下载客户端', sponsor: '赞助',
       unavailable: '暂无数据', on: '运行中', off: '未运行', stop: '停止串流', cancel: '取消', sponsorTitle: '赞助开发者', restartTitle: '重启 Sunshine？', restartText: '串流会话会中断。', stopTitle: '停止串流？', stopText: '正在进行的串流会话将被结束。' },
+    ctx: { open: '打开', browser: '在浏览器中打开', resize: '更改大小', remove: '移除', edit: '编辑磁贴' },
     padType: '手柄类型',
     back: '返回',
     stream: {
