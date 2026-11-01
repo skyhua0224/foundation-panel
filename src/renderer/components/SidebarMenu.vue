@@ -1,11 +1,15 @@
 <template>
   <div class="m-app m-app--scroll panel-shell">
-    <div class="panel-drag" data-tauri-drag-region @pointerdown="onTouchWindowDragStart"></div>
-    <div class="panel-window">
-      <MIconButton icon="remove" :label="t.sidebar.minimize" @click="minimizeWindow" />
-      <MIconButton :icon="isMaximized ? 'filter_none' : 'crop_square'" :label="isMaximized ? t.sidebar.restore : t.sidebar.maximize" @click="toggleMaximize" />
-      <MIconButton icon="close" :label="t.sidebar.hideWindow" @click="closeWindow" />
-    </div>
+    <!-- slim caption bar over the whole window: draggable, the window controls at the end; the pages start below it -->
+    <header class="panel-caption" data-tauri-drag-region @pointerdown="onTouchWindowDragStart">
+      <span class="panel-caption__title" data-tauri-drag-region>Foundation Sunshine</span>
+      <div class="panel-caption__controls">
+        <button type="button" class="panel-caption__btn" :aria-label="t.sidebar.minimize" :data-tip="t.sidebar.minimize" @click="minimizeWindow"><MIcon name="remove" /></button>
+        <button type="button" class="panel-caption__btn" :aria-label="isMaximized ? t.sidebar.restore : t.sidebar.maximize" :data-tip="isMaximized ? t.sidebar.restore : t.sidebar.maximize" @click="toggleMaximize"><MIcon :name="isMaximized ? 'filter_none' : 'crop_square'" /></button>
+        <button type="button" class="panel-caption__btn panel-caption__btn--close" :aria-label="t.sidebar.hideWindow" :data-tip="t.sidebar.hideWindow" @click="closeWindow"><MIcon name="close" /></button>
+      </div>
+    </header>
+    <div class="panel-body">
     <MScene :nav="nav" :rail-items="rail" :texts="sceneTexts" :overlay="isWebPage" storage-key="foundation-ui.panel.list" @rail="onRail">
       <template #list="{ entry }">
         <MNavList
@@ -60,6 +64,7 @@
         <PanelWebHost><slot /></PanelWebHost>
       </template>
     </MScene>
+    </div>
     <MContextMenu ref="contextMenu" @select="onContextSelect" />
     <UpdateDialog
       v-if="showUpdateDialog"
@@ -75,7 +80,7 @@
 <script setup>
 import { computed, defineAsyncComponent, ref, toRef, watch, onMounted } from 'vue'
 import { sunshine } from '../tauri-adapter.js'
-import { MScene, MNavList, MIconButton, MContextMenu, useAnnouncementBadge } from 'foundation-ui/vue'
+import { MScene, MNavList, MIconButton, MIcon, MContextMenu, useAnnouncementBadge } from 'foundation-ui/vue'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
 import VddSettings from './VddSettings.vue'
@@ -202,9 +207,15 @@ defineExpose({
 </script>
 
 <style lang="less">
-.panel-shell { position: relative; }
-.panel-drag { position: fixed; top: 0; left: 0; right: 132px; height: 32px; z-index: 6; }
-.panel-window { position: fixed; top: 4px; right: 8px; z-index: 40; display: flex; gap: 0; }
-.panel-window .m-icon-btn { width: 40px; height: 32px; border-radius: 9999px; font-size: 18px; }
-.panel-shell .m-scene--list-detail .m-scene__pane--detail .m-page, .panel-shell .m-scene--single .m-page, .panel-shell .m-scene__pane--supporting .m-page { --m-bar-end: 132px; }
+.panel-shell { position: relative; display: flex; flex-direction: column; height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+.panel-caption { flex: none; position: relative; z-index: 40; display: flex; align-items: stretch; justify-content: space-between; height: 40px; background: var(--m-page); user-select: none; }
+.panel-caption__title { align-self: center; padding-inline-start: 16px; font: 600 12px/1 var(--md-ref-typeface-brand); letter-spacing: .02em; color: var(--md-sys-color-on-surface-variant); }
+.panel-caption__controls { display: flex; }
+.panel-caption__btn { display: grid; place-items: center; width: 46px; height: 40px; padding: 0; border: 0; background: transparent; color: var(--md-sys-color-on-surface); font-size: 18px; cursor: default; transition: background-color 120ms linear, color 120ms linear; }
+.panel-caption__btn:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 9%, transparent); }
+.panel-caption__btn:active { background: color-mix(in srgb, var(--md-sys-color-on-surface) 14%, transparent); }
+.panel-caption__btn--close:hover { background: #c42b1c; color: #fff; } .panel-caption__btn--close:active { background: #b02417; color: #fff; }
+.panel-caption__btn:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px; }
+.panel-body { position: relative; flex: 1; min-height: 0; }
+.panel-body > .m-scene { position: absolute; inset: 0; height: auto; }
 </style>
