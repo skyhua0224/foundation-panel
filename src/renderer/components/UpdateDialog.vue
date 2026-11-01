@@ -1,113 +1,61 @@
 <template>
-  <el-dialog
-    v-model="visible"
-    :title="dialogTitle"
-    width="min(720px, 92vw)"
-    :close-on-click-modal="isLatest"
-    :close-on-press-escape="isLatest || (!isInstalling && !isDownloading)"
-    :show-close="!isInstalling && !isDownloading"
-  >
+  <MSheet v-model="visible" :title="dialogTitle" side="end" :persistent="!isLatest && (isInstalling || isDownloading)" :close-label="t.updateDialog.close">
     <div class="update-dialog-content">
-
-      <!-- 更新说明 -->
       <div v-if="updateInfo?.release_notes" class="release-notes">
         <div class="notes-content" v-html="parsedReleaseNotes"></div>
       </div>
 
-      <!-- 下载进度 (仅新版本) -->
       <div v-if="!isLatest && isDownloading" class="download-progress">
-        <div class="download-status">
-          <span v-if="downloadPhase !== 'complete'" class="download-spinner"></span>
-          <span v-else class="download-complete-mark">✓</span>
-          <p class="progress-text">{{ downloadStatusText }}</p>
-          <span
-            v-if="downloadPhase === 'downloading' && downloadSource"
-            class="download-source-chip"
-          >
-            {{ downloadSource }}
-          </span>
-        </div>
-        <el-progress
-          v-if="downloadProgress > 0"
-          :percentage="downloadProgress"
-          :stroke-width="8"
-          :show-text="false"
-          :status="downloadPhase === 'complete' ? 'success' : undefined"
-        />
+        <MStatusPill :icon="downloadPhase === 'complete' ? 'check_circle' : 'download'" :label="downloadStatusText" :tone="downloadPhase === 'complete' ? 'ok' : ''" :action="false" />
+        <MProgress :value="downloadProgress > 0 ? downloadProgress / 100 : null" :label="downloadStatusText" />
+        <MChip v-if="downloadPhase === 'downloading' && downloadSource" icon="cloud">{{ downloadSource }}</MChip>
       </div>
 
-      <!-- 安装包已就绪 (下载完成或上次已下载) -->
-      <div v-if="!isLatest && installReady" class="install-ready-panel">
-        <p class="install-note">{{ t.updateDialog.installReadyHint }}</p>
-      </div>
+      <MBanner v-if="!isLatest && installReady" tone="info" icon="check_circle">{{ t.updateDialog.installReadyHint }}</MBanner>
 
-      <!-- 安装提示 (仅新版本) -->
       <div v-if="!isLatest && isInstalling" class="install-progress-panel">
-        <div class="install-status">
-          <span class="install-spinner" :class="{ failed: installStage === 'failed' }"></span>
-          <div>
-            <p class="install-current">{{ currentInstallMessage }}</p>
-            <p v-if="installDetail" class="install-detail">{{ installDetail }}</p>
-          </div>
-        </div>
-
-        <ol class="install-steps">
-          <li
+        <MStatusPill :icon="installStage === 'failed' ? 'error' : 'sync'" :label="currentInstallMessage" :tone="installStage === 'failed' ? 'error' : ''" :action="false" />
+        <MGroup>
+          <MCheckItem
             v-for="(step, index) in installSteps"
             :key="step.key"
-            :class="getInstallStepStatus(index)"
-          >
-            <span class="step-dot"></span>
-            <span class="step-label">{{ step.label }}</span>
-          </li>
-        </ol>
-
-        <p class="install-note">{{ t.updateDialog.installDoNotRepeat }}</p>
-        <p v-if="installWaitHint" class="install-wait-hint">{{ installWaitHint }}</p>
+            :title="step.label"
+            :state="{ done: 'ok', failed: 'error', active: 'pending', pending: 'pending' }[getInstallStepStatus(index)]"
+          />
+        </MGroup>
+        <MFooter v-if="installDetail">{{ installDetail }}</MFooter>
+        <MFooter>{{ t.updateDialog.installDoNotRepeat }}</MFooter>
+        <MFooter v-if="installWaitHint">{{ installWaitHint }}</MFooter>
       </div>
     </div>
 
-    <template #footer>
-      <div class="dialog-footer">
-        <template v-if="isLatest">
-          <el-button @click="handleOpenBrowser">{{ t.updateDialog.viewInBrowser }}</el-button>
-          <el-button type="primary" @click="handleCancel">{{ t.updateDialog.close }}</el-button>
+    <template #actions>
+      <template v-if="isLatest">
+        <MButton variant="text" @click="handleOpenBrowser">{{ t.updateDialog.viewInBrowser }}</MButton>
+        <MButton @click="handleCancel">{{ t.updateDialog.close }}</MButton>
+      </template>
+      <template v-else>
+        <template v-if="showDownloadButtons">
+          <MButton variant="text" icon="open_in_new" @click="handleOpenBrowser">{{ t.updateDialog.openInBrowser }}</MButton>
+          <MButton variant="text" @click="handleSkipVersion">{{ t.updateDialog.skipVersion }}</MButton>
+          <MButton variant="tonal" @click="handleCancel">{{ t.updateDialog.remindLater }}</MButton>
+          <MButton icon="download" :loading="isDownloading" @click="handleDownload">{{ t.updateDialog.downloadAndInstall }}</MButton>
         </template>
-        <template v-else>
-          <template v-if="showDownloadButtons">
-            <el-button @click="handleOpenBrowser">{{ t.updateDialog.openInBrowser }}</el-button>
-            <el-button @click="handleSkipVersion">{{ t.updateDialog.skipVersion }}</el-button>
-            <el-button @click="handleCancel">{{ t.updateDialog.remindLater }}</el-button>
-            <el-button type="primary" :loading="isDownloading" @click="handleDownload">
-              <el-icon><Download /></el-icon>
-              {{ t.updateDialog.downloadAndInstall }}
-            </el-button>
-          </template>
-          <el-button
-            v-if="isDownloading"
-            type="primary"
-            :loading="downloadPhase !== 'complete'"
-            disabled
-          >
-            {{
-              downloadPhase === 'complete'
-                ? t.updateDialog.downloadComplete
-                : t.updateDialog.downloading
-            }}
-          </el-button>
-          <el-button v-if="installReady" @click="handleCancel">{{ t.updateDialog.remindLater }}</el-button>
-          <el-button v-if="installReady" type="primary" @click="handleInstall(downloadedFilePath)">{{ t.updateDialog.installNow }}</el-button>
-          <el-button v-if="isInstalling" type="primary" disabled>{{ t.updateDialog.installing }}</el-button>
-        </template>
-      </div>
+        <MButton v-if="isDownloading" :loading="downloadPhase !== 'complete'" disabled>
+          {{ downloadPhase === 'complete' ? t.updateDialog.downloadComplete : t.updateDialog.downloading }}
+        </MButton>
+        <MButton v-if="installReady" variant="tonal" @click="handleCancel">{{ t.updateDialog.remindLater }}</MButton>
+        <MButton v-if="installReady" @click="handleInstall(downloadedFilePath)">{{ t.updateDialog.installNow }}</MButton>
+        <MButton v-if="isInstalling" disabled>{{ t.updateDialog.installing }}</MButton>
+      </template>
     </template>
-  </el-dialog>
+  </MSheet>
 </template>
 
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Download } from '@element-plus/icons-vue'
+import { MSheet, MStatusPill, MProgress, MBanner, MGroup, MCheckItem, MFooter, MButton, MChip } from 'foundation-ui/vue'
 import { useI18n } from '../desktop/i18n/index.js'
 import { renderReleaseNotes } from '../utils/releaseNotes.js'
 

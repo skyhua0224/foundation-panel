@@ -54,6 +54,9 @@
           @webui-navigate="openWebUi"
         />
       </template>
+      <template #supporting="{ entry }">
+        <GamepadState v-if="entry.id === 'gamepad-state'" :runtime="runtime" />
+      </template>
       <template #overlay>
         <PanelWebHost><slot /></PanelWebHost>
       </template>
@@ -73,6 +76,7 @@
 import { computed, defineAsyncComponent, toRef, watch, onMounted } from 'vue'
 import { MScene, MNavList, MIconButton } from 'foundation-ui/vue'
 import PanelHome from './PanelHome.vue'
+import GamepadState from './m3e/GamepadState.vue'
 import PanelWebHost from './PanelWebHost.vue'
 import VddSettings from './VddSettings.vue'
 import Welcome from './welcome.vue'

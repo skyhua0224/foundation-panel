@@ -41,7 +41,7 @@ export const PAGES = {
   [ROUTES.WEB_APPS]: { rail: 'stream' },
   [ROUTES.WEB_CONFIG]: { rail: 'stream' },
   [ROUTES.WEB_DOWNLOADS]: { rail: 'stream' },
-  [ROUTES.GAMEPAD]: { rail: 'input' },
+  [ROUTES.GAMEPAD]: { rail: 'input', supporting: 'gamepad-state' },
   [ROUTES.MICROPHONE]: { rail: 'input' },
   [ROUTES.USB]: { rail: 'input' },
   [ROUTES.VDD_SETTINGS]: { rail: 'display' },
@@ -81,7 +81,7 @@ export const webPathOf = (route) => ({
 
 const routes = {}
 for (const rail of new Set(Object.values(PAGES).filter((p) => p.list !== false).map((p) => p.rail))) routes[`${rail}:list`] = { role: 'list', rail }
-for (const [id, p] of Object.entries(PAGES)) routes[id] = { role: 'detail', rail: p.rail, list: p.list }
+for (const [id, p] of Object.entries(PAGES)) routes[id] = { role: 'detail', rail: p.rail, list: p.list, supporting: p.supporting }
 
 let nav = null
 const shared = () => (nav ||= createNav({ routes, home: ROUTES.HOME }))
