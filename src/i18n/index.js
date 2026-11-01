@@ -69,6 +69,12 @@ export function getDefaultLocale() {
     return saved
   }
 
+  // 面板自己的语言设置（desktop/i18n 使用的 'language'）优先于浏览器语言
+  const panelLang = localStorage.getItem('language')
+  if (panelLang && supportedLocales.find((l) => l.code === panelLang)) {
+    return panelLang
+  }
+
   // 尝试从浏览器语言获取
   const browserLang = navigator.language || navigator.userLanguage
   const langCode = browserLang.split('-')[0]

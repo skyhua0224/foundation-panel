@@ -2,13 +2,13 @@
   <MSection :title="t.deviceHub.tabs.tools">
     <MSkeleton v-if="!initialized" :rows="2" />
     <MGroup v-else>
-      <MItem icon="sports_esports" :title="t.controllersHub.peripherals.meta.title" :text="t.controllersHub.peripherals.meta.hint">
+      <MItem icon="sports_esports" :title="t.controllersHub.peripherals.meta.title">
         <template #trail>
           <MChip :tone="!probeFailed && metaStatus.installed ? 'ok' : 'neutral'">{{ probeFailed ? t.deviceHub.probeUnavailable : (metaStatus.installed ? (metaStatus.version ? 'v' + metaStatus.version : t.controllersHub.peripherals.installed) : t.controllersHub.peripherals.notInstalled) }}</MChip>
           <MButton size="sm" :disabled="refreshing || probeFailed" @click="emit('open-controller-meta')">{{ t.controllersHub.peripherals.meta.launch }}</MButton>
         </template>
       </MItem>
-      <MItem icon="edit" :title="t.controllersHub.peripherals.stylus.title" :text="t.controllersHub.peripherals.stylus.hint">
+      <MItem icon="edit" :title="t.controllersHub.peripherals.stylus.title">
         <template #trail><MButton size="sm" :disabled="refreshing" @click="emit('open-stylus-input-probe')">{{ t.controllersHub.peripherals.stylus.launch }}</MButton></template>
       </MItem>
     </MGroup>

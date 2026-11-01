@@ -1120,10 +1120,12 @@ Output only one short sentence, no explanation. Reply in English.`,
     nav: { overview: 'Overview', stream: 'Stream', input: 'Input & devices', display: 'Display', system: 'System', settings: 'Panel settings', help: 'Help & about', main: 'Main navigation' },
     search: 'Search', noResults: 'No results', clear: 'Clear', resize: 'Resize list', shortcuts: 'Keyboard shortcuts', shortcutHelp: 'Show shortcuts', section: 'Go to section',
     home: { edit: 'Edit tiles', done: 'Done', add: 'Add tile', reset: 'Reset to default', remove: 'Remove', resize: 'Change size', earlier: 'Move earlier', later: 'Move later', addTitle: 'Add a tile', nothing: 'All tiles are on the page',
+      cpu: 'CPU', gpuLoad: 'GPU', loss: 'Packet loss', notReported: 'Not reported by the client', dropped: 'frames dropped', micOn: 'In use',
       host: 'Host', uptime: 'Up', update: 'Update available', session: 'Streaming session', idle: 'Idle', clients: 'Clients', paired: 'Paired', apps: 'Apps', bitrate: 'Bitrate', latency: 'Host latency', encoder: 'Encoder', hdr: 'HDR', hdrOn: 'On', hdrOff: 'Off',
       memory: 'Memory', gpu: 'Graphics', vdd: 'Virtual display', gamepad: 'Gamepad', mic: 'Microphone', usb: 'USB', ready: 'Ready', errors: 'Errors', warnings: 'warnings', noErrors: 'No errors', pair: 'Pair a client', restart: 'Restart host', logs: 'Logs', downloads: 'Download clients', sponsor: 'Sponsor',
       unavailable: 'No data', on: 'Running', off: 'Stopped', stop: 'Stop streaming', cancel: 'Cancel', sponsorTitle: 'Sponsor the developers', restartTitle: 'Restart Sunshine?', restartText: 'Streaming sessions will be interrupted.', stopTitle: 'Stop streaming?', stopText: 'The running streaming session will end.' },
     ctx: { open: 'Open', browser: 'Open in browser', resize: 'Change size', remove: 'Remove', edit: 'Edit tiles' },
+    state: { host: 'Host', pads: 'Gamepads', usb: 'USB/IP', none: 'None connected', connected: '{n} connected' },
     padType: 'Controller type',
     back: 'Back',
     stream: {
@@ -1482,7 +1484,7 @@ Output only one short sentence, no explanation. Reply in English.`,
         "applied": "{name} preset applied; save to keep it."
       },
       "pending": {
-        "title": "Not available yet",
+        "title": "Not implemented by the host yet",
         "hint": "These options are not connected in this version.",
         "reason": "Not available in this version",
         "count": "{count} options"

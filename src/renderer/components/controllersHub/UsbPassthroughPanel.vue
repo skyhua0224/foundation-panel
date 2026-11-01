@@ -4,7 +4,7 @@
     <UsbTransportPanel :transport="transport" />
     <MSection :title="t.deviceHub.usb.manualTitle" :description="t.deviceHub.usb.exporterHint">
       <MGroup>
-        <MItem action icon="folder_open" :title="t.deviceHub.usb.manualTitle" :text="t.deviceHub.usb.securityHint" @click="manualOpen = !manualOpen"><template #trail><MIcon :name="manualOpen ? 'keyboard_arrow_up' : 'keyboard_arrow_down'" /></template></MItem>
+        <MItem action icon="folder_open" :title="t.deviceHub.usb.manualTitle" @click="manualOpen = !manualOpen"><template #trail><MIcon :name="manualOpen ? 'keyboard_arrow_up' : 'keyboard_arrow_down'" /></template></MItem>
       </MGroup>
       <form v-if="manualOpen" class="m-usb__discover" @submit.prevent="discover">
         <md-outlined-text-field class="m-usb__host" :label="t.deviceHub.usb.hostPlaceholder" :value="remote" autocomplete="off" :disabled="!status.ready || discovering" @input="remote = $event.target.value" />
@@ -29,7 +29,6 @@
         </MItem>
       </MGroup>
     </MSection>
-    <MNotice :title="t.deviceHub.usb.boundaryTitle">{{ t.deviceHub.usb.boundaryHint }}</MNotice>
   </div>
 </template>
 

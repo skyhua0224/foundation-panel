@@ -1,26 +1,36 @@
 <template>
-  <MPage :title="t('greeting')" class="m-welcome">
-    <img src="../public/gura-pix.png" class="m-welcome__art" alt="Sunshine">
-    <form class="m-welcome__form" @submit.prevent="handleSubmit">
-      <MBanner tone="warn" icon="warning">{{ t('create_creds_alert') }}</MBanner>
+  <MWelcome :title="t('greeting')" icon="shield" :rows="[{ icon: 'warning', tone: 'tertiary', text: t('create_creds_alert') }]">
+    <template #top>
+      <label class="welcome-lang">
+        <MIcon name="language" />
+        <select v-model="currentLocale" :aria-label="supportedLocales.find((l) => l.code === currentLocale)?.name" @change="handleLocaleChange">
+          <option v-for="loc in supportedLocales" :key="loc.code" :value="loc.code">{{ loc.name }}</option>
+        </select>
+      </label>
+    </template>
+    <template #intro><p class="welcome-sub">{{ t('create_creds') }}</p></template>
+
+    <form id="panel-welcome-form" class="welcome-form" @submit.prevent="handleSubmit">
       <MGroup>
         <MFieldItem v-model="formData.username" :label="t('username')" autocomplete="username" />
         <MFieldItem v-model="formData.password" type="password" :label="t('password')" autocomplete="new-password" required />
         <MFieldItem v-model="formData.confirmPassword" type="password" :label="t('confirm_password')" autocomplete="new-password" required :error="showPasswordError ? t('password_mismatch') : ''" :supporting="showPasswordSuccess ? t('password_match') : ''" />
-        <MChoiceItem v-model="currentLocale" icon="translate" title="Language / 语言" :options="supportedLocales.map((l) => ({ value: l.code, label: l.name }))" cancel-label="×" @update:model-value="handleLocaleChange" />
       </MGroup>
-      <MNotice v-if="errorMessage" tone="error">{{ errorMessage }}</MNotice>
-      <MNotice v-if="successMessage" icon="check_circle">{{ successMessage }}</MNotice>
-      <MButton class="m-welcome__submit" type="submit" size="lg" :loading="loading" :disabled="loading || !isFormValid">{{ t('login') }}</MButton>
     </form>
-  </MPage>
+    <MBanner v-if="errorMessage" tone="error" icon="error">{{ errorMessage }}</MBanner>
+    <MBanner v-if="successMessage" tone="info" icon="check_circle">{{ successMessage }}</MBanner>
+
+    <template #actions>
+      <MButton type="submit" form="panel-welcome-form" size="lg" icon="login" :loading="loading" :disabled="loading || !isFormValid">{{ t('login') }}</MButton>
+    </template>
+  </MWelcome>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { supportedLocales, setLocale as setI18nLocale, getDefaultLocale, useWelcomeI18n } from '../../i18n/index.js'
 import { sunshine } from '../tauri-adapter.js'
-import { MPage, MGroup, MFieldItem, MChoiceItem, MBanner, MNotice, MButton } from 'foundation-ui/vue'
+import { MWelcome, MGroup, MFieldItem, MBanner, MButton, MIcon } from 'foundation-ui/vue'
 
 const REDIRECT_DELAY = 2000
 
@@ -114,7 +124,7 @@ onMounted(() => {
 </script>
 
 <style>
-.m-welcome__art { align-self: center; width: min(55%, 220px); image-rendering: pixelated; margin: 8px 0 4px; }
-.m-welcome__form { display: flex; flex-direction: column; gap: 12px; }
-.m-welcome__submit { width: 100%; height: 56px; }
+.welcome-lang { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 14px; border-radius: 20px; background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); }
+.welcome-lang select { border: 0; outline: 0; background: transparent; color: var(--md-sys-color-on-surface); font: var(--m-label-large); cursor: pointer; }
+.welcome-sub { margin: 0; text-align: center; color: var(--md-sys-color-on-surface-variant); font: var(--m-body-medium); }
 </style>

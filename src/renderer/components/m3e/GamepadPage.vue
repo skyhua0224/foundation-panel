@@ -11,10 +11,11 @@
       <MGroup v-else>
         <MChoiceItem v-model="gt.selectedMode.value" icon="sports_esports" :title="t.m3e.padType" :options="typeOptions" :disabled="gt.busyKey.value !== ''" :cancel-label="t.common.cancel" />
         <MItem action icon="apps" :title="t.controllersHub.emulation.perAppTitle" @click="open('per-game')" />
+        <MItem action icon="settings_input_component" :title="t.deviceHub.controllerAdvanced" @click="askAdvanced('emulation', 'emulation')" />
       </MGroup>
 
       <template v-if="dsVisible">
-        <MGroup>
+        <MGroup v-if="!withStatusPane">
           <MItem action icon="info" title="DualSense" :value="statusLabel" @click="open('status')" />
         </MGroup>
         <template v-if="tuning.snapshot.value">
@@ -28,7 +29,6 @@
           <MSection :title="tr('title')">
             <MGroup>
               <MItem v-for="card in tuning.cards.value" :key="card.id" action :icon="CARD_ICONS[card.id] || 'tune'" :title="tr('cards.' + card.id)" @click="open('card/' + card.id)" />
-              <MItem v-if="tuning.pendingRows.value.length" action icon="schedule" :title="tr('pending.title')" @click="open('pending')"><template #trail><span class="m-item__count">{{ tuning.pendingRows.value.length }}</span></template></MItem>
               <MItem action icon="build" :title="tr('advanced')" @click="askAdvanced('advanced')"><template #trail><span class="m-item__count">{{ tuning.advancedTotal.value }}</span></template></MItem>
             </MGroup>
           </MSection>
@@ -37,9 +37,6 @@
         <MNotice v-else-if="tuning.loadError.value && !tuning.unsupported.value" tone="error" :title="tr('load_failed')">{{ tuning.loadError.value }}<template #action><MButton size="sm" @click="tuning.load">{{ tr('retry') }}</MButton></template></MNotice>
       </template>
 
-      <MGroup>
-        <MItem action icon="settings_input_component" :title="t.deviceHub.controllerAdvanced" @click="askAdvanced('emulation', 'emulation')" />
-      </MGroup>
     </template>
 
     <!-- Per-game types -->
@@ -93,6 +90,7 @@
       </MGroup>
       <MEmpty v-if="!tuning.groups.value.length" icon="search" :title="tr('no_matches')" />
       <MGroup v-else>
+        <MItem v-if="tuning.pendingRows.value.length" action icon="schedule" :title="tr('pending.title')" @click="open('pending')"><template #trail><span class="m-item__count">{{ tuning.pendingRows.value.length }}</span></template></MItem>
         <MItem v-for="group in tuning.groups.value" :key="group.id" action :title="tr('groups.' + group.id)" @click="open('advanced/' + group.id)"><template #trail><span class="m-item__count">{{ group.wired.length + group.pending.length }}</span></template></MItem>
       </MGroup>
     </template>
@@ -129,7 +127,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, inject, onMounted, reactive, ref, watch } from 'vue'
 import { MPage, MGroup, MSection, MItem, MChoiceItem, MSeg, MButton, MIconButton, MNotice, MFooter, MOverflow, MSwitchItem, MField, MEmpty, MSkeleton, MDialog, MIcon, useSubpage } from 'foundation-ui/vue'
 const CARD_ICONS = { haptics: 'mobile_vibrate', vibration: 'mobile_vibrate', lighting: 'lightbulb', light: 'lightbulb', triggers: 'touch_app', trigger: 'touch_app', motion: 'sensors', audio: 'volume_up', sticks: 'gamepad', touchpad: 'touch_app' }
 import AdvancedWarningDialog from '../dualsense/AdvancedWarningDialog.vue'
@@ -179,6 +177,9 @@ const title = computed(() => {
   if (c === 'emulation') return t.value.deviceHub.controllerAdvanced
   return ''
 })
+const scene = inject('m-scene', null)
+// With the supporting pane beside the page the state is shown there; the row would repeat it.
+const withStatusPane = computed(() => scene?.kind.value === 'list-detail-supporting')
 const refreshAll = () => Promise.all([refresh({ force: true }), tuning.load()])
 
 // Both advanced entries ask first (five seconds, "do not show again") unless the warning was switched off.

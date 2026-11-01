@@ -8,10 +8,9 @@
       </MItem>
     </MGroup>
     <MNotice v-if="statusProbeFailed || (status.detail && status.installed)" tone="error">{{ friendlyError(status.detail) }}</MNotice>
-    <MNotice v-if="statusLoaded && !statusProbeFailed && status.supported && !status.ready && !needsCleanup">
-      {{ t.deviceHub.usb.setupHint }}
-      <template #action><MButton size="sm" :loading="installing" :disabled="transportBusy" @click="installTransport">{{ t.deviceHub.usb.installTransport }}</MButton></template>
-    </MNotice>
+    <MGroup v-if="statusLoaded && !statusProbeFailed && status.supported && !status.ready && !needsCleanup">
+      <MItem action icon="download" :title="t.deviceHub.usb.installTransport" :disabled="transportBusy || installing" @click="installTransport" />
+    </MGroup>
     <MNotice v-if="statusLoaded && !statusProbeFailed && status.supported && needsCleanup" tone="warn">
       {{ t.deviceHub.usb.residualHint }}
       <template #action><MButton size="sm" variant="danger" :loading="cleaning" :disabled="transportBusy" @click="cleanupResidual">{{ t.deviceHub.usb.cleanupResidual }}</MButton></template>
@@ -22,7 +21,7 @@
       <MItem v-if="detailOpen" plain :title="''"><pre class="m-pre">{{ status.detail }}</pre></MItem>
     </MGroup>
     <MGroup v-if="maintenance && statusLoaded && !statusProbeFailed && status.installed && !needsCleanup">
-      <MItem icon="build" :title="t.deviceHub.components.maintenance" :text="attachedDevices.length ? t.deviceHub.components.releaseDevices : t.deviceHub.components.cleanupHint">
+      <MItem icon="build" :title="t.deviceHub.components.maintenance">
         <template #trail><MButton size="sm" variant="danger" :loading="cleaning" :disabled="transportBusy || attachedDevices.length > 0" @click="cleanupResidual">{{ t.deviceHub.components.uninstallTransport }}</MButton></template>
       </MItem>
     </MGroup>

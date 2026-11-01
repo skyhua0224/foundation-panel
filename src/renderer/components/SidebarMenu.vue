@@ -201,5 +201,5 @@ defineExpose({
 .panel-drag { position: fixed; top: 0; left: 0; right: 132px; height: 32px; z-index: 6; }
 .panel-window { position: fixed; top: 4px; right: 8px; z-index: 40; display: flex; gap: 0; }
 .panel-window .m-icon-btn { width: 40px; height: 32px; border-radius: 9999px; font-size: 18px; }
-.panel-shell .m-page__bar { padding-right: 132px; }
+.panel-shell .m-scene--list-detail .m-scene__pane--detail .m-page, .panel-shell .m-scene--single .m-page, .panel-shell .m-scene__pane--supporting .m-page { --m-bar-end: 132px; }
 </style>

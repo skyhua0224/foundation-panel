@@ -27,6 +27,15 @@ test('setLocale persists and rejects unknown codes', () => {
   assert.equal(setLocale('klingon'), false)
 })
 
+test('the welcome page follows the panel language setting before the browser language', () => {
+  globalThis.localStorage.store = { language: 'zh' }
+  assert.equal(getDefaultLocale(), 'zh')
+  // an explicit choice on the welcome page itself wins over the panel setting
+  globalThis.localStorage.store = { language: 'zh', 'sunshine-locale': 'en' }
+  assert.equal(getDefaultLocale(), 'en')
+  globalThis.localStorage.store = {}
+})
+
 test('getDefaultLocale matches browser language over the default', () => {
   globalThis.localStorage.store = {}
   Object.defineProperty(globalThis, 'navigator', { value: { language: 'de-DE' }, configurable: true })

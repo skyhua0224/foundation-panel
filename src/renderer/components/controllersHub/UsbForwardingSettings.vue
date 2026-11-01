@@ -7,21 +7,21 @@
     <MNotice v-else-if="!supported">{{ text.updateHost }}</MNotice>
     <template v-else>
       <MGroup>
-        <MSwitchItem v-model="enabled" icon="usb" :title="text.allowClients" :text="enabled && !transportReady ? text.prepareTransport : ''" :disabled="saving" />
-        <MItem action icon="settings_ethernet" :title="text.advancedPort" :text="portOpen ? '' : (port ? String(port) : text.autoPortHint)" @click="portOpen = !portOpen">
+        <MSwitchItem v-model="enabled" icon="usb" :title="text.allowClients" :disabled="saving" />
+        <MItem action icon="settings_ethernet" :title="text.advancedPort" :value="port ? String(port) : '0'" @click="portOpen = !portOpen">
           <template #trail><MIcon :name="portOpen ? 'keyboard_arrow_up' : 'keyboard_arrow_down'" /></template>
         </MItem>
-        <MItem v-if="portOpen" plain :title="text.forwardingPort" :text="validPort ? text.autoPortHint : ''">
+        <MItem v-if="portOpen" plain :title="text.forwardingPort">
           <template #trail>
             <md-outlined-text-field class="m-port-field" type="number" min="0" max="65535" :value="port" :error="!validPort" :disabled="saving" :aria-label="text.forwardingPort" @input="port = Number($event.target.value)" />
           </template>
         </MItem>
       </MGroup>
       <p v-if="!validPort" aria-live="polite" class="m-section__desc" style="color: var(--md-sys-color-error)">{{ text.invalidForwardingPort }}</p>
+      <MNotice v-if="enabled && !transportReady" tone="warn">{{ text.prepareTransport }}</MNotice>
       <MNotice v-if="saveError" tone="error" :title="text.saveConfigFailed" />
       <div class="m-actions-row">
         <MButton :loading="saving" :disabled="!dirty || !validPort || saving" @click="save">{{ text.saveConfig }}</MButton>
-        <span class="m-muted m-small">{{ text.restartHint }}</span>
       </div>
     </template>
   </MSection>

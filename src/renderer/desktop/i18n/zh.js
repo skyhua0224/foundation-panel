@@ -1120,10 +1120,12 @@ export const zh = {
     nav: { overview: '概览', stream: '串流', input: '输入与外设', display: '显示', system: '系统', settings: '面板设置', help: '帮助与关于', main: '主导航' },
     search: '搜索', noResults: '没有结果', clear: '清除', resize: '调整列表宽度', shortcuts: '键盘快捷键', shortcutHelp: '显示快捷键', section: '切换栏目',
     home: { edit: '编辑磁贴', done: '完成', add: '添加磁贴', reset: '恢复默认', remove: '移除', resize: '更改大小', earlier: '前移', later: '后移', addTitle: '添加磁贴', nothing: '所有磁贴都已在页面上',
+      cpu: 'CPU', gpuLoad: 'GPU', loss: '丢包', notReported: '客户端未上报', dropped: '帧被丢弃', micOn: '使用中',
       host: '主机', uptime: '已运行', update: '有更新', session: '串流会话', idle: '空闲', clients: '客户端', paired: '已配对', apps: '应用', bitrate: '码率', latency: '主机延迟', encoder: '编码器', hdr: 'HDR', hdrOn: '已开启', hdrOff: '关闭',
       memory: '内存', gpu: '显卡', vdd: '虚拟显示器', gamepad: '手柄', mic: '麦克风', usb: 'USB', ready: '已就绪', errors: '错误', warnings: '条警告', noErrors: '没有错误', pair: '配对客户端', restart: '重启主机', logs: '日志', downloads: '下载客户端', sponsor: '赞助',
       unavailable: '暂无数据', on: '运行中', off: '未运行', stop: '停止串流', cancel: '取消', sponsorTitle: '赞助开发者', restartTitle: '重启 Sunshine？', restartText: '串流会话会中断。', stopTitle: '停止串流？', stopText: '正在进行的串流会话将被结束。' },
     ctx: { open: '打开', browser: '在浏览器中打开', resize: '更改大小', remove: '移除', edit: '编辑磁贴' },
+    state: { host: '主机', pads: '手柄', usb: 'USB/IP', none: '未连接', connected: '{n} 个已连接' },
     padType: '手柄类型',
     back: '返回',
     stream: {
@@ -1544,7 +1546,7 @@ export const zh = {
         "count": "{count} 项",
         "hint": "当前版本还没有接入这些选项。",
         "reason": "当前版本暂未开放",
-        "title": "暂未开放"
+        "title": "主机尚未实现"
       },
       "presets": {
         "applied": "已应用“{name}”预设，保存后生效。",
