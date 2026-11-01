@@ -32,7 +32,7 @@
 
       <div ref="chatContainer" class="ai-chat" aria-live="polite" @wheel="handleChatWheel">
         <div v-if="chatHistory.length === 0" class="ai-hint">
-          <img src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="ai-avatar ai-avatar--lg">
+          <img src="/sunshine-girl-256.png" :alt="t.aiAssistant.mitaName" class="ai-avatar ai-avatar--lg">
           <b>{{ t.aiAssistant.welcomeMsg }}</b>
           <div class="ai-examples">
             <button v-for="example in exampleQueries" :key="example" type="button" class="ai-example" :disabled="!config.enabled" @click="selectExample(example)">{{ example }}</button>
@@ -40,7 +40,7 @@
         </div>
         <div v-for="(msg, idx) in chatHistory" :key="idx" class="ai-msg" :class="msg.role">
           <span v-if="msg.role === 'user'" class="ai-avatar ai-avatar--user"><MIcon name="person" /></span>
-          <img v-else src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="ai-avatar">
+          <img v-else src="/sunshine-girl-256.png" :alt="t.aiAssistant.mitaName" class="ai-avatar">
           <div class="ai-bubble">
             <div class="ai-text" v-html="formatMessage(msg.content, msg.parsedAction)"></div>
             <div v-if="msg.parsedAction" class="ai-action">
@@ -51,7 +51,7 @@
             <MButton v-if="msg.isError" size="sm" variant="text" icon="refresh" @click="retryLastMessage">{{ t.aiAssistant.retry }}</MButton>
           </div>
         </div>
-        <div v-if="isLoading" class="ai-msg assistant"><img src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="ai-avatar"><div class="ai-bubble"><MLoading size="28px" /></div></div>
+        <div v-if="isLoading" class="ai-msg assistant"><img src="/sunshine-girl-256.png" :alt="t.aiAssistant.mitaName" class="ai-avatar"><div class="ai-bubble"><MLoading size="28px" /></div></div>
       </div>
 
       <div class="ai-composer">

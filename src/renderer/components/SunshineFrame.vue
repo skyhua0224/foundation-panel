@@ -9,7 +9,7 @@
       <transition name="fade-loading">
         <div v-if="loading" class="loading-overlay">
           <div class="loading-container">
-            <img src="../public/gura-pix.png" class="loading-image" alt="Loading" />
+            <img src="../public/sunshine-girl-1024.png" class="loading-image" alt="Loading" />
             <div class="loading-text">
               <template v-if="proxyHealthFailed">
                 <p class="proxy-health-error">{{ t.sunshineFrame.proxyUnavailable }}</p>
@@ -46,6 +46,7 @@ import { isNativeControlPanelMessage, isTrustedNativeControlPanelMessage } from 
 import { useI18n } from '../desktop/i18n/index.js'
 import SidebarMenu from './SidebarMenu.vue'
 import { isWebuiNavigationPath } from '../composables/webuiNavigation.js'
+import { parseSettingsHash } from 'foundation-ui/settings/index.js'
 
 invoke('main_panel_loading').catch(() => {})
 const { t } = useI18n()
@@ -175,8 +176,21 @@ let savedIframeUrl = ''
 // 窗口隐藏/最小化时的 iframe URL 保存（与 tab 切换分开追踪）
 let windowSuspendedUrl = ''
 
+// A place inside the page that is already open (/config#tab=av&focus=hevc_mode): the page is told, nothing reloads
+const settingsPlaceMessage = (path) => {
+  const at = path.indexOf('#')
+  if (at < 0 || path.slice(0, at) !== '/config' || !sunshineUrl.value || sunshineUrl.value === 'about:blank') return false
+  if (new URL(sunshineUrl.value, window.location.href).pathname.replace(/\.html$/, '') !== '/config') return false
+  const place = parseSettingsHash(path.slice(at))
+  const frame = sunshineIframe.value?.contentWindow
+  if (!place || !frame) return false
+  frame.postMessage({ type: 'foundation-settings-go', ...place }, new URL(sunshineUrl.value, window.location.href).origin)
+  currentPath.value = path
+  return true
+}
 const handleWebuiNavigate = (path) => {
   if (!isWebuiNavigationPath(path)) return
+  if (settingsPlaceMessage(path)) return
   requestedWebuiPath = path
   savedIframeUrl = ''
   windowSuspendedUrl = ''
