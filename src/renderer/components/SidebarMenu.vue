@@ -77,7 +77,7 @@
 <script setup>
 import { computed, defineAsyncComponent, ref, toRef, watch, onMounted } from 'vue'
 import { sunshine } from '../tauri-adapter.js'
-import { MScene, MNavList, MIconButton, MContextMenu } from 'foundation-ui/vue'
+import { MScene, MNavList, MIconButton, MContextMenu, useAnnouncementBadge } from 'foundation-ui/vue'
 import PanelHome from './PanelHome.vue'
 import GamepadState from './m3e/GamepadState.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -145,7 +145,10 @@ const toolsMenuItems = computed(() => createUtilityTools(toolsCtx))
 const nav = router.nav
 const isWebPage = computed(() => !!webPathOf(router.currentRoute.value))
 const back = () => nav.pop()
-const rail = computed(() => railItems(t.value))
+const announceVersion = ref('')
+onMounted(async () => { try { announceVersion.value = (await sunshine.getVersion()) || '' } catch { /* the version only narrows version-bound notices */ } })
+const { unread: announcementsUnread } = useAnnouncementBadge({ locale, version: announceVersion })
+const rail = computed(() => railItems(t.value).map((item) => (item.id === 'overview' && announcementsUnread.value ? { ...item, badge: announcementsUnread.value } : item)))
 const railLabel = (id) => t.value.m3e.nav[id]
 const runtimeView = computed(() => ({ ...runtime, micLabel: micLabel.value }))
 const micLabel = computed(() => t.value.deviceHub.microphone.statusLabels[microphoneOverviewState(runtime.mic || {})] || '')
@@ -175,6 +178,8 @@ const actions_openUrl = async (item) => {
 }
 // Old call sites speak in short ids; each maps to a destination.
 const openDestination = (id) => {
+  if (id === 'welcome') { openWelcome(); return }
+  if (id.startsWith('downloads:')) { emit('webui-navigate', `/downloads?platform=${encodeURIComponent(id.slice(10))}`); router.navigate(ROUTES.WEB_DOWNLOADS); return }
   const web = { clients: ROUTES.WEB_CLIENTS, apps: ROUTES.WEB_APPS, settings: ROUTES.WEB_CONFIG, downloads: ROUTES.WEB_DOWNLOADS }
   const route = web[id] || { gamepad: ROUTES.GAMEPAD, microphone: ROUTES.MICROPHONE, usb: ROUTES.USB, vdd: ROUTES.VDD_SETTINGS, quality: ROUTES.HDR_ENHANCED, components: ROUTES.COMPONENTS, diagnostics: ROUTES.DIAGNOSTICS, assistant: ROUTES.AI_ASSISTANT }[id]
   if (route) openRoute(route)

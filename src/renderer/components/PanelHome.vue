@@ -1,6 +1,6 @@
 <script setup>
-import { computed, ref } from 'vue'
-import { MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, buildHomeModel, homeTexts } from 'foundation-ui/vue'
+import { computed, ref, watch } from 'vue'
+import { MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, MHomeGuide, useAnnouncements, useGuideCard, buildHomeModel, buildGuideSteps, guidePlatforms, guideRecommended, homeTexts } from 'foundation-ui/vue'
 import { usePanelHome } from '../composables/usePanelHome.js'
 import { useGamepadType } from '../composables/useGamepadType.js'
 import { SPONSORS } from '../config/sponsors.js'
@@ -18,6 +18,17 @@ const { state, proxyUrl, session, uptimeMs, perfSession, restart, stopAll, openT
 const pad = useGamepadType()
 
 const dashTexts = computed(() => ({ done: h.value.done, reset: h.value.reset, earlier: h.value.earlier, later: h.value.later, addTitle: h.value.addTitle, nothing: h.value.nothing, hide: h.value.remove }))
+const announcements = useAnnouncements({ locale, version: computed(() => state.version) })
+const announceOpen = ref(false)
+const announceTexts = computed(() => { const x = homeTexts(locale.value); return { open: x.annOpen, dismiss: x.annDismiss, all: x.annAll, read: x.annRead, none: x.annNone } })
+const T = computed(() => homeTexts(locale.value))
+const SEEN_KEY = 'foundation-ui.guide.panel-home.sessionSeen'
+const sessionSeen = ref(localStorage.getItem(SEEN_KEY) === '1')
+watch(() => !!session.value || (state.recent?.length || 0) > 0, (v) => { if (v && !sessionSeen.value) { sessionSeen.value = true; try { localStorage.setItem(SEEN_KEY, '1') } catch { /* storage unavailable */ } } }, { immediate: true })
+const guide = useGuideCard('panel-home', () => (state.loaded ? buildGuideSteps(T.value, { paired: state.clientsTotal, sessionSeen: sessionSeen.value, apps: state.apps }) : []))
+const guideTexts = computed(() => ({ title: T.value.guideTitle, sub: T.value.guideSub, continue: T.value.guideContinue, dismiss: T.value.guideDismiss, downloadTitle: T.value.downloadTitle }))
+const STEP_TARGET = { download: 'downloads', pair: 'clients', game: 'apps' }
+const onGuideStep = (s) => { if (STEP_TARGET[s.id]) emit('open', STEP_TARGET[s.id]); else guide.toggle(s.id) }
 const edit = ref(false)
 const sponsorOpen = ref(false)
 const confirmRestart = ref(false)
@@ -89,9 +100,15 @@ const supportSections = computed(() => [
       <MIconButton icon="favorite" :label="h.sponsor" @click="sponsorOpen = true" />
       <MIconButton :icon="edit ? 'check' : 'edit'" :label="edit ? h.done : h.edit" @click="edit = !edit" />
     </template>
-    <MHomeDash v-model:edit="edit" :model="model" storage-key="panel-home" :texts="dashTexts"
+    <MAnnouncementStrip v-if="announcements.top.value" :item="announcements.top.value" :total="announcements.list.value.length" :texts="announceTexts" @dismiss="announcements.dismiss" @open-url="openExternalUrl" @open-list="announceOpen = true" />
+    <MHomeDash v-model:edit="edit" :guide="guide.visible.value" :model="model" storage-key="panel-home" :texts="dashTexts"
       @hero-action="onHero" @strip-group="onStripGroup" @strip-switch="onStripSwitch" @table-action="onTableAction" @link="onLink"
-      @table-row="() => emit('open', 'clients')" @app="() => emit('open', 'apps')" />
+      @table-row="() => emit('open', 'clients')" @app="() => emit('open', 'apps')">
+      <template #guide>
+        <MHomeGuide :steps="guide.steps.value" :platforms="guidePlatforms(T)" :recommended="guideRecommended(T)" :texts="guideTexts" @toggle="guide.toggle" @step="onGuideStep" @continue="emit('open', 'welcome')" @dismiss="guide.dismiss" @download="(id) => emit('open', `downloads:${id}`)" />
+      </template>
+    </MHomeDash>
+    <MAnnouncementSheet v-model="announceOpen" :items="announcements.list.value" :title="homeTexts(locale).annTitle" :texts="announceTexts" :close-label="h.done" @dismiss="announcements.dismiss" @open-url="openExternalUrl" />
     <MSupportSheet v-model="sponsorOpen" :title="h.sponsor" :sections="supportSections" :close-label="h.done" @open="(it) => openExternalUrl(it.url)" />
     <MDialog v-model="confirmRestart" :title="h.restartTitle" icon="restart_alt" tone="info">
       <p>{{ h.restartText }}</p>
