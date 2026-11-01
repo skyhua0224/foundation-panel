@@ -216,6 +216,12 @@
       </section>
     </template>
 
+    <AdvancedWarningDialog
+      :show="advancedWarningOpen"
+      @cancel="advancedWarningOpen = false"
+      @confirm="confirmAdvancedWarning"
+    />
+
     <Transition name="ds5t-bar">
       <div v-if="tuning.dirtyCount.value > 0 || tuning.saving.value" class="ds5t-savebar" role="region" :aria-label="tr('save')">
         <div class="ds5t-savebar-inner">
@@ -243,11 +249,13 @@
 import '../styles/DualSenseTuning.less'
 import { onMounted, reactive, ref, watch } from 'vue'
 import { Aim, Clock, MagicStick, Operation, RefreshLeft, Search } from '@element-plus/icons-vue'
+import AdvancedWarningDialog from './dualsense/AdvancedWarningDialog.vue'
 import DualSenseStatusCard from './dualsense/DualSenseStatusCard.vue'
 import TuningColor from './dualsense/TuningColor.vue'
 import TuningRow from './dualsense/TuningRow.vue'
 import TuningTrigger from './dualsense/TuningTrigger.vue'
 import { PRESET_CARDS } from '../composables/dualsenseTuning.js'
+import { isAdvancedWarningHidden, panelStorage, setAdvancedWarningHidden } from '../composables/advancedWarning.js'
 import { DUALSENSE_ICONS as icons } from '../composables/dualsenseIcons.js'
 import { useDualSenseStatus } from '../composables/useDualSenseStatus.js'
 import { useDualSenseTuning } from '../composables/useDualSenseTuning.js'
@@ -260,13 +268,27 @@ const { status, loading: statusLoading, failed: statusFailed, refresh } = useDua
 
 const ADVANCED_KEY = 'ds5.advanced.open'
 const advancedOpen = ref(false)
+const advancedWarningOpen = ref(false)
 const openGroups = reactive({})
 const groupOpen = (id) => tuning.filtering.value || openGroups[id] === true
 const toggleGroup = (id) => {
   openGroups[id] = !openGroups[id]
 }
 const toggleAdvanced = () => {
-  advancedOpen.value = !advancedOpen.value
+  if (advancedOpen.value) {
+    advancedOpen.value = false
+    return
+  }
+  if (isAdvancedWarningHidden(panelStorage())) {
+    advancedOpen.value = true
+    return
+  }
+  advancedWarningOpen.value = true
+}
+const confirmAdvancedWarning = (dontShowAgain) => {
+  if (dontShowAgain) setAdvancedWarningHidden(panelStorage(), true)
+  advancedWarningOpen.value = false
+  advancedOpen.value = true
 }
 
 watch(advancedOpen, (value) => {
@@ -290,7 +312,9 @@ watch(() => status.value?.state, (state, previous) => {
 
 onMounted(() => {
   try {
-    advancedOpen.value = localStorage.getItem(ADVANCED_KEY) === '1'
+    // A section left open is only restored once the warning has been switched off,
+    // so a reload never skips it.
+    advancedOpen.value = localStorage.getItem(ADVANCED_KEY) === '1' && isAdvancedWarningHidden(localStorage)
   } catch {
     advancedOpen.value = false
   }

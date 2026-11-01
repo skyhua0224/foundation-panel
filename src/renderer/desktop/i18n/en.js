@@ -1469,6 +1469,32 @@ Output only one short sentence, no explanation. Reply in English.`,
       },
       "advanced": "Advanced",
       "advanced_hint": "{count} more options, grouped by function",
+      "advanced_warning": {
+        "title": "Before you change advanced options",
+        "tuning": {
+          "intro": "These options change how the virtual controller talks to Windows and to games. A wrong value can cause problems that are hard to trace back to this page:",
+          "risks": [
+            "A game may stop recognising the controller, or show stuck or drifting sticks, missing rumble, triggers or motion.",
+            "The controller can disappear for a game or need to be attached again, which can interrupt a running stream.",
+            "Audio changes can send sound to the wrong device or make it unexpectedly loud.",
+            "Some changes only apply the next time the controller connects, so a problem can show up later and not when you save."
+          ],
+          "outro": "Opening this section does not change anything. If something goes wrong, use Restore defaults at the top of the page."
+        },
+        "emulation": {
+          "intro": "These options change what games see when the controller is emulated as a DualShock 4, and whether motion data is shared with other programs:",
+          "risks": [
+            "Touchpad and motion mappings can make a game react to presses or movement you did not make.",
+            "The motion server lets other programs read the controller's pose over UDP.",
+            "The changes apply after Sunshine restarts, which ends a running stream.",
+            "A mapping that does not suit a game is easy to miss until you are playing."
+          ],
+          "outro": "Opening this section does not change anything. Each option can be switched back at any time."
+        },
+        "dont_show": "Do not show this warning again",
+        "confirm": "Show advanced options",
+        "confirm_wait": "Show advanced options ({seconds})"
+      },
       "search": "Search options",
       "only_modified": "Changed only",
       "show_pending": "Show unavailable",
