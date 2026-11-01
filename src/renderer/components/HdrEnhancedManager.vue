@@ -1,289 +1,84 @@
 <template>
-  <section class="quality-manager">
-    <header class="quality-header">
-      <span class="quality-title-icon" aria-hidden="true">
-        <el-icon><Picture /></el-icon>
-      </span>
-      <div>
-        <h1>{{ text.title }}</h1>
-        <p>{{ text.intro }}</p>
-      </div>
-    </header>
-    <div class="quality-surface">
-      <nav class="quality-tabs" role="tablist" :aria-label="text.title">
-        <button
-          v-for="key in ['components', 'session', 'settings']"
-          :id="`quality-tab-${key}`"
-          :key="key"
-          role="tab"
-          :aria-controls="`quality-${key}`"
-          :aria-selected="tab === key"
-          @click="switchTab(key)"
-        >
-          {{ text[key] }}
-        </button>
-      </nav>
-      <div class="quality-body">
-        <div
-          v-show="tab === 'components'"
-          id="quality-components"
-          role="tabpanel"
-          aria-labelledby="quality-tab-components"
-        >
-          <p class="category-description">{{ text.componentHint }}</p>
-          <div class="enhancement-stack">
-            <EnhancementManager kind="nr" /><EnhancementManager kind="hdr" />
+  <MPage :title="current === 'session' ? text.session : current === 'keys' ? text.keys : current === 'components' ? text.components : text.title" :back="!!current" :back-label="t.m3e.back" @back="goBack">
+    <MBanner v-if="error" tone="error" icon="error">{{ enhancementError(text, error) }}</MBanner>
+
+    <!-- Overlay: the two controls of the page, then where the rest lives -->
+    <template v-if="!current">
+      <MGroup>
+        <MSwitchItem :model-value="visible" icon="picture_in_picture" :title="text.show" :disabled="saving || !loaded" @update:model-value="setVisibility" />
+        <MSliderItem v-model="draftOpacity" icon="opacity" :title="text.opacity" :min="35" :max="95" :step="1" :decimals="0" unit="%" size="m" icon-start="brightness_medium" icon-end="brightness_6" :disabled="saving || !loaded" @commit="save({ opacity: draftOpacity })" />
+      </MGroup>
+      <div class="quality-manager m-quality-preview" aria-hidden="true"><div class="preview-stage">
+        <div class="mini-overlay" :style="{ background: `rgb(14 16 13 / ${draftOpacity / 100})` }">
+          <header><Rank aria-hidden="true" /><i aria-hidden="true" /> DLSS NR <ArrowUp aria-hidden="true" /></header>
+          <div class="mini-body">
+            <div>{{ text.enhancement }}<span class="mini-toggle" /></div>
+            <p>{{ text.previewState }}</p>
+            <footer><kbd>{{ nrShortcutLabel(registration) || text.disabledKey }}</kbd><span>{{ text.action }}</span></footer>
           </div>
         </div>
-        <div
-          v-show="tab === 'session'"
-          id="quality-session"
-          role="tabpanel"
-          aria-labelledby="quality-tab-session"
-        >
-          <div v-if="!online" class="quality-note">
-            {{ text.disconnected }}
-            <button class="quality-link" @click="pollOnce">
-              {{ text.refresh }}
-            </button>
-          </div>
-          <p v-else-if="!pipelines.length" class="quality-note">
-            {{ text.noSession }}
-          </p>
-          <template v-else>
-            <label v-if="pipelines.length > 1 || !pipeline"
-              >{{ text.choose
-              }}<select
-                :value="selectedId ?? ''"
-                :disabled="saving"
-                @change="selectSession(Number($event.target.value))"
-              >
-                <option value="" disabled>{{ text.choose }}</option>
-                <option v-for="p in pipelines" :key="p.id" :value="p.id">
-                  {{ text.stream }} #{{ p.id }} · {{ nrOutputLabel(p) }}
-                </option>
-              </select></label
-            >
-            <div
-              v-if="pipeline && pipelines.length === 1"
-              class="session-identity"
-            >
-              <strong>{{ text.stream }} #{{ pipeline.id }}</strong
-              ><span>{{ text.connected }}</span>
-            </div>
-            <p v-if="selectedId && !pipeline" class="quality-note">
-              {{ text.expired }}
-            </p>
-            <div v-if="pipeline" class="session-grid">
-              <div>
-                <span>{{ text.enhancement }}</span
-                ><strong>{{
-                  overlayText.states[nrOverlayState(pipeline, online)]
-                }}</strong>
-              </div>
-              <div>
-                <span>{{ text.output }}</span
-                ><strong>{{ nrOutputLabel(pipeline) }}</strong>
-              </div>
-            </div>
-            <p
-              v-if="pipeline?.dv_profile && pipeline.dv_state !== 'active'"
-              class="quality-note"
-            >
-              {{
-                pipeline.dv_state === 'waiting'
-                  ? overlayText.dvWaiting
-                  : overlayText.dvFallback
-              }}
-            </p>
-            <NrSessionControls
-              v-if="pipeline"
-              :pipeline="pipeline"
-              :online="online"
-              @changed="pollOnce"
-              @error="error = $event"
-            />
-            <div class="quality-actions">
-              <button
-                class="quality-button primary"
-                :disabled="!pipeline || saving"
-                @click="setVisibility(true)"
-              >
-                <Monitor aria-hidden="true" />{{ text.open }}</button
-              ><button class="quality-button" @click="switchTab('settings')">
-                {{ text.settings }}
-              </button>
-            </div>
+      </div></div>
+      <MGroup>
+        <MItem action icon="cast_connected" :title="text.session" :value="pipelines.length ? `${text.stream} #${pipelines[0].id}` : text.noSession" @click="open('session')" />
+        <MItem action icon="keyboard" :title="text.keys" @click="open('keys')" />
+        <MItem action icon="extension" :title="text.components" @click="open('components')" />
+      </MGroup>
+      <MFooter>{{ saved ? text.saved : text.local }}</MFooter>
+    </template>
+
+    <!-- Current session -->
+    <template v-else-if="current === 'session'">
+      <MBanner v-if="!online" tone="warn" icon="warning">{{ text.disconnected }}<template #actions><MButton variant="text" size="sm" @click="pollOnce">{{ text.refresh }}</MButton></template></MBanner>
+      <MEmpty v-else-if="!pipelines.length" icon="cast_connected" :title="text.noSession" />
+      <template v-else>
+        <MGroup>
+          <MChoiceItem v-if="pipelines.length > 1 || !pipeline" icon="cast_connected" :title="text.choose" :model-value="selectedId ?? ''" :options="pipelines.map((p) => ({ value: p.id, label: `${text.stream} #${p.id} · ${nrOutputLabel(p)}` }))" :disabled="saving" :cancel-label="text.cancel" @update:model-value="(v) => selectSession(Number(v))" />
+          <MItem v-else icon="cast_connected" :title="`${text.stream} #${pipeline.id}`" :value="text.connected" />
+          <template v-if="pipeline">
+            <MItem icon="wand_stars" :title="text.enhancement" :value="overlayText.states[nrOverlayState(pipeline, online)]" />
+            <MItem icon="monitor" :title="text.output" :value="nrOutputLabel(pipeline)" />
           </template>
-          <p class="quality-note">{{ text.sessionHint }}</p>
-        </div>
-        <div
-          v-show="tab === 'settings'"
-          id="quality-settings"
-          role="tabpanel"
-          aria-labelledby="quality-tab-settings"
-          @keydown="captureKey"
-        >
-          <div class="quality-layout">
-            <div>
-              <div class="settings-row">
-                <div>
-                  <h3>{{ text.show }}</h3>
-                  <p>{{ text.showHint }}</p>
-                </div>
-                <el-switch
-                  :model-value="visible"
-                  :disabled="saving || !loaded"
-                  :aria-label="text.show"
-                  @change="setVisibility"
-                />
-              </div>
-              <div class="settings-row block">
-                <label class="range-title" for="quality-opacity"
-                  >{{ text.opacity }}<output>{{ draftOpacity }}%</output></label
-                ><input
-                  id="quality-opacity"
-                  :style="{
-                    '--range-progress': ((draftOpacity - 35) / 60) * 100 + '%'
-                  }"
-                  v-model.number="draftOpacity"
-                  type="range"
-                  min="35"
-                  max="95"
-                  :disabled="saving || !loaded"
-                  @change="save({ opacity: draftOpacity })"
-                />
-              </div>
-              <div class="shortcuts-title">
-                <h3>{{ text.keys }}</h3>
-                <button
-                  class="quality-link"
-                  :disabled="saving || !loaded"
-                  @click="resetShortcuts"
-                >
-                  {{ text.reset }}
-                </button>
-              </div>
-              <div v-for="group in shortcutGroups" :key="group.label" class="shortcut-group">
-                <h4>{{ group.label }}</h4>
-                <div class="shortcut-inputs">
-                  <div
-                    v-for="item in group.inputs"
-                    :key="item.key"
-                    class="shortcut-row"
-                  >
-                    <label :for="`record-${item.key}`">{{ item.gamepad ? text.gamepad : text.keyboard }}</label>
-                    <div class="shortcut-controls">
-                      <select
-                        v-if="item.gamepad"
-                        :id="`record-${item.key}`"
-                        :aria-label="`${group.label} · ${text.gamepad}`"
-                        :value="settings[item.key]"
-                        :disabled="saving || !loaded || !registration.gamepadSupported"
-                        @change="save({ [item.key]: $event.target.value })"
-                      >
-                        <option value="">{{ text.unset }}</option>
-                        <option v-for="option in FIXED_GAMEPAD_SHORTCUTS" :key="option" :value="option">
-                          {{ displayGamepadShortcut(option) }}
-                        </option>
-                      </select>
-                      <button
-                        v-else
-                        :id="`record-${item.key}`"
-                        :aria-label="`${group.label} · ${text.keyboard}`"
-                        class="quality-button record"
-                        :class="{ recording: recording === item.key }"
-                        :disabled="saving || !loaded"
-                        @click="startRecording(item.key)"
-                      >
-                        <span>{{
-                          recording === item.key
-                            ? text.record
-                            : displayShortcut(settings[item.key]) || text.unset
-                        }}</span
-                        ><Keyboard aria-hidden="true" /></button
-                      ><button
-                        v-if="!item.gamepad"
-                        class="quality-link"
-                        :disabled="saving || !loaded || !settings[item.key]"
-                        @click="clearShortcut(item.key)"
-                      >
-                        {{ text.clear }}
-                      </button>
-                    </div>
-                    <p
-                      v-if="!item.gamepad && settings[item.key] && !registration[item.registered]"
-                      class="quality-warning"
-                      role="status"
-                      aria-live="polite"
-                    >
-                      {{ text.statusUnavailable }}
-                    </p>
-                  </div>
-                </div>
-              </div>
-              <p class="quality-note">{{ text.keyHint }}</p>
-              <p class="quality-note">{{ text.gamepadHint }}</p>
-              <p v-if="loaded && !registration.gamepadSupported" class="quality-note" role="status">{{ text.gamepadUnsupported }}</p>
-              <p v-if="recording" class="record-hint" role="status">
-                {{ text.recordHint }}
-                <button class="quality-link" @click="cancelRecording">{{ text.cancel }}</button>
-              </p>
-            </div>
-            <aside>
-              <div class="preview-title">
-                {{ text.preview }} <span>DLSS NR</span>
-              </div>
-              <div class="preview-stage">
-                <div
-                  class="mini-overlay"
-                  :style="{
-                    background: `rgb(14 16 13 / ${draftOpacity / 100})`
-                  }"
-                >
-                  <header><Rank aria-hidden="true" /><i aria-hidden="true" /> DLSS NR <ArrowUp aria-hidden="true" /></header>
-                  <div class="mini-body">
-                    <div>
-                      {{ text.enhancement }}<span class="mini-toggle" />
-                    </div>
-                    <p>{{ text.previewState }}</p>
-                    <footer>
-                      <kbd>{{
-                        nrShortcutLabel(registration) || text.disabledKey
-                      }}</kbd
-                      ><span>{{ text.action }}</span>
-                    </footer>
-                  </div>
-                </div>
-              </div>
-              <p class="quality-note">{{ text.previewHint }}</p>
-            </aside>
-          </div>
-        </div>
-        <div
-          v-if="error || tab === 'settings'"
-          class="quality-feedback"
-          :class="{ failure: error }"
-          role="status"
-          aria-live="polite"
-        >
-          {{
-            error
-              ? enhancementError(text, error)
-              : saved
-                ? text.saved
-                : text.local
-          }}
-        </div>
-      </div>
+        </MGroup>
+        <MNotice v-if="selectedId && !pipeline" tone="warn">{{ text.expired }}</MNotice>
+        <MBanner v-if="pipeline?.dv_profile && pipeline.dv_state !== 'active'" tone="info" icon="info">{{ pipeline.dv_state === 'waiting' ? overlayText.dvWaiting : overlayText.dvFallback }}</MBanner>
+        <NrSessionControls v-if="pipeline" :pipeline="pipeline" :online="online" @changed="pollOnce" @error="error = $event" />
+        <MButton v-if="pipeline" icon="monitor" :disabled="saving" @click="setVisibility(true)">{{ text.open }}</MButton>
+      </template>
+      <MFooter>{{ text.sessionHint }}</MFooter>
+    </template>
+
+    <!-- Shortcuts: press a key while a row records -->
+    <div v-else-if="current === 'keys'" class="m-quality-keys" @keydown="captureKey">
+      <MBanner v-if="recording" tone="info" icon="keyboard">{{ text.recordHint }}<template #actions><MButton variant="text" size="sm" @click="cancelRecording">{{ text.cancel }}</MButton></template></MBanner>
+      <MSection v-for="group in shortcutGroups" :key="group.label" :title="group.label">
+        <MGroup>
+          <template v-for="item in group.inputs" :key="item.key">
+            <MChoiceItem v-if="item.gamepad" icon="sports_esports" :title="text.gamepad" :model-value="settings[item.key] || ''" :options="[{ value: '', label: text.unset }, ...FIXED_GAMEPAD_SHORTCUTS.map((o) => ({ value: o, label: displayGamepadShortcut(o) }))]" :disabled="saving || !loaded || !registration.gamepadSupported" :cancel-label="text.cancel" @update:model-value="(v) => save({ [item.key]: v })" />
+            <MItem v-else action icon="keyboard" :title="text.keyboard" :value="recording === item.key ? text.record : displayShortcut(settings[item.key]) || text.unset" :disabled="saving || !loaded" @click="startRecording(item.key)">
+              <template v-if="settings[item.key]" #trail><MIconButton icon="close" :label="text.clear" :disabled="saving || !loaded" @click.stop="clearShortcut(item.key)" /></template>
+            </MItem>
+          </template>
+        </MGroup>
+        <MFooter v-for="item in group.inputs.filter((i) => !i.gamepad && settings[i.key] && !registration[i.registered])" :key="item.key">{{ text.statusUnavailable }}</MFooter>
+      </MSection>
+      <MFooter>{{ text.keyHint }} {{ text.gamepadHint }}</MFooter>
+      <MFooter v-if="loaded && !registration.gamepadSupported">{{ text.gamepadUnsupported }}</MFooter>
+      <MButton variant="text" icon="restart_alt" :disabled="saving || !loaded" @click="resetShortcuts">{{ text.reset }}</MButton>
     </div>
-  </section>
+
+    <!-- Components -->
+    <template v-else-if="current === 'components'">
+      <div class="enhancement-stack"><EnhancementManager kind="nr" /><EnhancementManager kind="hdr" /></div>
+      <MFooter>{{ text.componentHint }}</MFooter>
+    </template>
+  </MPage>
 </template>
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { ArrowUp, Monitor, Picture, Rank } from '@element-plus/icons-vue'
+import { ArrowUp, Rank } from '@element-plus/icons-vue'
+import { MPage, MGroup, MSection, MItem, MSwitchItem, MSliderItem, MChoiceItem, MBanner, MNotice, MEmpty, MFooter, MButton, MIconButton, useSubpage } from 'foundation-ui/vue'
 import { displayGamepadShortcut, FIXED_GAMEPAD_SHORTCUTS } from '../composables/controllerButtons.js'
 import NrSessionControls from './NrSessionControls.vue'
 import EnhancementManager from './EnhancementManager.vue'
@@ -308,7 +103,8 @@ import { EditPen as Keyboard } from '@element-plus/icons-vue'
 const { locale } = useI18n()
 const text = computed(() => enhancementControlsText(locale.value)),
   overlayText = computed(() => nrOverlayText(locale.value))
-const tab = ref('components')
+const t = useI18n().t
+const { current, open, back } = useSubpage('quality')
 const settings = ref({ nrShortcut: '', overlayShortcut: '', nrGamepad: '', overlayGamepad: '', opacity: 62 }),
   registration = ref({})
 const draftOpacity = ref(62),
@@ -399,9 +195,9 @@ async function resetShortcuts() {
   await cancelRecording()
   await save({ nrShortcut: DEFAULT_NR_SHORTCUT, overlayShortcut: '', nrGamepad: '', overlayGamepad: '' })
 }
-function switchTab(key) {
+function goBack() {
   void cancelRecording()
-  tab.value = key
+  back()
 }
 async function setVisibility(value) {
   try {
@@ -497,3 +293,8 @@ onUnmounted(() => {
 </script>
 
 <style src="../styles/EnhancementManager.css"></style>
+<style>
+.m-quality-preview { margin: 4px 0; border-radius: 28px; overflow: hidden; }
+.m-quality-preview svg { width: 14px; height: 14px; flex: none; }
+.m-quality-preview .preview-stage { min-height: 0; }
+</style>
