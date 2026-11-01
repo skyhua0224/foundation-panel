@@ -41,7 +41,7 @@ export const PAGES = {
   [ROUTES.WEB_APPS]: { rail: 'stream' },
   [ROUTES.WEB_CONFIG]: { rail: 'stream' },
   [ROUTES.WEB_DOWNLOADS]: { rail: 'stream' },
-  [ROUTES.GAMEPAD]: { rail: 'input', supporting: 'gamepad-state' },
+  [ROUTES.GAMEPAD]: { rail: 'input' },
   [ROUTES.MICROPHONE]: { rail: 'input' },
   [ROUTES.USB]: { rail: 'input' },
   [ROUTES.VDD_SETTINGS]: { rail: 'display' },

@@ -15,7 +15,7 @@
       </MGroup>
 
       <template v-if="dsVisible">
-        <MGroup v-if="!withStatusPane">
+        <MGroup>
           <MItem action icon="info" title="DualSense" :value="statusLabel" @click="open('status')" />
         </MGroup>
         <template v-if="tuning.snapshot.value">
@@ -127,7 +127,7 @@
 </template>
 
 <script setup>
-import { computed, inject, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { MPage, MGroup, MSection, MItem, MChoiceItem, MSeg, MButton, MIconButton, MNotice, MFooter, MOverflow, MSwitchItem, MField, MEmpty, MSkeleton, MDialog, MIcon, useSubpage } from 'foundation-ui/vue'
 const CARD_ICONS = { haptics: 'mobile_vibrate', vibration: 'mobile_vibrate', lighting: 'lightbulb', light: 'lightbulb', triggers: 'touch_app', trigger: 'touch_app', motion: 'sensors', audio: 'volume_up', sticks: 'gamepad', touchpad: 'touch_app' }
 import AdvancedWarningDialog from '../dualsense/AdvancedWarningDialog.vue'
@@ -177,9 +177,7 @@ const title = computed(() => {
   if (c === 'emulation') return t.value.deviceHub.controllerAdvanced
   return ''
 })
-const scene = inject('m-scene', null)
 // With the supporting pane beside the page the state is shown there; the row would repeat it.
-const withStatusPane = computed(() => scene?.kind.value === 'list-detail-supporting')
 const refreshAll = () => Promise.all([refresh({ force: true }), tuning.load()])
 
 // Both advanced entries ask first (five seconds, "do not show again") unless the warning was switched off.

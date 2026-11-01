@@ -55,9 +55,6 @@
           @webui-navigate="openWebUi"
         />
       </template>
-      <template #supporting="{ entry }">
-        <GamepadState v-if="entry.id === 'gamepad-state'" :runtime="runtime" />
-      </template>
       <template #overlay>
         <PanelWebHost><slot /></PanelWebHost>
       </template>
@@ -79,7 +76,6 @@ import { computed, defineAsyncComponent, ref, toRef, watch, onMounted } from 'vu
 import { sunshine } from '../tauri-adapter.js'
 import { MScene, MNavList, MIconButton, MContextMenu, useAnnouncementBadge } from 'foundation-ui/vue'
 import PanelHome from './PanelHome.vue'
-import GamepadState from './m3e/GamepadState.vue'
 import PanelWebHost from './PanelWebHost.vue'
 import VddSettings from './VddSettings.vue'
 import Welcome from './welcome.vue'
