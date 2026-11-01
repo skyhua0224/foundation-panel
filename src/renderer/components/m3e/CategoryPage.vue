@@ -1,6 +1,7 @@
 <script setup>
 import { computed } from 'vue'
-import { MPage, MSection, MGroup, MItem, MChip } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MChip, MHero } from 'foundation-ui/vue'
+import { microphoneOverviewState } from '../../composables/deviceHubStatus.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
 const props = defineProps({
@@ -40,11 +41,8 @@ const entries = computed(() => {
   }
   return lists[props.category] || []
 })
-const micState = computed(() => {
-  const mic = props.runtime.mic || {}
-  if (mic.error_code) return 'error'
-  return mic.online ? 'active' : mic.device_created ? 'ready' : 'idle'
-})
+const micState = computed(() => microphoneOverviewState(props.runtime.mic || {}))
+const readyCount = computed(() => [dsReady.value, !!props.runtime.usb?.ready, props.runtime.mic?.component_available].filter(Boolean).length)
 const head = computed(() => ({
   stream: { title: m.value.stream.title, lead: m.value.stream.lead },
   input: { title: m.value.input.title, lead: m.value.input.lead },
@@ -56,6 +54,7 @@ const lead = { gamepad: 'primary', microphone: 'tertiary', usb: 'success' }
 
 <template>
   <MPage :title="head.title" :lead="head.lead">
+    <MHero v-if="category === 'input'" :tone="readyCount === 3 ? 'success' : 'tertiary'" :icon="readyCount === 3 ? 'check_circle' : 'info'" :title="m.input.summary.replace('{count}', readyCount).replace('{total}', 3)" />
     <MSection>
       <MGroup>
         <MItem v-for="entry in entries" :key="entry.id" action chevron :icon="entry.icon" :title="entry.title" :text="entry.text" :tone="lead[entry.id] || ''" @click="emit('open', entry.id)">

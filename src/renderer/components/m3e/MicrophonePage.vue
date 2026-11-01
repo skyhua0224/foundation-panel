@@ -168,7 +168,7 @@ onActivated(() => {
 onDeactivated(stopPolling)
 onUnmounted(() => { disposed = true; stopPolling() })
 
-const heroTone = computed(() => ({ 'state-error': 'neutral', 'state-ready': 'success', 'state-active': 'success' }[statusTone.value] || 'tertiary'))
+const heroTone = computed(() => ({ 'state-ready': 'success', 'state-active': 'success' }[statusTone.value] || 'neutral'))
 const heroIcon = computed(() => (loadError.value ? 'error' : state.value === 'idle' || state.value === 'unknown' ? 'mic' : 'check_circle'))
 const backendOptions = computed(() => MICROPHONE_BACKENDS.map((value) => ({ value, label: text.value.backends[value] })))
 const diagnosticsOpen = ref(false)
