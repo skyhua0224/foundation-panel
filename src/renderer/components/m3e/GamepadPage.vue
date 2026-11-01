@@ -9,27 +9,27 @@
     <template v-if="!current">
       <MNotice v-if="gt.unreachable.value" tone="error">{{ t.controllersHub.emulation.sunshineUnreachable }}<template #action><MButton size="sm" :loading="gt.loading.value" @click="gt.loadConfig">{{ t.controllersHub.emulation.retry }}</MButton></template></MNotice>
       <MGroup v-else>
-        <MChoiceItem v-model="gt.selectedMode.value" :title="t.m3e.padType" :options="typeOptions" :disabled="gt.busyKey.value !== ''" :cancel-label="t.common.cancel" />
-        <MItem action :title="t.controllersHub.emulation.perAppTitle" chevron @click="open('per-game')" />
+        <MChoiceItem v-model="gt.selectedMode.value" icon="sports_esports" :title="t.m3e.padType" :options="typeOptions" :disabled="gt.busyKey.value !== ''" :cancel-label="t.common.cancel" />
+        <MItem action icon="apps" :title="t.controllersHub.emulation.perAppTitle" @click="open('per-game')" />
       </MGroup>
 
       <template v-if="dsVisible">
         <MGroup>
-          <MItem action title="DualSense" :value="statusLabel" @click="open('status')" />
+          <MItem action icon="info" title="DualSense" :value="statusLabel" @click="open('status')" />
         </MGroup>
         <template v-if="tuning.snapshot.value">
           <MGroup>
-            <MItem :title="tr('presets.title')">
-              <template #trail>
-                <MSeg :model-value="tuning.selectedPreset.value" :label="tr('presets.title')" :options="presetOptions" @update:model-value="tuning.applyPreset" />
+            <MItem :title="tr('presets.title')" icon="tune" stack>
+              <template #control>
+                <MSeg block :model-value="tuning.selectedPreset.value" :label="tr('presets.title')" :options="presetOptions" @update:model-value="tuning.applyPreset" />
               </template>
             </MItem>
           </MGroup>
           <MSection :title="tr('title')">
             <MGroup>
-              <MItem v-for="card in tuning.cards.value" :key="card.id" action chevron :title="tr('cards.' + card.id)" @click="open('card/' + card.id)" />
-              <MItem v-if="tuning.pendingRows.value.length" action :title="tr('pending.title')" :value="String(tuning.pendingRows.value.length)" @click="open('pending')" />
-              <MItem action :title="tr('advanced')" :value="String(tuning.advancedTotal.value)" @click="askAdvanced('advanced')" />
+              <MItem v-for="card in tuning.cards.value" :key="card.id" action :icon="CARD_ICONS[card.id] || 'tune'" :title="tr('cards.' + card.id)" @click="open('card/' + card.id)" />
+              <MItem v-if="tuning.pendingRows.value.length" action icon="schedule" :title="tr('pending.title')" @click="open('pending')"><template #trail><span class="m-item__count">{{ tuning.pendingRows.value.length }}</span></template></MItem>
+              <MItem action icon="build" :title="tr('advanced')" @click="askAdvanced('advanced')"><template #trail><span class="m-item__count">{{ tuning.advancedTotal.value }}</span></template></MItem>
             </MGroup>
           </MSection>
         </template>
@@ -38,7 +38,7 @@
       </template>
 
       <MGroup>
-        <MItem action chevron :title="t.deviceHub.controllerAdvanced" @click="askAdvanced('emulation', 'emulation')" />
+        <MItem action icon="settings_input_component" :title="t.deviceHub.controllerAdvanced" @click="askAdvanced('emulation', 'emulation')" />
       </MGroup>
     </template>
 
@@ -66,7 +66,7 @@
           <template #action><MButton size="sm" @click="emit('manage-components')">{{ tx('status.install.open') }}</MButton></template>
         </MNotice>
         <MSection :title="t.deviceHub.tabs.tools">
-          <MGroup><MItem action :title="tr('open_meta')" @click="emit('open-controller-meta')" /></MGroup>
+          <MGroup><MItem action icon="gamepad" :title="tr('open_meta')" @click="emit('open-controller-meta')"><template #trail><MIcon name="open_in_new" /></template></MItem></MGroup>
         </MSection>
         <MFooter>{{ nextText }}</MFooter>
       </template>
@@ -93,7 +93,7 @@
       </MGroup>
       <MEmpty v-if="!tuning.groups.value.length" icon="search" :title="tr('no_matches')" />
       <MGroup v-else>
-        <MItem v-for="group in tuning.groups.value" :key="group.id" action chevron :title="tr('groups.' + group.id)" :value="String(group.wired.length + group.pending.length)" @click="open('advanced/' + group.id)" />
+        <MItem v-for="group in tuning.groups.value" :key="group.id" action :title="tr('groups.' + group.id)" @click="open('advanced/' + group.id)"><template #trail><span class="m-item__count">{{ group.wired.length + group.pending.length }}</span></template></MItem>
       </MGroup>
     </template>
     <template v-else-if="current.startsWith('advanced/')">
@@ -130,7 +130,8 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { MPage, MGroup, MSection, MItem, MChoiceItem, MSeg, MButton, MIconButton, MNotice, MFooter, MOverflow, MSwitchItem, MField, MEmpty, MSkeleton, MDialog, useSubpage } from 'foundation-ui/vue'
+import { MPage, MGroup, MSection, MItem, MChoiceItem, MSeg, MButton, MIconButton, MNotice, MFooter, MOverflow, MSwitchItem, MField, MEmpty, MSkeleton, MDialog, MIcon, useSubpage } from 'foundation-ui/vue'
+const CARD_ICONS = { haptics: 'mobile_vibrate', vibration: 'mobile_vibrate', lighting: 'lightbulb', light: 'lightbulb', triggers: 'touch_app', trigger: 'touch_app', motion: 'sensors', audio: 'volume_up', sticks: 'gamepad', touchpad: 'touch_app' }
 import AdvancedWarningDialog from '../dualsense/AdvancedWarningDialog.vue'
 import AdvancedControllerOptions from '../controllersHub/AdvancedControllerOptions.vue'
 import TuningRow from '../dualsense/TuningRow.vue'
@@ -156,7 +157,7 @@ const { status, loading: statusLoading, failed: statusFailed, refresh } = useDua
 
 const dsVisible = computed(() => gt.hasDs5Selection.value)
 const typeOptions = computed(() => gt.modeOptions.value.map((o) => ({ value: o.value, label: o.label, text: o.hint })))
-const presetOptions = computed(() => PRESET_CARDS.map((p) => ({ value: p.name, label: tr('presets.' + p.name) })))
+const presetOptions = computed(() => PRESET_CARDS.map((p) => ({ value: p.name, label: tr('presets.' + p.name), icon: { default: 'tune', competitive: 'bolt', immersive: 'graphic_eq', legacy: 'history' }[p.name] || 'tune' })))
 const statusLabel = computed(() => (status.value ? tx('status.states.' + status.value.state) : ''))
 const statusRowsView = computed(() => statusRows(status.value, (path, params) => tx('status.values.' + path, params)))
 const needsTransport = computed(() => ['usbip_missing', 'usbip_version', 'usbip_unsigned', 'usbip_not_ready'].includes(status.value?.state))

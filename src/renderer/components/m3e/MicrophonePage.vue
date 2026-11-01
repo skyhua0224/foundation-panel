@@ -3,21 +3,21 @@
     <template #actions>
       <MIconButton icon="refresh" :label="t.deviceHub.refresh" :disabled="loading || testing" @click="refresh({ force: true })" />
     </template>
-    <MHero :tone="heroTone" :icon="heroIcon" :title="loadError ? t.deviceHub.statusUnavailable : text.statusLabels[state]" :text="loadError ? '' : text.summaries[state]">
-      <MButton variant="filled" icon="play_arrow" :loading="testing" :disabled="!canTest || testing" @click="runTest">{{ testing ? text.testing : text.test }}</MButton>
-    </MHero>
-
-    <MNotice v-if="!loadError && componentMissing" tone="warn" :title="text.missingTitle">
-      {{ status.configured_backend === 'auto' ? text.missingHintAuto : text.missingHintUsb }}
-      <template #action>
-        <div class="m-notice__actions">
-          <MButton v-if="status.configured_backend === 'usbip_experimental'" size="sm" :loading="savingBackend" @click="chooseBackend('vb_cable')">{{ text.useVbCable }}</MButton>
-          <MButton size="sm" variant="tonal" @click="emit('manage-components')">{{ text.installTransport }}</MButton>
-        </div>
+    <MStatusPill :icon="loadError ? 'error' : heroIcon" :label="loadError ? t.deviceHub.statusUnavailable : text.statusLabels[state]" :tone="loadError ? 'error' : heroTone === 'success' ? 'ok' : heroTone === 'warning' ? 'warn' : ''" :action="false">
+      <template #actions>
+        <MButton variant="tonal" icon="play_arrow" :loading="testing" :disabled="!canTest || testing" @click="runTest">{{ testing ? text.testing : text.test }}</MButton>
       </template>
-    </MNotice>
-    <MNotice v-if="!loadError && status.fallback_reason" :title="text.fallback">{{ text.fallbackReason.replace('{reason}', errorText(status.fallback_reason)) }}</MNotice>
-    <MNotice v-if="!loadError && problemCode" tone="error" :title="text.problem">{{ errorText(problemCode) }}</MNotice>
+    </MStatusPill>
+
+    <MBanner v-if="!loadError && componentMissing" tone="warn" icon="warning">
+      <b>{{ text.missingTitle }}</b><br>{{ status.configured_backend === 'auto' ? text.missingHintAuto : text.missingHintUsb }}
+      <template #actions>
+        <MButton v-if="status.configured_backend === 'usbip_experimental'" size="sm" variant="text" :loading="savingBackend" @click="chooseBackend('vb_cable')">{{ text.useVbCable }}</MButton>
+        <MButton size="sm" variant="text" @click="emit('manage-components')">{{ text.installTransport }}</MButton>
+      </template>
+    </MBanner>
+    <MBanner v-if="!loadError && status.fallback_reason" tone="info" icon="info"><b>{{ text.fallback }}</b><br>{{ text.fallbackReason.replace('{reason}', errorText(status.fallback_reason)) }}</MBanner>
+    <MBanner v-if="!loadError && problemCode" tone="error" icon="error"><b>{{ text.problem }}</b><br>{{ errorText(problemCode) }}</MBanner>
 
     <MSection :title="text.backend">
       <MGroup>
@@ -35,8 +35,8 @@
         <MItem icon="extension" :title="text.component" :text="status.component_available ? text.componentReady : text.componentMissing">
           <template #trail><MChip :tone="status.component_available ? 'ok' : 'warn'" :icon="status.component_available ? 'check_circle' : 'warning'">{{ status.component_available ? text.componentReady : text.componentMissing }}</MChip></template>
         </MItem>
-        <MItem icon="info" :title="text.defaultsNote" />
-      </MGroup>
+              </MGroup>
+      <MFooter>{{ text.defaultsNote }}</MFooter>
     </MSection>
 
     <MSection v-if="!loadError && (usesUsbip || status.device_created)" :title="text.diagnostics">
@@ -55,7 +55,7 @@
 <script setup>
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MPage, MSection, MGroup, MItem, MChip, MHero, MSeg, MNotice, MButton, MIconButton, MSkeleton } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MChip, MStatusPill, MBanner, MFooter, MSeg, MNotice, MButton, MIconButton, MSkeleton } from 'foundation-ui/vue'
 import { virtualMicrophone } from '../../tauri-adapter.js'
 import { micStatusChannel } from '../../composables/deviceStatusStore.js'
 import {

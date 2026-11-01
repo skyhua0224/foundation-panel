@@ -1,5 +1,5 @@
 <template>
-  <MPage :title="heading.title" :lead="heading.description">
+  <MPage :title="heading.title">
     <template v-if="page === ROUTES.PANEL_SETTINGS">
       <MSection :title="t.sidebar.appearanceLanguage">
         <MGroup>
@@ -33,8 +33,8 @@
       </MSection>
       <MSection :title="t.sidebar.accountSettings">
         <MGroup>
-          <MItem action chevron icon="key" :title="t.sidebar.accountCredentials" :text="t.sidebar.accountDescription" @click="emit('webui-navigate', '/password')" />
-          <MItem action icon="logout" tone="error" :title="t.sidebar.logout" :text="t.sidebar.logoutDescription" @click="emit('webui-navigate', '/password#logout')" />
+          <MItem action icon="key" :title="t.sidebar.accountCredentials" :text="t.sidebar.accountDescription" @click="emit('webui-navigate', '/password')" />
+          <MItem action icon="logout" :title="t.sidebar.logout" :text="t.sidebar.logoutDescription" @click="emit('webui-navigate', '/password#logout')" />
         </MGroup>
       </MSection>
       <MSection :title="t.sidebar.maintenance">
@@ -49,21 +49,28 @@
       </MSection>
     </template>
     <template v-else>
+      <MPromo :title="t.sidebar.clientDownloads" text="Moonlight / VoidLink" icon="download" @click="emit('webui-navigate', '/downloads')" />
+      <MPromo :title="t.m3e.home.sponsor" :text="t.m3e.home.sponsorTitle" icon="favorite" tone="primary" @click="sponsorOpen = true" />
       <MSection>
         <MGroup>
           <MItem action icon="public" :title="t.sidebar.officialWebsite" text="AlkaidLab" @click="actions.openUrl('https://www.alkaidlab.com/')"><template #trail><MIcon name="open_in_new" /></template></MItem>
-          <MItem action chevron icon="download" :title="t.sidebar.clientDownloads" text="Moonlight / VoidLink" @click="emit('webui-navigate', '/downloads')" />
-          <MItem action chevron icon="bug_report" :title="t.sidebar.diagnostics" :text="t.sidebar.diagnosticsDescription" @click="emit('webui-navigate', '/troubleshooting')" />
+          <MItem action icon="bug_report" :title="t.sidebar.diagnostics" :text="t.sidebar.diagnosticsDescription" @click="emit('webui-navigate', '/troubleshooting')" />
         </MGroup>
+        <MFooter>Foundation Sunshine · {{ currentVersion }}</MFooter>
       </MSection>
-      <p class="m-version-note">Foundation Sunshine · {{ currentVersion }}</p>
+      <MSheet v-model="sponsorOpen" :title="t.m3e.home.sponsorTitle" side="end" :close-label="t.m3e.home.done">
+        <MGroup>
+          <MItem v-for="s in SPONSORS" :key="s.id" action icon="favorite" :title="s.label" @click="actions.openUrl(s.url)"><template #trail><MIcon name="open_in_new" /></template></MItem>
+        </MGroup>
+      </MSheet>
     </template>
   </MPage>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MPromo, MFooter, MSheet } from 'foundation-ui/vue'
+import { SPONSORS } from '../config/sponsors.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { ROUTES } from '../composables/useRouter.js'
 const props = defineProps({
@@ -86,10 +93,11 @@ const heading = computed(() => {
   return { title: s.helpAbout, description: 'Foundation Sunshine' }
 })
 const themeOptions = computed(() => [
-  { value: 'system', label: t.value.sidebar.systemTheme }, { value: 'light', label: t.value.sidebar.lightMode }, { value: 'dark', label: t.value.sidebar.darkMode },
+  { value: 'system', label: t.value.sidebar.systemTheme, icon: 'tonality' }, { value: 'light', label: t.value.sidebar.lightMode, icon: 'light_mode' }, { value: 'dark', label: t.value.sidebar.darkMode, icon: 'dark_mode' },
 ])
 const localeOptions = [{ value: 'zh', label: '简体中文' }, { value: 'en', label: 'English' }]
 const channelOptions = computed(() => [{ value: false, label: t.value.sidebar.stableChannel }, { value: true, label: t.value.sidebar.betaChannel }])
+const sponsorOpen = ref(false)
 const checkingUpdate = ref(false)
 const checkUpdate = async () => {
   if (checkingUpdate.value) return
@@ -101,6 +109,4 @@ const checkUpdate = async () => {
   }
 }
 </script>
-<style>
-.m-version-note { margin: 24px 16px 0; color: var(--md-sys-color-on-surface-variant); font: var(--m-body-small); }
-</style>
+

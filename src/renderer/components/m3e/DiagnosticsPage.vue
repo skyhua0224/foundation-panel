@@ -3,7 +3,7 @@
     <DeviceDiagnosticsPanel @open-controller-meta="emit('open-controller-meta')" @open-stylus-input-probe="emit('open-stylus-input-probe')" />
     <MSection :title="t.sidebar.toolbox">
       <MGroup>
-        <MItem v-for="tool in utilityTools" :key="tool.id" action :chevron="!tool.external" :icon="ICONS[tool.id] || 'build'" :title="tool.label" :text="tool.description" @click="tool.action()">
+        <MItem v-for="tool in utilityTools" :key="tool.id" action :icon="ICONS[tool.id] || 'build'" :title="tool.label" :text="tool.description" @click="tool.action()">
           <template v-if="tool.external" #trail><MIcon name="open_in_new" /></template>
         </MItem>
       </MGroup>
