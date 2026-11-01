@@ -55,7 +55,7 @@ const model = computed(() => {
     memTotal: state.memory?.system_total_memory || 0, memAvail: state.memory?.system_available_memory || 0, memProcess: state.memory?.total_working_set,
   } : null
   const base = buildHomeModel({
-    host: { name: state.config?.sunshine_name || 'Sunshine', version: state.version, uptimeMs: uptimeMs.value, running: state.loaded },
+    host: { name: state.config?.sunshine_name || 'Sunshine', version: state.version, uptimeMs: uptimeMs.value, running: state.loaded, update: props.updateAvailable ? h.value.update : '' },
     session: s ? { ...s, fpsMeasured: perfSession.value?.frame_rates?.encoded?.fps ?? perfSession.value?.host_latency?.recent_fps, latencyMs: perfSession.value?.host_latency?.avg_ms } : null,
     series: state.series, sys, encoder: state.config?.active_encoder || '',
     pads: { text: [modeLabel.value, dsLabel.value].filter(Boolean).join(' · ') || '–' },
@@ -63,6 +63,8 @@ const model = computed(() => {
     clients: state.clients ? state.clients.map((c) => ({ ...c, icon: 'devices' })) : null,
     apps: state.apps ? state.apps.map((a) => ({ id: a.name, name: a.name, cover: coverOf(a) })) : null,
     logs: state.errorLog, recent: state.recent, busy: busy.value,
+    usb: props.runtime.usb?.attached_devices ? props.runtime.usb.attached_devices.length : null,
+    display: state.vdd ? { vddText: state.vdd.status_text || (state.vdd.running ? h.value.on : h.value.off), vddTone: state.vdd.running ? 'ok' : '' } : null,
   }, homeTexts(locale.value))
   base.strip = {
     label: h.value.gamepadType, icon: 'sports_esports', value: pad.selectedMode.value || 'auto', busy: stripBusy.value || !!pad.busyKey.value,
@@ -82,6 +84,7 @@ function onHero() { if (session.value) confirmStop.value = true; else confirmRes
 const doRestart = async () => { confirmRestart.value = false; busy.value = true; try { await restart() } finally { busy.value = false } }
 const doStop = async () => { confirmStop.value = false; busy.value = true; try { await stopAll() } finally { busy.value = false } }
 const onTableAction = () => emit('open', 'clients')
+const onTableRow = (row) => { if (row.tab === 'errors' || row.tab === 'sessions') openTool('logs'); else emit('open', 'clients') }
 const onLink = (to) => emit('open', to)
 
 const supportSections = computed(() => [
@@ -103,7 +106,7 @@ const supportSections = computed(() => [
     <MAnnouncementStrip v-if="announcements.top.value" :item="announcements.top.value" :total="announcements.list.value.length" :texts="announceTexts" @dismiss="announcements.dismiss" @open-url="openExternalUrl" @open-list="announceOpen = true" />
     <MHomeDash v-model:edit="edit" :guide="guide.visible.value" :model="model" storage-key="panel-home" :texts="dashTexts"
       @hero-action="onHero" @strip-group="onStripGroup" @strip-switch="onStripSwitch" @table-action="onTableAction" @link="onLink"
-      @table-row="() => emit('open', 'clients')" @app="() => emit('open', 'apps')">
+      @table-row="onTableRow" @app="() => emit('open', 'apps')">
       <template #guide>
         <MHomeGuide :steps="guide.steps.value" :platforms="guidePlatforms(T)" :recommended="guideRecommended(T)" :texts="guideTexts" @toggle="guide.toggle" @step="onGuideStep" @continue="emit('open', 'welcome')" @dismiss="guide.dismiss" @download="(id) => emit('open', `downloads:${id}`)" />
       </template>
