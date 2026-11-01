@@ -75,3 +75,8 @@
   --el-fill-color-extra-light: rgba(255, 255, 255, 0.025);
   --el-mask-color-extra-light: rgba(45, 38, 40, 0.3);
 }
+
+// Dropdown menus sit over other text: keep them opaque where the page overlay is glass.
+[data-bs-theme="dark"] .el-popper {
+  --el-bg-color-overlay: rgb(61, 50, 53);
+}
