@@ -15,7 +15,7 @@ const safe = async (fn, fallback = null) => { try { return await fn() } catch { 
 export function usePanelHome() {
   const state = reactive({
     version: '', startMs: 0, now: Date.now(), sessions: [], clientsTotal: null, appsTotal: null,
-    perf: null, config: null, memory: null, gpus: [], vdd: null, logs: null, loaded: false,
+    perf: null, config: null, memory: null, gpus: [], vdd: null, vddSettings: null, logs: null, loaded: false,
     // CPU and GPU load come from native Windows counters (system_load); temperatures only exist through HWiNFO, if it is running
     sys: { cpu: null, gpu: null },
     hw: { available: false, cpuTemp: null, gpuTemp: null },
@@ -72,6 +72,7 @@ export function usePanelHome() {
     state.config = config
     state.memory = memory
     state.vdd = vdd
+    if (vdd && vdd.installed !== false) state.vddSettings = await safe(() => invoke('load_vdd_settings'))
     if (typeof logs === 'string') {
       const lines = logs.split('\n')
       const err = lines.filter((l) => /\]\s*(Error|Fatal):/.test(l))

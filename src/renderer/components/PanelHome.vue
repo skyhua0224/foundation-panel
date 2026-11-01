@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, MHomeGuide, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, guidePlatforms, guideRecommended, homeTexts } from 'foundation-ui/vue'
+import { MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
 import { usePanelHome } from '../composables/usePanelHome.js'
 import { useGamepadType } from '../composables/useGamepadType.js'
 import { SPONSORS } from '../config/sponsors.js'
@@ -17,7 +17,7 @@ const h = computed(() => t.value.m3e.home)
 const { state, proxyUrl, session, uptimeMs, perfSession, restart, stopAll, openTool } = usePanelHome()
 const pad = useGamepadType()
 
-const dashTexts = computed(() => ({ done: h.value.done, reset: h.value.reset, earlier: h.value.earlier, later: h.value.later, addTitle: h.value.addTitle, nothing: h.value.nothing, hide: h.value.remove }))
+const dashTexts = computed(() => ({ ...homeTexts(locale.value), done: h.value.done, hide: h.value.remove }))
 const announcements = useAnnouncements({ locale, version: computed(() => state.version) })
 const announceOpen = ref(false)
 const announceTexts = computed(() => { const x = homeTexts(locale.value); return { open: x.annOpen, dismiss: x.annDismiss, all: x.annAll, read: x.annRead, none: x.annNone } })
@@ -26,9 +26,7 @@ const SEEN_KEY = 'foundation-ui.guide.panel-home.sessionSeen'
 const sessionSeen = ref(localStorage.getItem(SEEN_KEY) === '1')
 watch(() => !!session.value || (state.recent?.length || 0) > 0, (v) => { if (v && !sessionSeen.value) { sessionSeen.value = true; try { localStorage.setItem(SEEN_KEY, '1') } catch { /* storage unavailable */ } } }, { immediate: true })
 const guide = useGuideCard('panel-home', () => (state.loaded ? buildStartSteps(T.value, { paired: state.clientsTotal, sessionSeen: sessionSeen.value, apps: state.apps }) : []))
-const guideTexts = computed(() => ({ title: T.value.guideTitle, sub: T.value.guideSub, continue: T.value.guideContinue, dismiss: T.value.guideDismiss, downloadTitle: T.value.downloadTitle }))
-const STEP_TARGET = { download: 'downloads', pair: 'clients', game: 'apps' }
-const onGuideStep = (s) => { if (STEP_TARGET[s.id]) emit('open', STEP_TARGET[s.id]); else guide.toggle(s.id) }
+const guideStepGo = (step) => { const to = GUIDE_TARGET[step.id]; emit('open', to) }
 const edit = ref(false)
 const sponsorOpen = ref(false)
 const confirmRestart = ref(false)
@@ -52,6 +50,15 @@ const coverOf = (a) => {
   return p === 'desktop' ? `${proxyUrl.value}/boxart/desktop.png` : `${proxyUrl.value}/boxart/${encodeURIComponent(p)}`
 }
 
+// the virtual display: its driver state from the panel's vdd state, the largest configured mode from its settings
+const vddInput = computed(() => {
+  const v = state.vdd
+  if (!v) return null
+  const set = state.vddSettings
+  const modes = (set?.resolutions?.resolution || []).filter((r) => r.width && r.height).sort((a, b2) => b2.width * b2.height - a.width * a.height)
+  const rates = (set?.global?.g_refresh_rate || []).map(Number).filter(Number.isFinite)
+  return { state: v.installed === false ? 'missing' : (v.running || v.state === 'ready') ? 'ready' : 'idle', text: '', width: modes[0]?.width, height: modes[0]?.height, hz: rates.length ? Math.max(...rates) : undefined, hdr: set ? !!set.colour?.HDRPlus : undefined }
+})
 const model = computed(() => {
   const s = session.value
   const sys = state.sys.cpu !== null || state.sys.gpu !== null || state.memory?.system_total_memory ? {
@@ -69,7 +76,7 @@ const model = computed(() => {
     apps: state.apps ? state.apps.map((a) => ({ id: a.name, name: a.name, cover: coverOf(a) })) : null,
     logs: state.errorLog, recent: state.recent, busy: busy.value,
     usb: props.runtime.usb?.attached_devices ? props.runtime.usb.attached_devices.length : null,
-    display: state.vdd ? { vddText: state.vdd.status_text || (state.vdd.running ? h.value.on : h.value.off), vddTone: state.vdd.running ? 'ok' : '' } : null,
+    vdd: vddInput.value,
   }, homeTexts(locale.value))
   base.strip = {
     label: h.value.gamepadType, icon: 'sports_esports', value: pad.selectedMode.value || 'auto', busy: stripBusy.value || !!pad.busyKey.value,
@@ -81,7 +88,27 @@ const model = computed(() => {
   }
   return base
 })
+const isNew = computed(() => guide.visible.value)
+const cards = computed(() => buildCards(model.value, { texts: T.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value), sponsor: sponsorCardData(T.value) }))
+const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value }))
 
+function onAction(a) {
+  switch (a.type) {
+    case 'hero': onHero(); break
+    case 'group': onStripGroup(a.value); break
+    case 'switch': onStripSwitch(a.value); break
+    case 'table-action': emit('open', 'clients'); break
+    case 'table-row': onTableRow(a.value); break
+    case 'app': emit('open', 'apps'); break
+    case 'open': emit('open', a.value); break
+    case 'detail-external': break
+    case 'guide-go': guideStepGo(a.value); break
+    case 'guide-skip': guide.toggle(a.value); break
+    case 'download': emit('open', `downloads:${a.value}`); break
+    case 'sponsor': if (a.value === 'star') openExternalUrl('https://github.com/AlkaidLab/foundation-sunshine'); else sponsorOpen.value = true; break
+    default: break
+  }
+}
 async function onStripGroup(v) { pad.selectedMode.value = v }
 async function onStripSwitch({ id, value }) {
   stripBusy.value = true
@@ -109,18 +136,10 @@ const supportSections = computed(() => [
 <template>
   <MPage :title="t.m3e.nav.overview" wide>
     <template #actions>
-      <button type="button" class="m-dpill m-dpill--head" @click="emit('open', 'downloads')"><MIcon name="download" /><span>{{ h.download }}</span></button>
-      <MIconButton icon="favorite" :label="h.sponsor" @click="sponsorOpen = true" />
       <MIconButton :icon="edit ? 'check' : 'edit'" :label="edit ? h.done : h.edit" @click="edit = !edit" />
     </template>
     <MAnnouncementStrip v-if="announcements.top.value" :item="announcements.top.value" :total="announcements.list.value.length" :texts="announceTexts" @dismiss="announcements.dismiss" @open-url="openExternalUrl" @open-list="announceOpen = true" />
-    <MHomeDash v-model:edit="edit" :guide="guide.visible.value" :model="model" storage-key="panel-home" :texts="dashTexts"
-      @hero-action="onHero" @strip-group="onStripGroup" @strip-switch="onStripSwitch" @table-action="onTableAction" @link="onLink"
-      @table-row="onTableRow" @app="() => emit('open', 'apps')">
-      <template #guide>
-        <MHomeGuide :steps="guide.steps.value" :platforms="guidePlatforms(T)" :recommended="guideRecommended(T)" :texts="guideTexts" @toggle="guide.toggle" @step="onGuideStep" @continue="emit('open', 'welcome')" @dismiss="guide.dismiss" @download="(id) => emit('open', `downloads:${id}`)" />
-      </template>
-    </MHomeDash>
+    <MHomeDash v-model:edit="edit" :cards="cards" :details="model.details" :ctx="dashCtx" storage-key="panel-home" :texts="dashTexts" @action="onAction" />
     <MAnnouncementSheet v-model="announceOpen" :items="announcements.list.value" :title="homeTexts(locale).annTitle" :texts="announceTexts" :close-label="h.done" @dismiss="announcements.dismiss" @open-url="openExternalUrl" />
     <MSupportSheet v-model="sponsorOpen" :title="h.sponsor" :sections="supportSections" :close-label="h.done" @open="(it) => openExternalUrl(it.url)" />
     <MDialog v-model="confirmRestart" :title="h.restartTitle" icon="restart_alt" tone="info">
