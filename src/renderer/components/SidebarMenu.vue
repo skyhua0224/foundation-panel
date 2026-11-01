@@ -11,17 +11,21 @@
     </header>
     <div class="panel-body">
     <MScene :nav="nav" :rail-items="rail" :texts="sceneTexts" :overlay="isWebPage" storage-key="foundation-ui.panel.list" @rail="onRail">
+      <template #rail-foot><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
       <template #list="{ entry }">
         <MNavList
-          :groups="[{ id: entry.rail, items: listItems(entry.rail) }]"
-          :current="nav.current.value"
+          :groups="listGroups(entry.rail)"
+          :current="currentRow"
+          :recent="entry.rail === 'config' ? settingsList.recentView.value : null"
           :search-items="searchItems"
           :search-placeholder="t.m3e.search"
           :search-empty="t.m3e.noResults"
           :clear-label="t.m3e.clear"
           :label="railLabel(entry.rail)"
-          @navigate="(item) => router.navigate(item.id)"
+          @navigate="onListNavigate"
           @search="onSearch"
+          @recent="(row) => onSearch(row.entry)"
+          @clear-recent="settingsList.clearRecent"
           @context="onRowContext"
         />
       </template>
@@ -32,7 +36,7 @@
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
         <HdrEnhancedManager v-else-if="entry.id === ROUTES.HDR_ENHANCED" />
-        <GamepadPage v-else-if="entry.id === ROUTES.GAMEPAD" @open-controller-meta="openGamepadTest" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
+        <GamepadPage v-else-if="entry.id === ROUTES.GAMEPAD || entry.id === ROUTES.CFG_DUALSENSE" :params="entry.params" @open-controller-meta="openGamepadTest" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <MicrophonePage v-else-if="entry.id === ROUTES.MICROPHONE" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <UsbPage v-else-if="entry.id === ROUTES.USB" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <ComponentsPage v-else-if="entry.id === ROUTES.COMPONENTS" />
@@ -78,9 +82,11 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, ref, toRef, watch, onMounted } from 'vue'
-import { sunshine } from '../tauri-adapter.js'
-import { MScene, MNavList, MIconButton, MIcon, MContextMenu, useAnnouncementBadge } from 'foundation-ui/vue'
+import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
+import { sunshine, openExternalUrl } from '../tauri-adapter.js'
+import { SPONSORS } from '../config/sponsors.js'
+import { MScene, MNavList, MIconButton, MIcon, MContextMenu, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton } from 'foundation-ui/vue'
+import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
 import VddSettings from './VddSettings.vue'
@@ -115,6 +121,9 @@ const {
   includePrerelease, setIncludePrerelease,
 } = useSidebarState()
 const { minimizeWindow, toggleMaximize, closeWindow } = useWindowControls(isMaximized)
+// the shared appearance (wallpaper, colour, light/dark); light/dark goes through the panel's own theme switch
+registerModeHandler((mode) => setTheme(mode))
+onMounted(() => { void useAppearance().init() })
 const { onTouchWindowDragStart } = useTouchWindowDrag(isMaximized)
 const {
   openTimer, openUrl, cleanupCovers, restartAsAdmin, checkForUpdates, openGamepadTest, openStylusInputProbe,
@@ -147,6 +156,11 @@ const toolsCtx = {
 }
 const toolsMenuItems = computed(() => createUtilityTools(toolsCtx))
 
+const sponsorSections = computed(() => [
+  { title: t.value.m3e.home.sponsorTitle, items: SPONSORS.map((x) => ({ id: x.id, icon: 'favorite', title: x.label, url: x.url })) },
+  { items: [{ id: 'star', icon: 'star', title: t.value.m3e.home.star, url: 'https://github.com/AlkaidLab/foundation-sunshine' }, { id: 'qq', icon: 'groups', title: t.value.m3e.home.qq, url: 'https://qm.qq.com/q/AfMQoyKrkc' }] },
+])
+const actions_openExternal = (url) => openExternalUrl(url)
 const nav = router.nav
 const isWebPage = computed(() => !!webPathOf(router.currentRoute.value))
 const back = () => nav.pop()
@@ -158,15 +172,66 @@ const railLabel = (id) => t.value.m3e.nav[id]
 const runtimeView = computed(() => ({ ...runtime, micLabel: micLabel.value }))
 const micLabel = computed(() => t.value.deviceHub.microphone.statusLabels[microphoneOverviewState(runtime.mic || {})] || '')
 const listItems = (id) => pageItems(t.value, id, runtimeView.value)
-const searchItems = computed(() => Object.keys(PAGES)
-  .filter((id) => PAGES[id].list !== false)
-  .flatMap((id) => {
-    const item = pageItems(t.value, PAGES[id].rail, runtimeView.value).find((p) => p.id === id)
-    return item ? [{ id, title: item.label, path: railLabel(PAGES[id].rail), icon: item.icon, route: id }] : []
-  }))
+// The stream settings are the shared model (categories in groups with a live line, search of every setting, recently used)
+const hostConfig = ref(null)
+const dualsenseKeys = ref([])
+const settingsList = useSettingsList({ locale, config: hostConfig, dualsenseKeys })
+const loadHostData = async () => {
+  try {
+    const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')
+    const [config, tuning] = await Promise.allSettled([fetch(`${base}/api/config`).then((r) => (r.ok ? r.json() : null)), fetch(`${base}/api/dualsense/tuning`).then((r) => (r.ok ? r.json() : null))])
+    if (config.status === 'fulfilled' && config.value) hostConfig.value = config.value
+    if (tuning.status === 'fulfilled' && tuning.value?.keys) dualsenseKeys.value = tuning.value.keys
+  } catch { /* the list shows no live lines and the search the pages only */ }
+}
+const listGroups = (rail) => (rail === 'config' ? settingsList.groups.value : [{ id: rail, items: listItems(rail) }])
+const currentRow = computed(() => {
+  const route = nav.current.value
+  if (route === ROUTES.WEB_CONFIG) return `config:${nav.detail.value?.params?.tab || 'general'}`
+  if (route === ROUTES.CFG_DUALSENSE) return 'dualsense'
+  if (route === ROUTES.WEB_PASSWORD) return 'password'
+  return route
+})
+const searchItems = computed(() => [
+  ...Object.keys(PAGES)
+    .filter((id) => PAGES[id].list !== false)
+    .flatMap((id) => {
+      const item = pageItems(t.value, PAGES[id].rail, runtimeView.value).find((p) => p.id === id)
+      return item ? [{ id, title: item.label, path: railLabel(PAGES[id].rail), icon: item.icon, route: id }] : []
+    }),
+  ...settingsList.searchItems.value,
+])
+// A place of the stream settings: the list pane opens the Web page in the frame at that tab, section and row
+const openConfig = (params = { tab: 'general' }) => {
+  emit('webui-navigate', `/config${settingsHash(params)}`)
+  router.navigate(ROUTES.WEB_CONFIG, params)
+}
+const openSettingsRoute = (item) => {
+  if (item.route === 'config') openConfig(item.params)
+  else if (item.route === 'dualsense') router.navigate(ROUTES.CFG_DUALSENSE, item.params)
+  else if (item.route === 'password') openRoute(ROUTES.WEB_PASSWORD)
+  else router.navigate(item.route || item.id)
+}
+const onListNavigate = (item) => (item.route ? openSettingsRoute(item) : router.navigate(item.id))
+
 const sceneTexts = computed(() => ({ resize: t.value.m3e.resize, main: t.value.m3e.nav.main, shortcuts: t.value.m3e.shortcuts, back: t.value.m3e.back, search: t.value.m3e.search, help: t.value.m3e.shortcutHelp, section: t.value.m3e.section, close: t.value.m3e.clear }))
-const onRail = (item) => router.navigate({ overview: ROUTES.HOME, settings: ROUTES.PANEL_SETTINGS, help: ROUTES.HELP, stream: ROUTES.CAT_STREAM, input: ROUTES.CAT_INPUT, display: ROUTES.CAT_DISPLAY, system: ROUTES.CAT_SYSTEM }[item.id])
-const onSearch = (item) => router.navigate(item.route || item.id)
+const onRail = (item) => {
+  if (item.id === 'config') { loadHostData(); openConfig({ tab: 'general' }); router.navigate(ROUTES.CAT_CONFIG); return }
+  router.navigate({ overview: ROUTES.HOME, settings: ROUTES.PANEL_SETTINGS, help: ROUTES.HELP, stream: ROUTES.CAT_STREAM, input: ROUTES.CAT_INPUT, display: ROUTES.CAT_DISPLAY, system: ROUTES.CAT_SYSTEM }[item.id])
+}
+const onSearch = (item) => {
+  settingsList.remember(item.keyName)
+  openSettingsRoute(item)
+}
+// A setting changed in the frame joins the recently used list
+const onFrameMessage = (event) => {
+  const data = event.data
+  if (data?.type !== 'foundation-settings-recent' || typeof data.key !== 'string') return
+  if (![...document.querySelectorAll('iframe')].some((frame) => frame.contentWindow === event.source)) return
+  settingsList.remember(data.key)
+}
+onMounted(() => { window.addEventListener('message', onFrameMessage); loadHostData() })
+onBeforeUnmount(() => window.removeEventListener('message', onFrameMessage))
 const contextMenu = ref(null)
 const onRowContext = (event, item) => {
   const items = [{ id: 'open', label: t.value.m3e.ctx.open, icon: 'open_in_new' }]
@@ -186,6 +251,7 @@ const openDestination = (id) => {
   if (id === 'welcome') { openWelcome(); return }
   if (id.startsWith('downloads:')) { emit('webui-navigate', `/downloads?platform=${encodeURIComponent(id.slice(10))}`); router.navigate(ROUTES.WEB_DOWNLOADS); return }
   const web = { clients: ROUTES.WEB_CLIENTS, apps: ROUTES.WEB_APPS, settings: ROUTES.WEB_CONFIG, downloads: ROUTES.WEB_DOWNLOADS }
+  if (id === 'settings') { openConfig({ tab: 'general' }); return }
   const route = web[id] || { gamepad: ROUTES.GAMEPAD, microphone: ROUTES.MICROPHONE, usb: ROUTES.USB, vdd: ROUTES.VDD_SETTINGS, quality: ROUTES.HDR_ENHANCED, components: ROUTES.COMPONENTS, diagnostics: ROUTES.DIAGNOSTICS, assistant: ROUTES.AI_ASSISTANT }[id]
   if (route) openRoute(route)
 }
