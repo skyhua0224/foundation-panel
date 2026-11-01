@@ -6,7 +6,7 @@ import { ROUTES, RAILS } from './useRouter.js'
  */
 export function railItems(t) {
   const n = t.m3e.nav
-  const icons = { overview: 'home', stream: 'cast_connected', input: 'sports_esports', display: 'desktop_windows', system: 'build', settings: 'settings', help: 'help' }
+  const icons = { overview: 'home', stream: 'cast_connected', config: 'tune', input: 'sports_esports', display: 'desktop_windows', system: 'build', settings: 'settings', help: 'help' }
   return RAILS.map((id) => ({ id, icon: icons[id], label: n[id] }))
 }
 
@@ -18,7 +18,6 @@ export function pageItems(t, rail, runtime = {}) {
     stream: [
       { id: ROUTES.WEB_CLIENTS, icon: 'devices', tone: 'tertiary', label: c.stream.clients[0] },
       { id: ROUTES.WEB_APPS, icon: 'apps', tone: 'secondary', label: c.stream.apps[0] },
-      { id: ROUTES.WEB_CONFIG, icon: 'tune', tone: 'primary', label: c.stream.settings[0] },
       { id: ROUTES.WEB_DOWNLOADS, icon: 'download', tone: 'success', label: c.stream.downloads[0] },
     ],
     input: [
@@ -35,7 +34,6 @@ export function pageItems(t, rail, runtime = {}) {
       { id: ROUTES.DIAGNOSTICS, icon: 'stethoscope', tone: 'warn', label: c.system.diagnostics },
       { id: ROUTES.AI_ASSISTANT, icon: 'smart_toy', tone: 'tertiary', label: c.system.assistant },
       { id: ROUTES.WEB_TROUBLESHOOTING, icon: 'bug_report', tone: 'error', label: t.sidebar.diagnostics },
-      { id: ROUTES.WEB_PASSWORD, icon: 'key', tone: 'error', label: t.sidebar.accountCredentials },
     ],
   }
   return pages[rail] || []

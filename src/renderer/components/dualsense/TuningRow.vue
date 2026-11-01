@@ -1,6 +1,7 @@
 <template>
   <div
     class="m-item m-tuning"
+    :data-ds5-key="descriptor.id"
     :class="['kind-' + kind, { 'm-item--stack': stacked, 'm-item--plain': true, 'is-disabled': disabled, 'is-modified': modified }]"
     :title="disabled ? tr('pending.reason') : null"
   >

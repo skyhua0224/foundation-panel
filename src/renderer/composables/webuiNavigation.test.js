@@ -26,3 +26,10 @@ test('shell can request only known local destinations', () => {
   ])
     assert.equal(isWebuiNavigationPath(path), false)
 })
+
+test('a place in the stream settings is a known destination, anything else after /config# is not', () => {
+  for (const path of ['/config#tab=general', '/config#tab=av&sub=display&focus=hevc_mode', '/config#tab=network&focus=port'])
+    assert.equal(isWebuiNavigationPath(path), true)
+  for (const path of ['/config#tab=../logout', '/config#tab=av&sub=a b', '/config#tab=av&focus=x;y', '/config#tab=', '/apps#tab=av'])
+    assert.equal(isWebuiNavigationPath(path), false)
+})

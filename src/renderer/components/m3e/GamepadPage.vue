@@ -144,6 +144,7 @@ import { PRESET_CARDS } from '../../composables/dualsenseTuning.js'
 import { isAdvancedWarningHidden, panelStorage, setAdvancedWarningHidden } from '../../composables/advancedWarning.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
+const props = defineProps({ params: { type: Object, default: null } })
 const emit = defineEmits(['back', 'open-controller-meta', 'manage-components'])
 const { t } = useI18n()
 const { tx } = useDualSenseText()
@@ -192,9 +193,27 @@ const confirmWarning = (dontShowAgain) => {
   open(warning.target)
 }
 // A page that was open when the panel reloaded is only restored if it is not behind the warning.
-onMounted(() => {
+// Where a search hit or a recent row lands: the card or the advanced group of the key (an advanced group only behind its warning), then the row
+const landOnKey = (focus, tries = 12) => {
+  setTimeout(() => {
+    const row = document.querySelector(`[data-ds5-key="${CSS.escape(String(focus))}"]`)
+    if (!row) { if (tries > 0) landOnKey(focus, tries - 1); return }
+    row.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    row.classList.add('ds5-hit')
+    setTimeout(() => row.classList.remove('ds5-hit'), 2200)
+  }, 200)
+}
+const landOnParams = () => {
+  const target = props.params
+  if (!target?.sub) return
+  if (target.sub.startsWith('g')) askAdvanced('advanced/' + target.sub.slice(1))
+  else open('card/' + target.sub)
+  if (target.focus) landOnKey(target.focus)
+}
+onMounted(async () => {
   if (['advanced', 'emulation'].some((p) => current.value.startsWith(p)) && !isAdvancedWarningHidden(panelStorage())) current.value = ''
-  tuning.load()
+  await tuning.load()
+  landOnParams()
 })
 watch(() => status.value?.state, (state, previous) => {
   if (previous && state && !tuning.snapshot.value && !['host_unreachable', 'host_unsupported'].includes(state)) tuning.load()
@@ -206,3 +225,8 @@ const restoreDefaults = () => {
   tuning.restoreDefaults()
 }
 </script>
+
+<style>
+.ds5-hit { animation: ds5-hit 2.2s ease-out; }
+@keyframes ds5-hit { 0%, 40% { box-shadow: inset 0 0 0 3px var(--md-sys-color-primary); } 100% { box-shadow: inset 0 0 0 3px transparent; } }
+</style>

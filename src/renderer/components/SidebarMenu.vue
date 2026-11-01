@@ -37,6 +37,7 @@
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
         <HdrEnhancedManager v-else-if="entry.id === ROUTES.HDR_ENHANCED" />
         <GamepadPage v-else-if="entry.id === ROUTES.GAMEPAD || entry.id === ROUTES.CFG_DUALSENSE" :params="entry.params" @open-controller-meta="openGamepadTest" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
+        <AppearancePage v-else-if="entry.id === ROUTES.CFG_APPEARANCE" />
         <MicrophonePage v-else-if="entry.id === ROUTES.MICROPHONE" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <UsbPage v-else-if="entry.id === ROUTES.USB" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <ComponentsPage v-else-if="entry.id === ROUTES.COMPONENTS" />
@@ -97,6 +98,7 @@ import HdrEnhancedManager from './HdrEnhancedManager.vue'
 import ControlPanelPage from './ControlPanelPage.vue'
 import GamepadPage from './m3e/GamepadPage.vue'
 import MicrophonePage from './m3e/MicrophonePage.vue'
+import AppearancePage from './m3e/AppearancePage.vue'
 import UsbPage from './m3e/UsbPage.vue'
 import ComponentsPage from './m3e/ComponentsPage.vue'
 import DiagnosticsPage from './m3e/DiagnosticsPage.vue'
@@ -188,7 +190,8 @@ const listGroups = (rail) => (rail === 'config' ? settingsList.groups.value : [{
 const currentRow = computed(() => {
   const route = nav.current.value
   if (route === ROUTES.WEB_CONFIG) return `config:${nav.detail.value?.params?.tab || 'general'}`
-  if (route === ROUTES.CFG_DUALSENSE) return 'dualsense'
+  if (route === ROUTES.CFG_DUALSENSE) return 'config:input' // the DualSense page sits under the gamepad of 输入
+  if (route === ROUTES.CFG_APPEARANCE) return 'config:appearance'
   if (route === ROUTES.WEB_PASSWORD) return 'password'
   return route
 })
@@ -207,7 +210,8 @@ const openConfig = (params = { tab: 'general' }) => {
   router.navigate(ROUTES.WEB_CONFIG, params)
 }
 const openSettingsRoute = (item) => {
-  if (item.route === 'config') openConfig(item.params)
+  if (item.route === 'config' && item.params?.tab === 'appearance') router.navigate(ROUTES.CFG_APPEARANCE)
+  else if (item.route === 'config') openConfig(item.params)
   else if (item.route === 'dualsense') router.navigate(ROUTES.CFG_DUALSENSE, item.params)
   else if (item.route === 'password') openRoute(ROUTES.WEB_PASSWORD)
   else router.navigate(item.route || item.id)
@@ -226,9 +230,10 @@ const onSearch = (item) => {
 // A setting changed in the frame joins the recently used list
 const onFrameMessage = (event) => {
   const data = event.data
-  if (data?.type !== 'foundation-settings-recent' || typeof data.key !== 'string') return
   if (![...document.querySelectorAll('iframe')].some((frame) => frame.contentWindow === event.source)) return
-  settingsList.remember(data.key)
+  if (data?.type === 'foundation-settings-recent' && typeof data.key === 'string') settingsList.remember(data.key)
+  // a page of the frame that the panel shows natively (the DualSense tuning, opened from the gamepad rows of 输入)
+  else if (data?.type === 'foundation-open' && data.page === 'dualsense') router.navigate(ROUTES.CFG_DUALSENSE)
 }
 onMounted(() => { window.addEventListener('message', onFrameMessage); loadHostData() })
 onBeforeUnmount(() => window.removeEventListener('message', onFrameMessage))

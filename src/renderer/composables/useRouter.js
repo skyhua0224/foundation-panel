@@ -27,6 +27,9 @@ export const ROUTES = {
   WEB_CLIENTS: 'web-clients',
   WEB_APPS: 'web-apps',
   WEB_CONFIG: 'web-config',
+  CFG_DUALSENSE: 'cfg-dualsense', // the DualSense tuning page, listed with the stream settings
+  CAT_CONFIG: 'cat-config',
+  CFG_APPEARANCE: 'cfg-appearance', // 个性化 among the stream settings
   WEB_DOWNLOADS: 'web-downloads',
   WEB_PASSWORD: 'web-password',
   WEB_TROUBLESHOOTING: 'web-troubleshooting',
@@ -39,8 +42,11 @@ export const PAGES = {
   [ROUTES.WEB_STREAM]: { rail: 'overview', list: false },
   [ROUTES.WEB_CLIENTS]: { rail: 'stream' },
   [ROUTES.WEB_APPS]: { rail: 'stream' },
-  [ROUTES.WEB_CONFIG]: { rail: 'stream' },
   [ROUTES.WEB_DOWNLOADS]: { rail: 'stream' },
+  [ROUTES.WEB_CONFIG]: { rail: 'config' },
+  [ROUTES.CFG_DUALSENSE]: { rail: 'config' },
+  [ROUTES.CFG_APPEARANCE]: { rail: 'config' },
+  [ROUTES.WEB_PASSWORD]: { rail: 'config' },
   [ROUTES.GAMEPAD]: { rail: 'input' },
   [ROUTES.MICROPHONE]: { rail: 'input' },
   [ROUTES.USB]: { rail: 'input' },
@@ -49,15 +55,14 @@ export const PAGES = {
   [ROUTES.COMPONENTS]: { rail: 'system' },
   [ROUTES.DIAGNOSTICS]: { rail: 'system' },
   [ROUTES.AI_ASSISTANT]: { rail: 'system' },
-  [ROUTES.WEB_PASSWORD]: { rail: 'system' },
   [ROUTES.WEB_TROUBLESHOOTING]: { rail: 'system' },
   [ROUTES.PANEL_SETTINGS]: { rail: 'settings', list: false },
   [ROUTES.HELP]: { rail: 'help', list: false },
 }
-export const RAILS = ['overview', 'stream', 'input', 'display', 'system', 'settings', 'help']
+export const RAILS = ['overview', 'stream', 'config', 'input', 'display', 'system', 'settings', 'help']
 
 const ALIAS = { [ROUTES.CONTROLLERS]: ROUTES.GAMEPAD, [ROUTES.TOOLBOX]: ROUTES.DIAGNOSTICS }
-const CATEGORY = { [ROUTES.CAT_STREAM]: 'stream', [ROUTES.CAT_INPUT]: 'input', [ROUTES.CAT_DISPLAY]: 'display', [ROUTES.CAT_SYSTEM]: 'system' }
+const CATEGORY = { [ROUTES.CAT_CONFIG]: 'config', [ROUTES.CAT_STREAM]: 'stream', [ROUTES.CAT_INPUT]: 'input', [ROUTES.CAT_DISPLAY]: 'display', [ROUTES.CAT_SYSTEM]: 'system' }
 const WEB_PATHS = [
   [/^\/(?:pin|clients)(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_CLIENTS],
   [/^\/apps(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_APPS],
@@ -90,11 +95,11 @@ const shared = () => (nav ||= createNav({ routes, home: ROUTES.HOME }))
 export function useRouter() {
   const { t } = useI18n()
   const stack = shared()
-  const navigate = (name) => {
+  const navigate = (name, params) => {
     const to = ALIAS[name] || name
     if (CATEGORY[to]) return stack.selectRail(CATEGORY[to])
     if (!PAGES[to]) { console.warn(`route ${name} does not exist`); return }
-    stack.go(to)
+    stack.go(to, params)
   }
   const currentRoute = computed(() => stack.current.value)
   const goHome = () => navigate(ROUTES.HOME)
