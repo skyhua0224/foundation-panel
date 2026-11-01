@@ -45,6 +45,7 @@
     "@tauri-apps/plugin-fs": "^2.7.1",
     "dompurify": "^3.4.16",
     "element-plus": "^2.14.2",
+    "foundation-ui": "file:../ds5-ui-m3e",
     "markdown-it": "^14.3.2",
     "pixi.js": "^8.19.0",
     "qrcode": "^1.5.4",
