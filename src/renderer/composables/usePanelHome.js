@@ -2,6 +2,7 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { sunshine } from '@/tauri-adapter.js'
 import { pickHardware } from './hardwareReadings.js'
+import { parseSessionLog, parseErrorLog } from 'foundation-ui/vue'
 
 const HISTORY = 60
 const safe = async (fn, fallback = null) => { try { return await fn() } catch { return fallback } }
@@ -18,7 +19,8 @@ export function usePanelHome() {
     // CPU and GPU load come from native Windows counters (system_load); temperatures only exist through HWiNFO, if it is running
     sys: { cpu: null, gpu: null },
     hw: { available: false, cpuTemp: null, gpuTemp: null },
-    series: { bitrate: [], latency: [], cpu: [], gpu: [], memory: [] },
+    series: { bitrate: [], fps: [], latency: [], cpu: [], gpu: [], memory: [] },
+    clients: null, apps: null, recent: null, errorLog: null,
   })
   const proxy = ref('')
   const fetchJson = async (path, init) => {
@@ -45,7 +47,8 @@ export function usePanelHome() {
       state.perf = perf
       const ps = perf?.sessions?.find((x) => x.active) || perf?.sessions?.[0]
       push(state.series.latency, ps?.host_latency?.avg_ms)
-    } else { state.perf = null; state.series.bitrate = []; state.series.latency = [] }
+      push(state.series.fps, ps?.frame_rates?.encoded?.fps ?? ps?.host_latency?.recent_fps ?? s.fps)
+    } else { state.perf = null; state.series.bitrate = []; state.series.fps = []; state.series.latency = [] }
     const load = await safe(() => invoke('system_load'))
     if (load) {
       state.sys.cpu = typeof load.cpu_percent === 'number' ? load.cpu_percent : null
@@ -63,14 +66,17 @@ export function usePanelHome() {
       safe(() => invoke('get_vdd_status')),
       safe(() => fetchText('/api/logs', { headers: { 'X-Log-Offset': '0' } })),
     ])
-    if (clients) state.clientsTotal = (clients.named_certs || []).length
-    state.appsTotal = Array.isArray(apps) ? apps.length : Array.isArray(apps?.apps) ? apps.apps.length : null
+    if (clients) { state.clients = clients.named_certs || []; state.clientsTotal = state.clients.length }
+    state.apps = Array.isArray(apps) ? apps : Array.isArray(apps?.apps) ? apps.apps : null
+    state.appsTotal = state.apps ? state.apps.length : null
     state.config = config
     state.memory = memory
     state.vdd = vdd
     if (typeof logs === 'string') {
       const lines = logs.split('\n')
       const err = lines.filter((l) => /\]\s*(Error|Fatal):/.test(l))
+      state.recent = parseSessionLog(logs)
+      state.errorLog = parseErrorLog(logs)
       state.logs = { errors: err.length, warnings: lines.filter((l) => /\]\s*Warning:/.test(l)).length, last: err[err.length - 1] || '' }
     }
     if (state.hw.available) {
@@ -101,7 +107,8 @@ export function usePanelHome() {
   const uptimeMs = computed(() => (state.startMs ? Math.max(0, state.now - state.startMs) : 0))
   const perfSession = computed(() => state.perf?.sessions?.find((x) => x.active) || state.perf?.sessions?.[0] || null)
   const share = computed(() => memoryShare(state.memory))
-  return { state, session, uptimeMs, perfSession, memoryShare: share, restart: () => invoke('restart_sunshine_service'), stopAll: () => sunshine.stopAllSessions(), openTool: (name) => invoke('open_tool_window', { toolName: name }) }
+  const proxyUrl = computed(() => proxy.value)
+  return { state, proxyUrl, session, uptimeMs, perfSession, memoryShare: share, restart: () => invoke('restart_sunshine_service'), stopAll: () => sunshine.stopAllSessions(), openTool: (name) => invoke('open_tool_window', { toolName: name }) }
 }
 
 export function formatUptime(ms) {
