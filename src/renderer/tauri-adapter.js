@@ -118,6 +118,7 @@ export const controllerHub = {
 export const virtualMicrophone = {
   getStatus: () => wrapResult('get_virtual_microphone_status'),
   test: () => wrapResult('test_virtual_microphone'),
+  saveBackend: (backend) => wrapResult('save_microphone_backend', { backend }),
 }
 
 export const dualsense = {

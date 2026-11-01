@@ -8,10 +8,15 @@ export function usbipTransportNeedsCleanup(status = {}) {
   )
 }
 
+export const MICROPHONE_BACKENDS = Object.freeze(['auto', 'vb_cable', 'usbip_experimental', 'disabled'])
+
+/** Backends that need the usbip-win2 host component. */
+const needsUsbip = (backend) => backend === 'usbip_experimental' || backend === 'auto'
+
 export function microphoneStatusTone(status = {}) {
   const state = microphoneOverviewState(status)
   if (state === 'faulted') return 'state-error'
-  if (['active', 'capturing', 'idle'].includes(state)) return 'state-ready'
+  if (['active', 'idle', 'capturing', 'streaming'].includes(state)) return 'state-ready'
   return ''
 }
 
@@ -19,24 +24,59 @@ export function canTestMicrophone(status = {}, loading = false) {
   return Boolean(
     !loading
     && status.state !== 'unsupported'
-    && ['vb_cable', 'auto', 'usbip_experimental'].includes(status.configured_backend)
+    && MICROPHONE_BACKENDS.includes(status.configured_backend)
+    && status.configured_backend !== 'disabled'
+    // Only the USB microphone alone cannot fall back; it needs usbip-win2.
     && (status.configured_backend !== 'usbip_experimental' || status.component_available),
   )
 }
 
+/**
+ * One state for the tab and the overview. The host's own states (absent, creating,
+ * enumerating, idle, host_capturing, remote_active, destroying, device_faulted) only
+ * describe the USB microphone; VB-CABLE reports `ready`.
+ */
 export function microphoneOverviewState(status = {}) {
   if (status.state === 'unsupported') return 'unsupported'
   if (!status.configured_backend) return 'unknown'
   if (status.configured_backend === 'disabled') return 'disabled'
-  // USB endpoint fields do not describe VB-Cable's capture state.
+  // USB endpoint fields do not describe VB-CABLE's capture state.
   if (status.active_backend === 'vb_cable') return 'active'
-  if (status.configured_backend === 'vb_cable') return 'waiting'
-  if (status.error_code || ['faulted', 'device_faulted'].includes(status.state)) return 'faulted'
-  if (status.configured_backend === 'auto' && !status.active_backend) return 'waiting'
-  if (!status.component_available) return 'missing'
-  if (status.host_streaming) return 'capturing'
-  if (status.device_created) return 'idle'
+  if (status.state === 'device_faulted') return 'faulted'
+  if (microphoneUsesUsbip(status) && status.active_backend) {
+    switch (status.state) {
+      case 'creating':
+      case 'enumerating':
+        return 'starting'
+      case 'destroying':
+        return 'stopping'
+      case 'remote_active':
+        return 'streaming'
+      case 'host_capturing':
+        return 'capturing'
+      default:
+        return 'idle'
+    }
+  }
+  if (status.error_code && !status.active_backend) {
+    return status.error_code === 'MIC_USBIP_COMPONENT_UNAVAILABLE' ? 'missing' : 'faulted'
+  }
+  if (status.configured_backend === 'usbip_experimental' && !status.component_available) return 'missing'
   return 'waiting'
+}
+
+/** usbip-win2 is missing although the chosen backend would use it. */
+export function microphoneComponentMissing(status = {}) {
+  return Boolean(
+    status.state !== 'unsupported'
+    && needsUsbip(status.configured_backend)
+    && !status.component_available,
+  )
+}
+
+/** The USB microphone buffer in milliseconds: 48 kHz, 16 bit, mono is 96 bytes per ms. */
+export function microphoneBufferedMs(status = {}) {
+  return Math.round(Number(status.buffered_bytes || 0) / 96)
 }
 
 export function microphoneUsesUsbip(status = {}) {

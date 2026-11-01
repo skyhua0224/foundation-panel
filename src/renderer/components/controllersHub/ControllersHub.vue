@@ -51,7 +51,7 @@ const panes = computed(() => ({
       'manage-components': gotoComponents,
     },
   },
-  microphone: { component: MicrophonePanel, on: {} },
+  microphone: { component: MicrophonePanel, on: { 'manage-components': gotoComponents } },
   usb: { component: UsbPassthroughPanel, on: {} },
   components: { component: RuntimeComponentsPanel, on: {} },
   tools: {

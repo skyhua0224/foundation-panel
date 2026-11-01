@@ -262,6 +262,7 @@ fn main() {
             controller_hub::save_controller_hub_config,
             controller_hub::get_virtual_microphone_status,
             controller_hub::test_virtual_microphone,
+            controller_hub::save_microphone_backend,
             vigem::get_vigem_status,
             vigem::install_vigem_driver,
             vigem::uninstall_vigem_driver,
