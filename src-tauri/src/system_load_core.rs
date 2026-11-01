@@ -34,6 +34,8 @@ pub fn cpu_percent(prev: CpuTimes, now: CpuTimes) -> Option<f64> {
 pub struct GpuEngine {
     pub luid: String,
     pub phys: u32,
+    /// engine index of the adapter (`eng_N`): the same type can exist several times (e.g. two video encoders)
+    pub eng: u32,
     pub engtype: String,
 }
 
@@ -47,26 +49,27 @@ pub fn parse_gpu_instance(name: &str) -> Option<GpuEngine> {
     }
     let phys_part = after("_phys_")?;
     let phys: u32 = phys_part.split('_').next()?.parse().ok()?;
+    let eng: u32 = after("_eng_")?.split('_').next()?.parse().ok()?;
     let engtype = after("_engtype_")?;
     if engtype.is_empty() {
         return None;
     }
-    Some(GpuEngine { luid: format!("{hi}_{lo}"), phys, engtype: engtype.to_string() })
+    Some(GpuEngine { luid: format!("{hi}_{lo}"), phys, eng, engtype: engtype.to_string() })
 }
 
-/// Load of the busiest adapter: per adapter the busiest engine type (sum over processes), clamped to 0..100.
+/// Load of the busiest adapter: per adapter the busiest engine (the instances of one engine summed over processes), clamped to 0..100.
 pub fn aggregate_gpu(items: &[(String, f64)]) -> Option<f64> {
-    let mut engines: HashMap<(String, u32, String), f64> = HashMap::new();
+    let mut engines: HashMap<(String, u32, u32, String), f64> = HashMap::new();
     for (name, value) in items {
         if !value.is_finite() || *value < 0.0 {
             continue;
         }
         if let Some(e) = parse_gpu_instance(name) {
-            *engines.entry((e.luid, e.phys, e.engtype)).or_insert(0.0) += value;
+            *engines.entry((e.luid, e.phys, e.eng, e.engtype)).or_insert(0.0) += value;
         }
     }
     let mut adapters: HashMap<(String, u32), f64> = HashMap::new();
-    for ((luid, phys, _), sum) in engines {
+    for ((luid, phys, _, _), sum) in engines {
         let slot = adapters.entry((luid, phys)).or_insert(0.0);
         if sum > *slot {
             *slot = sum;
@@ -102,10 +105,10 @@ mod tests {
     #[test]
     fn instance_names_are_parsed() {
         let e = parse_gpu_instance("pid_1234_luid_0x00000000_0x0000A1B2_phys_0_eng_0_engtype_3D").unwrap();
-        assert_eq!(e, GpuEngine { luid: "0x00000000_0x0000A1B2".into(), phys: 0, engtype: "3D".into() });
+        assert_eq!(e, GpuEngine { luid: "0x00000000_0x0000A1B2".into(), phys: 0, eng: 0, engtype: "3D".into() });
         let v = parse_gpu_instance("pid_9_luid_0x00000000_0x0000A1B2_phys_1_eng_5_engtype_VideoEncode").unwrap();
-        assert_eq!((v.phys, v.engtype.as_str()), (1, "VideoEncode"));
-        for bad in ["", "pid_1", "pid_1_luid_0x0_0x1_phys_x_eng_0_engtype_3D", "pid_1_luid_1_2_phys_0_eng_0_engtype_3D", "pid_1_luid_0x0_0x1_phys_0_eng_0"] {
+        assert_eq!((v.phys, v.eng, v.engtype.as_str()), (1, 5, "VideoEncode"));
+        for bad in ["", "pid_1", "pid_1_luid_0x0_0x1_phys_x_eng_0_engtype_3D", "pid_1_luid_1_2_phys_0_eng_0_engtype_3D", "pid_1_luid_0x0_0x1_phys_0_eng_0", "pid_1_luid_0x0_0x1_phys_0_eng_x_engtype_3D"] {
             assert!(parse_gpu_instance(bad).is_none(), "{bad}");
         }
     }
@@ -123,6 +126,14 @@ mod tests {
             (inst("0x0000000A", 0, "Copy", 3), 5.0),
         ];
         assert_eq!(aggregate_gpu(&items), Some(55.0));
+    }
+
+    #[test]
+    fn engines_of_one_type_are_not_added_together() {
+        // two video encoders at 40 % each are two busy engines, not one engine at 80 %
+        let a = "pid_1_luid_0x00000000_0x0000000A_phys_0_eng_3_engtype_VideoEncode".to_string();
+        let b = "pid_1_luid_0x00000000_0x0000000A_phys_0_eng_4_engtype_VideoEncode".to_string();
+        assert_eq!(aggregate_gpu(&[(a, 40.0), (b, 40.0)]), Some(40.0));
     }
 
     #[test]
