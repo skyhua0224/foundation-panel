@@ -1,0 +1,97 @@
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import { sunshine } from '@/tauri-adapter.js'
+
+const HISTORY = 60
+const safe = async (fn, fallback = null) => { try { return await fn() } catch { return fallback } }
+
+/**
+ * Live data of the overview tiles. Every value comes from a real source (host API through the local proxy, Tauri commands);
+ * a source that fails leaves its field empty and the tile shows its unavailable state. Samples for the sparklines are
+ * collected here while the page is open.
+ */
+export function usePanelHome() {
+  const state = reactive({
+    version: '', startMs: 0, now: Date.now(), sessions: [], clientsTotal: null, clientNames: [], appsTotal: null,
+    perf: null, config: null, memory: null, gpus: [], vdd: null, logs: null, loaded: false,
+    bitrateSeries: [], latencySeries: [],
+  })
+  const proxy = ref('')
+  const fetchJson = async (path, init) => {
+    const r = await fetch(`${proxy.value}${path}`, init)
+    if (!r.ok) throw new Error(String(r.status))
+    return r.json()
+  }
+  const fetchText = async (path, init) => {
+    const r = await fetch(`${proxy.value}${path}`, init)
+    if (!r.ok) throw new Error(String(r.status))
+    return r.text()
+  }
+  const push = (list, v) => { if (typeof v === 'number' && Number.isFinite(v)) { list.push(v); if (list.length > HISTORY) list.shift() } }
+
+  async function fast() {
+    state.now = Date.now()
+    state.sessions = (await safe(() => sunshine.getActiveSessions(), [])) || []
+    const s = state.sessions[0]
+    if (s) {
+      push(state.bitrateSeries, s.bitrate)
+      const perf = await safe(() => fetchJson('/api/perf/current'))
+      state.perf = perf
+      const ps = perf?.sessions?.find((x) => x.active) || perf?.sessions?.[0]
+      push(state.latencySeries, ps?.host_latency?.avg_ms)
+    } else { state.perf = null; state.bitrateSeries = []; state.latencySeries = [] }
+  }
+  async function slow() {
+    const [clients, apps, config, memory, vdd, logs] = await Promise.all([
+      safe(() => fetchJson('/api/clients/list')),
+      safe(() => fetchJson('/api/apps')),
+      safe(() => fetchJson('/api/config')),
+      safe(() => invoke('get_process_memory_info')),
+      safe(() => invoke('get_vdd_status')),
+      safe(() => fetchText('/api/logs', { headers: { 'X-Log-Offset': '0' } })),
+    ])
+    if (clients) { const list = clients.named_certs || []; state.clientsTotal = list.length; state.clientNames = list.map((c) => ({ name: c.name, streaming: !!c.streaming })) }
+    state.appsTotal = Array.isArray(apps) ? apps.length : Array.isArray(apps?.apps) ? apps.apps.length : null
+    state.config = config
+    state.memory = memory
+    state.vdd = vdd
+    if (typeof logs === 'string') {
+      const lines = logs.split('\n')
+      const err = lines.filter((l) => /\]\s*(Error|Fatal):/.test(l))
+      const warn = lines.filter((l) => /\]\s*Warning:/.test(l))
+      state.logs = { errors: err.length, warnings: warn.length, last: err[err.length - 1] || '' }
+    }
+    state.loaded = true
+  }
+  let t1 = 0, t2 = 0
+  onMounted(async () => {
+    proxy.value = (await safe(() => sunshine.getProxyUrl(), '')) || ''
+    state.version = (await safe(() => sunshine.getVersion(), '')) || ''
+    const start = await safe(() => invoke('get_sunshine_start_time'))
+    state.startMs = start?.start_time_ms || 0
+    const gpus = await safe(() => invoke('get_gpus'), [])
+    state.gpus = Array.isArray(gpus) ? gpus : []
+    await Promise.all([fast(), slow()])
+    t1 = setInterval(fast, 3000)
+    t2 = setInterval(slow, 15000)
+  })
+  onBeforeUnmount(() => { clearInterval(t1); clearInterval(t2) })
+
+  const session = computed(() => state.sessions[0] || null)
+  const uptimeMs = computed(() => (state.startMs ? Math.max(0, state.now - state.startMs) : 0))
+  const perfSession = computed(() => state.perf?.sessions?.find((x) => x.active) || state.perf?.sessions?.[0] || null)
+  const memoryShare = computed(() => {
+    const m = state.memory
+    if (!m?.system_total_memory) return null
+    return Math.min(1, (m.system_total_memory - (m.system_available_memory || 0)) / m.system_total_memory)
+  })
+  return { state, session, uptimeMs, perfSession, memoryShare, restart: () => invoke('restart_sunshine_service'), stopAll: () => sunshine.stopAllSessions(), openTool: (name) => invoke('open_tool_window', { toolName: name }) }
+}
+
+export function formatUptime(ms) {
+  const m = Math.floor(ms / 60000)
+  const d = Math.floor(m / 1440)
+  const h = Math.floor((m % 1440) / 60)
+  const mm = m % 60
+  return d ? `${d}d ${h}h` : h ? `${h}h ${mm}m` : `${mm}m`
+}

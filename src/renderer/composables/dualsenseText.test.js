@@ -34,7 +34,7 @@ test('both languages define the same DualSense sentences', () => {
 test('every sentence the page looks up exists in both languages', () => {
   const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
   const files = [
-    '../components/DualSenseSettings.vue',
+    '../components/m3e/GamepadPage.vue',
     '../components/dualsense/DualSenseStatusCard.vue',
     '../components/dualsense/TuningRow.vue',
     '../components/dualsense/TuningColor.vue',

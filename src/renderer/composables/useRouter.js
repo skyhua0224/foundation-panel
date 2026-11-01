@@ -1,21 +1,19 @@
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
+import { createNav } from 'foundation-ui/vue'
 import { useI18n } from '../desktop/i18n/index.js'
 
-/**
- * 路由定义
- */
+/** Destinations of the control panel. A page is a detail entry of one back stack (see foundation-ui createNav). */
 export const ROUTES = {
-  HOME: 'home',           // 默认内容 (slot)
+  HOME: 'home', // overview: the tile page
   VDD_SETTINGS: 'vdd-settings',
   WELCOME: 'welcome',
   WEB_STREAM: 'web-stream',
   AI_ASSISTANT: 'ai-assistant',
-  CONTROLLERS: 'controllers',
+  CONTROLLERS: 'controllers', // old name of GAMEPAD
   HDR_ENHANCED: 'hdr-enhanced',
-  TOOLBOX: 'toolbox',
+  TOOLBOX: 'toolbox', // old name of DIAGNOSTICS
   PANEL_SETTINGS: 'panel-settings',
   HELP: 'help',
-  // Task-based destinations (see docs/redesign): four categories and the pages below them.
   CAT_STREAM: 'cat-stream',
   CAT_INPUT: 'cat-input',
   CAT_DISPLAY: 'cat-display',
@@ -25,134 +23,90 @@ export const ROUTES = {
   USB: 'usb',
   COMPONENTS: 'components',
   DIAGNOSTICS: 'diagnostics',
+  // Pages of the Web UI shown in the embedded frame
+  WEB_CLIENTS: 'web-clients',
+  WEB_APPS: 'web-apps',
+  WEB_CONFIG: 'web-config',
+  WEB_DOWNLOADS: 'web-downloads',
+  WEB_PASSWORD: 'web-password',
+  WEB_TROUBLESHOOTING: 'web-troubleshooting',
 }
 
-/**
- * 路由配置
- */
-const routeConfig = {
-  [ROUTES.HOME]: {
-    name: ROUTES.HOME,
-    component: null, // 使用 slot
-    titleKey: 'home',
-  },
-  [ROUTES.VDD_SETTINGS]: {
-    name: ROUTES.VDD_SETTINGS,
-    component: 'VddSettings',
-    titleKey: 'virtualDisplay',
-  },
-  [ROUTES.WELCOME]: {
-    name: ROUTES.WELCOME,
-    component: 'Welcome',
-    titleKey: 'welcome',
-  },
-  [ROUTES.WEB_STREAM]: {
-    name: ROUTES.WEB_STREAM,
-    component: 'WebStreamSettings',
-    titleKey: 'webStream',
-  },
-  [ROUTES.AI_ASSISTANT]: {
-    name: ROUTES.AI_ASSISTANT,
-    component: 'AiAssistant',
-    titleKey: 'aiAssistant',
-  },
-  [ROUTES.CONTROLLERS]: {
-    name: ROUTES.CONTROLLERS,
-    component: 'ControllersHub',
-    titleKey: 'deviceHub',
-  },
-  [ROUTES.HDR_ENHANCED]: {
-    name: ROUTES.HDR_ENHANCED,
-    component: 'HdrEnhancedManager',
-    titleKey: 'hdrEnhanced',
-  },
-  [ROUTES.TOOLBOX]: { name: ROUTES.TOOLBOX, component: 'ControlPanelPage', titleKey: 'toolbox' },
-  [ROUTES.PANEL_SETTINGS]: { name: ROUTES.PANEL_SETTINGS, component: 'ControlPanelPage', titleKey: 'panelSettings' },
-  [ROUTES.HELP]: { name: ROUTES.HELP, component: 'ControlPanelPage', titleKey: 'helpAbout' },
-  [ROUTES.CAT_STREAM]: { name: ROUTES.CAT_STREAM, component: 'CategoryPage', titleKey: 'stream' },
-  [ROUTES.CAT_INPUT]: { name: ROUTES.CAT_INPUT, component: 'CategoryPage', titleKey: 'deviceHub' },
-  [ROUTES.CAT_DISPLAY]: { name: ROUTES.CAT_DISPLAY, component: 'CategoryPage', titleKey: 'virtualDisplay' },
-  [ROUTES.CAT_SYSTEM]: { name: ROUTES.CAT_SYSTEM, component: 'CategoryPage', titleKey: 'toolbox' },
-  [ROUTES.GAMEPAD]: { name: ROUTES.GAMEPAD, component: 'GamepadPage', titleKey: 'deviceHub' },
-  [ROUTES.MICROPHONE]: { name: ROUTES.MICROPHONE, component: 'MicrophonePage', titleKey: 'deviceHub' },
-  [ROUTES.USB]: { name: ROUTES.USB, component: 'UsbPage', titleKey: 'deviceHub' },
-  [ROUTES.COMPONENTS]: { name: ROUTES.COMPONENTS, component: 'ComponentsPage', titleKey: 'deviceHub' },
-  [ROUTES.DIAGNOSTICS]: { name: ROUTES.DIAGNOSTICS, component: 'DiagnosticsPage', titleKey: 'toolbox' },
+/** rail: category of the page (rail item); list: false = the page takes the whole width (no list pane) */
+export const PAGES = {
+  [ROUTES.HOME]: { rail: 'overview', list: false },
+  [ROUTES.WELCOME]: { rail: 'overview', list: false },
+  [ROUTES.WEB_STREAM]: { rail: 'overview', list: false },
+  [ROUTES.WEB_CLIENTS]: { rail: 'stream' },
+  [ROUTES.WEB_APPS]: { rail: 'stream' },
+  [ROUTES.WEB_CONFIG]: { rail: 'stream' },
+  [ROUTES.WEB_DOWNLOADS]: { rail: 'stream' },
+  [ROUTES.GAMEPAD]: { rail: 'input' },
+  [ROUTES.MICROPHONE]: { rail: 'input' },
+  [ROUTES.USB]: { rail: 'input' },
+  [ROUTES.VDD_SETTINGS]: { rail: 'display' },
+  [ROUTES.HDR_ENHANCED]: { rail: 'display' },
+  [ROUTES.COMPONENTS]: { rail: 'system' },
+  [ROUTES.DIAGNOSTICS]: { rail: 'system' },
+  [ROUTES.AI_ASSISTANT]: { rail: 'system' },
+  [ROUTES.WEB_PASSWORD]: { rail: 'system' },
+  [ROUTES.WEB_TROUBLESHOOTING]: { rail: 'system' },
+  [ROUTES.PANEL_SETTINGS]: { rail: 'settings', list: false },
+  [ROUTES.HELP]: { rail: 'help', list: false },
 }
+export const RAILS = ['overview', 'stream', 'input', 'display', 'system', 'settings', 'help']
 
-/**
- * 路由管理 Composable
- */
+const ALIAS = { [ROUTES.CONTROLLERS]: ROUTES.GAMEPAD, [ROUTES.TOOLBOX]: ROUTES.DIAGNOSTICS }
+const CATEGORY = { [ROUTES.CAT_STREAM]: 'stream', [ROUTES.CAT_INPUT]: 'input', [ROUTES.CAT_DISPLAY]: 'display', [ROUTES.CAT_SYSTEM]: 'system' }
+const WEB_PATHS = [
+  [/^\/(?:pin|clients)(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_CLIENTS],
+  [/^\/apps(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_APPS],
+  [/^\/config(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_CONFIG],
+  [/^\/downloads(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_DOWNLOADS],
+  [/^\/password(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_PASSWORD],
+  [/^\/troubleshooting(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_TROUBLESHOOTING],
+  [/^\/dualsense(?:\.html)?(?:[?#/]|$)/, ROUTES.GAMEPAD],
+]
+/** The panel destination that shows a Web UI path; the Web home is the panel's own overview. */
+export const routeForWebPath = (path) => {
+  const p = String(path || '/')
+  for (const [re, route] of WEB_PATHS) if (re.test(p)) return route
+  return ROUTES.HOME
+}
+/** The Web UI path of a Web page destination (null for panel pages). */
+export const webPathOf = (route) => ({
+  [ROUTES.WEB_CLIENTS]: '/pin', [ROUTES.WEB_APPS]: '/apps', [ROUTES.WEB_CONFIG]: '/config', [ROUTES.WEB_DOWNLOADS]: '/downloads',
+  [ROUTES.WEB_PASSWORD]: '/password', [ROUTES.WEB_TROUBLESHOOTING]: '/troubleshooting',
+}[route] || null)
+
+const routes = {}
+for (const rail of new Set(Object.values(PAGES).filter((p) => p.list !== false).map((p) => p.rail))) routes[`${rail}:list`] = { role: 'list', rail }
+for (const [id, p] of Object.entries(PAGES)) routes[id] = { role: 'detail', rail: p.rail, list: p.list }
+
+let nav = null
+const shared = () => (nav ||= createNav({ routes, home: ROUTES.HOME }))
+
+/** Navigation of the panel: one back stack for the whole window. */
 export function useRouter() {
   const { t } = useI18n()
-  const currentRoute = ref(ROUTES.HOME)
-  const routeHistory = ref([ROUTES.HOME])
-
-  /**
-   * 导航到指定路由
-   * @param {string} routeName - 路由名称
-   * @param {object} options - 导航选项
-   */
-  const navigate = (routeName, options = {}) => {
-    if (!routeConfig[routeName]) {
-      console.warn(`路由 ${routeName} 不存在`)
-      return
-    }
-
-    // 如果需要替换当前历史记录而不是添加
-    if (options.replace) {
-      routeHistory.value[routeHistory.value.length - 1] = routeName
-    } else {
-      routeHistory.value.push(routeName)
-      // 限制历史记录长度
-      if (routeHistory.value.length > 10) {
-        routeHistory.value.shift()
-      }
-    }
-
-    currentRoute.value = routeName
+  const stack = shared()
+  const navigate = (name) => {
+    const to = ALIAS[name] || name
+    if (CATEGORY[to]) return stack.selectRail(CATEGORY[to])
+    if (!PAGES[to]) { console.warn(`route ${name} does not exist`); return }
+    stack.go(to)
   }
-
-  /**
-   * 返回上一页
-   */
-  const goBack = () => {
-    if (routeHistory.value.length > 1) {
-      routeHistory.value.pop() // 移除当前路由
-      currentRoute.value = routeHistory.value[routeHistory.value.length - 1]
-    }
-  }
-
-  /**
-   * 返回首页
-   */
-  const goHome = () => {
-    navigate(ROUTES.HOME, { replace: true })
-  }
-
-  /**
-   * 获取当前路由配置
-   */
-  const getCurrentRouteConfig = computed(() => {
-    const config = routeConfig[currentRoute.value] || routeConfig[ROUTES.HOME]
-    return { ...config, title: t.value.routeTitles[config.titleKey] || t.value.sidebar[config.titleKey] }
-  })
-
-  /**
-   * 检查是否是某个路由
-   */
-  const isRoute = (routeName) => {
-    return currentRoute.value === routeName
-  }
-
+  const currentRoute = computed(() => stack.current.value)
+  const goHome = () => navigate(ROUTES.HOME)
+  const goBack = () => stack.pop()
   return {
+    nav: stack,
     currentRoute,
-    routeHistory,
     navigate,
     goBack,
     goHome,
-    getCurrentRouteConfig,
-    isRoute,
+    isRoute: (name) => currentRoute.value === (ALIAS[name] || name),
+    getCurrentRouteConfig: computed(() => ({ name: currentRoute.value, title: t.value.routeTitles?.[currentRoute.value] || '' })),
     ROUTES,
   }
 }

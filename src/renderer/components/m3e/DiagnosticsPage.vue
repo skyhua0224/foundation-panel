@@ -1,5 +1,5 @@
 <template>
-  <MPage :title="t.m3e.system.diagnostics" :lead="t.m3e.system.diagnosticsNote" :eyebrow="t.m3e.system.title" back :back-label="t.m3e.back" @back="emit('back')">
+  <MPage :title="t.m3e.system.diagnostics" :lead="t.m3e.system.diagnosticsNote" :eyebrow="t.m3e.system.title">
     <DeviceDiagnosticsPanel @open-controller-meta="emit('open-controller-meta')" @open-stylus-input-probe="emit('open-stylus-input-probe')" />
     <MSection :title="t.sidebar.toolbox">
       <MGroup>

@@ -74,18 +74,17 @@ test('both panel languages carry the complete warning text for each section', ()
 })
 
 test('both advanced entries ask first and never restore past the warning', async () => {
-  const settings = await readFile(new URL('../components/DualSenseSettings.vue', import.meta.url), 'utf8')
-  const toggle = settings.match(/const toggleAdvanced = \(\) => \{[\s\S]*?\n\}\n/)?.[0] ?? ''
-  assert.ok(toggle.indexOf('isAdvancedWarningHidden') > 0)
-  assert.ok(toggle.indexOf('isAdvancedWarningHidden') < toggle.indexOf('advancedOpen.value = true'))
-  assert.match(settings, /localStorage\.getItem\(ADVANCED_KEY\) === '1' && isAdvancedWarningHidden\(localStorage\)/)
-  assert.equal((settings.match(/advancedOpen\.value = true/g) ?? []).length, 2)
-  assert.match(settings, /<AdvancedWarningDialog[\s\S]*?@confirm="confirmAdvancedWarning"/)
-
   const page = await readFile(new URL('../components/m3e/GamepadPage.vue', import.meta.url), 'utf8')
-  assert.match(page, /<AdvancedWarningDialog[\s\S]*?scope="emulation"/)
-  const emulationToggle = page.match(/function toggleEmulation\(\) \{[\s\S]*?\n\}\n/)?.[0] ?? ''
-  assert.ok(emulationToggle.indexOf('isAdvancedWarningHidden') > 0)
-  assert.ok(emulationToggle.indexOf('isAdvancedWarningHidden') < emulationToggle.indexOf('advancedOpen.value = true'))
-  assert.match(emulationToggle, /warningOpen\.value = true/)
+  // the tuning group and the emulation options both go through askAdvanced
+  assert.match(page, /askAdvanced\('advanced'\)/)
+  assert.match(page, /askAdvanced\('emulation', 'emulation'\)/)
+  const ask = page.match(/const askAdvanced = \(target, scope = 'tuning'\) => \{[\s\S]*?\n\}\n/)?.[0] ?? ''
+  assert.ok(ask.indexOf('isAdvancedWarningHidden') > 0)
+  assert.ok(ask.indexOf('isAdvancedWarningHidden') < ask.indexOf('warning, { open: true'))
+  assert.match(page, /<AdvancedWarningDialog[\s\S]*?@confirm="confirmWarning"/)
+  // reopening after a reload never lands behind the warning
+  assert.match(page, /startsWith\(p\)\)[\s\S]*?!isAdvancedWarningHidden\(panelStorage\(\)\)\) current\.value = ''/)
+  // the countdown and the opt-out box live in the dialog
+  const dialog = await readFile(new URL('../components/dualsense/AdvancedWarningDialog.vue', import.meta.url), 'utf8')
+  assert.match(dialog, /ADVANCED_WARNING_SECONDS|remainingSeconds/)
 })

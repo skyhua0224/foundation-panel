@@ -1,5 +1,5 @@
 <template>
-  <MPage :title="title" back :back-label="t.m3e.back" @back="onBack">
+  <MPage :title="title" :back="!!current" :back-label="t.m3e.back" @back="back">
     <template #actions>
       <MIconButton v-if="current === 'status'" icon="refresh" :label="tx('refresh')" :disabled="statusLoading" @click="refreshAll" />
       <MOverflow v-if="!current && dsVisible && tuning.snapshot.value" :items="[{ id: 'restore', label: tr('restore_defaults') }]" :label="t.deviceHub.refresh" @select="restoreOpen = true" />
@@ -178,7 +178,6 @@ const title = computed(() => {
   if (c === 'emulation') return t.value.deviceHub.controllerAdvanced
   return ''
 })
-const onBack = () => (current.value ? back() : emit('back'))
 const refreshAll = () => Promise.all([refresh({ force: true }), tuning.load()])
 
 // Both advanced entries ask first (five seconds, "do not show again") unless the warning was switched off.

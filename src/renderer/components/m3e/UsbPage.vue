@@ -1,5 +1,5 @@
 <template>
-  <MPage :title="t.m3e.input.usb" :lead="t.deviceHub.intro" :eyebrow="t.m3e.input.title" back :back-label="t.m3e.back" @back="emit('back')">
+  <MPage :title="t.m3e.input.usb" :lead="t.deviceHub.intro" :eyebrow="t.m3e.input.title">
     <UsbPassthroughPanel />
   </MPage>
 </template>

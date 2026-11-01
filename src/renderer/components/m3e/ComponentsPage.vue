@@ -1,5 +1,5 @@
 <template>
-  <MPage :title="t.m3e.system.components" :lead="t.deviceHub.components.managementHint" :eyebrow="t.m3e.system.title" back :back-label="t.m3e.back" @back="emit('back')">
+  <MPage :title="t.m3e.system.components" :lead="t.deviceHub.components.managementHint" :eyebrow="t.m3e.system.title">
     <UsbTransportPanel :transport="transport" maintenance />
     <InputDriversPanel />
   </MPage>
