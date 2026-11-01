@@ -1118,6 +1118,7 @@ export const zh = {
   },
   m3e: {
     nav: { overview: '概览', stream: '串流', input: '输入与外设', display: '显示', system: '系统', settings: '面板设置', help: '帮助与关于', main: '主导航' },
+    padType: '手柄类型',
     back: '返回',
     stream: {
       title: '串流', lead: '客户端、应用与串流参数。',
@@ -1557,6 +1558,7 @@ export const zh = {
       "open_meta": "打开手柄测试工具",
       "profile_warning": "保存的调校文件有部分内容无法读取，这些设置已改用默认值。",
       "restore_defaults": "全部恢复默认",
+      "restore_confirm": "把所有 DualSense 调校恢复为默认值？保存后生效。",
       "retry": "重试",
       "save": "保存",
       "save_ok": "已保存 {count} 项。",

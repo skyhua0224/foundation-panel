@@ -1118,6 +1118,7 @@ Output only one short sentence, no explanation. Reply in English.`,
   },
   m3e: {
     nav: { overview: 'Overview', stream: 'Stream', input: 'Input & devices', display: 'Display', system: 'System', settings: 'Panel settings', help: 'Help & about', main: 'Main navigation' },
+    padType: 'Controller type',
     back: 'Back',
     stream: {
       title: 'Stream', lead: 'Clients, apps and stream settings.',
@@ -1452,6 +1453,7 @@ Output only one short sentence, no explanation. Reply in English.`,
       "open_meta": "Open controller test tool",
       "profile_warning": "Part of the saved tuning file could not be read, so those settings use their defaults.",
       "restore_defaults": "Restore defaults",
+      "restore_confirm": "Reset all DualSense tuning to the defaults? They apply once you save.",
       "cards": {
         "haptics": "Haptics and rumble",
         "triggers": "Adaptive triggers",

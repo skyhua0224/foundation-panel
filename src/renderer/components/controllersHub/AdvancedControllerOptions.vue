@@ -1,6 +1,6 @@
 <template>
   <div class="m-advanced">
-    <MSection :title="t.controllersHub.emulation.dsuTitle" :description="t.controllersHub.emulation.dsuHint">
+    <MSection :title="t.controllersHub.emulation.dsuTitle">
       <MGroup>
         <MSwitchItem :model-value="config.enable_dsu_server" icon="sensors" :title="t.controllersHub.emulation.dsuEnable" :disabled="busyKey !== ''" @update:model-value="(v) => saveKey('enable_dsu_server', v)" />
         <MItem icon="settings_ethernet" :title="t.controllersHub.emulation.dsuPort" :disabled="!config.enable_dsu_server || busyKey !== ''">
@@ -9,19 +9,21 @@
           </template>
         </MItem>
       </MGroup>
+      <MFooter>{{ t.controllersHub.emulation.dsuHint }}</MFooter>
     </MSection>
-    <MSection :title="t.controllersHub.emulation.ds4Title" :description="t.controllersHub.emulation.ds4Hint">
+    <MSection :title="t.controllersHub.emulation.ds4Title">
       <MGroup>
         <MSwitchItem :model-value="config.ds4_back_as_touchpad_click" icon="touch_app" :title="t.controllersHub.emulation.backAsTouchpadClick" :disabled="busyKey !== ''" @update:model-value="(v) => saveKey('ds4_back_as_touchpad_click', v)" />
         <MSwitchItem :model-value="config.motion_as_ds4" icon="sensors" :title="t.controllersHub.emulation.motionAsDs4" :disabled="busyKey !== ''" @update:model-value="(v) => saveKey('motion_as_ds4', v)" />
         <MSwitchItem :model-value="config.touchpad_as_ds4" icon="touch_app" :title="t.controllersHub.emulation.touchpadAsDs4" :disabled="busyKey !== ''" @update:model-value="(v) => saveKey('touchpad_as_ds4', v)" />
       </MGroup>
+      <MFooter>{{ t.controllersHub.emulation.ds4Hint }}</MFooter>
     </MSection>
   </div>
 </template>
 
 <script setup>
-import { MSection, MGroup, MItem, MSwitchItem } from 'foundation-ui/vue'
+import { MSection, MGroup, MItem, MSwitchItem, MFooter } from 'foundation-ui/vue'
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useControllerHubConfig } from '../../composables/useControllerHubConfig.js'
