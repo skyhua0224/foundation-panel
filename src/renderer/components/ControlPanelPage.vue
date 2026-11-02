@@ -19,6 +19,7 @@
           </MItem>
         </MGroup>
       </MSection>
+      <PanelOptions :locale="locale" />
       <MSection :title="t.sidebar.syncFeatures">
         <MGroup>
           <MItem icon="content_paste" :title="t.sidebar.clipboardSync" :text="t.sidebar.clipboardDescription">
@@ -73,6 +74,7 @@ import { computed, ref } from 'vue'
 import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MPromo, MFooter, MSheet, aboutTexts, guideTexts, homeTexts, useGuideCard, MAppearance } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import { useI18n } from '../desktop/i18n/index.js'
+import PanelOptions from './m3e/PanelOptions.vue'
 import { ROUTES } from '../composables/useRouter.js'
 const props = defineProps({
   page: { type: String, required: true },
