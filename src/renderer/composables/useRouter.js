@@ -1,5 +1,6 @@
 import { computed } from 'vue'
 import { createNav } from 'foundation-ui/vue'
+import { settingsHash } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
 /** Destinations of the control panel. A page is a detail entry of one back stack (see foundation-ui createNav). */
@@ -29,7 +30,6 @@ export const ROUTES = {
   WEB_CLIENTS: 'web-clients',
   WEB_APPS: 'web-apps',
   WEB_CONFIG: 'web-config',
-  CFG_DUALSENSE: 'cfg-dualsense', // the DualSense tuning page, listed with the stream settings
   CAT_CONFIG: 'cat-config',
   CFG_APPEARANCE: 'cfg-appearance', // 个性化 among the stream settings
   WEB_DOWNLOADS: 'web-downloads',
@@ -46,7 +46,6 @@ export const PAGES = {
   [ROUTES.WEB_APPS]: { rail: 'stream' },
   [ROUTES.WEB_DOWNLOADS]: { rail: 'stream' },
   [ROUTES.WEB_CONFIG]: { rail: 'config' },
-  [ROUTES.CFG_DUALSENSE]: { rail: 'config' },
   [ROUTES.CFG_APPEARANCE]: { rail: 'config' },
   [ROUTES.WEB_PASSWORD]: { rail: 'config' },
   [ROUTES.GAMEPAD]: { rail: 'input' },
@@ -88,6 +87,8 @@ export const routeForWebPath = (path) => {
 export const webPathOf = (route) => ({
   [ROUTES.WEB_CLIENTS]: '/pin', [ROUTES.WEB_APPS]: '/apps', [ROUTES.WEB_CONFIG]: '/config', [ROUTES.WEB_DOWNLOADS]: '/downloads',
   [ROUTES.WEB_PASSWORD]: '/password', [ROUTES.WEB_TROUBLESHOOTING]: '/troubleshooting',
+  // the gamepad is a page of 输入 in the Web UI: the rail destination shows that page in the frame
+  [ROUTES.GAMEPAD]: `/config${settingsHash({ tab: 'input', focus: 'ds5-block' })}`,
 }[route] || null)
 
 const routes = {}

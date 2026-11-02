@@ -36,7 +36,6 @@
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
         <HdrEnhancedManager v-else-if="entry.id === ROUTES.HDR_ENHANCED" />
-        <GamepadPage v-else-if="entry.id === ROUTES.GAMEPAD || entry.id === ROUTES.CFG_DUALSENSE" :params="entry.params" @open-controller-meta="openGamepadTest" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <AppearancePage v-else-if="entry.id === ROUTES.CFG_APPEARANCE" />
         <MicrophonePage v-else-if="entry.id === ROUTES.MICROPHONE" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <UsbPage v-else-if="entry.id === ROUTES.USB" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
@@ -100,7 +99,6 @@ import WebStreamSettings from './WebStreamSettings.vue'
 import AiAssistant from './AiAssistant.vue'
 import HdrEnhancedManager from './HdrEnhancedManager.vue'
 import ControlPanelPage from './ControlPanelPage.vue'
-import GamepadPage from './m3e/GamepadPage.vue'
 import MicrophonePage from './m3e/MicrophonePage.vue'
 import AppearancePage from './m3e/AppearancePage.vue'
 import UsbPage from './m3e/UsbPage.vue'
@@ -120,6 +118,8 @@ import { createUtilityTools } from '../composables/toolsRegistry.js'
 import { ROUTES, PAGES, routeForWebPath, webPathOf } from '../composables/useRouter.js'
 import { railItems, pageItems } from '../composables/panelNav.js'
 import { useI18n } from '../desktop/i18n/index.js'
+import { useDualSenseStatus } from '../composables/useDualSenseStatus.js'
+import { useDualSenseText } from '../composables/useDualSenseText.js'
 const UpdateDialog = defineAsyncComponent(() => import('./UpdateDialog.vue'))
 const props = defineProps({ webuiPath: { type: String, default: '/' } })
 const emit = defineEmits(['route-change', 'webui-navigate'])
@@ -210,7 +210,6 @@ const listGroups = (rail) => (rail === 'config' ? settingsList.groups.value : [{
 const currentRow = computed(() => {
   const route = nav.current.value
   if (route === ROUTES.WEB_CONFIG) return `config:${nav.detail.value?.params?.tab || 'general'}`
-  if (route === ROUTES.CFG_DUALSENSE) return 'config:input' // the DualSense page sits under the gamepad of 输入
   if (route === ROUTES.CFG_APPEARANCE) return 'config:appearance'
   if (route === ROUTES.WEB_PASSWORD) return 'password'
   return route
@@ -239,7 +238,6 @@ const openConfig = (params = { tab: 'general' }) => {
 const openSettingsRoute = (item) => {
   if (item.route === 'config' && item.params?.tab === 'appearance') router.navigate(ROUTES.CFG_APPEARANCE)
   else if (item.route === 'config') openConfig(item.params)
-  else if (item.route === 'dualsense') router.navigate(ROUTES.CFG_DUALSENSE, item.params)
   else if (item.route === 'password') openRoute(ROUTES.WEB_PASSWORD)
   else openRoute(item.route || item.id)
 }
@@ -263,14 +261,26 @@ const onSearch = (item) => {
 }
 // A setting changed in the frame joins the recently used list
 const frameSub = ref(false)
+const ds5 = useDualSenseStatus()
+const { tx } = useDualSenseText()
+const TRANSPORT_STATES = ['usbip_missing', 'usbip_version', 'usbip_unsigned', 'usbip_not_ready']
+const pushDs5Status = () => {
+  const s = ds5.status.value
+  if (!s) return
+  const message = { type: 'foundation-ds5-status', state: s.state, label: tx(`status.states.${s.state}`), next: tx(`status.next.${s.state}`, { pinned: s.transport?.pinned_version || '', version: s.transport?.version || '' }), needsTransport: TRANSPORT_STATES.includes(s.state) }
+  for (const frame of document.querySelectorAll('iframe')) frame.contentWindow?.postMessage(message, '*')
+}
+watch(() => ds5.status.value?.state, pushDs5Status)
 const onFrameMessage = (event) => {
   const data = event.data
   if (![...document.querySelectorAll('iframe')].some((frame) => frame.contentWindow === event.source)) return
   if (data?.type === 'foundation-subpage') frameSub.value = data.open === true
   else if (data?.type === 'foundation-settings-recent' && typeof data.key === 'string') settingsList.remember(data.key)
-  // a page of the frame that the panel shows natively (the DualSense tuning, opened from the gamepad rows of 输入)
-  else if (data?.type === 'foundation-open' && data.page === 'dualsense') router.navigate(ROUTES.CFG_DUALSENSE)
-}
+  // what the gamepad page of the frame cannot do by itself: the controller test tool, the component page, and the state of the
+  // DualSense transport that only the panel reads
+  else if (data?.type === 'foundation-open' && data.page === 'controller-test') openGamepadTest()
+  else if (data?.type === 'foundation-open' && data.page === 'components') router.navigate(ROUTES.COMPONENTS)
+  else if (data?.type === 'foundation-ds5-status-request') pushDs5Status()}
 onMounted(() => { window.addEventListener('message', onFrameMessage); loadHostData(); componentStatus.start(60000) })
 onBeforeUnmount(() => { window.removeEventListener('message', onFrameMessage); componentStatus.stop() })
 const contextMenu = ref(null)

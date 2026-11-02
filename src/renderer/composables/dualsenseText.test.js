@@ -31,31 +31,6 @@ test('both languages define the same DualSense sentences', () => {
   assert.deepEqual(flatten(zh.dualSense).sort(), flatten(en.dualSense).sort())
 })
 
-test('every sentence the page looks up exists in both languages', () => {
-  const read = (path) => readFileSync(new URL(path, import.meta.url), 'utf8')
-  const files = [
-    '../components/m3e/GamepadPage.vue',
-    '../components/dualsense/TuningRow.vue',
-    '../components/dualsense/TuningColor.vue',
-    '../components/dualsense/TuningCurve.vue',
-    '../components/dualsense/TuningTrigger.vue',
-    './useDualSenseTuning.js',
-  ]
-  // `tr('presets.' + name)` is a dynamic family: only its prefix can be checked here.
-  const has = (root, path) => path.replace(/\.$/, '').split('.').reduce((node, part) => node?.[part], root) !== undefined
-  for (const file of files) {
-    const source = read(file)
-    for (const [, path] of source.matchAll(/\btr\('([a-z_][\w.]*)'/g)) {
-      assert.ok(has(zh.dualSense.tuning, path), `zh tuning.${path} (${file})`)
-      assert.ok(has(en.dualSense.tuning, path), `en tuning.${path} (${file})`)
-    }
-    for (const [, path] of source.matchAll(/\btx\('([a-z_][\w.]*)'/g)) {
-      assert.ok(has(zh.dualSense, path), `zh ${path} (${file})`)
-      assert.ok(has(en.dualSense, path), `en ${path} (${file})`)
-    }
-  }
-})
-
 test('dynamic sentence families are complete', () => {
   for (const locale of [zh, en]) {
     const status = locale.dualSense.status
