@@ -2,7 +2,8 @@
 /* the chat fills the pane: the header, the conversation (the only part that scrolls) and the input pinned under it */
 .ai-shell { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; }
 .ai-head { flex: none; display: flex; align-items: center; gap: 14px; padding: 16px max(16px, calc((100% - var(--m-column, 720px)) / 2 + 16px)) 8px; min-height: 80px; position: relative; isolation: isolate; background: transparent; }
-.ai-head::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0; background: color-mix(in srgb, var(--m-frame, var(--m-page-solid)) 94%, transparent); backdrop-filter: blur(14px); box-shadow: 0 8px 14px -12px var(--m-seam-shadow); transition: opacity 220ms var(--m-spring-default-effects, ease); }
+/* the same top app bar behaviour as the pages: the header takes the page's material, a little more opaque, when the conversation scrolls under it, with a soft fade below */
+.ai-head::before { content: ''; position: absolute; left: 0; right: 0; top: 0; bottom: -24px; z-index: -1; pointer-events: none; opacity: 0; background: color-mix(in srgb, var(--m-page-solid) 90%, transparent); backdrop-filter: blur(12px); -webkit-mask-image: linear-gradient(#000 calc(100% - 24px), transparent); mask-image: linear-gradient(#000 calc(100% - 24px), transparent); transition: opacity 200ms var(--m-spring-default-effects, ease); }
 .ai-head.is-scrolled::before { opacity: 1; }
 .ai-head__avatar { width: 44px; height: 44px; border-radius: 14px; background: var(--md-sys-color-secondary-container); padding: 4px; }
 .ai-head__id { flex: 1; min-width: 0; }

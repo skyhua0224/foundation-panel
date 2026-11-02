@@ -30,7 +30,8 @@
         />
       </template>
       <template #detail="{ entry }">
-        <PanelHome v-if="entry.id === ROUTES.HOME" :runtime="runtime" :update-available="!!updateInfo" @open="openDestination" @webui-navigate="openWebUi" />
+        <MHostOffline v-if="offlineShown" :state="hostConn.state" :locale="locale" can-restart can-user-mode can-logs @retry="hostConn.retry" @restart="hostConn.restart('service')" @user-mode="hostConn.restart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" />
+        <PanelHome v-else-if="entry.id === ROUTES.HOME" :runtime="runtime" :update-available="!!updateInfo" @open="openDestination" @webui-navigate="openWebUi" />
         <Welcome v-else-if="entry.id === ROUTES.WELCOME" @close="goHome" @webui-navigate="openWebUi" />
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" />
@@ -70,7 +71,9 @@
         />
       </template>
       <template #overlay>
-        <PanelWebHost :sub="frameSub"><slot /></PanelWebHost>
+        <!-- the frame stays mounted while the host is away (it only is hidden): it loads again when the host is back -->
+        <div v-show="!offlineShown" class="panel-web-keep"><PanelWebHost :sub="frameSub"><slot /></PanelWebHost></div>
+        <MHostOffline v-if="offlineShown" :state="hostConn.state" :locale="locale" can-restart can-user-mode can-logs @retry="hostConn.retry" @restart="hostConn.restart('service')" @user-mode="hostConn.restart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" />
       </template>
     </MScene>
     </div>
@@ -101,7 +104,7 @@
 import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { sunshine, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
-import { MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -194,6 +197,21 @@ const sponsorSections = computed(() => [
 const actions_openExternal = (url) => openExternalUrl(url)
 const nav = router.nav
 const isWebPage = computed(() => !!webPathOf(router.currentRoute.value))
+// The host (Sunshine) does not answer: the content area shows the offline state (Vivi, the actions, the countdown); the rail stays usable and the pages that
+// do not need the host (the panel's settings, 米塔 AI, help, about, the diagnostics) stay as they are. When the host is back the frame loads again.
+const probeHost = async () => {
+  const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')
+  const response = await fetch(`${base}/`, { cache: 'no-store', signal: AbortSignal.timeout(2500) })
+  return response.status !== 502 && response.status !== 503
+}
+const hostConn = useHostConnection({
+  probe: probeHost,
+  restartService: () => sunshine.restartSunshineService(),
+  restartUser: () => sunshine.restartSunshineInUserMode(),
+  onRecovered: () => { for (const frame of document.querySelectorAll('iframe')) { const src = frame.src; frame.src = src } },
+})
+const NEEDS_NO_HOST = new Set([ROUTES.PANEL_SETTINGS, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
+const offlineShown = computed(() => hostConn.state.status !== 'online' && !NEEDS_NO_HOST.has(router.currentRoute.value))
 const back = () => nav.pop()
 const announceVersion = ref('')
 onMounted(async () => { try { announceVersion.value = (await sunshine.getVersion()) || '' } catch { /* the version only narrows version-bound notices */ } })
@@ -362,5 +380,6 @@ defineExpose({
 .panel-caption__btn--close:hover { background: #c42b1c; color: #fff; } .panel-caption__btn--close:active { background: #b02417; color: #fff; }
 .panel-caption__btn:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px; }
 .panel-body { position: absolute; inset: 0; min-height: 0; overflow: clip; }
+.panel-web-keep { height: 100%; min-height: 0; }
 .panel-body > .m-scene { position: absolute; inset: 0; height: auto; }
 </style>
