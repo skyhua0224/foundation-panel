@@ -291,6 +291,7 @@ fn main() {
             fs_utils::search_steam_covers,
             fs_utils::upload_steam_cover,
             fs_utils::save_text_file,
+            fs_utils::save_binary_file,
             update::check_for_updates,
             update::check_for_updates_for_channel,
             update::start_update_checker_when_ui_ready,

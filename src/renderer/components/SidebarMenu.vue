@@ -47,6 +47,7 @@
           :tools="toolsMenuItems"
           @open-controller-meta="openGamepadTest"
           @open-stylus-input-probe="openStylusInputProbe"
+          @go="goDiagnosticsPlace"
         />
         <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" @open-update="showUpdateDialog = true" @open="actions_openExternal" />
         <ControlPanelPage
@@ -224,6 +225,13 @@ const searchItems = computed(() => [
     }),
   ...settingsList.searchItems.value,
 ])
+// Where an error of the diagnostics page leads
+const goDiagnosticsPlace = (place) => {
+  if (place === 'drivers') router.navigate(ROUTES.COMPONENTS)
+  else if (place === 'encoder') openConfig({ tab: 'encoders' })
+  else if (place === 'network') openConfig({ tab: 'network' })
+  else if (place === 'audio' || place === 'display') openConfig({ tab: 'av' })
+}
 // A place of the stream settings: the list pane opens the Web page in the frame at that tab, section and row
 const openConfig = (params = { tab: 'general' }) => {
   emit('webui-navigate', `/config${settingsHash(params)}`)
