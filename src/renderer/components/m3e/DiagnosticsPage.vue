@@ -2,6 +2,8 @@
   <MDiagnostics
     :title="diagnosticsTexts(locale).title"
     :text="diag.text.value"
+    :records="diag.records.value"
+    panel
     v-model:live="diag.live.value"
     :facts="diag.facts.value"
     :collect="diag.collect"

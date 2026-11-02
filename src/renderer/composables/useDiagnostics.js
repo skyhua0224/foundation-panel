@@ -2,6 +2,7 @@ import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { appendTail, createLogByteDecoder, decodeLogBytes, findSessions, parseLog, sessionSummary } from 'foundation-ui/diagnostics'
 import { sunshine } from '../tauri-adapter.js'
+import { combineDiagnosticsRecords } from './diagnosticsRecords.js'
 
 // The data of the diagnostics page of the control panel: the host log and configuration through the local proxy, and what only the panel
 // can read (system, graphics cards, monitors, device status). Reading only: `save` writes a file the person chose in the system dialog.
@@ -32,6 +33,7 @@ export async function saveBundle(name, bytes) {
 /** `status` = { usb, dualsense, mic, vdd } readers (cached status of the device hub) for the devices part of the bundle. */
 export function useDiagnostics({ update, devices = async () => ({}) } = {}) {
   const text = ref('')
+  const panelEntries = ref([])
   const live = ref(true)
   const config = ref(null)
   const system = ref(null)
@@ -43,6 +45,11 @@ export function useDiagnostics({ update, devices = async () => ({}) } = {}) {
   let timer = 0
   let logBytes = createLogByteDecoder()
 
+  // One viewer, two sources: the host's text log and the panel's own LogEntry
+  // list from get_all_logs. Both become the same records; source.id keeps the
+  // two apart for the filter.
+  const records = computed(() => combineDiagnosticsRecords(text.value, panelEntries.value))
+
   const readLogChunk = async (response, { final = false } = {}) => {
     if (typeof response.arrayBuffer !== 'function') return response.text()
     return logBytes.push(new Uint8Array(await response.arrayBuffer()), { final })
@@ -52,6 +59,7 @@ export function useDiagnostics({ update, devices = async () => ({}) } = {}) {
     if (reading) return
     reading = true
     try {
+      panelEntries.value = (await safe(() => invoke('get_all_logs'), [])) || []
       const response = await fetch(`${await proxy()}/api/logs`, { headers: { 'X-Log-Offset': String(offset) }, signal: AbortSignal.timeout(6000) })
       if (response.status === 304) return
       if (!response.ok) return
@@ -99,7 +107,7 @@ export function useDiagnostics({ update, devices = async () => ({}) } = {}) {
   }
 
   async function collect() {
-    const [log, conf, runtime, clients, sys, gpuList, monitors, dev] = await Promise.all([
+    const [log, conf, runtime, clients, sys, gpuList, monitors, dev, panel] = await Promise.all([
       safe(async () => {
         const r = await fetch(`${await proxy()}/api/logs`)
         if (!r.ok) return ''
@@ -112,9 +120,11 @@ export function useDiagnostics({ update, devices = async () => ({}) } = {}) {
       safe(() => invoke('get_gpus'), []),
       safe(() => invoke('get_monitors'), []),
       safe(devices, {}),
+      safe(() => invoke('get_all_logs'), []),
     ])
     const out = {}
     if (log) out.log = log
+    if (panel?.length) out.panelRecords = panel
     if (conf) { out.config = conf }
     out.versions = { host: conf?.version || '', controlPanel: sys?.app_version || '' }
     out.os = sys ? { name: sys.os_version, cpu: sys.cpu_model, memoryBytes: sys.memory_total, fromLog: osLine(log) } : { fromLog: osLine(log) }
@@ -129,5 +139,5 @@ export function useDiagnostics({ update, devices = async () => ({}) } = {}) {
     return out
   }
 
-  return { text, live, facts, hostNames, clientNames, statsFor, collect, save: saveBundle, start, stop, loadFacts }
+  return { text, records, live, facts, hostNames, clientNames, statsFor, collect, save: saveBundle, start, stop, loadFacts }
 }
