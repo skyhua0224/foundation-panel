@@ -19,7 +19,8 @@ export function usePanelHome() {
     // CPU and GPU load come from native Windows counters (system_load); temperatures only exist through HWiNFO, if it is running
     sys: { cpu: null, gpu: null },
     hw: { available: false, cpuTemp: null, gpuTemp: null },
-    series: { bitrate: [], fps: [], latency: [], cpu: [], gpu: [], memory: [] },
+    series: { bitrate: [], fps: [], latency: [], cpu: [], gpu: [], memory: [], loss: [], dropped: [] },
+    logText: '',
     clients: null, apps: null, recent: null, errorLog: null,
   })
   const proxy = ref('')
@@ -43,12 +44,13 @@ export function usePanelHome() {
     const s = state.sessions[0]
     if (s) {
       push(state.series.bitrate, s.bitrate)
+      push(state.series.loss, s.packet_loss); push(state.series.dropped, s.dropped_frames)
       const perf = await safe(() => fetchJson('/api/perf/current'))
       state.perf = perf
       const ps = perf?.sessions?.find((x) => x.active) || perf?.sessions?.[0]
       push(state.series.latency, ps?.host_latency?.avg_ms)
       push(state.series.fps, ps?.frame_rates?.encoded?.fps ?? ps?.host_latency?.recent_fps ?? s.fps)
-    } else { state.perf = null; state.series.bitrate = []; state.series.fps = []; state.series.latency = [] }
+    } else { state.perf = null; state.series.bitrate = []; state.series.fps = []; state.series.latency = []; state.series.loss = []; state.series.dropped = [] }
     const load = await safe(() => invoke('system_load'))
     if (load) {
       state.sys.cpu = typeof load.cpu_percent === 'number' ? load.cpu_percent : null
@@ -76,6 +78,7 @@ export function usePanelHome() {
     if (typeof logs === 'string') {
       const lines = logs.split('\n')
       const err = lines.filter((l) => /\]\s*(Error|Fatal):/.test(l))
+      state.logText = logs
       state.recent = parseSessionLog(logs)
       state.errorLog = parseErrorLog(logs)
       state.logs = { errors: err.length, warnings: lines.filter((l) => /\]\s*Warning:/.test(l)).length, last: err[err.length - 1] || '' }

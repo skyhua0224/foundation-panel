@@ -1,6 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import { MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
+import { buildCatalogue, buildCatalogueDetails, createHistory, saveSettingKey } from 'foundation-ui/vue'
 import { usePanelHome } from '../composables/usePanelHome.js'
 import { useGamepadType } from '../composables/useGamepadType.js'
 import { SPONSORS } from '../config/sponsors.js'
@@ -86,8 +87,34 @@ const model = computed(() => {
   }
   return base
 })
+// history this interface keeps itself (the host has none): finished sessions and minutes per day; the curves reuse the live series
+const history = createHistory(localStorage, 'foundation-ui.history.panel-home')
+const historyTick = ref(0)
+watch(session, (s) => { if (history.observe(s ? { ...s, fpsMeasured: perfSession.value?.frame_rates?.encoded?.fps, latencyP95Ms: perfSession.value?.host_latency?.p95_ms } : null)) historyTick.value += 1 }, { immediate: true })
+const catalogueInput = computed(() => {
+  void historyTick.value
+  const s = session.value
+  const p = perfSession.value
+  const series = state.series
+  return {
+    series: { bitrate: series.bitrate, fps: series.fps, latency: series.latency },
+    host: { version: state.version, update: props.updateAvailable ? h.value.update : '' },
+    session: s ? { ...s, fpsMeasured: p?.frame_rates?.encoded?.fps, latencyMs: p?.host_latency?.avg_ms, latencyP95Ms: p?.host_latency?.p95_ms, uptimeMs: p?.uptime_ms ?? s.uptimeMs } : null,
+    history: { samples: { cpu: series.cpu, gpu: series.gpu, mem: series.memory.map((v) => v * 100), latency: series.latency, loss: series.loss, dropped: series.dropped }, sessions: history.sessions, days: history.days, last: () => history.last() },
+    sys: model.value.info.some((i) => i.id === 'memory') && state.memory ? { memTotal: state.memory.system_total_memory, memAvail: state.memory.system_available_memory } : null,
+    config: state.config, logText: state.logText, logs: state.errorLog, clients: state.clients ? state.clients.map((c) => ({ ...c, icon: 'devices' })) : null,
+    apps: state.apps ? state.apps.map((a) => ({ id: a.name, name: a.name, cover: coverOf(a) })) : null,
+    codecModes: state.config && state.config.hevc_mode !== undefined ? { hevc: state.config.hevc_mode, av1: state.config.av1_mode } : null,
+    pads: { text: [modeLabel.value, dsLabel.value].filter(Boolean).join(' · ') || '–' }, usb: props.runtime.usb?.attached_devices ? props.runtime.usb.attached_devices.length : null,
+    display: vddInput.value && vddInput.value.hdr !== undefined ? { hdr: vddInput.value.hdr } : null,
+    temps: state.hw.available ? { cpu: state.hw.cpuTemp, gpu: state.hw.gpuTemp } : null,
+    announcements: announcements.list.value.map((a) => ({ id: a.id, title: a.title || a.text || '' })),
+  }
+})
+const catalogue = computed(() => buildCatalogue(catalogueInput.value, T.value).data)
+const allDetails = computed(() => ({ ...model.value.details, ...buildCatalogueDetails(catalogueInput.value, T.value) }))
 const isNew = computed(() => guide.visible.value)
-const cards = computed(() => buildCards(model.value, { texts: T.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value), sponsor: sponsorCardData(T.value) }))
+const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue: catalogue.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value), sponsor: sponsorCardData(T.value) }))
 const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value }))
 
 function onAction(a) {
@@ -103,10 +130,18 @@ function onAction(a) {
     case 'guide-go': guideStepGo(a.value); break
     case 'guide-skip': guide.toggle(a.value); break
     case 'download': emit('open', `downloads:${a.value}`); break
+    case 'link': openExternalUrl(a.value); break
+    case 'setting': saveSetting(a.value); break
     case 'sponsor': if (a.value === 'star') openExternalUrl('https://github.com/AlkaidLab/foundation-sunshine'); else sponsorOpen.value = true; break
     default: break
   }
 }
+// a control card saves its setting the way the settings do: read the configuration, change the key, write it back
+const hostApi = {
+  getJson: async (path) => (await fetch(`${proxyUrl.value}${path}`)).json(),
+  postJson: async (path, body) => (await fetch(`${proxyUrl.value}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json(),
+}
+async function saveSetting({ key, value }) { const r = await saveSettingKey(hostApi, key, value); if (r.ok) state.config = r.config }
 async function onStripGroup(v) { pad.selectedMode.value = v }
 async function onStripSwitch({ id, value }) {
   stripBusy.value = true
@@ -136,7 +171,7 @@ const supportSections = computed(() => [
       <MIconButton :icon="edit ? 'check' : 'edit'" :label="edit ? h.done : h.edit" @click="edit = !edit" />
     </template>
     <MAnnouncementStrip v-if="announcements.top.value" :item="announcements.top.value" :total="announcements.list.value.length" :texts="announceTexts" @dismiss="announcements.dismiss" @open-url="openExternalUrl" @open-list="announceOpen = true" />
-    <MHomeDash v-model:edit="edit" :cards="cards" :details="model.details" :ctx="dashCtx" storage-key="panel-home" :texts="dashTexts" @action="onAction" />
+    <MHomeDash v-model:edit="edit" :cards="cards" :details="allDetails" :ctx="dashCtx" storage-key="panel-home" :texts="dashTexts" @action="onAction" />
     <MAnnouncementSheet v-model="announceOpen" :items="announcements.list.value" :title="homeTexts(locale).annTitle" :texts="announceTexts" :close-label="h.done" @dismiss="announcements.dismiss" @open-url="openExternalUrl" />
     <MSupportSheet v-model="sponsorOpen" :title="h.sponsor" :sections="supportSections" :close-label="h.done" @open="(it) => openExternalUrl(it.url)" />
     <MDialog v-model="confirmRestart" :title="h.restartTitle" icon="restart_alt" tone="info">
