@@ -11,8 +11,8 @@
       </div>
     </header>
     <div class="panel-body">
-    <MScene :nav="nav" :caption-height="48" :rail-items="rail" :bar-items="bar" :bar-current="barCur" :texts="sceneTexts" :overlay="isWebPage" storage-key="foundation-ui.panel.list" @rail="onRail" @search="uni.show()">
-      <template #rail-foot><MIconButton icon="search" :label="t.m3e.search" @click="uni.show()" /><MIconButton icon="info" :label="aboutTexts(locale).title" @click="router.navigate(ROUTES.ABOUT)" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
+    <MScene :nav="nav" :caption-height="48" :rail-items="rail" :bar-items="bar" :bar-current="barCur" :texts="sceneTexts" :overlay="isWebPage" storage-key="foundation-ui.panel.list" @rail="onRail">
+      <template #rail-foot><MIconButton icon="info" :label="aboutTexts(locale).title" @click="router.navigate(ROUTES.ABOUT)" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
       <template #list="{ entry }">
         <MNavList
           :groups="listGroups(entry.rail)"
@@ -97,7 +97,7 @@
 import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
-import { MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { filterHash, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -282,8 +282,8 @@ const searchDocs = computed(() => [
 const recentSettingDocs = computed(() => settingDocs(settingsList.recentView.value.items.map((r) => r.entry), { prefix: railLabel('config') }))
 const onUnifiedChoose = (doc) => {
   if (doc.type === 'setting' || doc.type === 'page') onSearch(doc.entry)
-  else if (doc.type === 'client') openRoute(ROUTES.WEB_CLIENTS)
-  else if (doc.type === 'app') openRoute(ROUTES.WEB_APPS)
+  else if (doc.type === 'client') { emit('webui-navigate', `/pin${filterHash(doc.client?.name || doc.title)}`); router.navigate(ROUTES.WEB_CLIENTS) }
+  else if (doc.type === 'app') { emit('webui-navigate', `/apps${filterHash(doc.app?.name || doc.title)}`); router.navigate(ROUTES.WEB_APPS) }
   else if (doc.type === 'tile') { addTileToHome('panel-home', doc.tile); router.navigate(ROUTES.HOME) }
 }
 const uni = useUnifiedSearch({ docs: searchDocs, recentSettings: recentSettingDocs, onChoose: onUnifiedChoose })
@@ -321,11 +321,6 @@ const onRail = (item) => {
   // the stream rail opens on its first page: the frame has to show it
   if (item.id === 'stream') { emit('webui-navigate', webPathOf(ROUTES.WEB_CLIENTS)); router.navigate(ROUTES.CAT_STREAM); return }
   router.navigate({ overview: ROUTES.HOME, settings: ROUTES.PANEL_SETTINGS, help: ROUTES.HELP, stream: ROUTES.CAT_STREAM, input: ROUTES.CAT_INPUT, display: ROUTES.CAT_DISPLAY, system: ROUTES.CAT_SYSTEM, assistant: ROUTES.AI_ASSISTANT }[item.id])
-}
-// the search of the settings from anywhere: open the list that has the field, then put the cursor in it
-const openSearch = () => {
-  onRail({ id: 'config' })
-  setTimeout(() => { const input = document.querySelector('.m-search input'); input?.focus() }, 250)
 }
 const onSearch = (item) => {
   settingsList.remember(item.keyName)
