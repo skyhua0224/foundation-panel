@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { sunshine } from '@/tauri-adapter.js'
 import { pickHardware } from './hardwareReadings.js'
 import { parseSessionLog, parseErrorLog } from 'foundation-ui/vue'
+import { readLogResponse } from 'foundation-ui/diagnostics'
 
 const HISTORY = 60
 const safe = async (fn, fallback = null) => { try { return await fn() } catch { return fallback } }
@@ -29,10 +30,11 @@ export function usePanelHome() {
     if (!r.ok) throw new Error(String(r.status))
     return r.json()
   }
+  // the host log is read as bytes and decoded line by line (UTF-8, GBK of an older log, UTF-16), never as r.text(), which turns legacy bytes into U+FFFD
   const fetchText = async (path, init) => {
     const r = await fetch(`${proxy.value}${path}`, init)
     if (!r.ok) throw new Error(String(r.status))
-    return r.text()
+    return readLogResponse(r)
   }
   const push = (list, v) => { if (typeof v === 'number' && Number.isFinite(v)) { list.push(v); if (list.length > HISTORY) list.shift() } }
   const memoryShare = (m) => (m?.system_total_memory ? Math.min(1, (m.system_total_memory - (m.system_available_memory || 0)) / m.system_total_memory) : null)
