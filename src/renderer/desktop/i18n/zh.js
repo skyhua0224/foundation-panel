@@ -285,7 +285,7 @@ export const zh = {
     },
     pet: '桌宠',
     deskObserve: '桌面观察',
-    deskObserveDesc: '基地娘会定时偷看你的桌面并发表评论（需要启用 AI 并配置支持视觉的模型如 GPT-4o）',
+    deskObserveDesc: '米塔会定时偷看你的桌面并发表评论（需要启用 AI 并配置支持视觉的模型如 GPT-4o）',
     observeInterval: '观察间隔（秒）',
     observeIntervalDesc: '每隔多少秒截取桌面并生成评论（最小 15 秒）',
     intervals: {
@@ -296,7 +296,7 @@ export const zh = {
       m5: '5 分钟',
     },
     pokeMita: '立即触发',
-    pokeMitaDesc: '让基地娘现在就看看你的桌面',
+    pokeMitaDesc: '让米塔现在就看看你的桌面',
     pokeBtn: '戳一下',
     pokeBtnObserving: '观察中...',
     about: '关于',
@@ -629,7 +629,7 @@ export const zh = {
     jitterDesc: '每次随机对话间隔上下浮动的范围（0% 为固定间隔，最高 100%）',
     vision: '桌面观察',
     visionDesc: '桌宠会定时偏看你的屏幕并生成评论（需要多模态 AI）',
-    visionHelp: '需要在「基地娘 AI 助手」中配置好 API Key，且选择支持视觉的模型。\n启用后桌宠会定时截屏并交给 AI 生成一句针对屏幕内容的吐槽。',
+    visionHelp: '需要在「米塔 AI 助手」中配置好 API Key，且选择支持视觉的模型。\n启用后桌宠会定时截屏并交给 AI 生成一句针对屏幕内容的吐槽。',
     visionPrivacyConfirm: {
       title: '开启桌面观察？',
       message: '桌面观察会定期截取当前屏幕，并将截图发送到您配置的 AI 服务进行分析。截图可能包含账号、聊天、文件、通知等个人或敏感信息。请确认您了解所选 AI 服务提供商的数据处理与安全政策，并仅在可信环境中启用。',
@@ -650,7 +650,7 @@ export const zh = {
     visionHistoryClear: '清空',
     visionHistoryView: '查看',
     aiKeyMissing: '尚未配置 AI 助手',
-    aiKeyMissingDesc: '请先在「基地娘 AI 助手」中填入 API Key 并启用，才能开启桌面观察。',
+    aiKeyMissingDesc: '请先在「米塔 AI 助手」中填入 API Key 并启用，才能开启桌面观察。',
     // 桌宠气泡中使用的运行时提示
     runtime: {
       // 后端话术加载失败时用的内置傅本
@@ -673,7 +673,7 @@ export const zh = {
         '音频延迟了呢，杂鱼听得清吗♡',
         '串流设置改来改去，杂鱼真挑剔～',
       ],
-      visionPrompt: `你是一个可爱但毒舌的桌面宠物"基地娘"。你正在偷看用户的电脑屏幕。
+      visionPrompt: `你是一个可爱但毒舌的桌面宠物"米塔"。你正在偷看用户的电脑屏幕。
 根据截图内容，假定用户正在做某件事，然后调戏用户。不要用"你是不是在..."这种猜测句式，而是直接断言"你又在..."来调侃。
 15-40字，雌小鬼风格，常用口癖：杂鱼♡、哼、切、笨蛋。
 示例风格：
@@ -683,7 +683,7 @@ export const zh = {
 - 看到聊天→"跟谁聊得这么开心？哼，才不在意呢"
 只输出一句话，不要解释。用中文回复。`,
       visionUserMsg: '看看我的桌面，说点什么吧',
-      visionNotConfigured: '还没配好 AI 助手哦，去「基地娘 AI 助手」填个 Key 吧～',
+      visionNotConfigured: '还没配好 AI 助手哦，去「米塔 AI 助手」填个 Key 吧～',
       visionEmpty: 'AI 返回了一口气，什么都没说…试试换个模型？',
       visionErrorPrefix: '看晕了：',
       visionUnknownError: '发生什么事了？',
@@ -693,7 +693,7 @@ export const zh = {
       visionBusy: '让我先看完手上这张～',
       errors: {
         notVlm: '这个模型不会看图哦，换个支持视觉的吧～',
-        unauthorized: 'API Key 不对，去看看界面上的基地娘AI助手',
+        unauthorized: 'API Key 不对，去看看界面上的米塔AI助手',
         forbidden: '权限不够，模型可能没开通',
         notFound: '找不到这个模型，换一个？',
         rateLimit: '请求太快了，是不是额度不够了？',
@@ -1694,7 +1694,7 @@ export const zh = {
 
   // === AI 助手 ===
   aiAssistant: {
-    title: '基地娘 AI 助手',
+    title: '米塔 AI 助手',
     enabled: '已启用',
     disabled: '未启用',
     modelConfig: '模型配置',
@@ -1713,12 +1713,12 @@ export const zh = {
     connected: '✓ 已连接',
     smartChat: '智能对话',
     clearHistory: '清空记录',
-    welcomeMsg: '哼，又是你啊~我是基地娘♡ 你的 Sunshine 不会自己配吗，杂鱼~',
+    welcomeMsg: '哼，又是你啊~我是米塔♡ 你的 Sunshine 不会自己配吗，杂鱼~',
     welcomeHint: '切、快说你想要什么吧，本小姐大发慈悲帮你生成命令：',
     inputPlaceholder: '输入你的需求，例如：帮我把编码器切换到 HEVC...',
     send: '发送',
     retry: '重试',
-    mitaName: '基地娘',
+    mitaName: '米塔',
     exampleQueries: {
       addKeyboardCmd: '给 Desktop 添加一个打开触摸键盘的菜单命令',
       closeGameBar: '串流前关闭 Windows Game Bar，结束后恢复',
@@ -1765,7 +1765,7 @@ export const zh = {
       apiKeyClearFailed: '清除 API Key 失败: {error}',
       connectionSuccess: 'AI 服务连接成功！',
       connectionFailed: '连接失败: {error}',
-      enableFirst: '请先启用基地娘 AI 助手',
+      enableFirst: '请先启用米塔 AI 助手',
       emptyResponse: '无法获取回复',
       requestError: '❌ 请求出错: {error}',
       actionFailed: '操作失败: {error}',

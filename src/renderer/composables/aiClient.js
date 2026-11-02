@@ -1,7 +1,7 @@
 /**
  * AI HTTP client.
  *
- * The control panel is the only human-facing configuration entry, while
+ * The Mita control panel is the only human-facing configuration entry, while
  * Sunshine's /api/ai/config and /api/ai/chat/completions remain the shared
  * storage and execution path for every AI feature.
  */

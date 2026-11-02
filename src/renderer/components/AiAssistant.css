@@ -16,3 +16,6 @@
 .ai-composer { position: sticky; bottom: 12px; display: flex; align-items: flex-end; gap: 8px; padding: 8px 8px 8px 20px; border-radius: 28px; background: var(--md-sys-color-surface-container-highest); box-shadow: 0 4px 16px color-mix(in srgb, var(--md-sys-color-shadow) 14%, transparent); }
 .ai-composer textarea { flex: 1; min-height: 40px; max-height: 128px; resize: none; border: 0; outline: 0; background: transparent; color: var(--md-sys-color-on-surface); font: var(--m-body-large); padding: 10px 0; field-sizing: content; }
 .ai-composer textarea::placeholder { color: var(--md-sys-color-on-surface-variant); }
+
+/* her own pixel avatar is drawn without smoothing */
+.ai-avatar--pixel { image-rendering: pixelated; }

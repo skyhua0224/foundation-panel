@@ -11,7 +11,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const ROOT = join(here, '../../..')
 const DIRS = ['src', 'src-tauri/src', 'src-tauri/icons', 'src-tauri/assets', 'src-tauri/tauri.conf.json', 'scripts', 'setup-tauri.sh', 'README.md', 'TOOL_DEVELOPMENT_GUIDE.md', 'package.json']
 const SKIP = new Set(['node_modules', 'dist', 'target', 'build', '.git', 'third-party', 'ssl'])
-const NAME = /(?<![a-z])gura(?![a-z])|(?<![a-z])gura(?=[A-Z_])|gawr|shark|鲨|米塔|miside|(?<![a-z])mita(?![a-z])/i
+const NAME = /(?<![a-z])gura(?![a-z])|(?<![a-z])gura(?=[A-Z_])|gawr|shark|鲨|基地娘|(?<![a-z])sunshine[ -]?girl(?![a-z])/i
 // sha256 of images that were shipped and show another character (the owner's list); they must not come back
 const BLOCKED_IMAGES = new Map([
   ['53b38badafb38f5b533fd337a373d74b12a6c55866564ee4dd0e09731aabcf4a', 'the old application icon'],

@@ -285,7 +285,7 @@ export const en = {
     },
     pet: 'Desktop Pet',
     deskObserve: 'Desktop Observation',
-    deskObserveDesc: 'Sunshine Girl will periodically peek at your desktop and make comments (requires AI enabled with vision-capable model like GPT-4o)',
+    deskObserveDesc: 'Mita will periodically peek at your desktop and make comments (requires AI enabled with vision-capable model like GPT-4o)',
     observeInterval: 'Observation Interval (seconds)',
     observeIntervalDesc: 'How often to capture desktop and generate comments (minimum 15 seconds)',
     intervals: {
@@ -296,7 +296,7 @@ export const en = {
       m5: '5 minutes',
     },
     pokeMita: 'Trigger Now',
-    pokeMitaDesc: 'Let Sunshine Girl peek at your desktop right now',
+    pokeMitaDesc: 'Let Mita peek at your desktop right now',
     pokeBtn: 'Poke',
     pokeBtnObserving: 'Observing...',
     about: 'About',
@@ -629,7 +629,7 @@ export const en = {
     jitterDesc: 'Randomize each talk interval within this range (0% is fixed, max 100%)',
     vision: 'Desktop Observation',
     visionDesc: 'Pet peeks at your screen and generates AI comments (multimodal AI required)',
-    visionHelp: 'Configure an API key under \'Sunshine Girl AI Assistant\' and pick a vision-capable model (e.g. GPT-4o).\nWhen enabled, the pet periodically captures the screen and asks the AI for a snarky comment about what it sees.',
+    visionHelp: 'Configure an API key under \'Mita AI Assistant\' and pick a vision-capable model (e.g. GPT-4o).\nWhen enabled, the pet periodically captures the screen and asks the AI for a snarky comment about what it sees.',
     visionPrivacyConfirm: {
       title: 'Enable Desktop Observation?',
       message: 'Desktop Observation periodically captures your current screen and sends screenshots to your configured AI service for analysis. Screenshots may contain account details, messages, files, notifications, or other personal and sensitive information. Confirm that you understand the selected AI provider\'s data handling and security policies, and only enable this feature in a trusted environment.',
@@ -650,7 +650,7 @@ export const en = {
     visionHistoryClear: 'Clear',
     visionHistoryView: 'View',
     aiKeyMissing: 'AI assistant not configured',
-    aiKeyMissingDesc: 'Configure an API key and enable \'Sunshine Girl AI Assistant\' to use Desktop Observation.',
+    aiKeyMissingDesc: 'Configure an API key and enable \'Mita AI Assistant\' to use Desktop Observation.',
 
     // Runtime tips used inside the toolbar speech bubble
     runtime: {
@@ -674,7 +674,7 @@ export const en = {
         'Audio delay detected, can you hear me?♡',
         'Constantly fiddling with settings, so picky~',
       ],
-      visionPrompt: `You are Sunshine Girl, a cute but sharp-tongued desktop pet sneaking a peek at the user's screen.
+      visionPrompt: `You are Mita, a cute but sharp-tongued desktop pet sneaking a peek at the user's screen.
 Looking at the screenshot, assume the user is doing something specific, then tease them. Don't use guessing phrases like "Are you...?" - assert directly with "You're at it again..." style.
 15-40 characters, bratty kohai tone. Common verbal tics: hmph, tch, dummy, loser~.
 Examples:
@@ -683,7 +683,7 @@ Examples:
 - chatting -> "Chatting up a storm with someone? Hmph, not that I care."
 Output only one short sentence, no explanation. Reply in English.`,
       visionUserMsg: 'Take a look at my desktop and say something.',
-      visionNotConfigured: 'AI assistant not set up yet, fill in a Key in Sunshine Girl AI Assistant~',
+      visionNotConfigured: 'AI assistant not set up yet, fill in a Key in Mita AI Assistant~',
       visionEmpty: 'AI returned nothing... try a different model?',
       visionErrorPrefix: 'Got dizzy: ',
       visionUnknownError: 'Something happened?',
@@ -693,7 +693,7 @@ Output only one short sentence, no explanation. Reply in English.`,
       visionBusy: 'Let me finish this one first~',
       errors: {
         notVlm: 'This model can\'t see images, switch to a vision model~',
-        unauthorized: 'API Key invalid, check it in Sunshine Girl AI Assistant',
+        unauthorized: 'API Key invalid, check it in Mita AI Assistant',
         forbidden: 'Access denied, model may not be enabled',
         notFound: 'Model not found, try another?',
         rateLimit: 'Rate limited or quota exceeded, try later',
@@ -1694,7 +1694,7 @@ Output only one short sentence, no explanation. Reply in English.`,
 
   // === AI Assistant ===
   aiAssistant: {
-    title: 'Sunshine Girl AI Assistant',
+    title: 'Mita AI Assistant',
     enabled: 'Enabled',
     disabled: 'Disabled',
     modelConfig: 'Model Configuration',
@@ -1713,12 +1713,12 @@ Output only one short sentence, no explanation. Reply in English.`,
     connected: '✓ Connected',
     smartChat: 'Smart Chat',
     clearHistory: 'Clear History',
-    welcomeMsg: 'Hmph, it\'s you again~ I\'m Sunshine Girl♡ Can\'t you configure Sunshine yourself, you noob~',
+    welcomeMsg: 'Hmph, it\'s you again~ I\'m Mita♡ Can\'t you configure Sunshine yourself, you noob~',
     welcomeHint: 'Tch, just tell me what you want already, I\'ll graciously generate commands for you:',
     inputPlaceholder: 'Enter your request, e.g.: Switch the encoder to HEVC...',
     send: 'Send',
     retry: 'Retry',
-    mitaName: 'Sunshine Girl',
+    mitaName: 'Mita',
     exampleQueries: {
       addKeyboardCmd: 'Add a menu command to open the touch keyboard for Desktop',
       closeGameBar: 'Close Windows Game Bar before streaming and reopen it afterward',
@@ -1765,7 +1765,7 @@ Output only one short sentence, no explanation. Reply in English.`,
       apiKeyClearFailed: 'Failed to clear the API Key: {error}',
       connectionSuccess: 'AI service connected!',
       connectionFailed: 'Connection failed: {error}',
-      enableFirst: 'Enable Sunshine Girl AI Assistant first',
+      enableFirst: 'Enable Mita AI Assistant first',
       emptyResponse: 'Could not get a response',
       requestError: '❌ Request failed: {error}',
       actionFailed: 'Action failed: {error}',
