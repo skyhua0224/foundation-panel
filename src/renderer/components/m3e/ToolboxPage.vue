@@ -42,5 +42,5 @@ onMounted(async () => {
 .panel-toolgrid .m-tile { min-height: 132px; text-align: start; }
 .panel-toolgrid .m-tile__title { white-space: normal; }
 .panel-tool__sub { margin: 0; font: var(--m-body-small); color: var(--md-sys-color-on-surface-variant); }
-.panel-tool__go { font: var(--m-label-medium); color: var(--md-sys-color-primary); }
+.panel-tool__go { font: var(--m-label-medium); color: color-mix(in srgb, var(--md-sys-color-primary) 65%, var(--md-sys-color-on-surface)); }
 </style>
