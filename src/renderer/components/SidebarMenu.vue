@@ -3,6 +3,7 @@
     <!-- slim caption bar over the whole window: draggable, the window controls at the end; the pages start below it -->
     <header class="panel-caption" data-tauri-drag-region @pointerdown="onTouchWindowDragStart">
       <MBrand class="panel-caption__brand" :size="20" data-tauri-drag-region />
+      <div class="panel-caption__search" data-tauri-drag-region><MUnifiedSearch :search="uni" :texts="searchT" :compact="compactSearch" :height="38" /></div>
       <div class="panel-caption__controls">
         <button type="button" class="panel-caption__btn" :aria-label="t.sidebar.minimize" :data-tip="t.sidebar.minimize" @click="minimizeWindow"><MIcon name="remove" /></button>
         <button type="button" class="panel-caption__btn" :aria-label="isMaximized ? t.sidebar.restore : t.sidebar.maximize" :data-tip="isMaximized ? t.sidebar.restore : t.sidebar.maximize" @click="toggleMaximize"><MIcon :name="isMaximized ? 'filter_none' : 'crop_square'" /></button>
@@ -10,22 +11,14 @@
       </div>
     </header>
     <div class="panel-body">
-    <MScene :nav="nav" :caption-height="40" :rail-items="rail" :bar-items="bar" :bar-current="barCur" :texts="sceneTexts" :overlay="isWebPage" storage-key="foundation-ui.panel.list" @rail="onRail" @search="openSearch">
-      <template #rail-foot><MIconButton icon="search" :label="t.m3e.search" @click="openSearch" /><MIconButton icon="info" :label="aboutTexts(locale).title" @click="router.navigate(ROUTES.ABOUT)" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
+    <MScene :nav="nav" :caption-height="48" :rail-items="rail" :bar-items="bar" :bar-current="barCur" :texts="sceneTexts" :overlay="isWebPage" storage-key="foundation-ui.panel.list" @rail="onRail" @search="uni.show()">
+      <template #rail-foot><MIconButton icon="search" :label="t.m3e.search" @click="uni.show()" /><MIconButton icon="info" :label="aboutTexts(locale).title" @click="router.navigate(ROUTES.ABOUT)" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
       <template #list="{ entry }">
         <MNavList
           :groups="listGroups(entry.rail)"
           :current="currentRow"
-          :recent="entry.rail === 'config' ? settingsList.recentView.value : null"
-          :search-items="searchItems"
-          :search-placeholder="t.m3e.search"
-          :search-empty="t.m3e.noResults"
-          :clear-label="t.m3e.clear"
           :label="railLabel(entry.rail)"
           @navigate="onListNavigate"
-          @search="onSearch"
-          @recent="(row) => onSearch(row.entry)"
-          @clear-recent="settingsList.clearRecent"
           @context="onRowContext"
         />
       </template>
@@ -81,7 +74,7 @@
     <!-- 更多 of the bottom bar: what the bar has no room for -->
     <MSheet v-model="moreOpen" :title="t.m3e.nav.moreTitle" side="end" :close-label="t.m3e.home.done">
       <MGroup>
-        <MItem action icon="search" :title="t.m3e.search" @click="moreGo(openSearch)" />
+        <MItem action icon="search" :title="t.m3e.search" @click="moreGo(() => uni.show())" />
         <MItem action icon="settings" :title="t.m3e.nav.settings" @click="moreGo(() => onRail({ id: 'settings' }))" />
         <MItem action icon="help" :title="t.m3e.nav.help" :tone="updateWaiting ? 'warn' : ''" @click="moreGo(() => onRail({ id: 'help' }))" />
         <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="moreGo(() => { sponsorOpen = true })" />
@@ -104,7 +97,7 @@
 import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
-import { MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -230,6 +223,8 @@ const listItems = (id) => pageItems(t.value, id, runtimeView.value)
 // The stream settings are the shared model (categories in groups with a live line, search of every setting, recently used)
 const hostConfig = ref(null)
 const dualsenseKeys = ref([])
+const hostClients = ref([])
+const hostApps = ref([])
 const settingsList = useSettingsList({ locale, config: hostConfig, dualsenseKeys })
 const loadHostData = async () => {
   try {
@@ -237,6 +232,9 @@ const loadHostData = async () => {
     const [config, tuning] = await Promise.allSettled([fetch(`${base}/api/config`).then((r) => (r.ok ? r.json() : null)), fetch(`${base}/api/dualsense/tuning`).then((r) => (r.ok ? r.json() : null))])
     if (config.status === 'fulfilled' && config.value) hostConfig.value = config.value
     if (tuning.status === 'fulfilled' && tuning.value?.keys) dualsenseKeys.value = tuning.value.keys
+    const [clients, apps] = await Promise.allSettled([fetch(`${base}/api/clients/list`).then((r) => (r.ok ? r.json() : null)), fetch(`${base}/api/apps`).then((r) => (r.ok ? r.json() : null))])
+    if (clients.status === 'fulfilled' && clients.value?.named_certs) hostClients.value = clients.value.named_certs
+    if (apps.status === 'fulfilled' && Array.isArray(apps.value?.apps)) hostApps.value = apps.value.apps
   } catch { /* the list shows no live lines and the search the pages only */ }
 }
 const listGroups = (rail) => (rail === 'config' ? settingsList.groups.value : [{ id: rail, items: listItems(rail) }])
@@ -258,6 +256,37 @@ const searchItems = computed(() => [
   { id: ROUTES.AI_ASSISTANT, title: t.value.m3e.nav.assistant, path: t.value.m3e.nav.main, icon: 'smart_toy', route: ROUTES.AI_ASSISTANT },
   ...settingsList.searchItems.value,
 ])
+// ---- the unified search: one entry in the caption bar (an icon and a full-screen view on a narrow window) over everything a person can look for ----
+const compactSearch = ref(typeof window !== 'undefined' && window.innerWidth < 600)
+const onSearchResize = () => { compactSearch.value = window.innerWidth < 600 }
+onMounted(() => window.addEventListener('resize', onSearchResize))
+onBeforeUnmount(() => window.removeEventListener('resize', onSearchResize))
+const searchT = computed(() => searchTexts(locale.value))
+const actionHandlers = {
+  restart: () => tools.restartSunshineService(),
+  userMode: () => tools.restartSunshineInUserMode(),
+  restartDriver: () => tools.restartGraphicsDriver(),
+  pair: () => openRoute(ROUTES.WEB_CLIENTS),
+  exportDiag: () => router.navigate(ROUTES.DIAGNOSTICS),
+  checkUpdate: () => handleCheckForUpdates(),
+  logs: () => router.navigate(ROUTES.DIAGNOSTICS),
+  addApp: () => openRoute(ROUTES.WEB_APPS),
+}
+const searchDocs = computed(() => [
+  ...settingDocs(searchItems.value, { prefix: railLabel('config') }),
+  ...actionDocs(locale.value, actionHandlers, searchT.value.types.action),
+  ...clientDocs(hostClients.value, { place: `${railLabel('stream')}` }),
+  ...appDocs(hostApps.value, { place: `${railLabel('stream')}` }),
+  ...tileDocs(locale.value),
+])
+const recentSettingDocs = computed(() => settingDocs(settingsList.recentView.value.items.map((r) => r.entry), { prefix: railLabel('config') }))
+const onUnifiedChoose = (doc) => {
+  if (doc.type === 'setting' || doc.type === 'page') onSearch(doc.entry)
+  else if (doc.type === 'client') openRoute(ROUTES.WEB_CLIENTS)
+  else if (doc.type === 'app') openRoute(ROUTES.WEB_APPS)
+  else if (doc.type === 'tile') { addTileToHome('panel-home', doc.tile); router.navigate(ROUTES.HOME) }
+}
+const uni = useUnifiedSearch({ docs: searchDocs, recentSettings: recentSettingDocs, onChoose: onUnifiedChoose })
 // Where an error of the diagnostics page leads
 const goDiagnosticsPlace = (place) => {
   if (place === 'drivers') router.navigate(ROUTES.COMPONENTS)
@@ -318,6 +347,7 @@ const onFrameMessage = (event) => {
   const data = event.data
   if (![...document.querySelectorAll('iframe')].some((frame) => frame.contentWindow === event.source)) return
   if (data?.type === 'foundation-subpage') frameSub.value = data.open === true
+  else if (data?.type === 'foundation-search-open') uni.show()
   else if (data?.type === 'foundation-settings-recent' && typeof data.key === 'string') settingsList.remember(data.key)
   // what the gamepad page of the frame cannot do by itself: the controller test tool, the component page, and the state of the
   // DualSense transport that only the panel reads
@@ -371,10 +401,12 @@ defineExpose({
 
 <style lang="less">
 .panel-shell { position: relative; height: 100vh; height: 100dvh; min-height: 0; overflow: clip; }
-.panel-caption { position: absolute; top: 0; left: var(--m-rail-w, 0px); right: 0; z-index: 40; transition: left var(--m-spring-default-spatial-duration, .4s) var(--m-spring-default-spatial, ease); display: flex; align-items: stretch; justify-content: space-between; height: 40px; background: transparent; user-select: none; }
+.panel-caption { position: absolute; top: 0; left: var(--m-rail-w, 0px); right: 0; z-index: 40; transition: left var(--m-spring-default-spatial-duration, .4s) var(--m-spring-default-spatial, ease); display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(180px, 560px) minmax(max-content, 1fr); align-items: stretch; height: 48px; background: transparent; user-select: none; }
 .panel-caption__brand { align-self: center; padding-inline-start: 16px; pointer-events: none; }
-.panel-caption__controls { display: flex; }
-.panel-caption__btn { display: grid; place-items: center; width: 46px; height: 40px; padding: 0; border: 0; background: transparent; color: var(--md-sys-color-on-surface); font-size: 18px; cursor: default; transition: background-color 120ms linear, color 120ms linear; }
+.panel-caption__controls { display: flex; justify-self: end; }
+.panel-caption__search { display: flex; align-items: center; justify-content: center; min-width: 0; padding: 0 12px; }
+@media (max-width: 599.98px) { .panel-caption { grid-template-columns: minmax(max-content, 1fr) auto auto; } .panel-caption__search { padding: 0 4px; } }
+.panel-caption__btn { display: grid; place-items: center; width: 46px; height: 48px; padding: 0; border: 0; background: transparent; color: var(--md-sys-color-on-surface); font-size: 18px; cursor: default; transition: background-color 120ms linear, color 120ms linear; }
 .panel-caption__btn:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 9%, transparent); }
 .panel-caption__btn:active { background: color-mix(in srgb, var(--md-sys-color-on-surface) 14%, transparent); }
 .panel-caption__btn--close:hover { background: #c42b1c; color: #fff; } .panel-caption__btn--close:active { background: #b02417; color: #fff; }
