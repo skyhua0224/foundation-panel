@@ -8,11 +8,15 @@
     <!-- Root: short, one row per thing -->
     <template v-if="!current">
       <MNotice v-if="gt.unreachable.value" tone="error">{{ t.controllersHub.emulation.sunshineUnreachable }}<template #action><MButton size="sm" :loading="gt.loading.value" @click="gt.loadConfig">{{ t.controllersHub.emulation.retry }}</MButton></template></MNotice>
-      <MGroup v-else>
-        <MChoiceItem v-model="gt.selectedMode.value" icon="sports_esports" :title="t.m3e.padType" :options="typeOptions" :disabled="gt.busyKey.value !== ''" :cancel-label="t.common.cancel" />
+      <template v-else>
+        <MChoiceCards v-model="gt.selectedMode.value" :options="typeCards" :label="t.m3e.padType" :disabled="gt.busyKey.value !== ''">
+          <template #art="{ option }"><MControllerArt :type="option.value" /></template>
+        </MChoiceCards>
+      <MGroup>
         <MItem action icon="apps" :title="t.controllersHub.emulation.perAppTitle" @click="open('per-game')" />
         <MItem action icon="settings_input_component" :title="t.deviceHub.controllerAdvanced" @click="askAdvanced('emulation', 'emulation')" />
       </MGroup>
+      </template>
 
       <template v-if="dsVisible">
         <MGroup>
@@ -128,7 +132,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { MPage, MGroup, MSection, MItem, MChoiceItem, MSeg, MButton, MIconButton, MNotice, MFooter, MOverflow, MSwitchItem, MField, MEmpty, MSkeleton, MDialog, MIcon, useSubpage } from 'foundation-ui/vue'
+import { MChoiceCards, MControllerArt, MPage, MGroup, MSection, MItem, MChoiceItem, MSeg, MButton, MIconButton, MNotice, MFooter, MOverflow, MSwitchItem, MField, MEmpty, MSkeleton, MDialog, MIcon, useSubpage } from 'foundation-ui/vue'
 const CARD_ICONS = { haptics: 'mobile_vibrate', vibration: 'mobile_vibrate', lighting: 'lightbulb', light: 'lightbulb', triggers: 'touch_app', trigger: 'touch_app', motion: 'sensors', audio: 'volume_up', sticks: 'gamepad', touchpad: 'touch_app' }
 import AdvancedWarningDialog from '../dualsense/AdvancedWarningDialog.vue'
 import AdvancedControllerOptions from '../controllersHub/AdvancedControllerOptions.vue'
@@ -162,6 +166,8 @@ const { status, loading: statusLoading, failed: statusFailed, refresh } = useDua
 
 const dsVisible = computed(() => gt.hasDs5Selection.value)
 const typeOptions = computed(() => gt.modeOptions.value.map((o) => ({ value: o.value, label: o.label, text: o.hint })))
+// the cards of the type: the short name above, what is in the brackets as the second line (the same cards as the Web page)
+const typeCards = computed(() => typeOptions.value.map((o) => { const m = /^(.*?)\s*[（(]([^）)]*)[）)]\s*$/.exec(o.label); return { value: o.value, label: m ? m[1] : o.label, text: m ? m[2] : (o.text && o.text.length <= 14 ? o.text : '') } }))
 const presetOptions = computed(() => PRESET_CARDS.map((p) => ({ value: p.name, label: tr('presets.' + p.name), icon: { default: 'tune', competitive: 'bolt', immersive: 'graphic_eq', legacy: 'history' }[p.name] || 'tune' })))
 const statusLabel = computed(() => (status.value ? tx('status.states.' + status.value.state) : ''))
 const statusRowsView = computed(() => statusRows(status.value, (path, params) => tx('status.values.' + path, params)))

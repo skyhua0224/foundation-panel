@@ -1564,6 +1564,7 @@ export const zh = {
         "title": "预设"
       },
       "reset_key": "恢复默认",
+      "cancel": "取消",
       "open_meta": "打开手柄测试工具",
       "profile_warning": "保存的调校文件有部分内容无法读取，这些设置已改用默认值。",
       "restore_defaults": "全部恢复默认",

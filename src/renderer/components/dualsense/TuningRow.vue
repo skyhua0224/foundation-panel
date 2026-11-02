@@ -1,130 +1,83 @@
 <template>
-  <div
-    class="m-item m-tuning"
+  <MChoiceItem
+    v-if="kind === 'select'"
+    :model-value="selectedOption"
+    :title="fieldLabel"
+    :options="segOptions"
+    :disabled="disabled"
+    :cancel-label="tr('cancel')"
+    :search-label="tr('search')"
     :data-ds5-key="descriptor.id"
-    :class="['kind-' + kind, { 'm-item--stack': stacked, 'm-item--plain': true, 'is-disabled': disabled, 'is-modified': modified }]"
-    :title="disabled ? tr('pending.reason') : null"
+    @update:model-value="selectValue"
   >
-    <div class="m-item__body">
-      <label :id="labelId" :for="hasInput ? fieldId : null" class="m-item__title">
-        <span>{{ fieldLabel }}</span>
-        <span v-if="descriptor.expert" class="m-chip m-chip--warn m-tuning__tag">{{ tr('expert') }}</span>
-      </label>
-    </div>
-    <div class="m-item__trail">
-      <output v-if="kind === 'slider'" class="m-slider-value" :for="fieldId">{{ displayValue }}</output>
-      <md-switch
-        v-else-if="kind === 'toggle'"
-        :id="fieldId"
-        :selected="modelValue === true"
-        :disabled="disabled"
-        :aria-labelledby="labelId"
-        @change="$emit('update:modelValue', $event.target.selected)"
-      />
-      <md-outlined-select
-        v-else-if="kind === 'select'"
-        :id="fieldId"
-        class="m-tuning__select"
-        :value="selectedOption"
-        :disabled="disabled"
-        :aria-labelledby="labelId"
-        @change="selectValue($event.target.value)"
-      >
-        <md-select-option v-for="option in descriptor.enum_names" :key="option" :value="option" :selected="option === selectedOption">
-          <div slot="headline">{{ optionLabel(option) }}</div>
-        </md-select-option>
-      </md-outlined-select>
-      <button
-        type="button"
-        class="m-icon-btn m-tuning__reset"
-        :class="{ shown: modified && !disabled }"
-        :title="tr('reset_key')"
-        :aria-label="tr('reset_key')"
-        :tabindex="modified && !disabled ? 0 : -1"
-        @click="$emit('reset')"
-      ><MIcon name="restart_alt" /></button>
-    </div>
-    <div v-if="stacked" class="m-item__control">
-      <md-slider
+    <template v-if="descriptor.expert || reset" #trail><MChip v-if="descriptor.expert" tone="warn">{{ tr('expert') }}</MChip><MIconButton v-if="reset" icon="restart_alt" :label="tr('reset_key')" @click.stop="$emit('reset')" /></template>
+  </MChoiceItem>
+
+  <MItem v-else :title="fieldLabel" :disabled="disabled" :stack="stacked" class="ds5-field" :class="{ 'is-modified': modified }" :data-ds5-key="descriptor.id" :data-tip="disabled ? tr('pending.reason') : undefined">
+    <template #trail>
+      <MChip v-if="descriptor.expert" tone="warn">{{ tr('expert') }}</MChip>
+      <span v-if="kind === 'slider'" class="ds5-readout">{{ displayValue }}</span>
+      <MIconButton v-if="reset" icon="restart_alt" :label="tr('reset_key')" @click="$emit('reset')" />
+      <MSwitch v-if="kind === 'toggle'" :model-value="modelValue === true" :label="fieldLabel" :disabled="disabled" @update:model-value="$emit('update:modelValue', $event)" />
+    </template>
+    <template v-if="stacked" #control>
+      <MSlider
         v-if="kind === 'slider'"
-        :id="fieldId"
-        :min="sliderMin"
-        :max="sliderMax"
+        :model-value="Number(modelValue)"
+        :min="Number(descriptor.min)"
+        :max="Number(descriptor.max)"
         :step="sliderStep"
-        :value="sliderValue"
+        :decimals="decimals"
+        :unit="unitSuffix"
+        :log="descriptor.scale === 'log'"
+        :centered="centered"
+        :center="centered ? 0 : null"
+        size="m"
+        :icon-start="icon"
         :disabled="disabled"
-        :aria-labelledby="labelId"
-        @input="onSliderInput"
+        :label="fieldLabel"
+        @update:model-value="onSlider"
         @dblclick="$emit('reset')"
       />
-      <MSeg
-        v-else-if="kind === 'segmented'"
-        block
-        :label="fieldLabel"
-        :model-value="selectedOption"
-        :options="descriptor.enum_names.map((name) => ({ value: name, label: optionLabel(name) }))"
-        :disabled="disabled"
-        @update:model-value="selectValue"
-      />
-      <TuningCurve
-        v-else-if="kind === 'curve'"
-        :model-value="String(modelValue)"
-        :label="fieldLabel"
-        :disabled="disabled"
-        @update:model-value="$emit('update:modelValue', $event)"
-      />
-      <div v-else-if="kind === 'chips'" class="m-tuning__chips" role="group" :aria-labelledby="labelId">
-        <button
-          v-for="chip in chips"
-          :key="chip.name"
-          type="button"
-          class="m-tuning__chip"
-          :aria-pressed="chip.checked"
-          :disabled="disabled"
-          @click="toggleChip(chip)"
-        >{{ optionLabel(chip.name) }}</button>
-      </div>
-    </div>
-  </div>
+      <MSeg v-else-if="kind === 'segmented'" block :label="fieldLabel" :model-value="selectedOption" :options="segOptions" :disabled="disabled" @update:model-value="selectValue" />
+      <TuningCurve v-else-if="kind === 'curve'" :model-value="String(modelValue)" :label="fieldLabel" :disabled="disabled" @update:model-value="$emit('update:modelValue', $event)" />
+      <MSeg v-else-if="kind === 'chips'" multiple block :label="fieldLabel" :model-value="chipValues" :options="segOptions" :disabled="disabled" @update:model-value="setChips" />
+    </template>
+  </MItem>
 </template>
 
 <script setup>
-import { MIcon, MSeg } from 'foundation-ui/vue'
+import { MChip, MChoiceItem, MIconButton, MItem, MSeg, MSlider, MSwitch } from 'foundation-ui/vue'
 import { computed } from 'vue'
-import { RefreshLeft } from '@element-plus/icons-vue'
 import TuningCurve from './TuningCurve.vue'
+import { sliderIcon } from './tuningIcons.js'
 import { useDualSenseText } from '../../composables/useDualSenseText.js'
 import { localizedKeyLabel, localizedOptionLabel } from '../../composables/dualsenseLabels.js'
-import { formatValue, isModified } from '../../composables/dualsenseTuning.js'
+import { isModified } from '../../composables/dualsenseTuning.js'
 
+// One tuning key as an Expressive row. The same rows, in the same order of preference, as the Web page: switch, connected
+// button group (short names), searchable picker (long lists), slider with inset icon and value indicator (log and centred
+// variants), curve, chips as a toggle group.
 const props = defineProps({
   descriptor: { type: Object, required: true },
   modelValue: { type: [Boolean, Number, String], required: true },
   disabled: { type: Boolean, default: false },
 })
-
 const emit = defineEmits(['update:modelValue', 'reset'])
 const { tr, locale } = useDualSenseText()
 
-const LOG_STEPS = 1000
-const fieldId = computed(() => 'ds5t-key-' + props.descriptor.id)
-const labelId = computed(() => 'ds5t-label-' + props.descriptor.id)
 const fieldLabel = computed(() => localizedKeyLabel(props.descriptor, locale.value))
 const isInteger = computed(() => props.descriptor.type === 'u32' || props.descriptor.type === 'i32')
+const numeric = computed(() => ['f32', 'u32', 'i32'].includes(props.descriptor.type))
+const optionLabel = (option) => localizedOptionLabel(option, locale.value)
 
-// A segmented control only stays readable while its labels are short; wide CJK
-// characters count in full, Latin letters about half.
+// A connected button group only stays readable while its labels are short; wide CJK characters count in full, Latin about half.
 const fitsSegmented = computed(() => {
   const names = props.descriptor.enum_names || []
   if (names.length > 4) return false
-  const width = names
-    .map((name) => localizedOptionLabel(name, locale.value))
-    .join('')
-    .split('')
-    .reduce((sum, character) => sum + (character.charCodeAt(0) > 0x2e80 ? 1 : 0.55), 0)
+  const width = names.map((name) => optionLabel(name)).join('').split('').reduce((sum, character) => sum + (character.charCodeAt(0) > 0x2e80 ? 1 : 0.55), 0)
   return width <= 13
 })
-
 const kind = computed(() => {
   switch (props.descriptor.control) {
     case 'slider':
@@ -142,83 +95,47 @@ const kind = computed(() => {
       return 'select'
   }
 })
-const hasInput = computed(() => ['slider', 'toggle', 'select'].includes(kind.value))
-
 const stacked = computed(() => ['slider', 'segmented', 'curve', 'chips'].includes(kind.value))
-const displayValue = computed(() => formatValue(props.descriptor, props.modelValue))
-const modified = computed(() => isModified(props.descriptor, props.modelValue))
 
-const isLog = computed(() => props.descriptor.scale === 'log')
-const sliderMin = computed(() => (isLog.value ? 0 : props.descriptor.min))
-const sliderMax = computed(() => (isLog.value ? LOG_STEPS : props.descriptor.max))
+const decimals = computed(() => {
+  const step = Number(props.descriptor.step)
+  if (isInteger.value || !Number.isFinite(step) || step >= 1 || step <= 0) return 0
+  return Math.min(6, Math.max(0, Math.ceil(-Math.log10(step))))
+})
+const unitSuffix = computed(() => (props.descriptor.unit === 'deg' ? '°' : props.descriptor.unit ? ' ' + props.descriptor.unit : ''))
+const displayValue = computed(() => {
+  const number = Number(props.modelValue)
+  return (numeric.value && Number.isFinite(number) ? number.toFixed(decimals.value) : String(props.modelValue)) + unitSuffix.value
+})
 const sliderStep = computed(() => {
-  if (isLog.value) return 1
   const step = Number(props.descriptor.step)
   if (step > 0) return step
   return isInteger.value ? 1 : 0.01
 })
-const sliderValue = computed(() => {
-  if (!isLog.value) return Number(props.modelValue)
-  const min = Math.max(Number(props.descriptor.min), 1e-9)
-  const max = Number(props.descriptor.max)
-  const value = Math.max(min, Math.min(max, Number(props.modelValue)))
-  return Math.round((Math.log(value / min) / Math.log(max / min)) * LOG_STEPS)
-})
-const sliderPercent = computed(() => {
-  const span = Number(sliderMax.value) - Number(sliderMin.value)
-  if (!(span > 0)) return 0
-  return Math.min(100, Math.max(0, ((sliderValue.value - Number(sliderMin.value)) / span) * 100))
-})
+// A value around zero (an offset) is drawn from the middle outwards
+const centered = computed(() => Number(props.descriptor.min) < 0 && Number(props.descriptor.max) > 0)
+const icon = computed(() => sliderIcon(props.descriptor.key))
+const onSlider = (value) => emit('update:modelValue', isInteger.value ? Math.round(Number(value)) : Number(value))
 
-const chips = computed(() => (props.descriptor.enum_names || []).map((name, index) => ({
-  name,
-  bit: 1 << index,
-  checked: (Number(props.modelValue) & (1 << index)) !== 0,
-})))
+const modified = computed(() => isModified(props.descriptor, props.modelValue))
+const reset = computed(() => modified.value && !props.disabled)
 
+const segOptions = computed(() => (props.descriptor.enum_names || []).map((name) => ({ value: name, label: optionLabel(name) })))
 const selectedOption = computed(() => {
   if (!isInteger.value) return String(props.modelValue)
-  return Number(props.modelValue) === 0 && (props.descriptor.enum_names || []).includes('auto')
-    ? 'auto'
-    : String(props.modelValue)
+  return Number(props.modelValue) === 0 && (props.descriptor.enum_names || []).includes('auto') ? 'auto' : String(props.modelValue)
 })
+const selectValue = (option) => emit('update:modelValue', isInteger.value ? (option === 'auto' ? 0 : Number(option)) : option)
 
-const optionLabel = (option) => localizedOptionLabel(option, locale.value)
-
-const isSelected = (option) => {
-  if (isInteger.value) {
-    return option === 'auto' ? Number(props.modelValue) === 0 : Number(option) === Number(props.modelValue)
-  }
-  return option === props.modelValue
-}
-
-const selectValue = (option) => {
-  if (isInteger.value) emit('update:modelValue', option === 'auto' ? 0 : Number(option))
-  else emit('update:modelValue', option)
-}
-
-const onSliderInput = (event) => {
-  const raw = Number(event.target.value)
-  if (!isLog.value) {
-    emit('update:modelValue', isInteger.value ? Math.round(raw) : raw)
-    return
-  }
-  const min = Math.max(Number(props.descriptor.min), 1e-9)
-  const max = Number(props.descriptor.max)
-  let value = min * Math.pow(max / min, raw / LOG_STEPS)
-  if (isInteger.value) {
-    value = Math.round(value)
-  } else {
-    const step = Number(props.descriptor.step)
-    if (step > 0) value = Math.round(value / step) * step
-  }
-  emit('update:modelValue', Math.min(max, Math.max(min, value)))
-}
-
-const toggleChip = (chip) => {
-  const current = Number(props.modelValue)
-  emit('update:modelValue', chip.checked ? current & ~chip.bit : current | chip.bit)
+// A multi-select value is a bit mask: one bit per option name
+const chipValues = computed(() => (props.descriptor.enum_names || []).filter((name, index) => (Number(props.modelValue) & (1 << index)) !== 0))
+const setChips = (names) => {
+  const all = props.descriptor.enum_names || []
+  emit('update:modelValue', names.reduce((mask, name) => mask | (1 << all.indexOf(name)), 0))
 }
 </script>
 
-
+<style>
+.ds5-readout { font: var(--m-label-large); font-variant-numeric: tabular-nums; color: var(--md-sys-color-primary); text-align: right; }
+.ds5-field.is-modified .m-item__title::after { content: ''; display: inline-block; width: 6px; height: 6px; margin-inline-start: 8px; border-radius: 50%; background: var(--md-sys-color-primary); vertical-align: middle; }
+</style>
