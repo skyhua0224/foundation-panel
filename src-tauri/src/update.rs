@@ -1114,7 +1114,7 @@ fn is_pid_running(pid: u32) -> bool {
         return false;
     };
 
-    let text = String::from_utf8_lossy(&output.stdout);
+    let text = crate::text_encoding::decode_console_bytes(&output.stdout);
     text.contains(&pid.to_string())
 }
 

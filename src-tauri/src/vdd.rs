@@ -113,8 +113,7 @@ fn probe_vdd_status() -> VddStatus {
         }
     };
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let (stdout, stderr) = crate::text_encoding::decode_output(&output);
     let combined = format!("{}\n{}", stdout, stderr);
     if !output.status.success() || probe_value(&combined, "VDD_PROBE_OK") != "1" {
         let payload_missing = combined.contains("driver payload not found")
@@ -1511,15 +1510,15 @@ mod tests {
         fs::write(&script, "@echo off\r\necho VDD_PROBE_OK=1\r\n").unwrap();
 
         let output = run_vdd_probe(&script).unwrap();
-        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stdout = crate::text_encoding::decode_console_bytes(&output.stdout);
         let _ = fs::remove_dir_all(&directory);
 
         assert!(
             output.status.success(),
             "status={:?}, stdout={}, stderr={}",
             output.status.code(),
-            String::from_utf8_lossy(&output.stdout),
-            String::from_utf8_lossy(&output.stderr)
+            crate::text_encoding::decode_console_bytes(&output.stdout),
+            crate::text_encoding::decode_console_bytes(&output.stderr)
         );
         assert_eq!(probe_value(&stdout, "VDD_PROBE_OK"), "1");
     }

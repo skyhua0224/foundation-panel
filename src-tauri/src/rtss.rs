@@ -282,10 +282,10 @@ fn run_rtss_cli(args: &[&str]) -> Result<String, String> {
         .output()
         .map_err(|e| format!("执行 rtss-cli 失败: {}", e))?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stdout = crate::text_encoding::decode_console_bytes(&output.stdout).trim().to_string();
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        let stderr = crate::text_encoding::decode_console_bytes(&output.stderr).trim().to_string();
         return Err(format!("rtss-cli 错误: {} {}", stdout, stderr));
     }
 
@@ -624,7 +624,7 @@ impl OsdEntryLayout {
         }
         let bytes = unsafe { std::slice::from_raw_parts(slot.add(off), len) };
         let nul = bytes.iter().position(|&b| b == 0).unwrap_or(len);
-        String::from_utf8_lossy(&bytes[..nul]).to_string()
+        crate::text_encoding::decode_ansi_bytes(&bytes[..nul])
     }
 
     /// 槽位是否完全空闲（owner 与 text 首字节均为 0）

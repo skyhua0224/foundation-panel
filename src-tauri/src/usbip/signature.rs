@@ -79,7 +79,7 @@ async fn signature_of(path: &std::path::Path) -> DriverSignature {
         .creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
     match tokio::time::timeout(std::time::Duration::from_secs(20), command.output()).await {
         Ok(Ok(output)) if output.status.success() => {
-            parse_signature_report(&String::from_utf8_lossy(&output.stdout))
+            parse_signature_report(&crate::text_encoding::decode_console_bytes(&output.stdout))
         }
         _ => unknown(),
     }

@@ -505,7 +505,7 @@ async fn ensure_sunshine_started() -> Result<(), String> {
         .await
         .map_err(|e| e.to_string())?
         .map_err(|e| e.to_string())
-        .map(|output| String::from_utf8_lossy(&output.stdout).contains("true"))?;
+        .map(|output| crate::text_encoding::decode_console_bytes(&output.stdout).contains("true"))?;
 
         if already_running {
             return Ok(());

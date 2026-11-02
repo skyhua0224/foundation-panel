@@ -245,8 +245,7 @@ pub async fn get_sunshine_version() -> Result<String, String> {
         .output()
         .map_err(|e| e.to_string())?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let (stdout, stderr) = crate::text_encoding::decode_output(&output);
     let combined = format!("{}{}", stdout, stderr);
 
     // 按优先级匹配版本号模式
@@ -1310,7 +1309,7 @@ pub(crate) fn is_sunshine_running_in_user_mode_impl() -> Result<bool, String> {
             .creation_flags(CREATE_NO_WINDOW)
             .output()
         {
-            let output_str = String::from_utf8_lossy(&result.stdout).to_uppercase();
+            let output_str = crate::text_encoding::decode_console_bytes(&result.stdout).to_uppercase();
             if output_str.contains("RUNNING") {
                 return Ok(false); // 服务模式
             }
@@ -1322,7 +1321,7 @@ pub(crate) fn is_sunshine_running_in_user_mode_impl() -> Result<bool, String> {
             .creation_flags(CREATE_NO_WINDOW)
             .output()
         {
-            let output_str = String::from_utf8_lossy(&result.stdout).to_lowercase();
+            let output_str = crate::text_encoding::decode_console_bytes(&result.stdout).to_lowercase();
             if output_str.contains("sunshine.exe") {
                 return Ok(true); // 用户模式
             }

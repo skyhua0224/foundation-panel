@@ -57,7 +57,7 @@ fn check_device_installed() -> (bool, bool, String) {
 
     match output {
         Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            let stdout = crate::text_encoding::decode_console_bytes(&out.stdout).trim().to_string();
             if stdout.is_empty() || stdout == "null" {
                 return (false, false, "未安装".to_string());
             }
@@ -96,7 +96,7 @@ fn check_device_installed() -> (bool, bool, String) {
                     .output();
                 let hid_present = hid_output
                     .ok()
-                    .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+                    .map(|out| crate::text_encoding::decode_console_bytes(&out.stdout).trim().to_string())
                     .filter(|stdout| !stdout.is_empty() && stdout != "null")
                     .and_then(|stdout| serde_json::from_str::<serde_json::Value>(&stdout).ok())
                     .map(|hid| {

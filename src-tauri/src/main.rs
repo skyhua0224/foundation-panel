@@ -37,6 +37,7 @@ mod sunshine;
 mod system;
 mod system_load;
 mod system_load_core;
+mod text_encoding;
 #[cfg(target_os = "windows")]
 mod text_context;
 mod toolbar;

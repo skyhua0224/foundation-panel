@@ -129,7 +129,7 @@ fn is_process_running() -> bool {
             .creation_flags(0x08000000)
             .output()
         {
-            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stdout = crate::text_encoding::decode_console_bytes(&output.stdout);
             return stdout.to_lowercase().contains(&BINARY_NAME.to_lowercase());
         }
     }

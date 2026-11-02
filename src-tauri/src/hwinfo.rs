@@ -120,7 +120,7 @@ fn read_string_from_ptr(ptr: *const u8, max_len: usize) -> String {
         }
         bytes.push(b);
     }
-    String::from_utf8_lossy(&bytes).to_string()
+    crate::text_encoding::decode_console_bytes(&bytes)
 }
 
 #[cfg(target_os = "windows")]

@@ -116,7 +116,7 @@ $result | ConvertTo-Json -Compress
         .output()
     {
         Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            let stdout = crate::text_encoding::decode_console_bytes(&out.stdout).trim().to_string();
             serde_json::from_str(&stdout).unwrap_or_else(|e| {
                 warn!("解析 ViGEmBus 状态 JSON 失败: {} ({})", e, stdout);
                 VigemProbe::default()
