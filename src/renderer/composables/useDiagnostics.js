@@ -1,6 +1,6 @@
 import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { appendTail, findSessions, parseLog, sessionSummary } from 'foundation-ui/diagnostics/index.js'
+import { appendTail, createLogByteDecoder, decodeLogBytes, findSessions, parseLog, sessionSummary } from 'foundation-ui/diagnostics'
 import { sunshine } from '../tauri-adapter.js'
 
 // The data of the diagnostics page of the control panel: the host log and configuration through the local proxy, and what only the panel
@@ -41,6 +41,12 @@ export function useDiagnostics({ update, devices = async () => ({}) } = {}) {
   let offset = 0
   let reading = false
   let timer = 0
+  let logBytes = createLogByteDecoder()
+
+  const readLogChunk = async (response, { final = false } = {}) => {
+    if (typeof response.arrayBuffer !== 'function') return response.text()
+    return logBytes.push(new Uint8Array(await response.arrayBuffer()), { final })
+  }
 
   async function refresh() {
     if (reading) return
@@ -51,7 +57,8 @@ export function useDiagnostics({ update, devices = async () => ({}) } = {}) {
       if (!response.ok) return
       const size = Number.parseInt(response.headers.get('X-Log-Size') || '0', 10)
       const incremental = (response.headers.get('X-Log-Range') || '').trim().toLowerCase() === 'incremental'
-      const chunk = await response.text()
+      if (!incremental) logBytes = createLogByteDecoder()
+      const chunk = await readLogChunk(response, { final: !incremental })
       if (incremental && !chunk) { offset = Number.isNaN(size) ? offset : size; return }
       text.value = appendTail(text.value, chunk, { incremental })
       offset = Number.isNaN(size) || size < 0 ? 0 : size
@@ -93,7 +100,11 @@ export function useDiagnostics({ update, devices = async () => ({}) } = {}) {
 
   async function collect() {
     const [log, conf, runtime, clients, sys, gpuList, monitors, dev] = await Promise.all([
-      safe(async () => { const r = await fetch(`${await proxy()}/api/logs`); return r.ok ? r.text() : '' }, ''),
+      safe(async () => {
+        const r = await fetch(`${await proxy()}/api/logs`)
+        if (!r.ok) return ''
+        return typeof r.arrayBuffer === 'function' ? decodeLogBytes(new Uint8Array(await r.arrayBuffer())) : r.text()
+      }, ''),
       safe(() => getJson('/api/config')),
       safe(() => getJson('/api/runtime/sessions')),
       safe(() => getJson('/api/clients/list')),
