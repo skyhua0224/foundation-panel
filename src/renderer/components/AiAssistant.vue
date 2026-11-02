@@ -2,7 +2,7 @@
   <!-- 米塔 AI is a destination of the rail: the chat takes the whole pane (header, the conversation that scrolls, the input pinned at the bottom);
        its settings are pages behind the gear of the header -->
   <div v-if="!current" class="ai-shell">
-    <header class="ai-head">
+    <header class="ai-head" :class="{ 'is-scrolled': scrolled }">
       <img class="ai-avatar ai-avatar--pixel ai-head__avatar" src="/mita-pixel.png" :alt="t.aiAssistant.mitaName">
       <div class="ai-head__id">
         <h2 class="ai-head__title">{{ t.aiAssistant.title }}</h2>
@@ -14,15 +14,15 @@
       </div>
     </header>
 
-    <div ref="chatContainer" class="ai-scroll" aria-live="polite" @wheel="handleChatWheel">
+    <div ref="chatContainer" class="ai-scroll" aria-live="polite" @wheel="handleChatWheel" @scroll.passive="scrolled = $event.target.scrollTop > 2">
       <div class="ai-col" data-wp-cover>
         <div v-if="chatHistory.length === 0 && !isLoading" class="ai-hint">
           <img src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="ai-avatar ai-avatar--lg ai-avatar--pixel">
           <b>{{ t.aiAssistant.welcomeMsg }}</b>
+          <MButton v-if="!config.enabled" variant="tonal" icon="settings" @click="open('config')">{{ t.aiAssistant.modelConfig }}</MButton>
           <div class="ai-examples">
             <button v-for="example in exampleQueries" :key="example" type="button" class="ai-example" :disabled="!config.enabled" @click="selectExample(example)">{{ example }}</button>
           </div>
-          <MButton v-if="!config.enabled" variant="tonal" icon="settings" @click="open('config')">{{ t.aiAssistant.modelConfig }}</MButton>
         </div>
         <div v-for="(msg, idx) in chatHistory" :key="idx" class="ai-msg" :class="msg.role">
           <span v-if="msg.role === 'user'" class="ai-avatar ai-avatar--user"><MIcon name="person" /></span>
@@ -118,6 +118,7 @@ const {
 
 const providers = AI_PROVIDERS
 const chatContainer = ref(null)
+const scrolled = ref(false) // the header gains its surface only when the conversation scrolls under it
 const chatInput = ref(null)
 const { current, open, back } = useSubpage('ai')
 // the chat page opens first; a banner on it leads to the settings when the assistant is not set up yet
