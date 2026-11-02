@@ -38,6 +38,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
+import { followRoot } from '../composables/frameRoot.js'
 import { ElMessage } from 'element-plus'
 import { invoke } from '@tauri-apps/api/core'
 import { sunshine } from '@/tauri-adapter.js'
@@ -272,6 +273,8 @@ const createMessageHandler = () => {
   }
 
   const handlers = {
+    // a Web page in the frame asks for the panel's colours and scheme (composables/frameRoot.js)
+    'foundation-root-request': (_data, event) => replyToSunshine(event, rootFollow ? rootFollow.snapshot() : { type: 'foundation-root', props: {}, classes: [], theme: '' }),
     'native-navigation-context-request': (_data, event) => {
       replyToSunshine(event, {
         type: 'native-navigation-context',
@@ -464,7 +467,12 @@ const handleLocaleChanged = () => {
 }
 
 // Lifecycle
+// the frame follows the panel's root element: a new wallpaper colour, light or dark, the picture on or off
+let rootFollow = null
+const frameOrigin = () => { try { return new URL(sunshineUrl.value || sunshineIframe.value?.src || '', window.location.href).origin } catch { return '' } }
+
 onUnmounted(() => {
+  rootFollow?.stop()
   window.removeEventListener('navigate-frame', handleNavigateFrame)
   window.removeEventListener('locale-changed', handleLocaleChanged)
   if (messageHandler) window.removeEventListener('message', messageHandler)
@@ -476,6 +484,7 @@ onUnmounted(() => {
 })
 
 onMounted(async () => {
+  rootFollow = followRoot(() => sunshineIframe.value, frameOrigin)
   window.addEventListener('navigate-frame', handleNavigateFrame)
   window.addEventListener('locale-changed', handleLocaleChanged)
 
