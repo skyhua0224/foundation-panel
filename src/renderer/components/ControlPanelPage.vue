@@ -47,6 +47,7 @@
       </MSection>
     </template>
     <template v-else>
+      <MPromo :title="aboutText.title" text="Foundation Sunshine" icon="info" tone="tertiary" @click="emit('open-about')" />
       <MPromo :title="guide.guide" :text="guide.helpRow" icon="rocket_launch" tone="secondary" @click="emit('open-guide')" />
       <MPromo :title="t.sidebar.clientDownloads" text="Moonlight / VoidLink" icon="download" @click="emit('webui-navigate', '/downloads')" />
       <MPromo :title="t.m3e.home.sponsor" :text="t.m3e.home.sponsorTitle" icon="favorite" tone="primary" @click="sponsorOpen = true" />
@@ -69,7 +70,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MPromo, MFooter, MSheet, guideTexts, homeTexts, useGuideCard, MAppearance } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MPromo, MFooter, MSheet, aboutTexts, guideTexts, homeTexts, useGuideCard, MAppearance } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { ROUTES } from '../composables/useRouter.js'
@@ -84,10 +85,11 @@ const props = defineProps({
   isAdmin: Boolean,
   actions: { type: Object, required: true },
 })
-const emit = defineEmits(['theme-change', 'locale-change', 'channel-change', 'webui-navigate', 'open-guide'])
+const emit = defineEmits(['theme-change', 'locale-change', 'channel-change', 'webui-navigate', 'open-guide', 'open-about'])
 const { t } = useI18n()
 // The guided first run can be opened again from here; its texts come with the package (zh and en)
 const guide = computed(() => guideTexts(props.locale))
+const aboutText = computed(() => aboutTexts(props.locale))
 // the get started card of the overview comes back from here
 const startText = computed(() => homeTexts(props.locale))
 const startCard = useGuideCard('panel-home', () => [])

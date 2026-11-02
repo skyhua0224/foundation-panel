@@ -11,7 +11,7 @@
     </header>
     <div class="panel-body">
     <MScene :nav="nav" :rail-items="rail" :texts="sceneTexts" :overlay="isWebPage" storage-key="foundation-ui.panel.list" @rail="onRail">
-      <template #rail-foot><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
+      <template #rail-foot><MIconButton icon="info" :label="aboutTexts(locale).title" @click="router.navigate(ROUTES.ABOUT)" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
       <template #list="{ entry }">
         <MNavList
           :groups="listGroups(entry.rail)"
@@ -47,6 +47,7 @@
           @open-controller-meta="openGamepadTest"
           @open-stylus-input-probe="openStylusInputProbe"
         />
+        <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" @open-update="showUpdateDialog = true" @open="actions_openExternal" />
         <ControlPanelPage
           v-else-if="entry.id === ROUTES.PANEL_SETTINGS || entry.id === ROUTES.HELP"
           :page="entry.id"
@@ -63,6 +64,7 @@
           @channel-change="setIncludePrerelease"
           @webui-navigate="openWebUi"
           @open-guide="openWelcome"
+          @open-about="router.navigate(ROUTES.ABOUT)"
         />
       </template>
       <template #overlay>
@@ -71,6 +73,7 @@
     </MScene>
     </div>
     <MContextMenu ref="contextMenu" @select="onContextSelect" />
+    <MThanksLine v-if="thanks.visible.value" :locale="locale" @star="thanksStar" @sponsor="thanksSponsor" @dismiss="thanks.dismiss" />
     <UpdateDialog
       v-if="showUpdateDialog"
       v-model="showUpdateDialog"
@@ -86,7 +89,7 @@
 import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { sunshine, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
-import { MScene, MNavList, MIconButton, MIcon, MContextMenu, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton } from 'foundation-ui/vue'
+import { MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -100,6 +103,7 @@ import GamepadPage from './m3e/GamepadPage.vue'
 import MicrophonePage from './m3e/MicrophonePage.vue'
 import AppearancePage from './m3e/AppearancePage.vue'
 import UsbPage from './m3e/UsbPage.vue'
+import AboutPage from './m3e/AboutPage.vue'
 import ComponentsPage from './m3e/ComponentsPage.vue'
 import DiagnosticsPage from './m3e/DiagnosticsPage.vue'
 import { microphoneOverviewState } from '../composables/deviceHubStatus.js'
@@ -169,7 +173,13 @@ const back = () => nav.pop()
 const announceVersion = ref('')
 onMounted(async () => { try { announceVersion.value = (await sunshine.getVersion()) || '' } catch { /* the version only narrows version-bound notices */ } })
 const { unread: announcementsUnread } = useAnnouncementBadge({ locale, version: announceVersion })
-const rail = computed(() => railItems(t.value).map((item) => (item.id === 'overview' && announcementsUnread.value ? { ...item, badge: announcementsUnread.value } : item)))
+// a dot on the help rail while an update is waiting (the about page checks and opens the update sheet)
+const updateWaiting = computed(() => !!updateInfo.value && !updateInfo.value.is_latest)
+const rail = computed(() => railItems(t.value).map((item) => (item.id === 'overview' && announcementsUnread.value ? { ...item, badge: announcementsUnread.value } : item.id === 'help' && updateWaiting.value ? { ...item, badge: 'dot' } : item)))
+// the one-time thank-you line after the guided first run
+const thanks = useThanks({ guideKey: 'foundation.guide.panel' })
+const thanksStar = () => { actions_openExternal('https://github.com/AlkaidLab/foundation-sunshine'); thanks.dismiss() }
+const thanksSponsor = () => { thanks.dismiss(); router.navigate(ROUTES.ABOUT) }
 const railLabel = (id) => t.value.m3e.nav[id]
 const runtimeView = computed(() => ({ ...runtime, micLabel: micLabel.value }))
 const micLabel = computed(() => t.value.deviceHub.microphone.statusLabels[microphoneOverviewState(runtime.mic || {})] || '')

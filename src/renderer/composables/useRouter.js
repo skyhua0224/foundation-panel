@@ -14,6 +14,7 @@ export const ROUTES = {
   TOOLBOX: 'toolbox', // old name of DIAGNOSTICS
   PANEL_SETTINGS: 'panel-settings',
   HELP: 'help',
+  ABOUT: 'about',
   CAT_STREAM: 'cat-stream',
   CAT_INPUT: 'cat-input',
   CAT_DISPLAY: 'cat-display',
@@ -58,6 +59,7 @@ export const PAGES = {
   [ROUTES.WEB_TROUBLESHOOTING]: { rail: 'system' },
   [ROUTES.PANEL_SETTINGS]: { rail: 'settings', list: false },
   [ROUTES.HELP]: { rail: 'help', list: false },
+  [ROUTES.ABOUT]: { rail: 'help', list: false },
 }
 export const RAILS = ['overview', 'stream', 'config', 'input', 'display', 'system', 'settings', 'help']
 
