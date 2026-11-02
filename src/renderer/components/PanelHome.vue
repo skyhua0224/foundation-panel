@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
+import { micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
 import { buildCatalogue, buildCatalogueDetails, createHistory, createHttpVddAdapter, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
 import { usePanelHome } from '../composables/usePanelHome.js'
 import { useGamepadType } from '../composables/useGamepadType.js'
@@ -70,8 +70,8 @@ const model = computed(() => {
     session: s ? { ...s, fpsMeasured: perfSession.value?.frame_rates?.encoded?.fps ?? perfSession.value?.host_latency?.recent_fps, latencyMs: perfSession.value?.host_latency?.avg_ms } : null,
     series: state.series, sys, encoder: state.config?.active_encoder || '',
     codecModes: state.config && state.config.hevc_mode !== undefined ? { hevc: state.config.hevc_mode, av1: state.config.av1_mode } : null,
-    pads: { text: [modeLabel.value, dsLabel.value].filter(Boolean).join(' · ') || '–', word: dsLabel.value || modeLabel.value, ready: ['ready', 'active'].includes(props.runtime.ds?.state) },
-    mic: micText.value ? { text: micText.value, ready: ['active', 'streaming', 'capturing', 'idle', 'waiting'].includes(props.runtime.mic?.state) } : null,
+    pads: { text: [modeLabel.value, dsLabel.value].filter(Boolean).join(' · ') || '–', word: dsLabel.value || modeLabel.value, ready: padIsReady(props.runtime.ds?.state) },
+    mic: micText.value ? { text: micText.value, ready: micIsReady({ state: props.runtime.mic?.state }) } : null,
     clients: state.clients ? state.clients.map((c) => ({ ...c, icon: 'devices' })) : null,
     apps: state.apps ? state.apps.map((a) => ({ id: a.name, name: a.name, cover: coverOf(a) })) : null,
     logs: state.errorLog, recent: state.recent, busy: busy.value,
