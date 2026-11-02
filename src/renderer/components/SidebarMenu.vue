@@ -10,8 +10,8 @@
       </div>
     </header>
     <div class="panel-body">
-    <MScene :nav="nav" :rail-items="rail" :texts="sceneTexts" :overlay="isWebPage" storage-key="foundation-ui.panel.list" @rail="onRail">
-      <template #rail-foot><MIconButton icon="info" :label="aboutTexts(locale).title" @click="router.navigate(ROUTES.ABOUT)" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
+    <MScene :nav="nav" :rail-items="rail" :texts="sceneTexts" :overlay="isWebPage" storage-key="foundation-ui.panel.list" @rail="onRail" @search="openSearch">
+      <template #rail-foot><MIconButton icon="search" :label="t.m3e.search" @click="openSearch" /><MIconButton icon="info" :label="aboutTexts(locale).title" @click="router.navigate(ROUTES.ABOUT)" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
       <template #list="{ entry }">
         <MNavList
           :groups="listGroups(entry.rail)"
@@ -245,12 +245,17 @@ const openSettingsRoute = (item) => {
 }
 const onListNavigate = (item) => (item.route ? openSettingsRoute(item) : openRoute(item.id))
 
-const sceneTexts = computed(() => ({ resize: t.value.m3e.resize, main: t.value.m3e.nav.main, shortcuts: t.value.m3e.shortcuts, back: t.value.m3e.back, search: t.value.m3e.search, help: t.value.m3e.shortcutHelp, section: t.value.m3e.section, close: t.value.m3e.clear }))
+const sceneTexts = computed(() => ({ resize: t.value.m3e.resize, main: t.value.m3e.nav.main, expand: t.value.m3e.nav.expand, collapse: t.value.m3e.nav.collapse, shortcuts: t.value.m3e.shortcuts, back: t.value.m3e.back, search: t.value.m3e.search, help: t.value.m3e.shortcutHelp, section: t.value.m3e.section, close: t.value.m3e.clear }))
 const onRail = (item) => {
   if (item.id === 'config') { loadHostData(); openConfig({ tab: 'general' }); router.navigate(ROUTES.CAT_CONFIG); return }
   // the stream rail opens on its first page: the frame has to show it
   if (item.id === 'stream') { emit('webui-navigate', webPathOf(ROUTES.WEB_CLIENTS)); router.navigate(ROUTES.CAT_STREAM); return }
   router.navigate({ overview: ROUTES.HOME, settings: ROUTES.PANEL_SETTINGS, help: ROUTES.HELP, stream: ROUTES.CAT_STREAM, input: ROUTES.CAT_INPUT, display: ROUTES.CAT_DISPLAY, system: ROUTES.CAT_SYSTEM }[item.id])
+}
+// the search of the settings from anywhere: open the list that has the field, then put the cursor in it
+const openSearch = () => {
+  onRail({ id: 'config' })
+  setTimeout(() => { const input = document.querySelector('.m-search input'); input?.focus() }, 250)
 }
 const onSearch = (item) => {
   settingsList.remember(item.keyName)
@@ -285,6 +290,9 @@ const actions_openUrl = async (item) => {
 // Old call sites speak in short ids; each maps to a destination.
 const openDestination = (id) => {
   if (id === 'welcome') { openWelcome(); return }
+  // the pairing sheet and the new application editor open at once: the Web pages read #pairing and #guide-add
+  if (id === 'pair') { emit('webui-navigate', '/pin#pairing'); router.navigate(ROUTES.WEB_CLIENTS); return }
+  if (id === 'apps:add') { emit('webui-navigate', '/apps#guide-add'); router.navigate(ROUTES.WEB_APPS); return }
   if (id.startsWith('downloads:')) { emit('webui-navigate', `/downloads?platform=${encodeURIComponent(id.slice(10))}`); router.navigate(ROUTES.WEB_DOWNLOADS); return }
   const web = { clients: ROUTES.WEB_CLIENTS, apps: ROUTES.WEB_APPS, settings: ROUTES.WEB_CONFIG, downloads: ROUTES.WEB_DOWNLOADS }
   if (id === 'settings') { openConfig({ tab: 'general' }); return }

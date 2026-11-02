@@ -141,9 +141,10 @@ function onAction(a) {
     case 'hero': onHero(); break
     case 'group': onStripGroup(a.value); break
     case 'switch': onStripSwitch(a.value); break
-    case 'table-action': emit('open', 'clients'); break
+    case 'table-action': emit('open', 'pair'); break
     case 'table-row': onTableRow(a.value); break
     case 'app': emit('open', 'apps'); break
+    case 'add-app': emit('open', 'apps:add'); break
     case 'open': emit('open', a.value); break
     case 'detail-external': break
     case 'guide-go': guideStepGo(a.value); break
@@ -171,7 +172,7 @@ async function onStripSwitch({ id, value }) {
 function onHero() { if (session.value) confirmStop.value = true; else confirmRestart.value = true }
 const doRestart = async () => { confirmRestart.value = false; busy.value = true; try { await restart() } finally { busy.value = false } }
 const doStop = async () => { confirmStop.value = false; busy.value = true; try { await stopAll() } finally { busy.value = false } }
-const onTableAction = () => emit('open', 'clients')
+const onTableAction = () => emit('open', 'pair')
 const onTableRow = (row) => { if (row.tab === 'errors' || row.tab === 'sessions') openTool('logs'); else emit('open', 'clients') }
 const onLink = (to) => emit('open', to)
 

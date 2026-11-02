@@ -1117,7 +1117,7 @@ Output only one short sentence, no explanation. Reply in English.`,
     open: 'Manage image enhancement',
   },
   m3e: {
-    nav: { overview: 'Overview', stream: 'Stream', config: 'Stream settings', input: 'Input & devices', display: 'Display', system: 'System', settings: 'Panel settings', help: 'Help & about', main: 'Main navigation' },
+    nav: { overview: 'Overview', stream: 'Stream', config: 'Stream settings', input: 'Input & devices', display: 'Display', system: 'System', settings: 'Panel settings', help: 'Help & about', main: 'Main navigation', expand: 'Expand navigation', collapse: 'Collapse navigation' },
     search: 'Search', noResults: 'No results', clear: 'Clear', resize: 'Resize list', shortcuts: 'Keyboard shortcuts', shortcutHelp: 'Show shortcuts', section: 'Go to section',
     micFlow: { client: 'Client microphone', host: 'Host', device: 'Virtual device', apps: 'Apps', buffer: 'Buffer' },
     home: { pad: { auto: 'Auto', x360: 'Xbox 360', ds4: 'DualShock 4', ds5: 'DualSense' }, gamepadType: 'Gamepad type', vddKeep: 'Keep virtual display', vddKeepSub: 'Stay after streaming ends', download: 'Download clients', star: 'Star on GitHub', qq: 'QQ group', edit: 'Edit tiles', done: 'Done', add: 'Add tile', reset: 'Reset to default', remove: 'Remove', resize: 'Change size', earlier: 'Move earlier', later: 'Move later', addTitle: 'Add a tile', nothing: 'All tiles are on the page',
