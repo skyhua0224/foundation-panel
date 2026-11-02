@@ -58,11 +58,11 @@
         font-family: 'PixelMplus12', 'Segoe UI', sans-serif;
       }
 
-      .boot-loading img {
-        width: min(180px, 36vw);
-        opacity: 0.85;
-        filter: drop-shadow(0 4px 12px var(--boot-shadow));
-        animation: boot-mascot 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+      .boot-loading .vivi-loading {
+        width: 144px;
+        height: 196px;
+        background: url('./public/vivi/vivi-loading.webp') 0 0 / 576px 196px no-repeat;
+        animation: vivi-bob 840ms step-end infinite;
       }
 
       .boot-loading p {
@@ -70,21 +70,20 @@
         font-size: 18px;
       }
 
-      @keyframes boot-mascot {
-        0% {
-          transform: translateX(-80%) rotate(-5deg) translateY(-5px) scale(0.9);
-        }
-        45% {
-          transform: translateX(0) rotate(0deg) translateY(2px) scale(1.08);
-        }
-        55% {
-          transform: translateX(10%) rotate(3deg) translateY(-8px) scale(0.96);
-        }
-        100% {
-          transform: translateX(80%) rotate(5deg) translateY(-5px) scale(0.9);
-        }
+      @keyframes vivi-bob {
+        0% { background-position: 0 0; }
+        16.66% { background-position: -144px 0; }
+        33.33% { background-position: -288px 0; }
+        50% { background-position: -432px 0; }
+        66.66% { background-position: -288px 0; }
+        83.33% { background-position: -144px 0; }
+        100% { background-position: 0 0; }
       }
-      
+
+      @media (prefers-reduced-motion: reduce) {
+        .boot-loading .vivi-loading { animation: none; background-position: 0 0; }
+      }
+
       @font-face {
         font-family: 'PixelMplus12';
         src: url('./public/fonts/PixelMplus12-Bold.woff2') format('woff2');
@@ -95,7 +94,7 @@
   <body>
     <div id="app">
       <div class="boot-loading" role="status" aria-live="polite">
-        <img src="./public/sunshine-girl-1024.png" alt="" />
+        <span class="vivi-loading" role="img" aria-label="Loading"></span>
         <p>Preparing Sunshine...</p>
       </div>
     </div>

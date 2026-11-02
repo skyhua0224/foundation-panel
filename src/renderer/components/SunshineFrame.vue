@@ -9,7 +9,7 @@
       <transition name="fade-loading">
         <div v-if="loading" class="loading-overlay">
           <div class="loading-container">
-            <img src="../public/sunshine-girl-1024.png" class="loading-image" alt="Loading" />
+            <span class="vivi-loading" role="img" aria-label="Loading"></span>
             <div class="loading-text">
               <template v-if="proxyHealthFailed">
                 <p class="proxy-health-error">{{ t.sunshineFrame.proxyUnavailable }}</p>
@@ -620,34 +620,28 @@ const onLoad = () => {
   max-width: 400px;
 }
 
-.loading-image {
-  width: 60%;
-  max-width: 180px;
-  opacity: 0.85;
-  margin-bottom: 24px;
-  animation: mascot-bob 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  position: relative;
-  left: -20%;
-  transform-style: preserve-3d;
-  filter: drop-shadow(0 4px 12px rgba(212, 165, 165, 0.3));
+/* 薇薇 swimming in her ring: four open-eyed frames of the sprite, 144 x 196 shown (the file is for 2x screens); a still frame when motion is reduced */
+.vivi-loading {
+  display: block;
+  width: 144px;
+  height: 196px;
+  margin: 0 auto 20px;
+  background: url('../public/vivi/vivi-loading.webp') 0 0 / 576px 196px no-repeat;
+  animation: vivi-bob 840ms step-end infinite;
 }
 
-@keyframes mascot-bob {
-  0% {
-    transform: translateX(-100%) rotate(-5deg) translateY(-5px) scale(0.9);
-  }
-  40% {
-    transform: translateX(0%) rotate(0deg) translateY(2px) scale(1.1);
-  }
-  50% {
-    transform: translateX(10%) rotate(3deg) translateY(-10px) scale(0.95);
-  }
-  60% {
-    transform: translateX(20%) rotate(-3deg) translateY(5px) scale(1.05);
-  }
-  100% {
-    transform: translateX(100%) rotate(5deg) translateY(-5px) scale(0.9);
-  }
+@keyframes vivi-bob {
+  0% { background-position: 0 0; }
+  16.66% { background-position: -144px 0; }
+  33.33% { background-position: -288px 0; }
+  50% { background-position: -432px 0; }
+  66.66% { background-position: -288px 0; }
+  83.33% { background-position: -144px 0; }
+  100% { background-position: 0 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vivi-loading { animation: none; background-position: 0 0; }
 }
 
 .loading-text {

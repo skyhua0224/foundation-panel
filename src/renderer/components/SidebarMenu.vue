@@ -4,9 +4,9 @@
     <header class="panel-caption" data-tauri-drag-region @pointerdown="onTouchWindowDragStart">
       <span class="panel-caption__title" data-tauri-drag-region>Foundation Sunshine</span>
       <div class="panel-caption__controls">
-        <button type="button" class="panel-caption__btn" :aria-label="t.sidebar.minimize" :data-tip="t.sidebar.minimize" @click="minimizeWindow"><MIcon name="remove" /></button>
-        <button type="button" class="panel-caption__btn" :aria-label="isMaximized ? t.sidebar.restore : t.sidebar.maximize" :data-tip="isMaximized ? t.sidebar.restore : t.sidebar.maximize" @click="toggleMaximize"><MIcon :name="isMaximized ? 'filter_none' : 'crop_square'" /></button>
-        <button type="button" class="panel-caption__btn panel-caption__btn--close" :aria-label="t.sidebar.hideWindow" :data-tip="t.sidebar.hideWindow" @click="closeWindow"><MIcon name="close" /></button>
+        <button type="button" class="panel-caption__btn" :aria-label="t.sidebar.minimize" :data-tip="t.sidebar.minimize" @click="minimizeWindow"><img class="panel-caption__ring" :src="VIVI.buttons.minimize" alt="" draggable="false" /></button>
+        <button type="button" class="panel-caption__btn" :aria-label="isMaximized ? t.sidebar.restore : t.sidebar.maximize" :data-tip="isMaximized ? t.sidebar.restore : t.sidebar.maximize" @click="toggleMaximize"><img class="panel-caption__ring" :src="isMaximized ? VIVI.buttons.restore : VIVI.buttons.maximize" alt="" draggable="false" /></button>
+        <button type="button" class="panel-caption__btn panel-caption__btn--close" :aria-label="t.sidebar.hideWindow" :data-tip="t.sidebar.hideWindow" @click="closeWindow"><img class="panel-caption__ring" :src="VIVI.buttons.close" alt="" draggable="false" /></button>
       </div>
     </header>
     <div class="panel-body">
@@ -89,7 +89,7 @@
 import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { sunshine, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
-import { MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, VIVI, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -336,6 +336,12 @@ defineExpose({
 .panel-caption__btn:active { background: color-mix(in srgb, var(--md-sys-color-on-surface) 14%, transparent); }
 .panel-caption__btn--close:hover { background: #c42b1c; color: #fff; } .panel-caption__btn--close:active { background: #b02417; color: #fff; }
 .panel-caption__btn:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px; }
+/* the swim rings of 薇薇: 24 px in the 46 x 40 hit target; they lift on hover and press in (the white disc keeps the dark glyph at 4.5:1 in both themes) */
+.panel-caption__ring { display: block; width: 24px; height: 24px; pointer-events: none; user-select: none; transition: transform 120ms var(--m-spring-fast-spatial, ease), filter 120ms linear; }
+.panel-caption__btn:hover .panel-caption__ring { transform: scale(1.14); }
+.panel-caption__btn:active .panel-caption__ring { transform: scale(.92); filter: brightness(.94); }
+.panel-caption__btn--close:hover .panel-caption__ring { filter: drop-shadow(0 0 0 #fff); }
+@media (prefers-reduced-motion: reduce) { .panel-caption__ring { transition: none; } }
 .panel-body { position: absolute; inset: 0; min-height: 0; }
 .panel-body > .m-scene { position: absolute; inset: 0; height: auto; }
 </style>
