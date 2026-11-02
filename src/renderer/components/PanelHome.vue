@@ -70,8 +70,8 @@ const model = computed(() => {
     session: s ? { ...s, fpsMeasured: perfSession.value?.frame_rates?.encoded?.fps ?? perfSession.value?.host_latency?.recent_fps, latencyMs: perfSession.value?.host_latency?.avg_ms } : null,
     series: state.series, sys, encoder: state.config?.active_encoder || '',
     codecModes: state.config && state.config.hevc_mode !== undefined ? { hevc: state.config.hevc_mode, av1: state.config.av1_mode } : null,
-    pads: { text: [modeLabel.value, dsLabel.value].filter(Boolean).join(' · ') || '–' },
-    mic: micText.value ? { text: micText.value } : null,
+    pads: { text: [modeLabel.value, dsLabel.value].filter(Boolean).join(' · ') || '–', word: dsLabel.value || modeLabel.value, ready: ['ready', 'active'].includes(props.runtime.ds?.state) },
+    mic: micText.value ? { text: micText.value, ready: ['active', 'streaming', 'capturing', 'idle', 'waiting'].includes(props.runtime.mic?.state) } : null,
     clients: state.clients ? state.clients.map((c) => ({ ...c, icon: 'devices' })) : null,
     apps: state.apps ? state.apps.map((a) => ({ id: a.name, name: a.name, cover: coverOf(a) })) : null,
     logs: state.errorLog, recent: state.recent, busy: busy.value,
@@ -133,7 +133,7 @@ const catalogueInput = computed(() => {
 const catalogue = computed(() => buildCatalogue(catalogueInput.value, T.value).data)
 const allDetails = computed(() => ({ ...model.value.details, ...buildCatalogueDetails(catalogueInput.value, T.value) }))
 const isNew = computed(() => guide.visible.value)
-const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue: catalogue.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value), sponsor: sponsorCardData(T.value) }))
+const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue: catalogue.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value), sponsor: sponsorCardData(T.value, SPONSORS) }))
 const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value }))
 
 function onAction(a) {
@@ -152,7 +152,7 @@ function onAction(a) {
     case 'download': emit('open', `downloads:${a.value}`); break
     case 'link': openExternalUrl(a.value); break
     case 'setting': saveSetting(a.value); break
-    case 'sponsor': if (a.value === 'star') openExternalUrl('https://github.com/AlkaidLab/foundation-sunshine'); else sponsorOpen.value = true; break
+    case 'sponsor': { const target = SPONSORS.find((x) => x.id === a.value); if (a.value === 'star') openExternalUrl('https://github.com/AlkaidLab/foundation-sunshine'); else if (target) openExternalUrl(target.url); else sponsorOpen.value = true; break }
     default: break
   }
 }
