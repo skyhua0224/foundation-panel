@@ -99,41 +99,44 @@ mod win {
                 self.cpu_prev = Some(now);
             }
             if self.pdh {
-                self.gpu = unsafe { self.read_gpu() };
+                self.gpu = self.read_gpu();
             }
             SystemLoad { cpu_percent: self.cpu, gpu_percent: self.gpu }
         }
 
         /// Two collections are needed before a rate counter has a value; until then (or when the counter set is missing,
         /// as on drivers older than WDDM 2.0) this returns `None`.
-        unsafe fn read_gpu(&mut self) -> Option<f64> {
-            if PdhCollectQueryData(self.query) != 0 {
-                return None;
-            }
-            let format = PDH_FMT(PDH_FMT_DOUBLE.0 | PDH_FMT_NOCAP100);
-            let mut size: u32 = 0;
-            let mut count: u32 = 0;
-            if PdhGetFormattedCounterArrayW(self.counter, format, &mut size, &mut count, None) != PDH_MORE_DATA || size == 0 {
-                return None;
-            }
-            // 8-byte aligned storage for the item array and the instance names that follow it
-            let mut storage: Vec<u64> = vec![0; (size as usize + 7) / 8];
-            let items = storage.as_mut_ptr() as *mut PDH_FMT_COUNTERVALUE_ITEM_W;
-            if PdhGetFormattedCounterArrayW(self.counter, format, &mut size, &mut count, Some(items)) != 0 {
-                return None;
-            }
-            let list = std::slice::from_raw_parts(items, count as usize);
-            let mut readings: Vec<(String, f64)> = Vec::with_capacity(list.len());
-            for item in list {
-                let status = item.FmtValue.CStatus;
-                if status != PDH_CSTATUS_VALID_DATA && status != PDH_CSTATUS_NEW_DATA {
-                    continue;
+        fn read_gpu(&mut self) -> Option<f64> {
+            // SAFETY: the query and counter handles are valid while `pdh` is set; the item buffer is sized by the first call.
+            unsafe {
+                if PdhCollectQueryData(self.query) != 0 {
+                    return None;
                 }
-                if let Ok(name) = item.szName.to_string() {
-                    readings.push((name, item.FmtValue.Anonymous.doubleValue));
+                let format = PDH_FMT(PDH_FMT_DOUBLE.0 | PDH_FMT_NOCAP100);
+                let mut size: u32 = 0;
+                let mut count: u32 = 0;
+                if PdhGetFormattedCounterArrayW(self.counter, format, &mut size, &mut count, None) != PDH_MORE_DATA || size == 0 {
+                    return None;
                 }
+                // 8-byte aligned storage for the item array and the instance names that follow it
+                let mut storage: Vec<u64> = vec![0; (size as usize + 7) / 8];
+                let items = storage.as_mut_ptr() as *mut PDH_FMT_COUNTERVALUE_ITEM_W;
+                if PdhGetFormattedCounterArrayW(self.counter, format, &mut size, &mut count, Some(items)) != 0 {
+                    return None;
+                }
+                let list = std::slice::from_raw_parts(items, count as usize);
+                let mut readings: Vec<(String, f64)> = Vec::with_capacity(list.len());
+                for item in list {
+                    let status = item.FmtValue.CStatus;
+                    if status != PDH_CSTATUS_VALID_DATA && status != PDH_CSTATUS_NEW_DATA {
+                        continue;
+                    }
+                    if let Ok(name) = item.szName.to_string() {
+                        readings.push((name, item.FmtValue.Anonymous.doubleValue));
+                    }
+                }
+                aggregate_gpu(&readings)
             }
-            aggregate_gpu(&readings)
         }
     }
 
