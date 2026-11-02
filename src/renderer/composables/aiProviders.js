@@ -1,5 +1,5 @@
 /**
- * AI provider presets for the Mita control-panel entry point.
+ * AI provider presets for the control-panel entry point.
  */
 
 export const STORAGE_KEY = 'sunshine-ai-config'
@@ -74,7 +74,7 @@ export const AI_PROVIDERS = [
     compatibility: 'openai-chat',
   },
   {
-    label: 'Mita / Custom',
+    label: 'Sunshine Girl / Custom',
     value: 'custom',
     base: '',
     models: [],
