@@ -752,11 +752,13 @@
 .quality-manager .live-scale strong {
   float: none;
 }
-.quality-manager .live-scale input {
-  width: 100%;
-  display: block;
+.quality-manager .live-scale > span {
   grid-column: 1/-1;
-  margin: 0;
+  display: flex;
+  justify-content: space-between;
+}
+.quality-manager .live-scale .m-slider {
+  grid-column: 1/-1;
 }
 .quality-manager .live-controls .quality-note {
   margin-top: 10px;

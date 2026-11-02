@@ -13,25 +13,20 @@
         @change="(enabled) => send({ enabled }, pipeline.id)"
       />
     </div>
-    <label v-if="pipeline.nr_live_controls_version >= 2" class="live-scale">
-      {{ text.scale }}<strong>{{ draftScale }}%</strong>
-      <input
-        type="range"
-        min="20"
-        max="100"
-        step="5"
-        :value="draftScale"
-        :aria-label="text.scale"
+    <div v-if="pipeline.nr_live_controls_version >= 2" class="live-scale" @pointerdown.capture="beginEdit" @keydown.capture="beginEdit" @focusout="cancelEdit">
+      <span>{{ text.scale }}<strong>{{ draftScale }}%</strong></span>
+      <MSlider
+        :model-value="draftScale"
+        :min="20"
+        :max="100"
+        :step="5"
+        unit="%"
+        :label="text.scale"
         :disabled="!canChange || !pipeline.nr_requested_enabled"
-        :style="{ '--range-progress': ((draftScale - 20) / 80) * 100 + '%' }"
-        @pointerdown="beginEdit"
-        @keydown="beginEdit"
-        @input="draftScale = Number($event.target.value)"
-        @change="commitScale"
-        @blur="cancelEdit"
-        @pointercancel="cancelEdit"
+        @update:model-value="draftScale = $event"
+        @commit="commitScale"
       />
-    </label>
+    </div>
     <p class="quality-note">{{ text.scaleHint }}</p>
     <p v-if="pending" class="quality-note" role="status">
       {{ overlayText.states[state] }}
@@ -47,6 +42,7 @@
 </template>
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { MSlider } from 'foundation-ui/vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../desktop/i18n/index.js'
 import { enhancementControlsText } from '../composables/enhancementControls.js'
