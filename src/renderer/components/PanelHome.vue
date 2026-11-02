@@ -1,7 +1,8 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
-import { buildCatalogue, buildCatalogueDetails, createHistory, createHttpVddAdapter, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
+import { buildCatalogue, buildCatalogueDetails, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
+import QRCode from 'qrcode'
 import { usePanelHome } from '../composables/usePanelHome.js'
 import { useGamepadType } from '../composables/useGamepadType.js'
 import { SPONSORS } from '../config/sponsors.js'
@@ -127,6 +128,7 @@ const catalogueInput = computed(() => {
     pads: { text: [modeLabel.value, dsLabel.value].filter(Boolean).join(' · ') || '–' }, usb: props.runtime.usb?.attached_devices ? props.runtime.usb.attached_devices.length : null,
     display: vddInput.value && vddInput.value.hdr !== undefined ? { hdr: vddInput.value.hdr } : null,
     temps: state.hw.available ? { cpu: state.hw.cpuTemp, gpu: state.hw.gpuTemp } : null,
+    pairQr: pairQr.view,
     announcements: announcements.list.value.map((a) => ({ id: a.id, title: a.title || a.text || '' })),
   }
 })
@@ -144,6 +146,8 @@ function onAction(a) {
     case 'table-action': emit('open', 'pair'); break
     case 'pair-pin': pairPin(a.value?.pin); break
     case 'pair-qr': emit('open', 'pair:qr'); break
+    case 'pair-qr-begin': pairQr.begin(); break
+    case 'pair-qr-stop': pairQr.stop(); break
     case 'table-row': onTableRow(a.value); break
     case 'app': emit('open', 'apps'); break
     case 'add-app': emit('open', 'apps:add'); break
@@ -163,6 +167,14 @@ const hostApi = {
   getJson: async (path) => (await fetch(`${proxyUrl.value}${path}`)).json(),
   postJson: async (path, body) => (await fetch(`${proxyUrl.value}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json(),
 }
+// the QR code of the pairing card: a pairing window is open on the host only while the card shows it (the card asks and gives it back)
+const pairQr = createPairQr({
+  start: async () => { const d = await hostApi.postJson('/api/qr-pair', {}); if (String(d.status) !== 'true') throw new Error(d.error || 'qr'); return d },
+  poll: () => hostApi.getJson('/api/qr-pair'),
+  cancel: () => hostApi.postJson('/api/qr-pair/cancel', {}),
+  render: (url) => QRCode.toDataURL(url, { width: 280, margin: 2, color: { dark: '#000000', light: '#ffffff' } }),
+})
+onBeforeUnmount(() => pairQr.stop())
 // the PIN typed on the pairing card goes to the host like the pairing sheet sends it
 async function pairPin(pin) {
   if (!/^\d{4}$/.test(String(pin || ''))) return
