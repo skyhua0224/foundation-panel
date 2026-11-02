@@ -142,6 +142,8 @@ function onAction(a) {
     case 'group': onStripGroup(a.value); break
     case 'switch': onStripSwitch(a.value); break
     case 'table-action': emit('open', 'pair'); break
+    case 'pair-pin': pairPin(a.value?.pin); break
+    case 'pair-qr': emit('open', 'pair:qr'); break
     case 'table-row': onTableRow(a.value); break
     case 'app': emit('open', 'apps'); break
     case 'add-app': emit('open', 'apps:add'); break
@@ -160,6 +162,11 @@ function onAction(a) {
 const hostApi = {
   getJson: async (path) => (await fetch(`${proxyUrl.value}${path}`)).json(),
   postJson: async (path, body) => (await fetch(`${proxyUrl.value}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json(),
+}
+// the PIN typed on the pairing card goes to the host like the pairing sheet sends it
+async function pairPin(pin) {
+  if (!/^\d{4}$/.test(String(pin || ''))) return
+  try { const data = await hostApi.postJson('/api/pin', { pin: String(pin), name: dashTexts.value.pairDefaultName }); say(String(data.status) === 'true' ? dashTexts.value.pairSent : dashTexts.value.pairFailed) } catch { say(dashTexts.value.pairFailed) }
 }
 async function saveSetting({ key, value }) { const r = await saveSettingKey(hostApi, key, value); if (r.ok) state.config = r.config }
 async function onStripGroup(v) { pad.selectedMode.value = v }

@@ -375,6 +375,7 @@ const openDestination = (id) => {
   if (id === 'welcome') { openWelcome(); return }
   // the pairing sheet and the new application editor open at once: the Web pages read #pairing and #guide-add
   if (id === 'pair') { emit('webui-navigate', '/pin#pairing'); router.navigate(ROUTES.WEB_CLIENTS); return }
+  if (id === 'pair:qr') { emit('webui-navigate', '/pin#pairing-qr'); router.navigate(ROUTES.WEB_CLIENTS); return }
   if (id === 'apps:add') { emit('webui-navigate', '/apps#guide-add'); router.navigate(ROUTES.WEB_APPS); return }
   if (id.startsWith('downloads:')) { emit('webui-navigate', `/downloads?platform=${encodeURIComponent(id.slice(10))}`); router.navigate(ROUTES.WEB_DOWNLOADS); return }
   const web = { clients: ROUTES.WEB_CLIENTS, apps: ROUTES.WEB_APPS, settings: ROUTES.WEB_CONFIG, downloads: ROUTES.WEB_DOWNLOADS }
