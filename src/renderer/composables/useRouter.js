@@ -14,6 +14,7 @@ export const ROUTES = {
   HDR_ENHANCED: 'hdr-enhanced',
   TOOLBOX: 'toolbox', // old name of DIAGNOSTICS
   PANEL_SETTINGS: 'panel-settings',
+  SETTINGS_HUB: 'settings-hub', // the bottom bar's one entry for 串流设置, 输入与外设, 显示 and 系统: a list of those four
   HELP: 'help',
   ABOUT: 'about',
   CAT_STREAM: 'cat-stream',
@@ -60,6 +61,7 @@ export const PAGES = {
   [ROUTES.AI_ASSISTANT]: { rail: 'assistant', list: false }, // 米塔 AI: the chat takes the whole width, its settings are behind the gear of the chat header
   [ROUTES.WEB_TROUBLESHOOTING]: { rail: 'system' },
   [ROUTES.PANEL_SETTINGS]: { rail: 'settings', list: false },
+  [ROUTES.SETTINGS_HUB]: { rail: 'config', list: false },
   [ROUTES.HELP]: { rail: 'help', list: false },
   [ROUTES.ABOUT]: { rail: 'help', list: false },
 }

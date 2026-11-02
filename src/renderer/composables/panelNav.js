@@ -37,3 +37,19 @@ export function pageItems(t, rail, runtime = {}) {
   }
   return pages[rail] || []
 }
+
+// The bottom bar of a narrow window (the Material navigation bar takes three to five destinations; nine crammed their labels): the overview, the stream,
+// ONE entry for the four settings categories (it opens a list of them), 米塔 AI, and 更多 (panel settings, help and about, search, sponsor).
+export const BAR_GROUP_OF = { overview: 'overview', stream: 'stream', config: 'settings-hub', input: 'settings-hub', display: 'settings-hub', system: 'settings-hub', assistant: 'assistant', settings: 'more', help: 'more' }
+export function barItems(t) {
+  const n = t.m3e.nav
+  return [
+    { id: 'overview', icon: 'home', label: n.overview },
+    { id: 'stream', icon: 'cast_connected', label: n.stream },
+    { id: 'settings-hub', icon: 'tune', label: n.barSettings },
+    { id: 'assistant', icon: 'smart_toy', label: n.assistant },
+    { id: 'more', icon: 'more_horiz', label: n.barMore },
+  ]
+}
+/** The bar entry that is current for a rail id. */
+export const barCurrent = (rail) => BAR_GROUP_OF[rail] || 'overview'

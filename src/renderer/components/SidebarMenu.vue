@@ -10,7 +10,7 @@
       </div>
     </header>
     <div class="panel-body">
-    <MScene :nav="nav" :caption-height="40" :rail-items="rail" :texts="sceneTexts" :overlay="isWebPage" storage-key="foundation-ui.panel.list" @rail="onRail" @search="openSearch">
+    <MScene :nav="nav" :caption-height="40" :rail-items="rail" :bar-items="bar" :bar-current="barCur" :texts="sceneTexts" :overlay="isWebPage" storage-key="foundation-ui.panel.list" @rail="onRail" @search="openSearch">
       <template #rail-foot><MIconButton icon="search" :label="t.m3e.search" @click="openSearch" /><MIconButton icon="info" :label="aboutTexts(locale).title" @click="router.navigate(ROUTES.ABOUT)" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
       <template #list="{ entry }">
         <MNavList
@@ -35,6 +35,7 @@
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
+        <SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" @select="onRail" />
         <HdrEnhancedManager v-else-if="entry.id === ROUTES.HDR_ENHANCED" />
         <AppearancePage v-else-if="entry.id === ROUTES.CFG_APPEARANCE" />
         <MicrophonePage v-else-if="entry.id === ROUTES.MICROPHONE" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
@@ -74,6 +75,16 @@
     </MScene>
     </div>
     <MContextMenu ref="contextMenu" @select="onContextSelect" />
+    <!-- 更多 of the bottom bar: what the bar has no room for -->
+    <MSheet v-model="moreOpen" :title="t.m3e.nav.moreTitle" side="end" :close-label="t.m3e.home.done">
+      <MGroup>
+        <MItem action icon="search" :title="t.m3e.search" @click="moreGo(openSearch)" />
+        <MItem action icon="settings" :title="t.m3e.nav.settings" @click="moreGo(() => onRail({ id: 'settings' }))" />
+        <MItem action icon="help" :title="t.m3e.nav.help" :tone="updateWaiting ? 'warn' : ''" @click="moreGo(() => onRail({ id: 'help' }))" />
+        <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="moreGo(() => { sponsorOpen = true })" />
+      </MGroup>
+    </MSheet>
+    <MSupportSheet v-model="sponsorOpen" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" />
     <MThanksLine v-if="thanks.visible.value" :locale="locale" @star="thanksStar" @sponsor="thanksSponsor" @dismiss="thanks.dismiss" />
     <UpdateDialog
       v-if="showUpdateDialog"
@@ -90,7 +101,7 @@
 import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { sunshine, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
-import { MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -98,6 +109,7 @@ import VddSettings from './VddSettings.vue'
 import Welcome from './welcome.vue'
 import WebStreamSettings from './WebStreamSettings.vue'
 import AiAssistant from './AiAssistant.vue'
+import SettingsHubPage from './m3e/SettingsHubPage.vue'
 import HdrEnhancedManager from './HdrEnhancedManager.vue'
 import ControlPanelPage from './ControlPanelPage.vue'
 import MicrophonePage from './m3e/MicrophonePage.vue'
@@ -117,7 +129,7 @@ import { useTools } from '../composables/useTools.js'
 import { useTouchWindowDrag } from '../composables/useTouchWindowDrag.js'
 import { createUtilityTools } from '../composables/toolsRegistry.js'
 import { ROUTES, PAGES, routeForWebPath, webPathOf } from '../composables/useRouter.js'
-import { railItems, pageItems } from '../composables/panelNav.js'
+import { railItems, pageItems, barItems, barCurrent } from '../composables/panelNav.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { useDualSenseStatus } from '../composables/useDualSenseStatus.js'
 import { useDualSenseText } from '../composables/useDualSenseText.js'
@@ -249,7 +261,15 @@ const openSettingsRoute = (item) => {
 const onListNavigate = (item) => (item.route ? openSettingsRoute(item) : openRoute(item.id))
 
 const sceneTexts = computed(() => ({ resize: t.value.m3e.resize, main: t.value.m3e.nav.main, expand: t.value.m3e.nav.expand, collapse: t.value.m3e.nav.collapse, shortcuts: t.value.m3e.shortcuts, back: t.value.m3e.back, search: t.value.m3e.search, help: t.value.m3e.shortcutHelp, section: t.value.m3e.section, close: t.value.m3e.clear }))
+// the bottom bar of a narrow window: five destinations, the settings categories behind one, the rest behind 更多
+const bar = computed(() => barItems(t.value).map((item) => (item.id === 'overview' && announcementsUnread.value ? { ...item, badge: announcementsUnread.value } : item.id === 'more' && updateWaiting.value ? { ...item, badge: 'dot' } : item)))
+const barCur = computed(() => (router.currentRoute.value === ROUTES.SETTINGS_HUB ? 'settings-hub' : barCurrent(nav.rail.value)))
+const moreOpen = ref(false)
+const sponsorOpen = ref(false)
+const moreGo = (action) => { moreOpen.value = false; setTimeout(action, 120) }
 const onRail = (item) => {
+  if (item.id === 'settings-hub') { router.navigate(ROUTES.SETTINGS_HUB); return }
+  if (item.id === 'more') { moreOpen.value = true; return }
   if (item.id === 'config') { loadHostData(); openConfig({ tab: 'general' }); router.navigate(ROUTES.CAT_CONFIG); return }
   // the stream rail opens on its first page: the frame has to show it
   if (item.id === 'stream') { emit('webui-navigate', webPathOf(ROUTES.WEB_CLIENTS)); router.navigate(ROUTES.CAT_STREAM); return }

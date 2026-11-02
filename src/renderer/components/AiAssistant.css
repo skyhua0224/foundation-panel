@@ -42,4 +42,3 @@ html.m-has-wallpaper .ai-hint { background: var(--m-card); border-radius: 28px; 
 
 /* a short or narrow window: the welcome card stays within the pane, with the settings button first and fewer examples, so nothing hides under the input */
 @media (max-height: 860px) { .ai-hint, html.m-has-wallpaper .ai-hint { gap: 10px; padding: 14px 12px; } .ai-hint .ai-avatar--lg { width: 56px; height: 56px; } .ai-example:nth-child(n+5) { display: none; } }
-html.m-has-wallpaper .ai-head__title, html.m-has-wallpaper .ai-head__line { text-shadow: 0 0 14px color-mix(in srgb, var(--m-page-solid) 80%, transparent), 0 0 3px color-mix(in srgb, var(--m-page-solid) 60%, transparent); }

@@ -24,3 +24,13 @@ test('米塔 AI is labelled 米塔 AI (Mita AI), never AI 助手', () => {
     assert.ok(!banned.test(t.aiAssistant.title))
   }
 })
+
+test("the bottom bar of a narrow window has five destinations with full labels and the settings categories behind one", async () => {
+  const src = fs.readFileSync(new URL("./panelNav.js", import.meta.url), "utf8")
+  const ids = [...src.slice(src.indexOf("export function barItems")).matchAll(/id: \x27([a-z-]+)\x27, icon/g)].map((m) => m[1])
+  assert.deepEqual(ids, ["overview", "stream", "settings-hub", "assistant", "more"], "three to five, as the Material navigation bar has")
+  for (const [lang, max] of [[zh, 6], [en, 10]]) { const n = lang.m3e.nav; for (const label of [n.overview, n.stream, n.barSettings, n.assistant, n.barMore]) assert.ok(label && [...label].length <= max, label) }
+  const map = Object.fromEntries([...src.matchAll(/(\w+): \x27(overview|stream|settings-hub|assistant|more)\x27/g)].map((m) => [m[1], m[2]]))
+  for (const rail of ["config", "input", "display", "system"]) assert.equal(map[rail], "settings-hub", rail)
+  assert.equal(map.settings, "more"); assert.equal(map.help, "more")
+})
