@@ -2,9 +2,9 @@
   <div class="m-usb">
     <UsbForwardingSettings :transport-ready="status.ready && !statusProbeFailed" />
     <UsbTransportPanel :transport="transport" />
-    <MSection :title="t.deviceHub.usb.manualTitle" :description="t.deviceHub.usb.exporterHint">
+    <MSection>
       <MGroup>
-        <MItem action icon="folder_open" :title="t.deviceHub.usb.manualTitle" @click="manualOpen = !manualOpen"><template #trail><MIcon :name="manualOpen ? 'keyboard_arrow_up' : 'keyboard_arrow_down'" /></template></MItem>
+        <MItem action icon="folder_open" :title="t.deviceHub.usb.manualTitle" @click="manualOpen = !manualOpen"><template #trail><MInfo :text="t.deviceHub.usb.exporterHint" /><MIcon :name="manualOpen ? 'keyboard_arrow_up' : 'keyboard_arrow_down'" /></template></MItem>
       </MGroup>
       <form v-if="manualOpen" class="m-usb__discover" @submit.prevent="discover">
         <md-outlined-text-field class="m-usb__host" :label="t.deviceHub.usb.hostPlaceholder" :value="remote" autocomplete="off" :disabled="!status.ready || discovering" @input="remote = $event.target.value" />
@@ -33,7 +33,7 @@
 </template>
 
 <script setup>
-import { MSection, MGroup, MItem, MNotice, MButton, MIcon, MChip, MEmpty } from 'foundation-ui/vue'
+import { MSection, MGroup, MItem, MNotice, MButton, MIcon, MInfo, MChip, MEmpty } from 'foundation-ui/vue'
 import { computed, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { usbip } from '../../tauri-adapter.js'

@@ -28,7 +28,7 @@
     <MBanner v-if="!loadError && status.fallback_reason" tone="info" icon="info"><b>{{ text.fallback }}</b><br>{{ text.fallbackReason.replace('{reason}', errorText(status.fallback_reason)) }}</MBanner>
     <MBanner v-if="!loadError && problemCode" tone="error" icon="error"><b>{{ text.problem }}</b><br>{{ errorText(problemCode) }}</MBanner>
 
-    <MSection :title="text.backend">
+    <MSection>
       <MGroup>
         <MItem icon="tune" :title="text.backend" :text="text.backendHints[backendChoice]" stack>
           <template #control>
@@ -38,17 +38,12 @@
       </MGroup>
     </MSection>
 
-    <MSection :title="t.deviceHub.tabs.microphone">
-      <MGroup>
-        <MItem icon="graphic_eq" :title="text.activeBackend" :text="status.active_backend ? text.backends[status.active_backend] || status.active_backend : text.noneActive" />
-        <MItem icon="extension" :title="text.component" :text="status.component_available ? text.componentReady : text.componentMissing">
-          <template #trail><MChip :tone="status.component_available ? 'ok' : 'warn'" :icon="status.component_available ? 'check_circle' : 'warning'">{{ status.component_available ? text.componentReady : text.componentMissing }}</MChip></template>
-        </MItem>
-              </MGroup>
+    <MSection>
+      <MStatusPills :items="pills" :label="t.deviceHub.tabs.microphone" />
       <MFooter>{{ text.defaultsNote }}</MFooter>
     </MSection>
 
-    <MSection v-if="!loadError && (usesUsbip || status.device_created)" :title="text.diagnostics">
+    <MSection v-if="!loadError && (usesUsbip || status.device_created)">
       <MGroup>
         <MItem action :icon="diagnosticsOpen ? 'keyboard_arrow_up' : 'keyboard_arrow_down'" :title="text.diagnostics" :text="diagnosticsOpen ? '' : text.device + ' · ' + text.buffer" @click="diagnosticsOpen = !diagnosticsOpen" />
         <template v-if="diagnosticsOpen">
@@ -64,7 +59,7 @@
 <script setup>
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import { MPage, MSection, MGroup, MItem, MChip, MStatusPill, MBanner, MFooter, MSeg, MNotice, MButton, MIconButton, MSkeleton, MIcon, MProgress } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MChip, MStatusPill, MBanner, MFooter, MSeg, MNotice, MButton, MIconButton, MSkeleton, MIcon, MProgress, MStatusPills } from 'foundation-ui/vue'
 import { virtualMicrophone } from '../../tauri-adapter.js'
 import { micStatusChannel } from '../../composables/deviceStatusStore.js'
 import {
@@ -195,4 +190,10 @@ const diagnostics = computed(() => [
   [text.value.underruns, status.underruns], [text.value.droppedFrames, status.dropped_frames], [text.value.submitErrors, status.submit_errors],
 ])
 const onBackend = (value) => { backendChoice.value = value; saveBackend(value) }
+
+// the backend in use and the component as labelled pills (what used to be two text rows)
+const pills = computed(() => [
+  { id: 'backend', icon: 'graphic_eq', label: text.value.activeBackend, value: status.active_backend ? text.value.backends[status.active_backend] || status.active_backend : text.value.noneActive, tone: status.active_backend ? 'live' : 'off' },
+  { id: 'component', icon: status.component_available ? 'check_circle' : 'warning', label: text.value.component, value: status.component_available ? text.value.componentReady : text.value.componentMissing, tone: status.component_available ? 'ok' : 'warn' },
+])
 </script>

@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, unref } from 'vue'
 import { MButton, MDialog, MExpertItem, MFooter, MGroup, MIcon, MIconButton, MItem, MPathItem, MSection, MSeg, MSheet, MSnackbar, MSwitchItem, MSwitch, useAppearance } from 'foundation-ui/vue'
 import { useI18n } from '../../desktop/i18n/index.js'
 import { defaultDesktopSettings, desktopSettings, loadDesktopSettings, saveDesktopSettings } from '../../desktop/composables/useDesktopSettings.js'
@@ -21,6 +21,9 @@ const hasTauri = ref(false)
 const notice = ref('')
 const sheet = ref('')
 const open = (id) => { sheet.value = id }
+// how many switches of a group are on, for the row that opens it (`{n} / {total}`)
+const onCount = (rows, source) => { const o = unref(source) || {}; return `${rows.filter(([key]) => Boolean(o[key])).length} / ${rows.length}` }
+const bigOn = computed(() => bigScreen.value.filter(([key]) => Boolean(unref(bigScreenSettings)?.[key])).length + (autoLaunchDesktop.value ? 1 : 0))
 const closeSheet = (value) => { if (!value) sheet.value = '' }
 
 onMounted(async () => {
@@ -163,21 +166,11 @@ const resetAll = async () => {
     </MGroup>
     <input ref="picker" type="file" accept="application/json,.json" hidden @change="importAppearance" />
   </MSection>
-  <MSection :title="st.startup">
+  <MSection>
     <MGroup>
-      <MSwitchItem v-for="[key, name, info] in startup" :key="key" :model-value="Boolean(settings[key])" :title="name" :info="info" :data-panel-option="key" @update:model-value="set(key, $event)" />
-    </MGroup>
-  </MSection>
-  <MSection :title="st.notifications">
-    <MGroup>
-      <MSwitchItem v-for="[key, name, info] in notifications" :key="key" :model-value="Boolean(settings[key])" :title="name" :info="info" :disabled="key === 'connectionNotify' && !settings.notifications" :data-panel-option="key" @update:model-value="set(key, $event)" />
-    </MGroup>
-  </MSection>
-  <MSection :title="st.bigScreen">
-    <MGroup>
- 
-      <MSwitchItem :model-value="autoLaunchDesktop" :title="t.stream.autoLaunchDesktopUI" :info="t.stream.autoLaunchDesktopUIDesc" data-panel-option="autoLaunchDesktop" @update:model-value="setDesktopLaunch" />
-      <MSwitchItem v-for="[key, name, info] in bigScreen" :key="key" :model-value="Boolean(bigScreenSettings[key])" :title="name" :info="info" :data-panel-option="key" @update:model-value="setBigScreenSetting(key, $event)" />
+      <MItem action icon="power_settings_new" :title="st.startup" data-panel-option="startup" @click="open('startup')"><template #trail><span class="m-item__count">{{ onCount(startup, settings) }}</span></template></MItem>
+      <MItem action icon="notifications" :title="st.notifications" data-panel-option="notifications" @click="open('notifications')"><template #trail><span class="m-item__count">{{ onCount(notifications, settings) }}</span></template></MItem>
+      <MItem action icon="tv_gen" :title="st.bigScreen" data-panel-option="bigScreen" @click="open('bigscreen')"><template #trail><span class="m-item__count">{{ bigOn }} / {{ bigScreen.length + 1 }}</span></template></MItem>
     </MGroup>
   </MSection>
   <MSection>
@@ -188,6 +181,23 @@ const resetAll = async () => {
       <MItem action icon="tune" :title="st.advanced" data-panel-option="advanced" @click="open('expert')" />
     </MGroup>
   </MSection>
+
+  <MSheet :model-value="sheet === 'startup'" :title="st.startup" side="end" :close-label="fs.close" @update:model-value="closeSheet">
+    <MGroup>
+      <MSwitchItem v-for="[key, name, info] in startup" :key="key" :model-value="Boolean(settings[key])" :title="name" :info="info" :data-panel-option="key" @update:model-value="set(key, $event)" />
+    </MGroup>
+  </MSheet>
+  <MSheet :model-value="sheet === 'notifications'" :title="st.notifications" side="end" :close-label="fs.close" @update:model-value="closeSheet">
+    <MGroup>
+      <MSwitchItem v-for="[key, name, info] in notifications" :key="key" :model-value="Boolean(settings[key])" :title="name" :info="info" :disabled="key === 'connectionNotify' && !settings.notifications" :data-panel-option="key" @update:model-value="set(key, $event)" />
+    </MGroup>
+  </MSheet>
+  <MSheet :model-value="sheet === 'bigscreen'" :title="st.bigScreen" side="end" :close-label="fs.close" @update:model-value="closeSheet">
+    <MGroup>
+      <MSwitchItem :model-value="autoLaunchDesktop" :title="t.stream.autoLaunchDesktopUI" :info="t.stream.autoLaunchDesktopUIDesc" data-panel-option="autoLaunchDesktop" @update:model-value="setDesktopLaunch" />
+      <MSwitchItem v-for="[key, name, info] in bigScreen" :key="key" :model-value="Boolean(bigScreenSettings[key])" :title="name" :info="info" :data-panel-option="key" @update:model-value="setBigScreenSetting(key, $event)" />
+    </MGroup>
+  </MSheet>
 
   <MSheet :model-value="sheet === 'helpers'" :title="st.launchAssistant" side="end" :close-label="fs.close" @update:model-value="closeSheet">
     <p class="m-panel-opt__lead">{{ st.launchAssistantDesc }}</p>
