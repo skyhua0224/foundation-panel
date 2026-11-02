@@ -41,7 +41,6 @@
       <!-- Overview -->
       <template v-if="activeSection === 'overview'">
         <MStatusPill icon="desktop_windows" :label="vddStatusLabel" tone="ok" :action="false" />
-        <div class="m-vdd-badges"><MChip v-for="badge in capabilityBadges" :key="badge.key" :tone="badge.tone === 'success' ? 'ok' : badge.tone === 'warning' ? 'warn' : 'info'">{{ badge.text }} · {{ badge.sub }}</MChip></div>
         <div class="m-tiles m-tiles--static">
           <MTile v-for="card in overviewCards" :key="card.key" :title="card.label" :size="'1x1'">
             <span class="m-num m-num--sm">{{ card.value }}</span>
@@ -90,7 +89,7 @@
                 </div>
               </template>
             </MItem>
-            <MFieldItem v-model="gpuFriendlyName" :label="t.vddSettings.gpuBinding" :placeholder="t.vddSettings.gpuPlaceholder" @change="saveGpuEdit" @keyup.enter="saveGpuEdit" />
+            <MFieldItem v-if="!gpuOptions.length" v-model="gpuFriendlyName" :label="t.vddSettings.gpuBinding" :placeholder="t.vddSettings.gpuPlaceholder" @change="saveGpuEdit" @keyup.enter="saveGpuEdit" />
             <MChoiceItem v-if="gpuOptions.length" :model-value="gpuFriendlyName" icon="developer_board" :title="t.vddSettings.gpuBinding" :options="gpuOptions.map((g) => ({ value: g, label: g }))" :cancel-label="t.common.cancel" @update:model-value="(v) => { gpuFriendlyName = v; saveGpuEdit() }" />
             <MItem icon="monitor" :title="t.vddSettings.monitorCount" :text="t.vddSettings.monitorCountTip" :value="String(settings.monitors.count)" />
             <MSwitchItem v-model="settings.edid.Vrr" icon="sync" :title="t.vddSettings.vrr" :text="t.vddSettings.vrrTip" />
@@ -209,12 +208,6 @@ const suggestedRefreshRates = ['60', '120', '144', '240']
 const RESOLUTION_PATTERN = /^\d+x\d+$/
 const REFRESH_RATE_PATTERN = /^\d+(\.\d+)?$/
 const CHINESE_PATTERN = /[\u4e00-\u9fa5]/
-const capabilityBadges = [
-  { key: 'hdr', tone: 'hdr', text: 'HDR', sub: 'dynamic range' },
-  { key: 'resolution', tone: 'resolution', text: '4K', sub: 'ultra hd' },
-  { key: 'refresh', tone: 'refresh', text: '240Hz', sub: 'high refresh' },
-  { key: 'sync', tone: 'sync', text: 'VRR', sub: 'adaptive sync' },
-]
 const COLOR_DEPTH_DEFAULT = 'default'
 const COLOR_DEPTH_SDR10 = 'sdr10'
 const COLOR_DEPTH_HDR12 = 'hdr12'
@@ -249,7 +242,8 @@ const createInitialSettings = () => ({
 })
 
 const getErrorMessage = (error, fallback = '') => {
-  if (error instanceof Error && error.message) {
+  // the browser's own network failures ("Failed to fetch") are not wording for a person: the page's own sentence says what happened
+  if (error instanceof Error && error.message && !(error instanceof TypeError && /fetch|network|load failed/i.test(error.message))) {
     return error.message
   }
 

@@ -52,17 +52,20 @@
       </MSection>
     </template>
     <template v-else>
-      <MPromo :title="aboutText.title" text="Foundation Sunshine" icon="info" tone="tertiary" @click="emit('open-about')" />
-      <MPromo :title="guide.guide" :text="guide.helpRow" icon="rocket_launch" tone="secondary" @click="emit('open-guide')" />
-      <MPromo :title="t.sidebar.clientDownloads" text="Moonlight / VoidLink" icon="download" @click="emit('webui-navigate', '/downloads')" />
-      <MPromo :title="t.m3e.home.sponsor" :text="t.m3e.home.sponsorTitle" icon="favorite" tone="primary" @click="sponsorOpen = true" />
       <MSection>
         <MGroup>
-          <MItem action icon="public" :title="t.sidebar.officialWebsite" text="AlkaidLab" @click="actions.openUrl('https://www.alkaidlab.com/')"><template #trail><MIcon name="open_in_new" /></template></MItem>
+          <MItem action icon="info" :title="aboutText.title" :text="'Foundation Sunshine ' + currentVersion" @click="emit('open-about')" />
+          <MItem action icon="rocket_launch" :title="guide.guide" :text="guide.helpRow" @click="emit('open-guide')" />
           <MItem action icon="checklist" :title="startText.guideTitle" :text="startText.guideSub" @click="startCard.reopen()" />
-          <MItem action icon="bug_report" :title="t.sidebar.diagnostics" :text="t.sidebar.diagnosticsDescription" @click="emit('webui-navigate', '/troubleshooting')" />
         </MGroup>
-        <MFooter>Foundation Sunshine · {{ currentVersion }}</MFooter>
+      </MSection>
+      <MSection>
+        <MGroup>
+          <MItem action icon="download" :title="t.sidebar.clientDownloads" @click="emit('webui-navigate', '/downloads')" />
+          <MItem action icon="bug_report" :title="t.sidebar.diagnostics" @click="emit('webui-navigate', '/troubleshooting')" />
+          <MItem action icon="public" :title="t.sidebar.officialWebsite" @click="actions.openUrl('https://www.alkaidlab.com/')"><template #trail><MIcon name="open_in_new" /></template></MItem>
+          <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="sponsorOpen = true" />
+        </MGroup>
       </MSection>
       <MSheet v-model="sponsorOpen" :title="t.m3e.home.sponsorTitle" side="end" :close-label="t.m3e.home.done">
         <MGroup>
@@ -75,7 +78,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MPromo, MFooter, MSheet, aboutTexts, guideTexts, homeTexts, useGuideCard } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFooter, MSheet, aboutTexts, guideTexts, homeTexts, useGuideCard } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import PanelOptions from './m3e/PanelOptions.vue'
