@@ -1,7 +1,11 @@
 <template>
   <MPage :title="heading.title">
     <template v-if="page === ROUTES.PANEL_SETTINGS">
-      <MSection :title="locale && String(locale).startsWith('zh') ? '个性化' : 'Personalise'"><MAppearance :locale="locale" /></MSection>
+      <MSection>
+        <MGroup>
+          <MItem action icon="palette" :title="locale && String(locale).startsWith('zh') ? '个性化' : 'Personalise'" @click="emit('open-appearance')" />
+        </MGroup>
+      </MSection>
       <MSection :title="t.sidebar.language">
         <MGroup>
           <MItem icon="language" :title="t.sidebar.language" stack>
@@ -71,7 +75,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MPromo, MFooter, MSheet, aboutTexts, guideTexts, homeTexts, useGuideCard, MAppearance } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MPromo, MFooter, MSheet, aboutTexts, guideTexts, homeTexts, useGuideCard } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import PanelOptions from './m3e/PanelOptions.vue'
@@ -87,7 +91,7 @@ const props = defineProps({
   isAdmin: Boolean,
   actions: { type: Object, required: true },
 })
-const emit = defineEmits(['theme-change', 'locale-change', 'channel-change', 'webui-navigate', 'open-guide', 'open-about'])
+const emit = defineEmits(['theme-change', 'locale-change', 'channel-change', 'webui-navigate', 'open-guide', 'open-about', 'open-appearance'])
 const { t } = useI18n()
 // The guided first run can be opened again from here; its texts come with the package (zh and en)
 const guide = computed(() => guideTexts(props.locale))

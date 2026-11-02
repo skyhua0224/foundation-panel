@@ -65,6 +65,7 @@
           @webui-navigate="openWebUi"
           @open-guide="openWelcome"
           @open-about="router.navigate(ROUTES.ABOUT)"
+          @open-appearance="router.navigate(ROUTES.CFG_APPEARANCE)"
         />
       </template>
       <template #overlay>
