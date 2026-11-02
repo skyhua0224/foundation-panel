@@ -9,7 +9,7 @@
         <MSliderItem v-model="draftOpacity" icon="opacity" :title="text.opacity" :min="35" :max="95" :step="1" :decimals="0" unit="%" size="m" icon-start="brightness_medium" icon-end="brightness_6" :disabled="saving || !loaded" @commit="save({ opacity: draftOpacity })" />
       </MGroup>
       <div class="quality-manager m-quality-preview" aria-hidden="true"><div class="preview-stage">
-        <div class="mini-overlay" :style="{ background: `rgb(14 16 13 / ${draftOpacity / 100})` }">
+        <div class="mini-overlay" :style="{ background: `color-mix(in srgb, var(--md-sys-color-surface-container-highest) ${draftOpacity}%, transparent)` }">
           <header><Rank aria-hidden="true" /><i aria-hidden="true" /> DLSS NR <ArrowUp aria-hidden="true" /></header>
           <div class="mini-body">
             <div>{{ text.enhancement }}<span class="mini-toggle" /></div>
@@ -18,9 +18,14 @@
           </div>
         </div>
       </div></div>
+      <MSection :title="text.keys">
+        <MGroup>
+          <MItem action icon="visibility" :title="text.visibilityKey" @click="open('keys')"><template #trail><kbd class="m-quality-kbd">{{ displayShortcut(settings.overlayShortcut) || text.unset }}</kbd></template></MItem>
+          <MItem action icon="wand_stars" :title="text.nrKey" @click="open('keys')"><template #trail><kbd class="m-quality-kbd">{{ nrShortcutLabel(registration) || text.unset }}</kbd></template></MItem>
+        </MGroup>
+      </MSection>
       <MGroup>
-        <MItem action icon="cast_connected" :title="text.session" :value="pipelines.length ? `${text.stream} #${pipelines[0].id}` : text.noSession" @click="open('session')" />
-        <MItem action icon="keyboard" :title="text.keys" @click="open('keys')" />
+        <MItem action icon="cast_connected" :title="text.session" :text="pipelines.length ? `${text.stream} #${pipelines[0].id}` : text.noSession" @click="open('session')" />
         <MItem action icon="extension" :title="text.components" @click="open('components')" />
       </MGroup>
       <MFooter>{{ saved ? text.saved : text.local }}</MFooter>
@@ -294,7 +299,15 @@ onUnmounted(() => {
 
 <style src="../styles/EnhancementManager.css"></style>
 <style>
-.m-quality-preview { margin: 4px 0; border-radius: 28px; overflow: hidden; }
+.m-quality-preview { margin: 4px 0; padding: 0; width: 100%; max-width: none; border-radius: 28px; overflow: hidden; }
 .m-quality-preview svg { width: 14px; height: 14px; flex: none; }
-.m-quality-preview .preview-stage { min-height: 0; }
+/* the preview is drawn in the colours of the theme (the real overlay is dark over a game; here it is a sketch of its parts) */
+.m-quality-preview .preview-stage { min-height: 0; height: auto; padding: 20px; border-radius: 28px; width: 100%; background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); }
+.m-quality-preview .mini-overlay { width: min(100%, 380px); border: 0; border-radius: 16px; color: var(--md-sys-color-on-surface); box-shadow: 0 1px 2px color-mix(in srgb, var(--md-sys-color-shadow) 18%, transparent); }
+.m-quality-preview .mini-overlay header { border-bottom-color: var(--md-sys-color-outline-variant); }
+.m-quality-preview .mini-overlay header i { background: var(--md-sys-color-primary); border-radius: 50%; }
+.m-quality-preview .mini-body p { color: var(--md-sys-color-on-surface-variant); }
+.m-quality-preview .mini-body footer { border-top-color: var(--md-sys-color-outline-variant); }
+.m-quality-preview .mini-toggle { border: 0; border-radius: 9999px; background: var(--md-sys-color-primary); width: 32px; height: 18px; }
+.m-quality-kbd { padding: 4px 10px; border-radius: 8px; background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface); font: 12px/16px ui-monospace, 'Cascadia Mono', Consolas, monospace; }
 </style>

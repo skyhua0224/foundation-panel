@@ -348,6 +348,7 @@ const onFrameMessage = (event) => {
   // DualSense transport that only the panel reads
   else if (data?.type === 'foundation-open' && data.page === 'controller-test') openGamepadTest()
   else if (data?.type === 'foundation-open' && data.page === 'components') router.navigate(ROUTES.COMPONENTS)
+  else if (data?.type === 'foundation-open' && data.page === 'hdr-enhanced') router.navigate(ROUTES.HDR_ENHANCED)
   else if (data?.type === 'foundation-ds5-status-request') pushDs5Status()}
 onMounted(() => { window.addEventListener('message', onFrameMessage); loadHostData(); componentStatus.start(60000) })
 onBeforeUnmount(() => { window.removeEventListener('message', onFrameMessage); componentStatus.stop() })
