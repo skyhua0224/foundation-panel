@@ -1,28 +1,42 @@
 <template>
-  <MPage :title="current === 'config' ? t.aiAssistant.modelConfig : t.aiAssistant.title" :back="!!current" :back-label="t.m3e.back" @back="back">
+  <MPage :title="pageTitle" :back="!!current" :back-label="t.m3e.back" @back="back">
     <template #actions>
       <MIconButton v-if="!current && chatHistory.length" icon="delete" :label="t.aiAssistant.clearHistory" @click="clearHistory" />
       <MIconButton v-if="!current" icon="settings" :label="t.aiAssistant.modelConfig" @click="open('config')" />
     </template>
 
-    <!-- Model configuration: master switch, then the connection -->
+    <!-- Settings: a short page (switch and three rows), the connection and the model are pages of their own -->
     <template v-if="current === 'config'">
       <MMasterSwitch v-model="config.enabled" :title="t.aiAssistant.title" :text="config.enabled ? t.aiAssistant.enabled : t.aiAssistant.disabled" :disabled="isClearingApiKey" @update:model-value="saveConfig(false)" />
       <MGroup>
         <MChoiceItem v-model="config.provider" icon="cloud" :title="t.aiAssistant.provider" :options="providers" :cancel-label="t.common.cancel" @update:model-value="onProviderChange" />
-        <MChoiceItem v-model="config.compatibility" icon="swap_horiz" title="Compatibility" :options="[{ value: 'openai-chat', label: 'OpenAI Chat Completions' }, { value: 'anthropic-messages', label: 'Anthropic Messages' }]" :cancel-label="t.common.cancel" />
-        <MFieldItem v-model="config.apiBase" :label="t.aiAssistant.apiUrl" placeholder="https://api.openai.com/v1" />
-        <MFieldItem v-model="config.apiKey" type="password" :label="t.aiAssistant.apiKey" :placeholder="config.apiKeyConfigured ? '••••••••' : 'sk-...'" :supporting="t.aiAssistant.apiKeyHint" />
-        <MItem v-if="config.apiKeyConfigured" action icon="delete" :title="t.aiAssistant.clearApiKey" :disabled="isClearingApiKey" @click="clearApiKey" />
-        <MFieldItem v-model="config.model" :label="t.aiAssistant.model" :placeholder="t.aiAssistant.modelPlaceholder" :supporting="t.aiAssistant.modelHint" />
-        <MChoiceItem v-if="availableModels.length" :model-value="config.model" icon="list" :title="t.aiAssistant.availableModels" :options="availableModels.map((m) => ({ value: m, label: m }))" :cancel-label="t.common.cancel" @update:model-value="(v) => (config.model = v)" />
-        <MItem action icon="refresh" :title="t.aiAssistant.fetchModels" :disabled="isFetchingModels" @click="fetchRemoteModels" />
+        <MItem action icon="link" :title="labels.connection" :text="connectionLine" @click="open('connection')" />
+        <MItem action icon="neurology" :title="t.aiAssistant.model" :text="config.model || t.aiAssistant.modelPlaceholder" @click="open('model')" />
       </MGroup>
       <div class="m-actions-row">
         <MButton icon="wifi" :loading="isLoading" @click="testConnection">{{ t.aiAssistant.testConnection }}</MButton>
         <MButton variant="tonal" icon="save" :disabled="isClearingApiKey" @click="saveConfig()">{{ t.aiAssistant.saveConfig }}</MButton>
         <MChip v-if="isConnected" tone="ok" icon="check_circle">{{ t.aiAssistant.connected }}</MChip>
       </div>
+    </template>
+
+    <template v-else-if="current === 'connection'">
+      <MGroup>
+        <MFieldItem v-model="config.apiBase" :label="t.aiAssistant.apiUrl" placeholder="https://api.openai.com/v1" />
+        <MFieldItem v-model="config.apiKey" type="password" :label="t.aiAssistant.apiKey" :placeholder="config.apiKeyConfigured ? '••••••••' : 'sk-...'" :supporting="t.aiAssistant.apiKeyHint" />
+        <MChoiceItem v-model="config.compatibility" icon="swap_horiz" title="Compatibility" :options="[{ value: 'openai-chat', label: 'OpenAI Chat Completions' }, { value: 'anthropic-messages', label: 'Anthropic Messages' }]" :cancel-label="t.common.cancel" />
+        <MItem v-if="config.apiKeyConfigured" action icon="delete" :title="t.aiAssistant.clearApiKey" :disabled="isClearingApiKey" @click="clearApiKey" />
+      </MGroup>
+      <div class="m-actions-row"><MButton variant="tonal" icon="save" :disabled="isClearingApiKey" @click="saveConfig()">{{ t.aiAssistant.saveConfig }}</MButton></div>
+    </template>
+
+    <template v-else-if="current === 'model'">
+      <MGroup>
+        <MFieldItem v-model="config.model" :label="t.aiAssistant.model" :placeholder="t.aiAssistant.modelPlaceholder" :supporting="t.aiAssistant.modelHint" />
+        <MChoiceItem v-if="availableModels.length" :model-value="config.model" icon="list" :title="t.aiAssistant.availableModels" :options="availableModels.map((m) => ({ value: m, label: m }))" :cancel-label="t.common.cancel" @update:model-value="(v) => { config.model = v }" />
+        <MItem action icon="refresh" :title="t.aiAssistant.fetchModels" :disabled="isFetchingModels" @click="fetchRemoteModels" />
+      </MGroup>
+      <div class="m-actions-row"><MButton variant="tonal" icon="save" @click="saveConfig()">{{ t.aiAssistant.saveConfig }}</MButton></div>
     </template>
 
     <!-- Chat -->
@@ -69,7 +83,7 @@ import { MPage, MGroup, MItem, MChoiceItem, MFieldItem, MMasterSwitch, MStatusPi
 import { useAiAssistant, AI_PROVIDERS } from '../composables/useAiAssistant.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const {
   config,
@@ -96,7 +110,14 @@ const providers = AI_PROVIDERS
 const chatContainer = ref(null)
 const chatInput = ref(null)
 const { current, open, back } = useSubpage('ai')
-onMounted(() => { if (needsConfiguration.value && !current.value) open('config') })
+// the chat page opens first; a banner on it leads to the settings when the assistant is not set up yet
+const labels = computed(() => (/^zh/i.test(String(locale.value)) ? { connection: '连接' } : { connection: 'Connection' }))
+const connectionLine = computed(() => {
+  let host = ''
+  try { host = new URL(config.apiBase).host } catch { host = config.apiBase || '' }
+  return [host, config.apiKeyConfigured ? '••••' : ''].filter(Boolean).join(' · ') || '—'
+})
+const pageTitle = computed(() => ({ config: t.value.aiAssistant.modelConfig, connection: labels.value.connection, model: t.value.aiAssistant.model }[current.value] || t.value.aiAssistant.title))
 const markdown = new MarkdownIt({
   breaks: true,
   html: false,
