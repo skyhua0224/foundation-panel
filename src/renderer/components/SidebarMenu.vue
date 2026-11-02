@@ -102,7 +102,7 @@
 
 <script setup>
 import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
-import { sunshine, openExternalUrl } from '../tauri-adapter.js'
+import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import { MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
@@ -206,8 +206,8 @@ const probeHost = async () => {
 }
 const hostConn = useHostConnection({
   probe: probeHost,
-  restartService: () => sunshine.restartSunshineService(),
-  restartUser: () => sunshine.restartSunshineInUserMode(),
+  restartService: () => tools.restartSunshineService(),
+  restartUser: () => tools.restartSunshineInUserMode(),
   onRecovered: () => { for (const frame of document.querySelectorAll('iframe')) { const src = frame.src; frame.src = src } },
 })
 const NEEDS_NO_HOST = new Set([ROUTES.PANEL_SETTINGS, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
