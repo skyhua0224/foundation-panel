@@ -2,6 +2,10 @@
 //! be UTF-8. A console program on a Chinese Windows writes GBK; keep valid
 //! UTF-8 as it is and convert the rest from the Windows OEM code page before
 //! it reaches a panel log line, the log file or an export.
+//!
+//! Sources: panel-ms-multibytetowidechar-20261102 (CP_ACP, CP_OEMCP and
+//! MB_ERR_INVALID_CHARS) and panel-ms-code-page-identifiers-20261102 (65001
+//! and 936); the viewer's GB18030 fallback is panel-whatwg-encoding-20261102.
 
 #[cfg(target_os = "windows")]
 use windows::Win32::Globalization::{
