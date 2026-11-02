@@ -333,7 +333,7 @@ defineExpose({
 <style lang="less">
 .panel-shell { position: relative; height: 100vh; height: 100dvh; min-height: 0; overflow: clip; }
 .panel-caption { position: absolute; top: 0; left: var(--m-rail-w, 0px); right: 0; z-index: 40; transition: left var(--m-spring-default-spatial-duration, .4s) var(--m-spring-default-spatial, ease); display: flex; align-items: stretch; justify-content: space-between; height: 40px; background: transparent; user-select: none; }
-.panel-caption__title { align-self: center; padding-inline-start: 16px; font: 600 12px/1 var(--md-ref-typeface-brand); letter-spacing: .02em; color: var(--md-sys-color-on-surface-variant); }
+.panel-caption__title { align-self: center; padding-inline-start: 16px; font: 600 12px/1 var(--md-ref-typeface-brand); letter-spacing: .02em; color: var(--md-sys-color-on-surface); }
 .panel-caption__controls { display: flex; }
 .panel-caption__btn { display: grid; place-items: center; width: 46px; height: 40px; padding: 0; border: 0; background: transparent; color: var(--md-sys-color-on-surface); font-size: 18px; cursor: default; transition: background-color 120ms linear, color 120ms linear; }
 .panel-caption__btn:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 9%, transparent); }
