@@ -1,11 +1,11 @@
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
-import { buildCatalogue, buildCatalogueDetails, createHistory, saveSettingKey } from 'foundation-ui/vue'
+import { buildCatalogue, buildCatalogueDetails, createHistory, createHttpVddAdapter, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
 import { usePanelHome } from '../composables/usePanelHome.js'
 import { useGamepadType } from '../composables/useGamepadType.js'
 import { SPONSORS } from '../config/sponsors.js'
-import { openExternalUrl, virtualMicrophone } from '../tauri-adapter.js'
+import { openExternalUrl, vdd as vddApi, virtualMicrophone } from '../tauri-adapter.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
 const props = defineProps({
@@ -91,16 +91,35 @@ const model = computed(() => {
 const history = createHistory(localStorage, 'foundation-ui.history.panel-home')
 const historyTick = ref(0)
 watch(session, (s) => { if (history.observe(s ? { ...s, fpsMeasured: perfSession.value?.frame_rates?.encoded?.fps, latencyP95Ms: perfSession.value?.host_latency?.p95_ms } : null)) historyTick.value += 1 }, { immediate: true })
+// one sample of every live number every three seconds, kept for an hour (the sheets' time ranges read it)
+const SAMPLE_SEC = 3
+const sampleAll = () => {
+  const s = session.value, p = perfSession.value
+  history.sample('cpu', state.sys.cpu); history.sample('gpu', state.sys.gpu)
+  if (state.memory?.system_total_memory) history.sample('mem', ((state.memory.system_total_memory - (state.memory.system_available_memory || 0)) / state.memory.system_total_memory) * 100)
+  if (s) { history.sample('bitrate', s.bitrate); history.sample('fps', p?.frame_rates?.encoded?.fps ?? s.fps); history.sample('latency', p?.host_latency?.avg_ms); history.sample('loss', s.packet_loss); history.sample('dropped', s.dropped_frames) } else for (const k of ['bitrate', 'fps', 'latency', 'loss', 'dropped']) history.clear(k)
+  historyTick.value += 1
+}
+let sampler = 0
+onMounted(() => { sampleAll(); sampler = setInterval(sampleAll, SAMPLE_SEC * 1000) })
+onBeforeUnmount(() => clearInterval(sampler))
+// the shared virtual display control: the same store the settings use, here over the host API through the proxy and the tray commands
+const vddAdapter = createHttpVddAdapter({
+  fetchJson: async (path, init) => (await fetch(`${proxyUrl.value}${path}`, init)).json(),
+  setProtected: async (key, on) => { const r = key === 'vdd_keep_enabled' ? await vddApi.setKeepEnabled(on) : await vddApi.setHeadlessCreateEnabled(on); if (r && r.success === false) throw new Error(r.error || 'failed') },
+  status: async () => vddStatusOf(state.vdd),
+})
+const vddStore = createVddStore(vddAdapter, { autosave: true })
+onMounted(async () => { try { await vddAdapter.load() } catch { /* the card then shows the defaults */ } vddStore.refresh() })
 const catalogueInput = computed(() => {
   void historyTick.value
   const s = session.value
   const p = perfSession.value
-  const series = state.series
   return {
-    series: { bitrate: series.bitrate, fps: series.fps, latency: series.latency },
+    sampleSec: SAMPLE_SEC, vddStore: state.vdd && state.vdd.installed !== false ? vddStore : null,
     host: { version: state.version, update: props.updateAvailable ? h.value.update : '' },
     session: s ? { ...s, fpsMeasured: p?.frame_rates?.encoded?.fps, latencyMs: p?.host_latency?.avg_ms, latencyP95Ms: p?.host_latency?.p95_ms, uptimeMs: p?.uptime_ms ?? s.uptimeMs } : null,
-    history: { samples: { cpu: series.cpu, gpu: series.gpu, mem: series.memory.map((v) => v * 100), latency: series.latency, loss: series.loss, dropped: series.dropped }, sessions: history.sessions, days: history.days, last: () => history.last() },
+    history: { samples: history.samples, sessions: history.sessions, days: history.days, last: () => history.last() },
     sys: model.value.info.some((i) => i.id === 'memory') && state.memory ? { memTotal: state.memory.system_total_memory, memAvail: state.memory.system_available_memory } : null,
     config: state.config, logText: state.logText, logs: state.errorLog, clients: state.clients ? state.clients.map((c) => ({ ...c, icon: 'devices' })) : null,
     apps: state.apps ? state.apps.map((a) => ({ id: a.name, name: a.name, cover: coverOf(a) })) : null,
