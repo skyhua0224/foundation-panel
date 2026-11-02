@@ -40,6 +40,7 @@
         <AppearancePage v-else-if="entry.id === ROUTES.CFG_APPEARANCE" />
         <MicrophonePage v-else-if="entry.id === ROUTES.MICROPHONE" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <UsbPage v-else-if="entry.id === ROUTES.USB" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
+        <ComponentStatusPage v-else-if="entry.id === ROUTES.COMPONENT_STATUS" />
         <ComponentsPage v-else-if="entry.id === ROUTES.COMPONENTS" />
         <DiagnosticsPage
           v-else-if="entry.id === ROUTES.DIAGNOSTICS"
@@ -89,7 +90,7 @@
 import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { sunshine, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
-import { MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -104,6 +105,8 @@ import MicrophonePage from './m3e/MicrophonePage.vue'
 import AppearancePage from './m3e/AppearancePage.vue'
 import UsbPage from './m3e/UsbPage.vue'
 import AboutPage from './m3e/AboutPage.vue'
+import ComponentStatusPage from './m3e/ComponentStatusPage.vue'
+import { useComponentStatus } from '../composables/useComponentStatus.js'
 import ComponentsPage from './m3e/ComponentsPage.vue'
 import DiagnosticsPage from './m3e/DiagnosticsPage.vue'
 import { microphoneOverviewState } from '../composables/deviceHubStatus.js'
@@ -161,6 +164,13 @@ const toolsCtx = {
   openStylusInputProbe, cleanupCovers, restartAsAdmin, showClipboardSyncStatus, handleCheckForUpdates,
 }
 const toolsMenuItems = computed(() => createUtilityTools(toolsCtx))
+// the component status: one controller for the page and for the home cards the catalogue offers
+const componentStatus = useComponentStatus({
+  locale,
+  go: { vdd: () => router.navigate(ROUTES.VDD_SETTINGS), components: () => router.navigate(ROUTES.COMPONENTS), microphone: () => router.navigate(ROUTES.MICROPHONE), page: () => router.navigate(ROUTES.COMPONENT_STATUS) },
+  update: () => ({ state: updateInfo.value ? (updateInfo.value.is_latest ? 'latest' : 'available') : '', next: updateInfo.value?.version || '' }),
+  check: () => handleCheckForUpdates(),
+})
 
 const sponsorSections = computed(() => [
   { title: t.value.m3e.home.sponsorTitle, items: SPONSORS.map((x) => ({ id: x.id, icon: 'favorite', title: x.label, url: x.url })) },
@@ -181,7 +191,7 @@ const thanks = useThanks({ guideKey: 'foundation.guide.panel' })
 const thanksStar = () => { actions_openExternal('https://github.com/AlkaidLab/foundation-sunshine'); thanks.dismiss() }
 const thanksSponsor = () => { thanks.dismiss(); router.navigate(ROUTES.ABOUT) }
 const railLabel = (id) => t.value.m3e.nav[id]
-const runtimeView = computed(() => ({ ...runtime, micLabel: micLabel.value }))
+const runtimeView = computed(() => ({ ...runtime, micLabel: micLabel.value, statusTitle: statusTexts(locale.value).title }))
 const micLabel = computed(() => t.value.deviceHub.microphone.statusLabels[microphoneOverviewState(runtime.mic || {})] || '')
 const listItems = (id) => pageItems(t.value, id, runtimeView.value)
 // The stream settings are the shared model (categories in groups with a live line, search of every setting, recently used)
@@ -249,8 +259,8 @@ const onFrameMessage = (event) => {
   // a page of the frame that the panel shows natively (the DualSense tuning, opened from the gamepad rows of 输入)
   else if (data?.type === 'foundation-open' && data.page === 'dualsense') router.navigate(ROUTES.CFG_DUALSENSE)
 }
-onMounted(() => { window.addEventListener('message', onFrameMessage); loadHostData() })
-onBeforeUnmount(() => window.removeEventListener('message', onFrameMessage))
+onMounted(() => { window.addEventListener('message', onFrameMessage); loadHostData(); componentStatus.start(60000) })
+onBeforeUnmount(() => { window.removeEventListener('message', onFrameMessage); componentStatus.stop() })
 const contextMenu = ref(null)
 const onRowContext = (event, item) => {
   const items = [{ id: 'open', label: t.value.m3e.ctx.open, icon: 'open_in_new' }]

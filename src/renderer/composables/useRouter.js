@@ -23,6 +23,7 @@ export const ROUTES = {
   MICROPHONE: 'microphone',
   USB: 'usb',
   COMPONENTS: 'components',
+  COMPONENT_STATUS: 'component-status',
   DIAGNOSTICS: 'diagnostics',
   // Pages of the Web UI shown in the embedded frame
   WEB_CLIENTS: 'web-clients',
@@ -53,6 +54,7 @@ export const PAGES = {
   [ROUTES.USB]: { rail: 'input' },
   [ROUTES.VDD_SETTINGS]: { rail: 'display' },
   [ROUTES.HDR_ENHANCED]: { rail: 'display' },
+  [ROUTES.COMPONENT_STATUS]: { rail: 'system' },
   [ROUTES.COMPONENTS]: { rail: 'system' },
   [ROUTES.DIAGNOSTICS]: { rail: 'system' },
   [ROUTES.AI_ASSISTANT]: { rail: 'system' },

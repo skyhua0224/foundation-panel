@@ -30,6 +30,7 @@ export function pageItems(t, rail, runtime = {}) {
       { id: ROUTES.HDR_ENHANCED, icon: 'wand_stars', tone: 'tertiary', label: c.display.quality },
     ],
     system: [
+      { id: ROUTES.COMPONENT_STATUS, icon: 'monitor_heart', tone: 'success', label: runtime.statusTitle || 'Components' },
       { id: ROUTES.COMPONENTS, icon: 'extension', tone: 'secondary', label: c.system.components },
       { id: ROUTES.DIAGNOSTICS, icon: 'stethoscope', tone: 'warn', label: c.system.diagnostics },
       { id: ROUTES.AI_ASSISTANT, icon: 'smart_toy', tone: 'tertiary', label: c.system.assistant },
