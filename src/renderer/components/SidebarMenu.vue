@@ -41,13 +41,12 @@
         <MicrophonePage v-else-if="entry.id === ROUTES.MICROPHONE" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <UsbPage v-else-if="entry.id === ROUTES.USB" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <ComponentStatusPage v-else-if="entry.id === ROUTES.COMPONENT_STATUS" />
-        <ComponentsPage v-else-if="entry.id === ROUTES.COMPONENTS" />
+        <ToolboxPage v-else-if="entry.id === ROUTES.TOOLBOX" :tools="toolsMenuItems" />
         <DiagnosticsPage
           v-else-if="entry.id === ROUTES.DIAGNOSTICS"
-          :tools="toolsMenuItems"
-          @open-controller-meta="openGamepadTest"
-          @open-stylus-input-probe="openStylusInputProbe"
           @go="goDiagnosticsPlace"
+          @webui-navigate="openWebUi"
+          @open-guide="openWelcome"
         />
         <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" @open-update="showUpdateDialog = true" @open="actions_openExternal" />
         <ControlPanelPage
@@ -91,7 +90,7 @@
 import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { sunshine, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
-import { MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -108,7 +107,7 @@ import UsbPage from './m3e/UsbPage.vue'
 import AboutPage from './m3e/AboutPage.vue'
 import ComponentStatusPage from './m3e/ComponentStatusPage.vue'
 import { useComponentStatus } from '../composables/useComponentStatus.js'
-import ComponentsPage from './m3e/ComponentsPage.vue'
+import ToolboxPage from './m3e/ToolboxPage.vue'
 import DiagnosticsPage from './m3e/DiagnosticsPage.vue'
 import { microphoneOverviewState } from '../composables/deviceHubStatus.js'
 import { useDeviceRuntime } from '../composables/useDeviceRuntime.js'
@@ -192,7 +191,7 @@ const thanks = useThanks({ guideKey: 'foundation.guide.panel' })
 const thanksStar = () => { actions_openExternal('https://github.com/AlkaidLab/foundation-sunshine'); thanks.dismiss() }
 const thanksSponsor = () => { thanks.dismiss(); router.navigate(ROUTES.ABOUT) }
 const railLabel = (id) => t.value.m3e.nav[id]
-const runtimeView = computed(() => ({ ...runtime, micLabel: micLabel.value, statusTitle: statusTexts(locale.value).title }))
+const runtimeView = computed(() => ({ ...runtime, micLabel: micLabel.value, statusTitle: statusTexts(locale.value).title, diagTitle: diagnosticsTexts(locale.value).title }))
 const micLabel = computed(() => t.value.deviceHub.microphone.statusLabels[microphoneOverviewState(runtime.mic || {})] || '')
 const listItems = (id) => pageItems(t.value, id, runtimeView.value)
 // The stream settings are the shared model (categories in groups with a live line, search of every setting, recently used)

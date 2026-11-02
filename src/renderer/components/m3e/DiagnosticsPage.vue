@@ -1,6 +1,6 @@
 <template>
   <MDiagnostics
-    :title="t.m3e.system.diagnostics"
+    :title="diagnosticsTexts(locale).title"
     :text="diag.text.value"
     v-model:live="diag.live.value"
     :facts="diag.facts.value"
@@ -15,35 +15,24 @@
     @go="goPlace"
   >
     <template #actions>
-      <DeviceDiagnosticsPanel @open-controller-meta="emit('open-controller-meta')" @open-stylus-input-probe="emit('open-stylus-input-probe')" />
-      <MSection :title="t.sidebar.toolbox">
-        <MGroup>
-          <MItem v-for="tool in utilityTools" :key="tool.id" action :icon="ICONS[tool.id] || 'build'" :title="tool.label" @click="tool.action()">
-            <template v-if="tool.external" #trail><MIcon name="open_in_new" /></template>
-          </MItem>
-        </MGroup>
-      </MSection>
+      <HostActionsPanel @open-web-page="(path) => emit('webui-navigate', path)" @open-guide="emit('open-guide')" />
     </template>
   </MDiagnostics>
 </template>
 
 <script setup>
-import { computed, onMounted } from 'vue'
-import { MDiagnostics, MSection, MGroup, MItem, MIcon } from 'foundation-ui/vue'
-import DeviceDiagnosticsPanel from '../controllersHub/DeviceDiagnosticsPanel.vue'
+import { onMounted } from 'vue'
+import { MDiagnostics, diagnosticsTexts } from 'foundation-ui/vue'
+import HostActionsPanel from './HostActionsPanel.vue'
 import { useDiagnostics } from '../../composables/useDiagnostics.js'
 import { usbipStatusChannel, dualsenseStatusChannel, micStatusChannel, vigemStatusChannel } from '../../composables/deviceStatusStore.js'
 import { openExternalUrl } from '../../tauri-adapter.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
-// 日志与诊断 of the control panel: the shared page with the panel's own sources. The device diagnostics and the toolbox rows that were
-// here before stay at the top; the error centre, the log viewer, the summary, the bug report and the bundle follow.
-const props = defineProps({ tools: { type: Array, default: () => [] }, route: { type: Object, default: null } })
-const emit = defineEmits(['back', 'open-controller-meta', 'open-stylus-input-probe', 'go'])
+// 日志与诊断 of the control panel, one destination for the old 诊断工具 and 故障诊断: the host actions, the problem summary, the bug report, the
+// bundle and the error centre on one tab, the whole log on the other. The small tools moved to 工具箱.
+const emit = defineEmits(['back', 'go', 'webui-navigate', 'open-guide'])
 const { t, locale } = useI18n()
-// The controller test and the stylus probe are the two cards of the device tools above.
-const utilityTools = computed(() => props.tools.filter((tool) => !['gamepad-test', 'stylus-input-probe'].includes(tool.id)))
-const ICONS = { 'stream-timer': 'timer', 'latency-test': 'speed' }
 
 const data = (r) => (r?.success ? r.data : null)
 const devices = async () => {
@@ -58,7 +47,6 @@ const devices = async () => {
 }
 const diag = useDiagnostics({ devices })
 const openUrl = (url) => { openExternalUrl(url) }
-// where an error leads: the panel pages that hold the cause
 const goPlace = (place) => emit('go', place)
 onMounted(() => { diag.loadFacts(); diag.start() })
 </script>

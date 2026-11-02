@@ -56,6 +56,7 @@ export const PAGES = {
   [ROUTES.HDR_ENHANCED]: { rail: 'display' },
   [ROUTES.COMPONENT_STATUS]: { rail: 'system' },
   [ROUTES.COMPONENTS]: { rail: 'system' },
+  [ROUTES.TOOLBOX]: { rail: 'system' },
   [ROUTES.DIAGNOSTICS]: { rail: 'system' },
   [ROUTES.AI_ASSISTANT]: { rail: 'system' },
   [ROUTES.WEB_TROUBLESHOOTING]: { rail: 'system' },
@@ -65,7 +66,8 @@ export const PAGES = {
 }
 export const RAILS = ['overview', 'stream', 'config', 'input', 'display', 'system', 'settings', 'help']
 
-const ALIAS = { [ROUTES.CONTROLLERS]: ROUTES.GAMEPAD, [ROUTES.TOOLBOX]: ROUTES.DIAGNOSTICS }
+// the old component page is part of the component status page now
+const ALIAS = { [ROUTES.CONTROLLERS]: ROUTES.GAMEPAD, [ROUTES.COMPONENTS]: ROUTES.COMPONENT_STATUS }
 const CATEGORY = { [ROUTES.CAT_CONFIG]: 'config', [ROUTES.CAT_STREAM]: 'stream', [ROUTES.CAT_INPUT]: 'input', [ROUTES.CAT_DISPLAY]: 'display', [ROUTES.CAT_SYSTEM]: 'system' }
 const WEB_PATHS = [
   [/^\/(?:pin|clients)(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_CLIENTS],

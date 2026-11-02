@@ -31,10 +31,9 @@ export function pageItems(t, rail, runtime = {}) {
     ],
     system: [
       { id: ROUTES.COMPONENT_STATUS, icon: 'monitor_heart', tone: 'success', label: runtime.statusTitle || 'Components' },
-      { id: ROUTES.COMPONENTS, icon: 'extension', tone: 'secondary', label: c.system.components },
-      { id: ROUTES.DIAGNOSTICS, icon: 'stethoscope', tone: 'warn', label: c.system.diagnostics },
+      { id: ROUTES.DIAGNOSTICS, icon: 'stethoscope', tone: 'warn', label: runtime.diagTitle || c.system.diagnostics },
+      { id: ROUTES.TOOLBOX, icon: 'build', tone: 'secondary', label: t.sidebar.toolbox },
       { id: ROUTES.AI_ASSISTANT, icon: 'smart_toy', tone: 'tertiary', label: c.system.assistant },
-      { id: ROUTES.WEB_TROUBLESHOOTING, icon: 'bug_report', tone: 'error', label: t.sidebar.diagnostics },
     ],
   }
   return pages[rail] || []

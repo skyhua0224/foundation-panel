@@ -26,6 +26,8 @@ export function useComponentStatus({ locale, go = {}, update = () => ({}), check
   if (controller) return controller
   const open = (fn, label) => ({ run: () => fn?.(), ...(label ? { label } : {}) })
   const both = (fn) => ({ update: open(fn, (T) => T.updateRepair), repair: undefined })
+  // to the maintenance panels under the cards: the page scrolls there once it is open
+  const maintenance = () => { go.components?.(); setTimeout(() => controller?.hooks?.scrollToMaintenance?.(), 350) }
   controller = registerComponentStatus(createComponentStatus({
     locale,
     openPage: go.page,
@@ -50,9 +52,9 @@ export function useComponentStatus({ locale, go = {}, update = () => ({}), check
     },
     actions: {
       vdd: both(go.vdd),
-      usb: both(go.components),
-      dualsense: both(go.components),
-      drivers: both(go.components),
+      usb: both(maintenance),
+      dualsense: both(maintenance),
+      drivers: both(maintenance),
       mic: { open: open(go.microphone) },
       host: { update: open(check) },
     },
