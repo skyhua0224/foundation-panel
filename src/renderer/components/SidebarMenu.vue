@@ -327,7 +327,7 @@ defineExpose({
 </script>
 
 <style lang="less">
-.panel-shell { position: relative; height: 100vh; height: 100dvh; min-height: 0; overflow: hidden; }
+.panel-shell { position: relative; height: 100vh; height: 100dvh; min-height: 0; overflow: clip; }
 .panel-caption { position: absolute; top: 0; left: var(--m-rail-w, 0px); right: 0; z-index: 40; transition: left var(--m-spring-default-spatial-duration, .4s) var(--m-spring-default-spatial, ease); display: flex; align-items: stretch; justify-content: space-between; height: 40px; background: var(--m-page); user-select: none; }
 .panel-caption__title { align-self: center; padding-inline-start: 16px; font: 600 12px/1 var(--md-ref-typeface-brand); letter-spacing: .02em; color: var(--md-sys-color-on-surface-variant); }
 .panel-caption__controls { display: flex; }
@@ -336,6 +336,6 @@ defineExpose({
 .panel-caption__btn:active { background: color-mix(in srgb, var(--md-sys-color-on-surface) 14%, transparent); }
 .panel-caption__btn--close:hover { background: #c42b1c; color: #fff; } .panel-caption__btn--close:active { background: #b02417; color: #fff; }
 .panel-caption__btn:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px; }
-.panel-body { position: absolute; inset: 0; min-height: 0; }
+.panel-body { position: absolute; inset: 0; min-height: 0; overflow: clip; }
 .panel-body > .m-scene { position: absolute; inset: 0; height: auto; }
 </style>
