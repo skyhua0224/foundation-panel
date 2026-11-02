@@ -1,5 +1,5 @@
 <template>
-  <MPage :title="title" :back="!!current" :back-label="t.m3e.back" @back="back">
+  <MPage :title="title" :back="!!current || viaDualsense" :back-label="t.m3e.back" @back="onBack">
     <template #actions>
       <MIconButton v-if="current === 'status'" icon="refresh" :label="tx('refresh')" :disabled="statusLoading" @click="refreshAll" />
       <MOverflow v-if="!current && dsVisible && tuning.snapshot.value" :items="[{ id: 'restore', label: tr('restore_defaults') }]" :label="t.deviceHub.refresh" @select="restoreOpen = true" />
@@ -143,12 +143,18 @@ import { statusRows } from '../../composables/dualsenseStatusView.js'
 import { PRESET_CARDS } from '../../composables/dualsenseTuning.js'
 import { isAdvancedWarningHidden, panelStorage, setAdvancedWarningHidden } from '../../composables/advancedWarning.js'
 import { useI18n } from '../../desktop/i18n/index.js'
+import { useRouter } from '../../composables/useRouter.js'
+import { dualsenseBack, isDualSenseEntry } from '../../composables/gamepadPages.js'
 
 const props = defineProps({ params: { type: Object, default: null } })
 const emit = defineEmits(['back', 'open-controller-meta', 'manage-components'])
 const { t } = useI18n()
 const { tx } = useDualSenseText()
 const { current, open, back } = useSubpage('gamepad')
+const router = useRouter()
+// opened as the DualSense page of the stream settings: the root has a back bubble to 输入
+const viaDualsense = computed(() => isDualSenseEntry(router.nav.current.value))
+const onBack = () => { if (current.value || !viaDualsense.value) { back(); return } const to = dualsenseBack(); router.navigate(to.route, to.params) }
 const gt = useGamepadType()
 const tuning = useDualSenseTuning()
 const { tr } = tuning
