@@ -47,12 +47,11 @@ else
 fi
 
 # 复制图标文件
-SOURCE_ICON="src/main/static/gura.ico"
+SOURCE_ICON="src-tauri/icons/icon.ico"
 DEST_ICON="$ICON_DIR/icon.ico"
 
 if [ -f "$SOURCE_ICON" ]; then
-    cp "$SOURCE_ICON" "$DEST_ICON"
-    echo -e "   ${GREEN}✅ 已复制图标: gura.ico -> icon.ico${NC}"
+    echo -e "   ${GREEN}✅ 图标已存在: icons/icon.ico${NC}"
 elif [ -f "src/assets/sunshine.ico" ]; then
     cp "src/assets/sunshine.ico" "$DEST_ICON"
     echo -e "   ${GREEN}✅ 已复制图标: sunshine.ico -> icon.ico${NC}"

@@ -625,14 +625,14 @@ const onLoad = () => {
   max-width: 180px;
   opacity: 0.85;
   margin-bottom: 24px;
-  animation: gura 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  animation: mascot-bob 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
   position: relative;
   left: -20%;
   transform-style: preserve-3d;
   filter: drop-shadow(0 4px 12px rgba(212, 165, 165, 0.3));
 }
 
-@keyframes gura {
+@keyframes mascot-bob {
   0% {
     transform: translateX(-100%) rotate(-5deg) translateY(-5px) scale(0.9);
   }
@@ -710,7 +710,7 @@ const onLoad = () => {
 }
 
 :global(html[data-bs-theme='light'] .loading-overlay) {
-  background: linear-gradient(135deg, @gura-bg-light 0%, @gura-bg-mid 100%);
+  background: linear-gradient(135deg, @brand-bg-light 0%, @brand-bg-mid 100%);
 }
 
 :global(html[data-bs-theme='light'] .loading-image) {
@@ -718,7 +718,7 @@ const onLoad = () => {
 }
 
 :global(html[data-bs-theme='light'] .loading-text) {
-  color: @gura-blue;
+  color: @brand-blue;
   text-shadow: 1px 1px 3px rgba(74, 158, 255, 0.2);
 }
 
