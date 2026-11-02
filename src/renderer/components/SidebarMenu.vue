@@ -133,6 +133,8 @@ const { minimizeWindow, toggleMaximize, closeWindow } = useWindowControls(isMaxi
 // the shared appearance (wallpaper, colour, light/dark); light/dark goes through the panel's own theme switch
 registerModeHandler((mode) => setTheme(mode))
 onMounted(() => { void useAppearance().init() })
+// the overview has its own (lighter) frost over the wallpaper; every other page the stronger one
+watch(() => router.currentRoute.value, (route) => useAppearance().setScope(route === ROUTES.HOME ? 'home' : 'other'), { immediate: true })
 const { onTouchWindowDragStart } = useTouchWindowDrag(isMaximized)
 const {
   openTimer, openUrl, cleanupCovers, restartAsAdmin, checkForUpdates, openGamepadTest, openStylusInputProbe,
@@ -330,7 +332,7 @@ defineExpose({
 
 <style lang="less">
 .panel-shell { position: relative; height: 100vh; height: 100dvh; min-height: 0; overflow: clip; }
-.panel-caption { position: absolute; top: 0; left: var(--m-rail-w, 0px); right: 0; z-index: 40; transition: left var(--m-spring-default-spatial-duration, .4s) var(--m-spring-default-spatial, ease); display: flex; align-items: stretch; justify-content: space-between; height: 40px; background: var(--m-frame, var(--m-page)); user-select: none; }
+.panel-caption { position: absolute; top: 0; left: var(--m-rail-w, 0px); right: 0; z-index: 40; transition: left var(--m-spring-default-spatial-duration, .4s) var(--m-spring-default-spatial, ease); display: flex; align-items: stretch; justify-content: space-between; height: 40px; background: transparent; user-select: none; }
 .panel-caption__title { align-self: center; padding-inline-start: 16px; font: 600 12px/1 var(--md-ref-typeface-brand); letter-spacing: .02em; color: var(--md-sys-color-on-surface-variant); }
 .panel-caption__controls { display: flex; }
 .panel-caption__btn { display: grid; place-items: center; width: 46px; height: 40px; padding: 0; border: 0; background: transparent; color: var(--md-sys-color-on-surface); font-size: 18px; cursor: default; transition: background-color 120ms linear, color 120ms linear; }
