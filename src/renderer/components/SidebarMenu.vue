@@ -221,6 +221,8 @@ const searchItems = computed(() => [
       const item = pageItems(t.value, PAGES[id].rail, runtimeView.value).find((p) => p.id === id)
       return item ? [{ id, title: item.label, path: railLabel(PAGES[id].rail), icon: item.icon, route: id }] : []
     }),
+  // 米塔 AI is a destination of the rail (no list pane): a result of its own, and one for the settings behind the gear of its chat
+  { id: ROUTES.AI_ASSISTANT, title: t.value.m3e.nav.assistant, path: t.value.m3e.nav.main, icon: 'smart_toy', route: ROUTES.AI_ASSISTANT },
   ...settingsList.searchItems.value,
 ])
 // Where an error of the diagnostics page leads
@@ -248,7 +250,7 @@ const onRail = (item) => {
   if (item.id === 'config') { loadHostData(); openConfig({ tab: 'general' }); router.navigate(ROUTES.CAT_CONFIG); return }
   // the stream rail opens on its first page: the frame has to show it
   if (item.id === 'stream') { emit('webui-navigate', webPathOf(ROUTES.WEB_CLIENTS)); router.navigate(ROUTES.CAT_STREAM); return }
-  router.navigate({ overview: ROUTES.HOME, settings: ROUTES.PANEL_SETTINGS, help: ROUTES.HELP, stream: ROUTES.CAT_STREAM, input: ROUTES.CAT_INPUT, display: ROUTES.CAT_DISPLAY, system: ROUTES.CAT_SYSTEM }[item.id])
+  router.navigate({ overview: ROUTES.HOME, settings: ROUTES.PANEL_SETTINGS, help: ROUTES.HELP, stream: ROUTES.CAT_STREAM, input: ROUTES.CAT_INPUT, display: ROUTES.CAT_DISPLAY, system: ROUTES.CAT_SYSTEM, assistant: ROUTES.AI_ASSISTANT }[item.id])
 }
 // the search of the settings from anywhere: open the list that has the field, then put the cursor in it
 const openSearch = () => {

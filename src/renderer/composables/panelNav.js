@@ -6,8 +6,10 @@ import { ROUTES, RAILS } from './useRouter.js'
  */
 export function railItems(t) {
   const n = t.m3e.nav
-  const icons = { overview: 'home', stream: 'cast_connected', config: 'tune', input: 'sports_esports', display: 'desktop_windows', system: 'build', settings: 'settings', help: 'help' }
-  return RAILS.map((id) => ({ id, icon: icons[id], label: n[id] }))
+  const icons = { overview: 'home', stream: 'cast_connected', config: 'tune', input: 'sports_esports', display: 'desktop_windows', system: 'build', assistant: 'smart_toy', settings: 'settings', help: 'help' }
+  // 米塔 AI wears her own pixel avatar (12 x 15 cells, each cell 2 px at 1x, so it is drawn without smoothing at every density)
+  const faces = { assistant: { src: '/mita-rail-1x.png', srcset: '/mita-rail-1x.png 1x, /mita-rail-2x.png 2x, /mita-rail-3x.png 3x', width: 24, height: 30 } }
+  return RAILS.map((id) => ({ id, icon: icons[id], label: n[id], ...(faces[id] ? { image: faces[id] } : {}) }))
 }
 
 export function pageItems(t, rail, runtime = {}) {
@@ -33,7 +35,6 @@ export function pageItems(t, rail, runtime = {}) {
       { id: ROUTES.COMPONENT_STATUS, icon: 'monitor_heart', tone: 'success', label: runtime.statusTitle || 'Components' },
       { id: ROUTES.DIAGNOSTICS, icon: 'stethoscope', tone: 'warn', label: runtime.diagTitle || c.system.diagnostics },
       { id: ROUTES.TOOLBOX, icon: 'build', tone: 'secondary', label: t.sidebar.toolbox },
-      { id: ROUTES.AI_ASSISTANT, icon: 'smart_toy', tone: 'tertiary', label: c.system.assistant },
     ],
   }
   return pages[rail] || []

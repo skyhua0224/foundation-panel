@@ -27,7 +27,7 @@ Ctrl+F search, Ctrl+1..9 sections, `?` shortcut sheet. Container-width based (Re
 | 帮助与关于 (promo cards: downloads, sponsor sheet), 面板设置 | rebuilt | |
 | 更新 (sheet, wavy progress, step checks) | rebuilt | the sheet was not run against a real update |
 | 画质增强 (overlay, session, shortcuts, components) | rebuilt, `EnhancementManager` on rows | the sketch art of the component cards was removed |
-| AI 助手 (chat, configuration sub-page with master switch) | rebuilt | |
+| 米塔 AI (rail destination; chat full width, input pinned, configuration sub-pages behind the gear, a switch row) | rebuilt | |
 | 虚拟显示器 (overview, display, calibration, driver sub-pages) | rebuilt, no hard-coded colours (old Less removed) | checked with the harness mock only, not with a real driver |
 | Web 串流服务 (Moonlight Web, from the tray) | rebuilt | checked with the harness mock only |
 | 首次欢迎页 | rebuilt | |
@@ -86,7 +86,7 @@ Both consumers declare the package as a `file:../ds5-ui-m3e` dependency with reg
 | USB 设备, 组件, 诊断工具 | MPage, MSection (info tooltip for the description), MGroup, MItem, MSwitchItem |
 | 虚拟显示器 | MPage (sub-pages overview, display, calibration, driver), MStatusPill, MProgress, MCheckItem, MTile, MChip, MSeg, MChoiceItem, MSwitchItem, MFieldItem, MBanner, MFooter, savebar |
 | 画质增强 | MPage (sub-pages), MSwitchItem, MSlider (size m, inset icons, value bubble), MChoiceItem, MBanner, MStatusPill, MEmpty, MFooter; component cards: MSection, MStatusPill, MBanner, MSwitchItem, MItem |
-| AI 助手 | MPage (chat and configuration sub-page), MMasterSwitch, MChoiceItem, MFieldItem, MStatusPill, MBanner, MLoading, MButton |
+| 米塔 AI | MPage (configuration sub-pages), MSwitchItem, MChoiceItem, MFieldItem, MLoading, MButton, MIconButton; the chat is its own full-pane layout |
 | Web 串流服务 | MPage (sub-page), MStatusPill, MProgress, MSwitchItem, MSliderItem, MChoiceItem, MFieldItem, MIconButton |
 | 帮助与关于 | MPromo (downloads, sponsor), MSheet, MGroup, MItem, MFooter |
 | 面板设置 | MSeg (icons), MGroup, MItem, MChip, MButton |

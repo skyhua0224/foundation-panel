@@ -57,13 +57,13 @@ export const PAGES = {
   [ROUTES.COMPONENTS]: { rail: 'system' },
   [ROUTES.TOOLBOX]: { rail: 'system' },
   [ROUTES.DIAGNOSTICS]: { rail: 'system' },
-  [ROUTES.AI_ASSISTANT]: { rail: 'system' },
+  [ROUTES.AI_ASSISTANT]: { rail: 'assistant', list: false }, // 米塔 AI: the chat takes the whole width, its settings are behind the gear of the chat header
   [ROUTES.WEB_TROUBLESHOOTING]: { rail: 'system' },
   [ROUTES.PANEL_SETTINGS]: { rail: 'settings', list: false },
   [ROUTES.HELP]: { rail: 'help', list: false },
   [ROUTES.ABOUT]: { rail: 'help', list: false },
 }
-export const RAILS = ['overview', 'stream', 'config', 'input', 'display', 'system', 'settings', 'help']
+export const RAILS = ['overview', 'stream', 'config', 'input', 'display', 'system', 'assistant', 'settings', 'help']
 
 // the old component page is part of the component status page now
 const ALIAS = { [ROUTES.CONTROLLERS]: ROUTES.GAMEPAD, [ROUTES.COMPONENTS]: ROUTES.COMPONENT_STATUS }

@@ -1,17 +1,62 @@
 <template>
-  <MPage :title="pageTitle" :back="!!current" :back-label="t.m3e.back" @back="back">
-    <template #actions>
-      <MIconButton v-if="!current && chatHistory.length" icon="delete" :label="t.aiAssistant.clearHistory" @click="clearHistory" />
-      <MIconButton v-if="!current" icon="settings" :label="t.aiAssistant.modelConfig" @click="open('config')" />
-    </template>
+  <!-- 米塔 AI is a destination of the rail: the chat takes the whole pane (header, the conversation that scrolls, the input pinned at the bottom);
+       its settings are pages behind the gear of the header -->
+  <div v-if="!current" class="ai-shell">
+    <header class="ai-head">
+      <img class="ai-avatar ai-avatar--pixel ai-head__avatar" src="/mita-pixel.png" :alt="t.aiAssistant.mitaName">
+      <div class="ai-head__id">
+        <h2 class="ai-head__title">{{ t.aiAssistant.title }}</h2>
+        <p class="ai-head__line">{{ headLine }}</p>
+      </div>
+      <div class="ai-head__actions">
+        <MIconButton v-if="chatHistory.length" icon="delete" :label="t.aiAssistant.clearHistory" @click="clearHistory" />
+        <MIconButton icon="settings" :label="t.aiAssistant.modelConfig" @click="open('config')" />
+      </div>
+    </header>
 
+    <div ref="chatContainer" class="ai-scroll" aria-live="polite" @wheel="handleChatWheel">
+      <div class="ai-col" data-wp-cover>
+        <div v-if="chatHistory.length === 0 && !isLoading" class="ai-hint">
+          <img src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="ai-avatar ai-avatar--lg ai-avatar--pixel">
+          <b>{{ t.aiAssistant.welcomeMsg }}</b>
+          <div class="ai-examples">
+            <button v-for="example in exampleQueries" :key="example" type="button" class="ai-example" :disabled="!config.enabled" @click="selectExample(example)">{{ example }}</button>
+          </div>
+          <MButton v-if="!config.enabled" variant="tonal" icon="settings" @click="open('config')">{{ t.aiAssistant.modelConfig }}</MButton>
+        </div>
+        <div v-for="(msg, idx) in chatHistory" :key="idx" class="ai-msg" :class="msg.role">
+          <span v-if="msg.role === 'user'" class="ai-avatar ai-avatar--user"><MIcon name="person" /></span>
+          <img v-else src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="ai-avatar ai-avatar--pixel">
+          <div class="ai-bubble">
+            <div class="ai-text" v-html="formatMessage(msg.content, msg.parsedAction)"></div>
+            <div v-if="msg.parsedAction" class="ai-action">
+              <MButton size="sm" variant="tonal" @click="applyAction(msg.parsedAction)">{{ getActionButtonText(msg.parsedAction) }}</MButton>
+              <span>{{ getActionHint(msg.parsedAction) }}</span>
+            </div>
+            <span class="ai-time">{{ formatTime(msg.timestamp) }}</span>
+            <MButton v-if="msg.isError" size="sm" variant="text" icon="refresh" @click="retryLastMessage">{{ t.aiAssistant.retry }}</MButton>
+          </div>
+        </div>
+        <div v-if="isLoading" class="ai-msg assistant"><img src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="ai-avatar ai-avatar--pixel"><div class="ai-bubble"><MLoading size="28px" /></div></div>
+      </div>
+    </div>
+
+    <div class="ai-dock">
+      <div class="ai-composer">
+        <textarea ref="chatInput" v-model="currentInput" rows="1" :placeholder="t.aiAssistant.inputPlaceholder" :disabled="!config.enabled" :aria-label="t.aiAssistant.inputPlaceholder" @keydown.enter.exact.prevent="handleSend"></textarea>
+        <MButton icon="send" :loading="isLoading" :disabled="!config.enabled || !currentInput.trim()" @click="handleSend">{{ t.aiAssistant.send }}</MButton>
+      </div>
+    </div>
+  </div>
+
+  <MPage v-else :title="pageTitle" back :back-label="t.m3e.back" @back="back">
     <!-- Settings: a short page (switch and three rows), the connection and the model are pages of their own -->
     <template v-if="current === 'config'">
-      <MMasterSwitch v-model="config.enabled" :title="t.aiAssistant.title" :text="config.enabled ? t.aiAssistant.enabled : t.aiAssistant.disabled" :disabled="isClearingApiKey" @update:model-value="saveConfig(false)" />
       <MGroup>
+        <MSwitchItem v-model="config.enabled" icon="smart_toy" :title="t.aiAssistant.title" :text="config.enabled ? t.aiAssistant.enabled : t.aiAssistant.disabled" :disabled="isClearingApiKey" @update:model-value="saveConfig(false)" />
         <MChoiceItem v-model="config.provider" icon="cloud" :title="t.aiAssistant.provider" :options="providers" :cancel-label="t.common.cancel" @update:model-value="onProviderChange" />
         <MItem action icon="link" :title="labels.connection" :text="connectionLine" @click="open('connection')" />
-        <MItem action icon="neurology" :title="t.aiAssistant.model" :text="config.model || t.aiAssistant.modelPlaceholder" @click="open('model')" />
+        <MItem action icon="memory" :title="t.aiAssistant.model" :text="config.model || t.aiAssistant.modelPlaceholder" @click="open('model')" />
       </MGroup>
       <div class="m-actions-row">
         <MButton icon="wifi" :loading="isLoading" @click="testConnection">{{ t.aiAssistant.testConnection }}</MButton>
@@ -38,48 +83,13 @@
       </MGroup>
       <div class="m-actions-row"><MButton variant="tonal" icon="save" @click="saveConfig()">{{ t.aiAssistant.saveConfig }}</MButton></div>
     </template>
-
-    <!-- Chat -->
-    <template v-else>
-      <MStatusPill v-if="config.enabled" icon="smart_toy" :label="activeProviderLabel + (config.model ? ' · ' + config.model : '')" tone="ok" :action="false" />
-      <MBanner v-else tone="warn" icon="smart_toy">{{ t.aiAssistant.disabled }}<template #actions><MButton variant="text" size="sm" @click="open('config')">{{ t.aiAssistant.modelConfig }}</MButton></template></MBanner>
-
-      <div ref="chatContainer" class="ai-chat" aria-live="polite" @wheel="handleChatWheel">
-        <div v-if="chatHistory.length === 0" class="ai-hint">
-          <img src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="ai-avatar ai-avatar--lg ai-avatar--pixel">
-          <b>{{ t.aiAssistant.welcomeMsg }}</b>
-          <div class="ai-examples">
-            <button v-for="example in exampleQueries" :key="example" type="button" class="ai-example" :disabled="!config.enabled" @click="selectExample(example)">{{ example }}</button>
-          </div>
-        </div>
-        <div v-for="(msg, idx) in chatHistory" :key="idx" class="ai-msg" :class="msg.role">
-          <span v-if="msg.role === 'user'" class="ai-avatar ai-avatar--user"><MIcon name="person" /></span>
-          <img v-else src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="ai-avatar ai-avatar--pixel">
-          <div class="ai-bubble">
-            <div class="ai-text" v-html="formatMessage(msg.content, msg.parsedAction)"></div>
-            <div v-if="msg.parsedAction" class="ai-action">
-              <MButton size="sm" variant="tonal" @click="applyAction(msg.parsedAction)">{{ getActionButtonText(msg.parsedAction) }}</MButton>
-              <span>{{ getActionHint(msg.parsedAction) }}</span>
-            </div>
-            <span class="ai-time">{{ formatTime(msg.timestamp) }}</span>
-            <MButton v-if="msg.isError" size="sm" variant="text" icon="refresh" @click="retryLastMessage">{{ t.aiAssistant.retry }}</MButton>
-          </div>
-        </div>
-        <div v-if="isLoading" class="ai-msg assistant"><img src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="ai-avatar ai-avatar--pixel"><div class="ai-bubble"><MLoading size="28px" /></div></div>
-      </div>
-
-      <div class="ai-composer">
-        <textarea ref="chatInput" v-model="currentInput" rows="1" :placeholder="t.aiAssistant.inputPlaceholder" :disabled="!config.enabled" :aria-label="t.aiAssistant.inputPlaceholder" @keydown.enter.exact.prevent="handleSend"></textarea>
-        <MButton icon="send" :loading="isLoading" :disabled="!config.enabled || !currentInput.trim()" @click="handleSend">{{ t.aiAssistant.send }}</MButton>
-      </div>
-    </template>
   </MPage>
 </template>
 
 <script setup>
 import { ref, nextTick, watch, computed, onMounted } from 'vue'
 import MarkdownIt from 'markdown-it'
-import { MPage, MGroup, MItem, MChoiceItem, MFieldItem, MMasterSwitch, MStatusPill, MBanner, MButton, MIconButton, MChip, MIcon, MLoading, useSubpage } from 'foundation-ui/vue'
+import { MPage, MGroup, MItem, MChoiceItem, MFieldItem, MSwitchItem, MButton, MIconButton, MChip, MIcon, MLoading, useSubpage } from 'foundation-ui/vue'
 import { useAiAssistant, AI_PROVIDERS } from '../composables/useAiAssistant.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
@@ -117,6 +127,7 @@ const connectionLine = computed(() => {
   try { host = new URL(config.apiBase).host } catch { host = config.apiBase || '' }
   return [host, config.apiKeyConfigured ? '••••' : ''].filter(Boolean).join(' · ') || '—'
 })
+const headLine = computed(() => (config.enabled ? [activeProviderLabel.value, config.model].filter(Boolean).join(' · ') : t.value.aiAssistant.disabled))
 const pageTitle = computed(() => ({ config: t.value.aiAssistant.modelConfig, connection: labels.value.connection, model: t.value.aiAssistant.model }[current.value] || t.value.aiAssistant.title))
 const markdown = new MarkdownIt({
   breaks: true,
@@ -258,9 +269,6 @@ watch(
   },
 )
 
-watch(needsConfiguration, (required) => {
-  if (required) showConfig.value = true
-})
 </script>
 
 

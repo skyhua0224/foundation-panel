@@ -629,7 +629,7 @@ export const zh = {
     jitterDesc: '每次随机对话间隔上下浮动的范围（0% 为固定间隔，最高 100%）',
     vision: '桌面观察',
     visionDesc: '桌宠会定时偏看你的屏幕并生成评论（需要多模态 AI）',
-    visionHelp: '需要在「米塔 AI 助手」中配置好 API Key，且选择支持视觉的模型。\n启用后桌宠会定时截屏并交给 AI 生成一句针对屏幕内容的吐槽。',
+    visionHelp: '需要在「米塔 AI」中配置好 API Key，且选择支持视觉的模型。\n启用后桌宠会定时截屏并交给 AI 生成一句针对屏幕内容的吐槽。',
     visionPrivacyConfirm: {
       title: '开启桌面观察？',
       message: '桌面观察会定期截取当前屏幕，并将截图发送到您配置的 AI 服务进行分析。截图可能包含账号、聊天、文件、通知等个人或敏感信息。请确认您了解所选 AI 服务提供商的数据处理与安全政策，并仅在可信环境中启用。',
@@ -649,8 +649,8 @@ export const zh = {
     visionHistoryEmpty: '还没有历史记录，戳一下试试～',
     visionHistoryClear: '清空',
     visionHistoryView: '查看',
-    aiKeyMissing: '尚未配置 AI 助手',
-    aiKeyMissingDesc: '请先在「米塔 AI 助手」中填入 API Key 并启用，才能开启桌面观察。',
+    aiKeyMissing: '尚未配置米塔 AI',
+    aiKeyMissingDesc: '请先在「米塔 AI」中填入 API Key 并启用，才能开启桌面观察。',
     // 桌宠气泡中使用的运行时提示
     runtime: {
       // 后端话术加载失败时用的内置傅本
@@ -683,7 +683,7 @@ export const zh = {
 - 看到聊天→"跟谁聊得这么开心？哼，才不在意呢"
 只输出一句话，不要解释。用中文回复。`,
       visionUserMsg: '看看我的桌面，说点什么吧',
-      visionNotConfigured: '还没配好 AI 助手哦，去「米塔 AI 助手」填个 Key 吧～',
+      visionNotConfigured: '还没配好米塔 AI 哦，去「米塔 AI」填个 Key 吧～',
       visionEmpty: 'AI 返回了一口气，什么都没说…试试换个模型？',
       visionErrorPrefix: '看晕了：',
       visionUnknownError: '发生什么事了？',
@@ -1098,7 +1098,7 @@ export const zh = {
     restore: '还原',
     virtualDisplay: '虚拟显示器',
     webStream: 'Web 串流',
-    aiAssistant: 'AI 助手',
+    aiAssistant: '米塔 AI',
     deviceHub: '设备中心',
     hdrEnhanced: '画质增强',
     checkUpdate: '检查更新',
@@ -1117,7 +1117,7 @@ export const zh = {
     open: '管理画质增强',
   },
   m3e: {
-    nav: { overview: '概览', stream: '串流', config: '串流设置', input: '输入与外设', display: '显示', system: '系统', settings: '面板设置', help: '帮助与关于', main: '主导航', expand: '展开导航', collapse: '收起导航' },
+    nav: { overview: '概览', stream: '串流', config: '串流设置', input: '输入与外设', display: '显示', system: '系统', assistant: '米塔 AI', settings: '面板设置', help: '帮助与关于', main: '主导航', expand: '展开导航', collapse: '收起导航' },
     search: '搜索', noResults: '没有结果', clear: '清除', resize: '调整列表宽度', shortcuts: '键盘快捷键', shortcutHelp: '显示快捷键', section: '切换栏目',
     micFlow: { client: '客户端麦克风', host: '主机', device: '虚拟设备', apps: '应用', buffer: '缓冲' },
     home: { pad: { auto: '自动', x360: 'Xbox 360', ds4: 'DualShock 4', ds5: 'DualSense' }, gamepadType: '手柄类型', vddKeep: '保持虚拟显示器', vddKeepSub: '串流结束后保留', download: '下载客户端', star: '在 GitHub 点 Star', qq: 'QQ 交流群', edit: '编辑磁贴', done: '完成', add: '添加磁贴', reset: '恢复默认', remove: '移除', resize: '更改大小', earlier: '前移', later: '后移', addTitle: '添加磁贴', nothing: '所有磁贴都已在页面上',
@@ -1136,7 +1136,7 @@ export const zh = {
     },
     input: { summary: '{count} / {total} 项已就绪', title: '输入与外设', lead: '客户端带来的设备：手柄、麦克风与 USB 设备。', gamepad: '手柄', microphone: '麦克风', usb: 'USB 设备', usbNote: 'USB/IP 传输与已挂载设备', gamepadNote: '手柄类型与 DualSense 调校', micNote: '把客户端麦克风传到这台主机' },
     display: { title: '显示', lead: '虚拟显示器与画质。', vdd: '虚拟显示器', vddNote: '按客户端提供稳定的虚拟显示器，并校准 HDR', quality: '画质增强', qualityNote: 'RTX HDR 与 DLSS NR' },
-    system: { title: '系统', lead: '驱动组件、诊断与助手。', components: '组件', componentsNote: '虚拟手柄总线、USB/IP 传输等驱动', diagnostics: '诊断工具', diagnosticsNote: '手柄测试、手写笔检测、串流计时器、延迟测试', assistant: 'AI 助手', assistantNote: '帮你排查问题' },
+    system: { title: '系统', lead: '驱动组件、诊断与助手。', components: '组件', componentsNote: '虚拟手柄总线、USB/IP 传输等驱动', diagnostics: '诊断工具', diagnosticsNote: '手柄测试、手写笔检测、串流计时器、延迟测试', assistant: '米塔 AI', assistantNote: '帮你排查问题' },
   },
   deviceHub: {
     eyebrow: 'MANAGE / DEVICE HUB',
@@ -1694,7 +1694,7 @@ export const zh = {
 
   // === AI 助手 ===
   aiAssistant: {
-    title: '米塔 AI 助手',
+    title: '米塔 AI',
     enabled: '已启用',
     disabled: '未启用',
     modelConfig: '模型配置',
@@ -1765,7 +1765,7 @@ export const zh = {
       apiKeyClearFailed: '清除 API Key 失败: {error}',
       connectionSuccess: 'AI 服务连接成功！',
       connectionFailed: '连接失败: {error}',
-      enableFirst: '请先启用米塔 AI 助手',
+      enableFirst: '请先启用米塔 AI',
       emptyResponse: '无法获取回复',
       requestError: '❌ 请求出错: {error}',
       actionFailed: '操作失败: {error}',
