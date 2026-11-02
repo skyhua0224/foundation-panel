@@ -13,7 +13,8 @@ test('米塔 AI is a destination of the rail, the chat takes the whole width, an
   assert.match(router, /\[ROUTES\.AI_ASSISTANT\]: \{ rail: 'assistant', list: false \}/)
   const system = nav.slice(nav.indexOf('system: ['), nav.indexOf('],', nav.indexOf('system: [')))
   assert.ok(!/AI_ASSISTANT/.test(system), 'not in the 系统 list')
-  assert.match(nav, /assistant: \{ src: '\/mita-rail-1x\.png', srcset: '[^']*3x\.png 3x'/)
+  assert.match(nav, /assistant: 'smart_toy'/, 'a monochrome Material Symbol like every other destination')
+  assert.ok(!/mita-rail|image:/.test(nav), 'no colour picture in the rail')
 })
 test('米塔 AI is labelled 米塔 AI (Mita AI), never AI 助手', () => {
   for (const [t, label, banned] of [[zh, '米塔 AI', /AI 助手/], [en, 'Mita AI', /AI Assistant/i]]) {

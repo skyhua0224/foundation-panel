@@ -2,7 +2,7 @@
   <div class="m-app m-app--scroll panel-shell">
     <!-- slim caption bar over the whole window: draggable, the window controls at the end; the pages start below it -->
     <header class="panel-caption" data-tauri-drag-region @pointerdown="onTouchWindowDragStart">
-      <span class="panel-caption__title" data-tauri-drag-region>Foundation Sunshine</span>
+      <MBrand class="panel-caption__brand" :size="20" data-tauri-drag-region />
       <div class="panel-caption__controls">
         <button type="button" class="panel-caption__btn" :aria-label="t.sidebar.minimize" :data-tip="t.sidebar.minimize" @click="minimizeWindow"><MIcon name="remove" /></button>
         <button type="button" class="panel-caption__btn" :aria-label="isMaximized ? t.sidebar.restore : t.sidebar.maximize" :data-tip="isMaximized ? t.sidebar.restore : t.sidebar.maximize" @click="toggleMaximize"><MIcon :name="isMaximized ? 'filter_none' : 'crop_square'" /></button>
@@ -90,7 +90,7 @@
 import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { sunshine, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
-import { MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -334,7 +334,7 @@ defineExpose({
 <style lang="less">
 .panel-shell { position: relative; height: 100vh; height: 100dvh; min-height: 0; overflow: clip; }
 .panel-caption { position: absolute; top: 0; left: var(--m-rail-w, 0px); right: 0; z-index: 40; transition: left var(--m-spring-default-spatial-duration, .4s) var(--m-spring-default-spatial, ease); display: flex; align-items: stretch; justify-content: space-between; height: 40px; background: transparent; user-select: none; }
-.panel-caption__title { align-self: center; padding-inline-start: 16px; font: 600 12px/1 var(--md-ref-typeface-brand); letter-spacing: .02em; color: var(--md-sys-color-on-surface); }
+.panel-caption__brand { align-self: center; padding-inline-start: 16px; pointer-events: none; }
 .panel-caption__controls { display: flex; }
 .panel-caption__btn { display: grid; place-items: center; width: 46px; height: 40px; padding: 0; border: 0; background: transparent; color: var(--md-sys-color-on-surface); font-size: 18px; cursor: default; transition: background-color 120ms linear, color 120ms linear; }
 .panel-caption__btn:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 9%, transparent); }

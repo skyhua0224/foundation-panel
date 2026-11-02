@@ -3,7 +3,6 @@
        its settings are pages behind the gear of the header -->
   <div v-if="!current" class="ai-shell">
     <header class="ai-head" :class="{ 'is-scrolled': scrolled }">
-      <img class="ai-avatar ai-avatar--pixel ai-head__avatar" src="/mita-pixel.png" :alt="t.aiAssistant.mitaName">
       <div class="ai-head__id">
         <h2 class="ai-head__title">{{ t.aiAssistant.title }}</h2>
         <p class="ai-head__line">{{ headLine }}</p>
