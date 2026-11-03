@@ -142,11 +142,11 @@ import { ROUTES, PAGES, routeForWebPath, webPathOf } from '../composables/useRou
 import { createGuideData } from '../composables/guideData.js'
 import PanelPending from './PanelPending.vue'
 import { recordUpdateCheck } from '../composables/useUpdateCheckTime.js'
+import { createGuideData } from '../composables/guideData.js'
 import { useHostReach } from '../composables/useHostReach.js'
 import { ROW_OF_ROUTE, railItems, pageItems, barItems, barCurrent } from '../composables/panelNav.js'
 import { rowKeywords } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../desktop/i18n/index.js'
-import { recordUpdateCheck } from '../composables/useUpdateCheckTime.js'
 import { useDualSenseStatus } from '../composables/useDualSenseStatus.js'
 import { useDualSenseText } from '../composables/useDualSenseText.js'
 const UpdateDialog = defineAsyncComponent(() => import('./UpdateDialog.vue'))
@@ -185,12 +185,12 @@ const openWebUi = (path) => {
 const goHome = () => openWebUi('/')
 const handleCheckForUpdates = async (channel = null) => {
   const result = await checkForUpdates(channel)
+  recordUpdateCheck()
   if (!result) return false
   updateInfo.value = result
   showUpdateDialog.value = true
   return true
 }
-  recordUpdateCheck()
 const toolsCtx = {
   t, router, webuiPath: toRef(props, 'webuiPath'), openWebUi, openControllers, openTimer, openUrl, openGamepadTest,
   openStylusInputProbe, cleanupCovers, restartAsAdmin, showClipboardSyncStatus, handleCheckForUpdates,
