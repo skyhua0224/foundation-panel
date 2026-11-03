@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted } from 'vue'
 import { MNotifyHost, MPendingHost, mountPendingBridge, usePending } from 'foundation-ui/vue'
 import { tools } from '../tauri-adapter.js'
 import { defineVddSource } from '../composables/useVddPending.js'
+import { defineUsbSource } from '../composables/useUsbPending.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { ROUTES } from '../composables/useRouter.js'
 
@@ -13,6 +14,7 @@ const emit = defineEmits(['go'])
 const { t } = useI18n()
 const pending = usePending({ restartHost: () => tools.restartSunshineService() })
 defineVddSource({ pageLabel: t.value.m3e.nav.display })
+defineUsbSource({ pageLabel: t.value.m3e.input.usb })
 
 const frame = () => document.querySelector('.panel-web__frame iframe')
 const originOf = (el) => { try { return new URL(el.src, location.href).origin } catch { return '*' } }
@@ -38,6 +40,7 @@ function go(page) {
   const entry = pending.all.value.find((e) => e.page === page)
   if (page.startsWith('web:') || page.startsWith('config:') || page === 'gamepad' || page === 'apps') emit('go', { page, entry })
   else if (page === 'vdd') emit('go', { route: ROUTES.VDD_SETTINGS })
+  else if (page === 'usb') emit('go', { route: ROUTES.USB })
 }
 </script>
 
