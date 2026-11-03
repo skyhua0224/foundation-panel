@@ -93,7 +93,9 @@ fn ensure_class() {
         lpszClassName: class_name(),
         ..Default::default()
     };
-    unsafe { RegisterClassExW(&class) };
+    if unsafe { RegisterClassExW(&class) } == 0 {
+        log::warn!("[dpi-cover] the cover's window class was not registered: {}", windows::core::Error::from_thread());
+    }
 }
 
 unsafe extern "system" fn cover_proc(hwnd: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
@@ -167,17 +169,26 @@ pub(super) fn create(parent: HWND, color: (u8, u8, u8), frame: Option<&Frame>) -
             None,
         )
     };
-    let Ok(hwnd) = created else {
-        let face = unsafe { Box::from_raw(face) };
-        if let Some(bitmap) = face.bitmap {
-            let _ = unsafe { DeleteObject(HGDIOBJ(bitmap.0)) };
+    let hwnd = match created {
+        Ok(hwnd) => hwnd,
+        Err(error) => {
+            log::warn!("[dpi-cover] the cover window was not created: {error}");
+            let face = unsafe { Box::from_raw(face) };
+            if let Some(bitmap) = face.bitmap {
+                let _ = unsafe { DeleteObject(HGDIOBJ(bitmap.0)) };
+            }
+            return None;
         }
-        return None;
     };
     unsafe {
         SetWindowLongPtrW(hwnd, GWLP_USERDATA, face as isize);
-        let _ = SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA);
-        let _ = SetWindowPos(hwnd, Some(HWND_TOP), 0, 0, client.right.max(1), client.bottom.max(1), SWP_NOACTIVATE | SWP_SHOWWINDOW);
+        if let Err(error) = SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA) {
+            log::warn!("[dpi-cover] the cover is not layered: {error}");
+        }
+        if let Err(error) = SetWindowPos(hwnd, Some(HWND_TOP), 0, 0, client.right.max(1), client.bottom.max(1), SWP_NOACTIVATE | SWP_SHOWWINDOW) {
+            log::warn!("[dpi-cover] the cover was not placed: {error}");
+        }
+        log::info!("[dpi-cover] cover window {:?} over {}x{}", hwnd.0, client.right, client.bottom);
     }
     Some(hwnd)
 }
