@@ -86,6 +86,7 @@
     <MCoachMarks :locale="locale" storage-key="foundation.coach.panel" guide-key="foundation.guide.panel" />
     <MConnectDialog v-model="connect.open.value" v-model:tab="connect.tab.value" v-model:os="connect.os.value" :assets-of="connect.assetsOf" :version-of="connect.versionOf" :locale="locale" :qr="connect.matrix" :pair-qr="connect.pairQr" :count="hostClients.length" :latest="hostClients.length ? hostClients[hostClients.length - 1].name : ''" :close-label="t.m3e.home.done"
       @pair-pin="(e) => connect.pairPin(e.pin)" @pair-qr-begin="connect.qrBegin()" @pair-qr-stop="connect.qrStop()" @open-url="actions_openExternal" @open-downloads="() => { connect.open.value = false; openRoute(ROUTES.WEB_DOWNLOADS) }" />
+    <MPairPrompt :requests="pairing.requests.value" :locale="locale" @submit="onPairSubmit" @reject="(id) => pairing.reject(id)" @install="connect.show('install')" />
     <MSnackbar :model-value="!!connectNotice" :message="connectNotice" :timeout="4000" @update:model-value="(v) => { if (!v) connectNotice = '' }" />
     <MSupportSheet v-model="sponsorOpen" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" />
     <MThanksLine v-if="thanks.visible.value" :locale="locale" @star="thanksStar" @sponsor="thanksSponsor" @dismiss="thanks.dismiss" />
@@ -105,7 +106,7 @@ import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeU
 import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
-import { connectTexts, filterHash, MConnectDialog, MSnackbar, useConnectDialog, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { connectTexts, filterHash, MConnectDialog, MPairPrompt, createPairingPending, MSnackbar, useConnectDialog, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -287,6 +288,22 @@ const connect = useConnectDialog({
   say: (kind) => { connectNotice.value = kind === 'sent' ? connectT.value.pinSent : connectT.value.pinFailed },
   defaultName: locale.value.startsWith('zh') ? '新客户端' : 'New client',
 })
+// a device waits for its PIN: the prompt comes forward on any page (the host's long poll through the proxy, docs/api/pairing-pending.md); the native notification and the tray are the host tray's own
+const failing = (r) => Object.assign(new Error(`HTTP ${r.status}`), { status: r.status })
+const pairingApi = {
+  getJson: async (path) => { const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, ''); const r = await fetch(`${base}${path}`); if (!r.ok) throw failing(r); return r.json() },
+  postJson: async (path, body) => { const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, ''); const r = await fetch(`${base}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }); if (!r.ok) throw failing(r); return r.json() },
+  delete: async (path) => { const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, ''); const r = await fetch(`${base}${path}`, { method: 'DELETE' }); if (!r.ok) throw failing(r); return r.json() },
+}
+const pairing = createPairingPending({ hostApi: pairingApi })
+const onPairSubmit = async (e) => { const ok = await pairing.submit(e.id, e.pin, e.name); connectNotice.value = ok ? connectT.value.pinSent : connectT.value.pinFailed }
+// the tray's entries 配对新设备 and 下载客户端 open the dialog on a tab (the native side emits `open-connect` once the panel is ready)
+let unlistenConnect = null
+onMounted(async () => {
+  pairing.start()
+  try { const { listen } = await import('@tauri-apps/api/event'); unlistenConnect = await listen('open-connect', (event) => connect.show(event.payload?.tab === 'install' ? 'install' : 'pair')) } catch { /* not in the app window */ }
+})
+onBeforeUnmount(() => { pairing.stop(); if (unlistenConnect) unlistenConnect() })
 const actionHandlers = {
   restart: () => tools.restartSunshineService(),
   userMode: () => tools.restartSunshineInUserMode(),

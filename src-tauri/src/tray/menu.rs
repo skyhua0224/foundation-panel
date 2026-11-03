@@ -141,6 +141,16 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
         true,
         None::<&str>,
     )?;
+    // pairing and installing a client are rare and are looked for when they are needed: two entries that open the panel's connect dialog on its tab
+    let connect_device =
+        MenuItem::with_id(app, "connect_device", s.connect_device, true, None::<&str>)?;
+    let download_client = MenuItem::with_id(
+        app,
+        "download_client",
+        s.download_client,
+        true,
+        None::<&str>,
+    )?;
     #[cfg(target_os = "windows")]
     let recover_service = MenuItem::with_id(
         app,
@@ -428,6 +438,8 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
     }
     items.push(&primary_separator);
     items.push(&open_main_panel);
+    items.push(&connect_device);
+    items.push(&download_client);
     items.push(&open_desktop);
     #[cfg(target_os = "windows")]
     items.push(&auto_start);
