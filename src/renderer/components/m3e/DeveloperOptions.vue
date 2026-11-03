@@ -1,6 +1,6 @@
 <template>
   <MGroup>
-    <MSwitchItem :model-value="Boolean(settings.devMode)" :title="st.devMode" :info="st.devModeDesc" data-panel-option="devMode" @update:model-value="set($event)" />
+    <MSwitchItem :model-value="Boolean(settings.devMode)" :title="zh ? '调试输出' : 'Debug output'" :info="zh ? '打开面板的调试输出（例如开发者工具）；日常使用保持关闭。' : 'Turns on the debug output of the panel (such as the developer tools); leave off for daily use.'" data-panel-option="devMode" @update:model-value="set($event)" />
   </MGroup>
 </template>
 
