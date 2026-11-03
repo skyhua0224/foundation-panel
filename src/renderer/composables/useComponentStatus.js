@@ -1,5 +1,6 @@
 import { createComponentStatus, microphoneState, registerComponentStatus } from 'foundation-ui/vue'
 import { sunshine, vdd, vigem } from '../tauri-adapter.js'
+import { enhancementActions, enhancementSources } from './useEnhancementComponents.js'
 import { dualsenseStatusChannel, micStatusChannel, usbipStatusChannel, vigemStatusChannel } from './deviceStatusStore.js'
 
 // The component status of the control panel: the sources are the ones the panel already reads (the status channels of the device hub, the
@@ -40,6 +41,7 @@ export function useComponentStatus({ locale, go = {}, update = () => ({}), check
         fresh: async () => driversRaw(true),
       },
       mic: async () => { const s = data(await micStatusChannel.fetch({ force: false })); return s ? { state: microphoneState(s), backend: s.active_backend || s.configured_backend } : null },
+      ...enhancementSources(),
       encoder: async () => { const c = await hostConfig(); return { active: c.active_encoder, hevc: c.hevc_mode, av1: c.av1_mode } },
       host: async () => {
         let version = ''
@@ -56,6 +58,8 @@ export function useComponentStatus({ locale, go = {}, update = () => ({}), check
       dualsense: both(maintenance),
       drivers: both(maintenance),
       mic: { open: open(go.microphone) },
+      dlssnr: enhancementActions('dlssnr', { texts: () => controller.text(), refresh: () => controller.check('dlssnr') }),
+      rtxhdr: enhancementActions('rtxhdr', { texts: () => controller.text(), refresh: () => controller.check('rtxhdr') }),
       host: { update: open(check) },
     },
   }))
