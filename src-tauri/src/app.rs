@@ -78,6 +78,17 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
         }
     }
 
+    if !agent_only {
+        // The pages ask for these probes the moment they mount (0.05 to 1.7 s each on the Skyindows VM); started now, they are running or kept by then.
+        tauri::async_runtime::spawn(async {
+            let _ = tokio::join!(
+                crate::vdd::get_vdd_status(),
+                crate::vmouse::get_vmouse_status(),
+                crate::sunshine::get_sunshine_version(),
+                crate::system::get_sunshine_start_time(),
+            );
+        });
+    }
     tray::create_system_tray(&app_handle)?;
     crate::power::refresh_ecoqos_state(&app_handle);
     #[cfg(target_os = "windows")]
