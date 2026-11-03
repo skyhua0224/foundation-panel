@@ -12,7 +12,7 @@ const okStatus = (value) => value === true || value === 'true' || value === 1 ||
  * value. All outside access is injected, so the rules can be tested without a window.
  *
  * deps: { proxyUrl(): Promise<string>, fetchImpl, vddStatus(): Promise<object>, activeSessions(): Promise<array>,
- *         openUrl(url), copy(text), openApps(mode), navigate(url), redirectMs }
+ *         openUrl(url), copy(text), openApps(mode), navigate(url), redirectMs, reach (the shared reachability check, composables/useHostReach.js) }
  */
 export function createGuideData(deps) {
   const fetchImpl = deps.fetchImpl || ((...args) => globalThis.fetch(...args))
@@ -20,6 +20,8 @@ export function createGuideData(deps) {
     account: { exists: null },
     setup: { completed: false, locale: '', showLanguage: true, adapters: [], displayDevices: [], adapter: '', display: '', prep: 'ensure_only_display', virtual: true },
     host: { platform: '', addresses: null },
+    network: { port: 47989, upnpActive: null, upnpSaved: null, loaded: false, externalIp: '' },
+    reach: deps.reach ? deps.reach.view : { report: null, status: 'idle' },
     clients: null,
     sessions: null,
     pair: { name: '' },
@@ -60,7 +62,7 @@ export function createGuideData(deps) {
     }
   }
 
-  async function saveSetup({ locale, adapter, display }) {
+  async function saveSetup({ locale, adapter, display, prep }) {
     if (display === 'ZakoHDR' && state.setup.virtual) {
       let status = null
       try { status = await deps.vddStatus() } catch { /* not ready */ }
@@ -68,7 +70,7 @@ export function createGuideData(deps) {
       if (!ready) return { ok: false, vdd: false }
     }
     try {
-      const config = mergeSetupConfig(await getJson('/api/config'), { locale, adapter, display, prep: state.setup.prep })
+      const config = mergeSetupConfig(await getJson('/api/config'), { locale, adapter, display, prep: prep ?? state.setup.prep })
       const { response } = await postJson('/api/config', config)
       if (!response.ok) return { ok: false, error: await response.text().catch(() => '') }
       state.setup.completed = true
@@ -92,6 +94,59 @@ export function createGuideData(deps) {
     } catch {
       state.host.addresses = null
     }
+  }
+
+  /** The listener settings: the base port and UPnP as it runs now and as it is saved (a restart applies the saved one). */
+  async function loadNetwork() {
+    try {
+      const data = await getJson('/api/network/listeners')
+      if (!okStatus(data.status)) throw new Error('listeners')
+      Object.assign(state.network, { port: Number(data.saved?.port || data.active?.port) || 47989, upnpActive: !!data.active?.upnp, upnpSaved: !!data.saved?.upnp, loaded: true })
+      state.host.addresses = Array.isArray(data.addresses) ? data.addresses : state.host.addresses
+      try { state.network.externalIp = String((await getJson('/api/config')).external_ip || '') } catch { /* the field stays as it was */ }
+    } catch {
+      state.network.loaded = false
+    }
+  }
+
+  /** UPnP on or off in the saved configuration (the host applies it after a restart). */
+  async function setUpnp(on) {
+    try {
+      const config = { ...(await getJson('/api/config')), upnp: on ? 'enabled' : 'disabled' }
+      const { response } = await postJson('/api/config', config)
+      return response.ok ? { ok: true } : { ok: false, error: await response.text().catch(() => '') }
+    } catch (error) {
+      return { ok: false, error: error?.message || '' }
+    }
+  }
+
+  /** The public address (`external_ip`: an IP or a DDNS name) in the saved configuration. */
+  async function setPublicAddress(value) {
+    try {
+      const config = { ...(await getJson('/api/config')), external_ip: value }
+      const { response } = await postJson('/api/config', config)
+      if (!response.ok) return { ok: false, error: await response.text().catch(() => '') }
+      state.network.externalIp = value
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error?.message || '' }
+    }
+  }
+
+  async function restartHost() {
+    try {
+      const { response } = await postJson('/api/restart', {})
+      return { ok: response.ok }
+    } catch {
+      return { ok: true } // the connection drops while the host restarts
+    }
+  }
+
+  /** The QR window of the host: opened by the pair step and given back when the step goes away. */
+  const pairQr = {
+    start: async () => { const { data } = await postJson('/api/qr-pair', {}); if (!okStatus(data.status)) throw new Error(data.error || 'qr'); return data },
+    poll: () => getJson('/api/qr-pair'),
+    cancel: () => postJson('/api/qr-pair/cancel', {}),
   }
 
   async function refreshClients() {
@@ -142,6 +197,12 @@ export function createGuideData(deps) {
     refreshAddresses,
     refreshClients,
     refreshSessions,
+    loadNetwork,
+    checkReach: (force) => deps.reach?.refresh(force),
+    setUpnp,
+    setPublicAddress,
+    restartHost,
+    pairQr,
     pair,
     openApps: (mode) => deps.openApps(mode),
   }
@@ -150,7 +211,7 @@ export function createGuideData(deps) {
 
 /**
  * First run on this panel: the host reports setup not completed, nobody is paired, the guide is not finished and not closed this
- * session. Reads the host through the same proxy; an unreadable answer never opens the guide.
+ * session; or the guide was started and not finished (it opens again where it was). Reads the host through the same proxy; an unreadable answer never opens the guide.
  */
 export async function shouldOpenGuide({ proxyUrl, fetchImpl, progress, dismissed = false }) {
   if (dismissed || progress?.finished) return false
@@ -160,11 +221,13 @@ export async function shouldOpenGuide({ proxyUrl, fetchImpl, progress, dismissed
     const configResponse = await get(`${base}/api/config`)
     if (!configResponse.ok) return false
     const config = await configResponse.json()
-    if (isSetupCompleted(config)) return false
+    const completed = isSetupCompleted(config)
+    const resuming = !!progress && !progress.finished && progress.visited?.length > 0
+    if (completed && !resuming) return false
     const clientsResponse = await get(`${base}/api/clients/list`)
     if (!clientsResponse.ok) return false
     const clients = normalizeClients(await clientsResponse.json())
-    return shouldAutoOpen({ setupCompleted: false, pairedCount: clients ? clients.length : null, finished: false })
+    return shouldAutoOpen({ setupCompleted: completed, pairedCount: clients ? clients.length : null, finished: false, resuming })
   } catch {
     return false
   }

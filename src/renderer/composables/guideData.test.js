@@ -23,7 +23,7 @@ test('a host with an account answers the config, one without sends a page: the a
   const withAccount = make({ '/api/config': { version: '1', platform: 'windows' } })
   await withAccount.probeAccount()
   assert.equal(withAccount.state.account.exists, true)
-  assert.equal(buildGuideSteps({ skip: withAccount.state.account.exists ? ['account'] : [] })[0].id, 'setup')
+  assert.equal(buildGuideSteps({ skip: withAccount.state.account.exists ? ['account'] : [] })[0].id, 'basics')
 
   const without = make({ '/api/config': () => new Response('<html>create account</html>', { status: 200 }) })
   await without.probeAccount()

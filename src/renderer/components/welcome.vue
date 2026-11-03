@@ -1,4 +1,5 @@
 <template>
+  <MOnboardWindow :mode="onboardMode" :label="accountTexts?.title || ''" @close="closeGuide">
   <div class="panel-guide">
     <MLoading v-if="state.account.exists === null" class="panel-guide__loading" />
     <MGuideFlow
@@ -24,16 +25,18 @@
       </template>
     </MGuideFlow>
   </div>
+  </MOnboardWindow>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import QRCode from 'qrcode'
 import { invoke } from '@tauri-apps/api/core'
-import { MGuideFlow, MIcon, MLoading, buildGuideSteps } from 'foundation-ui/vue'
+import { MGuideFlow, MIcon, MLoading, MOnboardWindow, buildGuideSteps } from 'foundation-ui/vue'
 import { supportedLocales, setLocale as setI18nLocale, getDefaultLocale, useWelcomeI18n } from '../../i18n/index.js'
 import { openExternalUrl, sunshine } from '../tauri-adapter.js'
 import { GUIDE_DISMISSED_KEY, GUIDE_STORAGE_KEY, createGuideData } from '../composables/guideData.js'
+import { useHostReach } from '../composables/useHostReach.js'
 
 // The guided first run of the panel. It opens by itself on a first run, when the host serves its account page (no account yet), and from
 // the help page. The account step is part of the flow only while the host has no account.
@@ -56,6 +59,7 @@ const data = createGuideData({
   activeSessions: () => sunshine.getActiveSessions(),
   openUrl: (url) => openExternalUrl(url),
   copy: (text) => navigator.clipboard.writeText(text),
+  reach: useHostReach(),
   // The apps page of the Web UI takes the request from the address (#guide-scan, #guide-add, #guide-restore)
   openApps: (mode) => emit('webui-navigate', `/apps#guide-${mode}`),
   navigate: (to) => { window.location.href = to },
@@ -79,6 +83,8 @@ const accountTexts = computed(() => {
   }
 })
 
+// the presentation of the first-run window: the bottom sheet (default) or the floating dialog; ?onboard=dialog previews the other
+const onboardMode = 'sheet'
 const closeGuide = () => {
   try { window.sessionStorage.setItem(GUIDE_DISMISSED_KEY, '1') } catch { /* not remembered */ }
   emit('close')
@@ -97,6 +103,5 @@ onMounted(async () => {
 .welcome-lang select { border: 0; outline: 0; background: transparent; color: var(--md-sys-color-on-surface); font: var(--m-label-large); cursor: pointer; }
 .panel-guide { min-height: 100dvh; }
 .panel-guide .m-guide { min-height: 100dvh; }
-.panel-guide .m-guide__bar { padding-inline-end: 144px; }
 .panel-guide__loading { margin: 120px auto; }
 </style>

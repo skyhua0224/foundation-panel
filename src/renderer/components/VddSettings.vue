@@ -38,19 +38,30 @@
     </template>
 
     <template v-else>
-      <!-- Overview -->
+      <!-- Overview: the modes first (tier 1), then the options of a virtual display (tier 2), then the way to the rest -->
       <template v-if="activeSection === 'overview'">
         <MStatusPill icon="desktop_windows" :label="vddStatusLabel" tone="ok" :action="false" />
-        <div class="m-tiles m-tiles--static">
-          <MTile v-for="card in overviewCards" :key="card.key" :title="card.label" :size="'1x1'">
-            <span class="m-num m-num--sm">{{ card.value }}</span>
-            <template v-if="card.hint" #foot>{{ card.hint }}</template>
-          </MTile>
-        </div>
+        <MBanner v-if="hostVdd.store.error.value" tone="error" icon="error">{{ vp.saveFailed.replace('{error}', hostVdd.store.error.value) }}</MBanner>
+        <MSection :title="vp.source">
+          <MSeg v-model="sourceModel" block size="lg" :label="vp.source" :options="sourceOptions" :disabled="hostVdd.store.anyBusy.value" />
+          <MFooter>{{ vt.modeText[hostVdd.store.mode.value] }}<template v-if="!hostVdd.store.canSaveProtected"> {{ vt.trayMode }}</template></MFooter>
+        </MSection>
+        <MSection :title="vp.prepTitle">
+          <MChoiceCards v-model="prepModel" :options="prepOptions" :label="vp.prepLabel" :columns="3" :disabled="hostVdd.store.anyBusy.value">
+            <template #art="{ option }"><MPrepArt :mode="option.value" /></template>
+          </MChoiceCards>
+        </MSection>
+        <MSection v-if="isVirtualMode" :title="vp.options">
+          <MGroup>
+            <MSwitchItem v-model="reuseModel" icon="devices" :title="vp.reuse" :text="vp.reuseText" :disabled="hostVdd.store.busy.vdd_reuse" />
+            <MSwitchItem v-model="headlessModel" icon="desktop_access_disabled" :title="vp.headless" :text="hostVdd.store.canSaveProtected ? vp.headlessText : `${vp.headlessText} ${vt.trayOnly}`" :disabled="!hostVdd.store.canSaveProtected || hostVdd.store.busy.vdd_headless_create" />
+          </MGroup>
+        </MSection>
         <MGroup>
-          <MItem action icon="monitor" :title="t.vddSettings.tabDisplay" @click="activeSection = 'display'" />
-          <MItem action :icon="calibrationStatus.calibrated ? 'check_circle' : 'warning'" :title="t.vddSettings.calibrationTitle" :value="calibrationStatusTitle" @click="activeSection = 'calibration'" />
-          <MItem action icon="build" :title="t.vddSettings.tabDriver" @click="activeSection = 'driver'" />
+          <MItem action icon="monitor" :title="t.vddSettings.tabDisplay" :text="displaySummary" @click="activeSection = 'display'" />
+          <MItem action icon="hdr_on" :title="vp.qualityTitle" :text="qualitySummary" @click="activeSection = 'quality'" />
+          <MItem action :icon="calibrationStatus.calibrated ? 'check_circle' : 'warning'" :title="t.vddSettings.calibrationTitle" :text="calibrationStatusTitle" @click="activeSection = 'calibration'" />
+          <MItem action icon="build" :title="vp.driverTitle" :text="vp.tier3" @click="activeSection = 'driver'" />
         </MGroup>
       </template>
 
@@ -95,7 +106,25 @@
             <MSwitchItem v-model="settings.edid.Vrr" icon="sync" :title="t.vddSettings.vrr" :text="t.vddSettings.vrrTip" />
           </MGroup>
         </MSection>
-        <MSection :title="t.vddSettings.qualitySection">
+        <MSection :title="vp.displayRules">
+          <MGroup>
+            <MItem icon="aspect_ratio" :title="vt.resolution" stack data-cfg="resolution_change">
+              <template #control><MSeg v-model="ruleResolution" block :label="vt.resolution" :options="ruleOptions" /></template>
+            </MItem>
+            <MFieldItem v-if="ruleResolution === 'manual'" v-model="manualResolution" :label="vt.manualResolution" placeholder="2560x1440" />
+            <MItem icon="speed" :title="vt.refresh" stack data-cfg="refresh_rate_change">
+              <template #control><MSeg v-model="ruleRefresh" block :label="vt.refresh" :options="ruleOptions" /></template>
+            </MItem>
+            <MFieldItem v-if="ruleRefresh === 'manual'" v-model="manualRefresh" :label="vt.manualRefresh" placeholder="59.95" />
+            <MSwitchItem v-model="followModel" icon="sync" :title="vp.follow" />
+          </MGroup>
+          <MFooter>{{ vp.rulesFooter }}</MFooter>
+        </MSection>
+      </template>
+
+      <!-- Quality: colour depth, colour mode, cursor -->
+      <template v-else-if="activeSection === 'quality'">
+        <MSection :title="vp.qualityTitle">
           <MGroup>
             <MItem icon="hdr_on" :title="t.vddSettings.colorDepthProfile" :text="t.vddSettings.colorDepthMutualExclusiveTip" stack>
               <template #control>
@@ -140,9 +169,19 @@
 
       <!-- Driver: tools, trace, EDID -->
       <template v-else-if="activeSection === 'driver'">
+        <MSection :title="vp.advanced">
+          <MGroup>
+            <MSwitchItem :model-value="borrowedModel" icon="content_copy" :title="vp.borrowed" :text="vp.borrowedText" data-cfg="vdd_borrowed_texture" :disabled="hostVdd.store.busy.vdd_borrowed_texture" @update:model-value="(v) => confirmThen('borrowed', vp.borrowed, () => (borrowedModel = v))" />
+            <MSwitchItem :model-value="vsyncModel" icon="sync" :title="vp.vsync" :text="vp.vsyncText" data-cfg="nvenc_vdd_force_vsync" :disabled="hostVdd.store.busy.nvenc_vdd_force_vsync" @update:model-value="(v) => confirmThen('vsync', vp.vsync, () => (vsyncModel = v))" />
+            <MSwitchItem :model-value="vulkanModel" icon="hdr_on" :title="vp.vulkan" :text="vp.vulkanText" data-cfg="vdd_vulkan_hdr_bridge" :disabled="hostVdd.store.busy.vdd_vulkan_hdr_bridge" @update:model-value="(v) => confirmThen('vulkan', vp.vulkan, () => (vulkanModel = v))" />
+            <MItem :icon="vulkanView.icon" :title="vp.vulkanStatus[vulkanView.key]" />
+            <MItem v-if="vulkanView.showValidate" action icon="play_arrow" :disabled="!vulkanView.canValidate" :title="vulkan.validating.value ? vp.vulkanValidating : vp.vulkanValidate" :text="vulkanView.hint ? vp.vulkanHint : ''" @click="vulkan.validate" />
+          </MGroup>
+          <MFooter>{{ vp.advancedHint }}</MFooter>
+        </MSection>
         <MSection :title="t.vddSettings.driverTools">
           <MGroup>
-            <MItem action icon="refresh" :title="t.vddSettings.reloadDriver" :disabled="isReloadingDriver" @click="reloadDriver" />
+            <MItem action icon="refresh" :title="t.vddSettings.reloadDriver" :disabled="isReloadingDriver" @click="confirmThen('reload', t.vddSettings.reloadDriver, reloadDriver)" />
             <MItem v-if="edidFileExists" action icon="delete" :title="t.vddSettings.deleteEdid" :text="t.vddSettings.dangerZoneHint" :disabled="isDeletingEdid" @click="removeEdidFile" />
           </MGroup>
           <MFooter>{{ t.vddSettings.driverToolsHint }}</MFooter>
@@ -158,8 +197,8 @@
         </MSection>
         <MSection :title="t.vddSettings.edidSection">
           <MGroup>
-            <MSwitchItem v-model="settings.edid.DolbyVision" icon="hdr_on" :title="t.vddSettings.dolbyVision" :text="settings.edid.CustomEdid && !settings.edid.EdidCeaOverride ? t.vddSettings.dolbyVisionCustomEdidTip : t.vddSettings.dolbyVisionTip" :disabled="settings.edid.CustomEdid && !settings.edid.EdidCeaOverride" />
-            <MSwitchItem v-model="settings.edid.CustomEdid" icon="description" :title="t.vddSettings.customEdid" :text="t.vddSettings.customEdidTip" @update:model-value="handleEdidToggle" />
+            <MSwitchItem :model-value="settings.edid.DolbyVision" icon="hdr_on" :title="t.vddSettings.dolbyVision" :text="settings.edid.CustomEdid && !settings.edid.EdidCeaOverride ? t.vddSettings.dolbyVisionCustomEdidTip : t.vddSettings.dolbyVisionTip" :disabled="settings.edid.CustomEdid && !settings.edid.EdidCeaOverride" @update:model-value="(v) => confirmThen('dolby', t.vddSettings.dolbyVision, () => (settings.edid.DolbyVision = v))" />
+            <MSwitchItem :model-value="settings.edid.CustomEdid" icon="description" :title="t.vddSettings.customEdid" :text="t.vddSettings.customEdidTip" @update:model-value="(v) => confirmThen('customEdid', t.vddSettings.customEdid, () => { settings.edid.CustomEdid = v; handleEdidToggle(v) })" />
             <template v-if="settings.edid.CustomEdid">
               <MItem icon="description" :title="edidFileExists ? t.vddSettings.edidUploaded : t.vddSettings.edidNotUploaded" :text="edidFilePath" />
               <MItem action icon="upload" :title="t.vddSettings.edidSelectFile" @click="edidInput?.click()" />
@@ -178,6 +217,14 @@
         </MSection>
       </template>
 
+      <MDialog v-model="confirm.open" :title="vp.confirmTitle.replace('{name}', confirm.name)" icon="warning" tone="warning">
+        <p class="vdd-confirm__text">{{ confirm.text }}</p>
+        <template #actions>
+          <MButton variant="text" @click="confirm.open = false">{{ vp.cancel }}</MButton>
+          <MButton @click="confirmApply">{{ vp.confirmChange }}</MButton>
+        </template>
+      </MDialog>
+
       <Transition name="m-savebar">
         <div v-if="hasUnsavedChanges || isSaving" class="m-savebar" role="region" :aria-label="t.vddSettings.saveAndApply">
           <span class="m-savebar__count">{{ t.vddSettings.unsavedBadge }}</span>
@@ -192,7 +239,8 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MFieldItem, MSeg, MChip, MTile, MIcon, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, useSubpage } from 'foundation-ui/vue'
+import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards, MDialog, MPrepArt, MFieldItem, MSeg, MChip, MTile, MIcon, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, useSubpage, vddPageTexts, vddTexts, VDD_PREP, VDD_RULES, vddOn } from 'foundation-ui/vue'
+import { useHostVdd } from '../composables/useHostVdd.js'
 import { useEditableOptionField } from '../composables/useEditableOptionField.js'
 import { useVddEdid } from '../composables/useVddEdid.js'
 import { useVddStatusLabel } from '../composables/useVddStatusLabel.js'
@@ -200,7 +248,9 @@ import { installVddWithRecovery } from '../composables/vddInstallRecovery.js'
 import { openExternalUrl, sunshine, vdd } from '../tauri-adapter.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const vp = computed(() => vddPageTexts(locale.value))
+const vt = computed(() => vddTexts(locale.value))
 
 const DEFAULT_REFRESH_RATES = ['60', '120', '240']
 const suggestedResolutions = ['1280x720', '1920x1080', '2560x1440', '3840x2160']
@@ -306,11 +356,72 @@ const isRefreshingCalibration = ref(false)
 const isLaunchingCalibration = ref(false)
 const isLaunchingPhysicalCalibration = ref(false)
 const { current: vddSub, open: openVddSub, back: backVdd } = useSubpage('vdd')
+
+// ---- the host's keys of the virtual display (the modes, the shared display, the rules, the expert options): the shared store, each change saved at once ----
+const hostVdd = useHostVdd()
+const hostConfig = hostVdd.store.config
+const flagOf = (key, def = false) => computed({
+  get: () => (hostConfig.value[key] === undefined || hostConfig.value[key] === '' ? def : vddOn(hostConfig.value[key])),
+  set: (on) => { void hostVdd.store.set({ [key]: typeof hostConfig.value[key] === 'boolean' ? on : on ? 'enabled' : 'disabled' }) },
+})
+const pickOf = (key, def, list) => computed({ get: () => (list.includes(hostConfig.value[key]) ? hostConfig.value[key] : def), set: (value) => { void hostVdd.store.set({ [key]: value }) } })
+const textOf = (key) => computed({ get: () => hostConfig.value[key] ?? '', set: (value) => { void hostVdd.store.set({ [key]: value }) } })
+const isVirtualMode = computed(() => hostVdd.store.mode.value !== 'physical')
+const sourceModel = computed({ get: () => hostVdd.store.mode.value, set: (value) => { void hostVdd.store.setMode(value) } })
+const SOURCE_ICONS = { physical: 'monitor', ondemand: 'screen_share', persistent: 'push_pin' }
+const sourceOptions = computed(() => hostVdd.store.modes.value.map((m) => ({ value: m.id, label: vt.value.modes[m.id], icon: SOURCE_ICONS[m.id], disabled: m.disabled })))
+const prepModel = pickOf('display_device_prep', 'no_operation', VDD_PREP)
+const prepOptions = computed(() => VDD_PREP.map((value) => ({ value, label: vp.value.preps[value].title, text: vp.value.preps[value].text })))
+const reuseModel = flagOf('vdd_reuse')
+const headlessModel = flagOf('vdd_headless_create')
+const followModel = flagOf('dynamic_resolution_follow_display', true)
+const borrowedModel = flagOf('vdd_borrowed_texture', true)
+const vsyncModel = flagOf('nvenc_vdd_force_vsync')
+const vulkanModel = flagOf('vdd_vulkan_hdr_bridge')
+const ruleResolution = pickOf('resolution_change', 'automatic', VDD_RULES)
+const ruleRefresh = pickOf('refresh_rate_change', 'automatic', VDD_RULES)
+const manualResolution = textOf('manual_resolution')
+const manualRefresh = textOf('manual_refresh_rate')
+const ruleOptions = computed(() => VDD_RULES.map((value) => ({ value, label: vt.value.rules[value] })))
+
+// the Vulkan HDR bridge: what the host reports and a test of the current display
+const vulkanStatus = ref({ state: 'idle', artifacts_installed: false, display_available: false })
+const vulkanLoaded = ref(false)
+const vulkanValidating = ref(false)
+const vulkan = {
+  validating: vulkanValidating,
+  async refresh() {
+    try { const r = await hostVdd.fetchJson('/api/vulkan-hdr-bridge'); if (String(r?.status) === 'true') vulkanStatus.value = r; else throw new Error('no status') } catch { vulkanStatus.value = { state: 'unavailable', artifacts_installed: false, display_available: false } } finally { vulkanLoaded.value = true }
+  },
+  async validate() {
+    vulkanValidating.value = true; vulkanStatus.value = { ...vulkanStatus.value, state: 'validating' }
+    try { vulkanStatus.value = await hostVdd.fetchJson('/api/vulkan-hdr-bridge/validate', { method: 'POST' }) } catch { vulkanStatus.value = { ...vulkanStatus.value, state: 'error' } } finally { vulkanValidating.value = false; vulkanLoaded.value = true }
+  },
+}
+const vulkanView = computed(() => {
+  const st = vulkanStatus.value, on = vulkanModel.value
+  const icon = (k) => ({ enabled: 'check_circle', idle: 'check_circle', error: 'warning', validating: 'sync' }[k] || 'info')
+  if (!on) return { key: 'disabled', icon: icon('disabled'), showValidate: false }
+  if (!vulkanLoaded.value) return { key: 'loading', icon: icon('loading'), showValidate: false }
+  if (!st.artifacts_installed || st.state === 'unavailable') return { key: 'unavailable', icon: icon('unavailable'), showValidate: false }
+  const showValidate = st.state !== 'enabled', canValidate = showValidate && st.display_available && !vulkanValidating.value
+  if (st.state === 'idle' && !st.display_available) return { key: 'waiting', icon: icon('waiting'), showValidate, canValidate, hint: true }
+  const key = ['idle', 'validating', 'enabled', 'error'].includes(st.state) ? st.state : 'idle'
+  return { key, icon: icon(key), showValidate, canValidate }
+})
+
+// an expert option is confirmed before it changes: what it does, then the change
+const confirm = reactive({ open: false, name: '', text: '', apply: null })
+const confirmThen = (riskKey, name, apply) => { Object.assign(confirm, { open: true, name, text: vp.value.risk[riskKey] || '', apply }) }
+const confirmApply = () => { const run = confirm.apply; confirm.open = false; confirm.apply = null; if (run) run() }
+const displaySummary = computed(() => [`${sortedResolutionOptions.value.length} ${t.value.vddSettings.resolutionPresets}`, `${sortedRefreshRateOptions.value.length} ${t.value.vddSettings.refreshRatePresets}`].join(' · '))
+const qualitySummary = computed(() => [colorDepthOptions.value.find((o) => o.value === colorDepthProfile.value)?.label, settings.colour.ColourFormat].filter(Boolean).join(' · '))
+onMounted(() => { void hostVdd.load(); void vulkan.refresh() })
 const activeSection = computed({
   get: () => vddSub.value || 'overview',
   set: (value) => { if (value === 'overview') { if (vddSub.value) backVdd() } else openVddSub(value) },
 })
-const pageTitle = computed(() => ({ display: t.value.vddSettings.tabDisplay, calibration: t.value.vddSettings.calibrationTitle, driver: t.value.vddSettings.tabDriver }[activeSection.value] || t.value.vddSettings.title))
+const pageTitle = computed(() => ({ display: t.value.vddSettings.tabDisplay, quality: vp.value.qualityTitle, calibration: t.value.vddSettings.calibrationTitle, driver: vp.value.driverTitle }[activeSection.value] || t.value.vddSettings.title))
 const edidInput = ref(null)
 const onEdidPicked = (event) => {
   const file = event.target.files?.[0]

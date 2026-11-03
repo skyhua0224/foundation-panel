@@ -4,6 +4,7 @@ import { micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MH
 import { buildCatalogue, buildCatalogueDetails, useJourneyHome, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
 import { usePanelHome } from '../composables/usePanelHome.js'
+import { useHostReach } from '../composables/useHostReach.js'
 import { useGamepadType } from '../composables/useGamepadType.js'
 import { SPONSORS } from '../config/sponsors.js'
 import { openExternalUrl, vdd as vddApi, virtualMicrophone } from '../tauri-adapter.js'
@@ -112,12 +113,15 @@ const vddAdapter = createHttpVddAdapter({
 })
 const vddStore = createVddStore(vddAdapter, { autosave: true })
 onMounted(async () => { try { await vddAdapter.load() } catch { /* the card then shows the defaults */ } vddStore.refresh() })
+const hostReach = useHostReach()
+onMounted(() => { void hostReach.refresh() })
 const catalogueInput = computed(() => {
   void historyTick.value
   const s = session.value
   const p = perfSession.value
   return {
     sampleSec: SAMPLE_SEC, vddStore: state.vdd && state.vdd.installed !== false ? vddStore : null,
+    reach: hostReach.view.report,
     host: { version: state.version, update: props.updateAvailable ? h.value.update : '' },
     session: s ? { ...s, fpsMeasured: p?.frame_rates?.encoded?.fps, latencyMs: p?.host_latency?.avg_ms, latencyP95Ms: p?.host_latency?.p95_ms, uptimeMs: p?.uptime_ms ?? s.uptimeMs } : null,
     history: { samples: history.samples, sessions: history.sessions, days: history.days, last: () => history.last() },

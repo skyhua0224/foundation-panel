@@ -1,15 +1,15 @@
 <template>
   <div class="m-app m-app--scroll panel-shell">
     <!-- slim caption bar over the whole window: draggable, the window controls at the end; the pages start below it -->
-    <header class="panel-caption" data-tauri-drag-region @pointerdown="onTouchWindowDragStart">
-      <MBrand class="panel-caption__brand" :size="20" data-tauri-drag-region />
-      <div class="panel-caption__search" data-tauri-drag-region><MUnifiedSearch :search="uni" :texts="searchT" :compact="compactSearch" :height="38" /></div>
-      <div class="panel-caption__controls">
+    <MCaption bem="panel-caption" data-tauri-drag-region @pointerdown="onTouchWindowDragStart">
+      <template #brand><MBrand class="panel-caption__brand" :size="20" data-tauri-drag-region /></template>
+      <template #search><div class="panel-caption__search" data-tauri-drag-region><MUnifiedSearch :search="uni" :texts="searchT" :compact="compactSearch" :height="38" /></div></template>
+      <template #controls><div class="panel-caption__controls">
         <button type="button" class="panel-caption__btn" :aria-label="t.sidebar.minimize" :data-tip="t.sidebar.minimize" @click="minimizeWindow"><MIcon name="remove" /></button>
         <button type="button" class="panel-caption__btn" :aria-label="isMaximized ? t.sidebar.restore : t.sidebar.maximize" :data-tip="isMaximized ? t.sidebar.restore : t.sidebar.maximize" @click="toggleMaximize"><MIcon :name="isMaximized ? 'filter_none' : 'crop_square'" /></button>
         <button type="button" class="panel-caption__btn panel-caption__btn--close" :aria-label="t.sidebar.hideWindow" :data-tip="t.sidebar.hideWindow" @click="closeWindow"><MIcon name="close" /></button>
-      </div>
-    </header>
+      </div></template>
+    </MCaption>
     <div class="panel-body">
     <MScene :nav="nav" :caption-height="48" :rail-items="rail" :bar-items="bar" :bar-current="barCur" :texts="sceneTexts" :overlay="isWebPage" storage-key="foundation-ui.panel.list" @rail="onRail">
       <template #rail-foot><MIconButton icon="info" :label="aboutTexts(locale).title" @click="router.navigate(ROUTES.ABOUT)" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
@@ -59,6 +59,7 @@
           @channel-change="setIncludePrerelease"
           @webui-navigate="openWebUi"
           @open-guide="openWelcome"
+          @open-remote="remoteOpen = true"
           @open-about="router.navigate(ROUTES.ABOUT)"
           @open-appearance="router.navigate(ROUTES.CFG_APPEARANCE)"
         />
@@ -80,6 +81,7 @@
         <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="moreGo(() => { sponsorOpen = true })" />
       </MGroup>
     </MSheet>
+    <MRemoteWindow v-model="remoteOpen" :locale="locale" :state="remoteData.state" :callbacks="remoteData.callbacks" />
     <MSupportSheet v-model="sponsorOpen" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" />
     <MThanksLine v-if="thanks.visible.value" :locale="locale" @star="thanksStar" @sponsor="thanksSponsor" @dismiss="thanks.dismiss" />
     <UpdateDialog
@@ -97,7 +99,7 @@
 import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
-import { filterHash, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { filterHash, MCaption, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -124,6 +126,8 @@ import { useTools } from '../composables/useTools.js'
 import { useTouchWindowDrag } from '../composables/useTouchWindowDrag.js'
 import { createUtilityTools } from '../composables/toolsRegistry.js'
 import { ROUTES, PAGES, routeForWebPath, webPathOf } from '../composables/useRouter.js'
+import { createGuideData } from '../composables/guideData.js'
+import { useHostReach } from '../composables/useHostReach.js'
 import { ROW_OF_ROUTE, railItems, pageItems, barItems, barCurrent } from '../composables/panelNav.js'
 import { rowKeywords } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../desktop/i18n/index.js'
@@ -206,6 +210,9 @@ const hostConn = useHostConnection({
 const NEEDS_NO_HOST = new Set([ROUTES.PANEL_SETTINGS, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
 const offlineShown = computed(() => hostConn.state.status !== 'online' && !NEEDS_NO_HOST.has(router.currentRoute.value))
 const back = () => nav.pop()
+// the remote access tutorials (help page, and the fix of a reason of the reachability check)
+const remoteOpen = ref(false)
+const remoteData = createGuideData({ proxyUrl: () => sunshine.getProxyUrl(), openUrl: (url) => actions_openExternal(url), copy: (text) => navigator.clipboard.writeText(text), reach: useHostReach(), vddStatus: async () => null, openApps: () => {}, navigate: () => {} })
 const announceVersion = ref('')
 onMounted(async () => { try { announceVersion.value = (await sunshine.getVersion()) || '' } catch { /* the version only narrows version-bound notices */ } })
 const { unread: announcementsUnread } = useAnnouncementBadge({ locale, version: announceVersion })
