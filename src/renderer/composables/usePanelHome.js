@@ -8,6 +8,11 @@ import { readLogResponse } from 'foundation-ui/diagnostics'
 const HISTORY = 60
 const safe = async (fn, fallback = null) => { try { return await fn() } catch { return fallback } }
 
+// The last data of the overview (stale-while-revalidate): a visit after the first starts from it, so the tiles show their numbers at once and the
+// reads below replace them in place. The first visit waited for the slowest of its reads (the driver probe, 0.5 s) before anything showed.
+let remembered = null
+const REMEMBER = ['version', 'startMs', 'gpus', 'config', 'memory', 'vdd', 'vddSettings', 'logs', 'logText', 'clients', 'clientsTotal', 'apps', 'appsTotal', 'recent', 'errorLog']
+
 /**
  * Live data of the overview tiles. Every value comes from a real source (host API through the local proxy, Tauri commands);
  * a source that fails leaves its field empty and the tile hides or shows its unavailable state. Samples for the sparklines
@@ -25,6 +30,17 @@ export function usePanelHome() {
     clients: null, apps: null, recent: null, errorLog: null,
   })
   const proxy = ref('')
+  if (remembered) {
+    for (const key of REMEMBER) state[key] = remembered.state[key]
+    state.hw.available = remembered.hwAvailable
+    state.hw.cpuTemp = remembered.cpuTemp
+    state.hw.gpuTemp = remembered.gpuTemp
+    proxy.value = remembered.proxy
+    state.loaded = true
+  }
+  const remember = () => {
+    remembered = { state: Object.fromEntries(REMEMBER.map((key) => [key, state[key]])), hwAvailable: state.hw.available, cpuTemp: state.hw.cpuTemp, gpuTemp: state.hw.gpuTemp, proxy: proxy.value }
+  }
   const fetchJson = async (path, init) => {
     const r = await fetch(`${proxy.value}${path}`, init)
     if (!r.ok) throw new Error(String(r.status))
@@ -85,27 +101,38 @@ export function usePanelHome() {
       state.errorLog = parseErrorLog(logs)
       state.logs = { errors: err.length, warnings: lines.filter((l) => /\]\s*Warning:/.test(l)).length, last: err[err.length - 1] || '' }
     }
-    if (state.hw.available) {
-      const data = await safe(() => invoke('hwinfo_get_sensors'))
-      const hw = pickHardware(data?.readings)
-      state.hw.cpuTemp = hw.cpuTemp
-      state.hw.gpuTemp = hw.gpuTemp
-    }
     state.loaded = true
+    remember()
+  }
+  async function hardware() {
+    if (!state.hw.available) return
+    const data = await safe(() => invoke('hwinfo_get_sensors'))
+    const hw = pickHardware(data?.readings)
+    state.hw.cpuTemp = hw.cpuTemp
+    state.hw.gpuTemp = hw.gpuTemp
+    remember()
+  }
+  // what does not change while the page is open, read together (these were five reads one after the other: 20 + 63 + 70 + 25 ms before the first tile)
+  async function facts() {
+    const [version, start, gpus, hwAvailable] = await Promise.all([
+      safe(() => sunshine.getVersion(), ''),
+      safe(() => invoke('get_sunshine_start_time')),
+      safe(() => invoke('get_gpus'), []),
+      safe(() => invoke('hwinfo_check_available'), false),
+    ])
+    state.version = version || ''
+    state.startMs = start?.start_time_ms || 0
+    state.gpus = Array.isArray(gpus) ? gpus : []
+    state.hw.available = hwAvailable === true
+    remember()
   }
   let t1 = 0, t2 = 0
   onMounted(async () => {
-    proxy.value = (await safe(() => sunshine.getProxyUrl(), '')) || ''
-    state.version = (await safe(() => sunshine.getVersion(), '')) || ''
-    const start = await safe(() => invoke('get_sunshine_start_time'))
-    state.startMs = start?.start_time_ms || 0
-    const gpus = await safe(() => invoke('get_gpus'), [])
-    state.gpus = Array.isArray(gpus) ? gpus : []
-    state.hw.available = (await safe(() => invoke('hwinfo_check_available'), false)) === true
-    await slow()
-    await fast()
+    proxy.value = (await safe(() => sunshine.getProxyUrl(), '')) || proxy.value
+    await Promise.all([facts(), slow()])
+    await Promise.all([fast(), hardware()])
     t1 = setInterval(fast, 3000)
-    t2 = setInterval(slow, 15000)
+    t2 = setInterval(() => { slow(); hardware() }, 15000)
   })
   onBeforeUnmount(() => { clearInterval(t1); clearInterval(t2) })
 
