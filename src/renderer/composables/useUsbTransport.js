@@ -1,5 +1,6 @@
 import { computed, onActivated, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
+import { ElMessage } from './notifyMessage.js'
 import { usbip } from '../tauri-adapter.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { useDeviceComponentOperation } from './useDeviceComponentOperation.js'

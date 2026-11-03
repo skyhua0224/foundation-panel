@@ -20,7 +20,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '../../composables/notifyMessage.js'
 import { MSection, MGroup, MItem, MIcon, MDialog, MButton } from 'foundation-ui/vue'
 import { sunshine } from '../../tauri-adapter.js'
 import { useI18n } from '../../desktop/i18n/index.js'

@@ -1,0 +1,47 @@
+<script setup>
+import { onBeforeUnmount, onMounted } from 'vue'
+import { MNotifyHost, MPendingHost, mountPendingBridge, usePending } from 'foundation-ui/vue'
+import { tools } from '../tauri-adapter.js'
+import { defineVddSource } from '../composables/useVddPending.js'
+import { useI18n } from '../desktop/i18n/index.js'
+import { ROUTES } from '../composables/useRouter.js'
+
+// The window's one bar of unsaved changes, its list and the one save confirmation, and the place of the snackbars. The Web UI in the frame reports its own
+// edits to this window (mountPendingBridge) and saves them itself when asked; the pages of the panel (the virtual display) report here directly.
+defineProps({ locale: { type: String, default: 'en' } })
+const emit = defineEmits(['go'])
+const { t } = useI18n()
+const pending = usePending({ restartHost: () => tools.restartSunshineService() })
+defineVddSource({ pageLabel: t.value.m3e.nav.display })
+
+const frame = () => document.querySelector('.panel-web__frame iframe')
+const originOf = (el) => { try { return new URL(el.src, location.href).origin } catch { return '*' } }
+let stop = () => {}
+let last = null
+let timer = 0
+onMounted(() => {
+  stop = mountPendingBridge(pending, {
+    post: (message) => { const el = frame(); el?.contentWindow?.postMessage(message, originOf(el)) },
+    listen: (fn) => {
+      const on = (event) => { const el = frame(); if (el && event.source === el.contentWindow && event.origin === originOf(el)) fn(event.data) }
+      window.addEventListener('message', on)
+      return () => window.removeEventListener('message', on)
+    },
+  })
+  // the frame loads again when it opens another page of the Web UI: it is asked for what it holds
+  timer = setInterval(() => { const w = frame()?.contentWindow; if (w && w !== last) { last = w; frame()?.contentWindow?.postMessage({ type: 'foundation-pending', op: 'hello' }, originOf(frame())) } }, 600)
+})
+onBeforeUnmount(() => { stop(); clearInterval(timer) })
+
+// a page of the changes: the Web UI page that holds them, or the page of the panel
+function go(page) {
+  const entry = pending.all.value.find((e) => e.page === page)
+  if (page.startsWith('web:') || page.startsWith('config:') || page === 'gamepad' || page === 'apps') emit('go', { page, entry })
+  else if (page === 'vdd') emit('go', { route: ROUTES.VDD_SETTINGS })
+}
+</script>
+
+<template>
+  <MNotifyHost />
+  <MPendingHost :locale="locale" @go="go" />
+</template>

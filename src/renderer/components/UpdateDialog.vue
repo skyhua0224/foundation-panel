@@ -33,7 +33,8 @@
 
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
+import { ElMessage } from '../composables/notifyMessage.js'
 import { MUpdateSheet, sheetFromPanelInfo, downloadView } from 'foundation-ui/vue'
 import { channelOfVersion, fetchReleaseMetadata } from 'foundation-ui/update'
 import { useI18n } from '../desktop/i18n/index.js'

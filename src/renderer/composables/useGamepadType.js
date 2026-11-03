@@ -1,6 +1,6 @@
 // State of the controller type page: which pad games see, the per-game overrides, and the app list they come from.
 import { computed, onMounted, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from './notifyMessage.js'
 import { sunshine } from '../tauri-adapter.js'
 import { useControllerHubConfig } from './useControllerHubConfig.js'
 import { useI18n } from '../desktop/i18n/index.js'

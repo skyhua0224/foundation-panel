@@ -1,6 +1,6 @@
 <script setup>
-import { computed, onMounted, ref, unref } from 'vue'
-import { MButton, MDialog, MExpertItem, MFooter, MGroup, MIcon, MIconButton, MItem, MPathItem, MSection, MSeg, MSheet, MSnackbar, MSwitchItem, MSwitch, useAppearance } from 'foundation-ui/vue'
+import { computed, onMounted, ref, unref, watch } from 'vue'
+import { useNotify, MButton, MDialog, MExpertItem, MFooter, MGroup, MIcon, MIconButton, MItem, MPathItem, MSection, MSeg, MSheet, MSnackbar, MSwitchItem, MSwitch, useAppearance } from 'foundation-ui/vue'
 import { useI18n } from '../../desktop/i18n/index.js'
 import { defaultDesktopSettings, desktopSettings, loadDesktopSettings, saveDesktopSettings } from '../../desktop/composables/useDesktopSettings.js'
 import { bigScreenSettings, defaultBigScreenSettings, setBigScreenSetting } from '../../desktop/composables/useBigScreenSettings.js'
@@ -19,6 +19,8 @@ const st = computed(() => t.value.settings)
 const settings = desktopSettings
 const hasTauri = ref(false)
 const notice = ref('')
+// short results go to the one snackbar of the window
+watch(notice, (message) => { if (message) { useNotify().snack(message); notice.value = '' } })
 const sheet = ref('')
 const open = (id) => { sheet.value = id }
 // how many switches of a group are on, for the row that opens it (`{n} / {total}`)
@@ -255,7 +257,6 @@ const resetAll = async () => {
     <p>{{ revoking && fs.revokeConfirm.replace('{name}', revoking.name || revoking.id) }}</p>
     <template #actions><MButton variant="text" @click="revoking = null">{{ fs.close }}</MButton><MButton variant="danger" @click="revoke">{{ fs.revoke }}</MButton></template>
   </MDialog>
-  <MSnackbar :model-value="!!notice" :message="notice" :timeout="4000" @update:model-value="(v) => { if (!v) notice = '' }" />
 </template>
 
 <style>

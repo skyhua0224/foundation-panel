@@ -1,4 +1,5 @@
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
+import { ElMessage } from './notifyMessage.js'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
 import { EXTENSION_COMPONENTS } from 'foundation-ui/vue'
 import { dlssNr, rtxHdr } from '../tauri-adapter.js'

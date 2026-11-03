@@ -33,7 +33,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { followRoot } from '../composables/frameRoot.js'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '../composables/notifyMessage.js'
 import { invoke } from '@tauri-apps/api/core'
 import { sunshine } from '@/tauri-adapter.js'
 import { checkLocalProxyHealth } from '../utils/proxyHealth.js'

@@ -1,5 +1,6 @@
 import { ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
+import { ElMessage } from './notifyMessage.js'
 import { vdd } from '../tauri-adapter.js'
 
 const VALID_EDID_SIZES = [128, 256]

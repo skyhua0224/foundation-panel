@@ -5,7 +5,7 @@
     </template>
     <MStatusPill :icon="loadError ? 'error' : heroIcon" :label="loadError ? t.deviceHub.statusUnavailable : text.statusLabels[state]" :tone="loadError ? 'error' : heroTone === 'success' ? 'ok' : heroTone === 'warning' ? 'warn' : ''" :action="false">
       <template #actions>
-        <MButton variant="tonal" icon="play_arrow" :loading="testing" :disabled="!canTest || testing" @click="runTest">{{ testing ? text.testing : text.test }}</MButton>
+        <MButton variant="tonal" icon="play_arrow" :loading="testing" :disabled="!canTest || testing" @click="runTest">{{ text.test }}</MButton>
       </template>
     </MStatusPill>
 
@@ -58,7 +58,7 @@
 
 <script setup>
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '../../composables/notifyMessage.js'
 import { MPage, MSection, MGroup, MItem, MChip, MStatusPill, MBanner, MFooter, MSeg, MNotice, MButton, MIconButton, MSkeleton, MIcon, MProgress, MStatusPills } from 'foundation-ui/vue'
 import { virtualMicrophone } from '../../tauri-adapter.js'
 import { micStatusChannel } from '../../composables/deviceStatusStore.js'

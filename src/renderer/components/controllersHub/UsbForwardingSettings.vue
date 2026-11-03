@@ -30,7 +30,7 @@
 <script setup>
 import { MSection, MGroup, MItem, MSwitchItem, MNotice, MButton, MIcon, MSkeleton } from 'foundation-ui/vue'
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from '../../composables/notifyMessage.js'
 import { usbip } from '../../tauri-adapter.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 

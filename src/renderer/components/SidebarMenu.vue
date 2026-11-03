@@ -3,7 +3,7 @@
     <!-- slim caption bar over the whole window: draggable, the window controls at the end; the pages start below it -->
     <MCaption bem="panel-caption" data-tauri-drag-region @pointerdown="onTouchWindowDragStart">
       <template #brand><MBrand class="panel-caption__brand" :size="20" data-tauri-drag-region /></template>
-      <template #announcements><MAnnouncementButton :unread="announcements.unread.value" :locale="locale" @open="router.navigate(ROUTES.ANNOUNCEMENTS)" /></template>
+      <template #announcements><MStatusBell :locale="locale" /><MAnnouncementButton :unread="announcements.unread.value" :locale="locale" @open="router.navigate(ROUTES.ANNOUNCEMENTS)" /></template>
       <template #search><div class="panel-caption__search" data-tauri-drag-region><MUnifiedSearch :search="uni" :texts="searchT" :compact="compactSearch" :height="38" /></div></template>
       <template #connect><button type="button" class="m-caption-connect" :aria-label="connectT.title" :data-tip="connectT.title" @click="connect.show('pair')"><MIcon name="person_add" /><span>{{ connectT.title }}</span></button></template>
       <template #controls><div class="panel-caption__controls">
@@ -89,7 +89,7 @@
     <MConnectDialog v-model="connect.open.value" v-model:tab="connect.tab.value" v-model:os="connect.os.value" :assets-of="connect.assetsOf" :version-of="connect.versionOf" :locale="locale" :qr="connect.matrix" :pair-qr="connect.pairQr" :count="hostClients.length" :latest="hostClients.length ? hostClients[hostClients.length - 1].name : ''" :close-label="t.m3e.home.done"
       @pair-pin="(e) => connect.pairPin(e.pin)" @pair-qr-begin="connect.qrBegin()" @pair-qr-stop="connect.qrStop()" @open-url="actions_openExternal" @open-downloads="() => { connect.open.value = false; openRoute(ROUTES.WEB_DOWNLOADS) }" />
     <MPairPrompt :requests="pairing.requests.value" :locale="locale" @submit="onPairSubmit" @reject="(id) => pairing.reject(id)" @install="connect.show('install')" />
-    <MSnackbar :model-value="!!connectNotice" :message="connectNotice" :timeout="4000" @update:model-value="(v) => { if (!v) connectNotice = '' }" />
+    <PanelPending :locale="locale" @go="onPendingGo" />
     <MSupportSheet v-model="sponsorOpen" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" />
     <MThanksLine v-if="thanks.visible.value" :locale="locale" @star="thanksStar" @sponsor="thanksSponsor" @dismiss="thanks.dismiss" />
     <UpdateDialog
@@ -108,7 +108,7 @@ import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeU
 import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
-import { connectTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { useNotify, useSystemNotices, MStatusBell, connectTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -137,6 +137,8 @@ import { useTouchWindowDrag } from '../composables/useTouchWindowDrag.js'
 import { createUtilityTools } from '../composables/toolsRegistry.js'
 import { ROUTES, PAGES, routeForWebPath, webPathOf } from '../composables/useRouter.js'
 import { createGuideData } from '../composables/guideData.js'
+import PanelPending from './PanelPending.vue'
+import { recordUpdateCheck } from '../composables/useUpdateCheckTime.js'
 import { useHostReach } from '../composables/useHostReach.js'
 import { ROW_OF_ROUTE, railItems, pageItems, barItems, barCurrent } from '../composables/panelNav.js'
 import { rowKeywords } from 'foundation-ui/settings/index.js'
@@ -199,6 +201,13 @@ const componentStatus = useComponentStatus({
   check: () => handleCheckForUpdates(),
 })
 
+// what is wrong with the host or the app right now goes to the status button of the caption bar
+useSystemNotices({
+  status: componentStatus,
+  locale,
+  go: { components: () => router.navigate(ROUTES.COMPONENTS), microphone: () => router.navigate(ROUTES.MICROPHONE), vdd: () => router.navigate(ROUTES.VDD_SETTINGS), update: () => { showUpdateDialog.value = true } },
+  update: () => ({ state: updateInfo.value && !updateInfo.value.is_latest ? 'available' : '', next: updateInfo.value?.version || '' }),
+})
 const sponsorSections = computed(() => [
   { title: t.value.m3e.home.sponsorTitle, items: SPONSORS.map((x) => ({ id: x.id, icon: 'favorite', title: x.label, url: x.url })) },
   { items: [{ id: 'star', icon: 'star', title: t.value.m3e.home.star, url: 'https://github.com/AlkaidLab/foundation-sunshine' }, { id: 'qq', icon: 'groups', title: t.value.m3e.home.qq, url: 'https://qm.qq.com/q/AfMQoyKrkc' }] },
@@ -284,6 +293,8 @@ const searchT = computed(() => searchTexts(locale.value))
 // 连接设备: the dialog of the caption button and of the search; the host API through the proxy, like the overview's pairing card
 const connectT = computed(() => connectTexts(locale.value))
 const connectNotice = ref('')
+// short results go to the one snackbar of the window
+watch(connectNotice, (message) => { if (message) { useNotify().snack(message); connectNotice.value = '' } })
 const hostApiOf = async (path, init) => { const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, ''); return (await fetch(`${base}${path}`, init)).json() }
 const connect = useConnectDialog({
   hostApi: { getJson: (path) => hostApiOf(path), postJson: (path, body) => hostApiOf(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }) },
@@ -358,6 +369,12 @@ const openSettingsRoute = (item) => {
   else if (item.route === 'config') openConfig(item.params)
   else if (item.route === 'password') openRoute(ROUTES.WEB_PASSWORD)
   else openRoute(item.route || item.id)
+}
+// a page of the unsaved changes (the bar's list): the settings tab, the gamepad, the application list or the virtual display
+const onPendingGo = ({ page, entry, route }) => {
+  if (route) openRoute(route)
+  else if (page.startsWith('config:')) openConfig({ tab: entry?.tab || page.slice(7), sub: entry?.sub, focus: entry?.focus })
+  else openRoute(page === 'apps' ? ROUTES.WEB_APPS : ROUTES.GAMEPAD)
 }
 const onListNavigate = (item) => (item.route ? openSettingsRoute(item) : openRoute(item.id))
 

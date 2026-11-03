@@ -238,21 +238,14 @@
           <MButton @click="confirmApply">{{ vp.confirmChange }}</MButton>
         </template>
       </MDialog>
-
-      <Transition name="m-savebar">
-        <div v-if="hasUnsavedChanges || isSaving" class="m-savebar" role="region" :aria-label="t.vddSettings.saveAndApply">
-          <span class="m-savebar__count">{{ t.vddSettings.unsavedBadge }}</span>
-          <MButton variant="text" :disabled="isSaving" @click="reloadSettings">{{ t.vddSettings.reload }}</MButton>
-          <MButton :loading="isSaving" icon="save" @click="saveSettings">{{ t.vddSettings.saveAndApply }}</MButton>
-        </div>
-      </Transition>
     </template>
   </MPage>
 </template>
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
+import { ElMessage } from '../composables/notifyMessage.js'
 import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards, MDialog, MPrepArt, MFieldItem, MSeg, MChip, MTile, MIcon, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, MPageLoading, useSubpage, vddPageTexts, vddTexts, VDD_PREP, VDD_RULES, vddOn } from 'foundation-ui/vue'
 import { useHostVdd } from '../composables/useHostVdd.js'
 import { useEditableOptionField } from '../composables/useEditableOptionField.js'
@@ -260,6 +253,7 @@ import { useVddEdid } from '../composables/useVddEdid.js'
 import { useVddStatusLabel } from '../composables/useVddStatusLabel.js'
 import { installVddWithRecovery } from '../composables/vddInstallRecovery.js'
 import { openExternalUrl, sunshine, vdd } from '../tauri-adapter.js'
+import { setPath, useVddPending } from '../composables/useVddPending.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
 const { t, locale } = useI18n()
@@ -670,6 +664,21 @@ const buildSettingsPayload = () => ({
 
 const takeSnapshot = () => JSON.stringify(buildSettingsPayload())
 
+// the edits belong to the window's unsaved state (one bar for every page, saved from anywhere); the page reports them and takes them back
+useVddPending({
+  payload: buildSettingsPayload,
+  saved: () => JSON.parse(lastSavedSnapshot.value || '{}'),
+  ready: hasLoadedSnapshot,
+  locale: () => locale.value,
+  set: (path, value) => {
+    if (path === 'gpu.friendlyname') { gpuFriendlyName.value = value; settings.gpu.friendlyname = value }
+    else if (path === 'global.g_refresh_rate') setRefreshRateOptions((value || []).map(String))
+    else if (path === 'resolutions.resolution') setResolutionOptions((value || []).map((r) => `${r.width}x${r.height}`))
+    else setPath(settings, path, value)
+  },
+  onSaved: () => markSettingsClean(),
+  onReverted: () => syncVddState({ silentLoad: true }),
+})
 const hasUnsavedChanges = computed(() => hasLoadedSnapshot.value && takeSnapshot() !== lastSavedSnapshot.value)
 const vddReady = computed(() =>
   vddStatus.running &&

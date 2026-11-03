@@ -1,5 +1,6 @@
 import { createComponentStatus, microphoneState, registerComponentStatus } from 'foundation-ui/vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessageBox } from 'element-plus'
+import { ElMessage } from './notifyMessage.js'
 import { sunshine, vdd, vigem, vmouse } from '../tauri-adapter.js'
 import { enhancementActions, enhancementSources } from './useEnhancementComponents.js'
 import { dualsenseStatusChannel, micStatusChannel, usbipStatusChannel, vigemStatusChannel } from './deviceStatusStore.js'
