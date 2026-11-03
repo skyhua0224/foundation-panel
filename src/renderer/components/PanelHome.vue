@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
-import { buildCatalogue, buildCatalogueDetails, useJourneyHome, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
+import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
 import { usePanelHome } from '../composables/usePanelHome.js'
 import { useHostReach } from '../composables/useHostReach.js'
@@ -139,7 +139,7 @@ const catalogueInput = computed(() => {
 const catalogue = computed(() => buildCatalogue(catalogueInput.value, T.value).data)
 const allDetails = computed(() => ({ ...model.value.details, ...buildCatalogueDetails(catalogueInput.value, T.value) }))
 const isNew = computed(() => guide.visible.value)
-const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue: catalogue.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value), sponsor: sponsorCardData(T.value, SPONSORS), journey: journey.data.value }))
+const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue: catalogue.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value, { locale: locale.value, assetsOf: releases.assetsOf, versionOf: releases.versionOf }), sponsor: sponsorCardData(T.value, SPONSORS), journey: journey.data.value }))
 const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value }))
 
 function onAction(a) {
@@ -150,11 +150,11 @@ function onAction(a) {
     case 'table-action': emit('open', 'pair'); break
     case 'pair-pin': pairPin(a.value?.pin); break
     case 'pair-qr': emit('open', 'pair:qr'); break
+    case 'open-url': openExternalUrl(a.value); break
     case 'pair-qr-begin': pairQr.begin(); break
     case 'pair-qr-stop': pairQr.stop(); break
     case 'table-row': onTableRow(a.value); break
     case 'app': emit('open', 'apps'); break
-    case 'open-url': openExternalUrl(a.value); break
     case 'add-app': emit('open', 'apps:add'); break
     case 'open': emit('open', a.value); break
     case 'detail-external': break
@@ -180,12 +180,13 @@ const pairQr = createPairQr({
   render: (url) => QRCode.toDataURL(url, { width: 280, margin: 2, color: { dark: '#000000', light: '#ffffff' } }),
 })
 onBeforeUnmount(() => pairQr.stop())
+// the connect journey card: on by default while no client is paired (choose the device, install, pair, done)
+const releases = useReleaseAssets()
+const journey = useJourneyHome({ storageKey: 'panel-home', assetsOf: releases.assetsOf, versionOf: releases.versionOf, count: () => (state.clients ? state.clients.length : null), latest: () => (state.clients?.length ? state.clients[state.clients.length - 1].name : ''), locale: () => locale.value, qr: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules, pairQr: pairQr.view })
 // the PIN typed on the pairing card goes to the host like the pairing sheet sends it
 async function pairPin(pin) {
   if (!/^\d{4}$/.test(String(pin || ''))) return
   try { const data = await hostApi.postJson('/api/pin', { pin: String(pin), name: dashTexts.value.pairDefaultName }); say(String(data.status) === 'true' ? dashTexts.value.pairSent : dashTexts.value.pairFailed) } catch { say(dashTexts.value.pairFailed) }
-// the connect journey card: on by default while no client is paired (choose the device, install, pair, done)
-const journey = useJourneyHome({ storageKey: 'panel-home', count: () => (state.clients ? state.clients.length : null), latest: () => (state.clients?.length ? state.clients[state.clients.length - 1].name : ''), locale: () => locale.value, qr: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules, pairQr: pairQr.view })
 }
 async function saveSetting({ key, value }) { const r = await saveSettingKey(hostApi, key, value); if (r.ok) state.config = r.config }
 async function onStripGroup(v) { pad.selectedMode.value = v }

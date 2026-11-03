@@ -4,6 +4,7 @@
     <MCaption bem="panel-caption" data-tauri-drag-region @pointerdown="onTouchWindowDragStart">
       <template #brand><MBrand class="panel-caption__brand" :size="20" data-tauri-drag-region /></template>
       <template #search><div class="panel-caption__search" data-tauri-drag-region><MUnifiedSearch :search="uni" :texts="searchT" :compact="compactSearch" :height="38" /></div></template>
+      <template #connect><button type="button" class="m-caption-connect" :class="{ 'is-icon': hostClients.length > 0 }" :aria-label="connectT.title" :data-tip="connectT.title" @click="connect.show('pair')"><MIcon name="person_add" /><span v-if="hostClients.length === 0">{{ connectT.title }}</span></button></template>
       <template #controls><div class="panel-caption__controls">
         <button type="button" class="panel-caption__btn" :aria-label="t.sidebar.minimize" :data-tip="t.sidebar.minimize" @click="minimizeWindow"><MIcon name="remove" /></button>
         <button type="button" class="panel-caption__btn" :aria-label="isMaximized ? t.sidebar.restore : t.sidebar.maximize" :data-tip="isMaximized ? t.sidebar.restore : t.sidebar.maximize" @click="toggleMaximize"><MIcon :name="isMaximized ? 'filter_none' : 'crop_square'" /></button>
@@ -83,6 +84,9 @@
     </MSheet>
     <MRemoteWindow v-model="remoteOpen" :locale="locale" :state="remoteData.state" :callbacks="remoteData.callbacks" />
     <MCoachMarks :locale="locale" storage-key="foundation.coach.panel" guide-key="foundation.guide.panel" />
+    <MConnectDialog v-model="connect.open.value" v-model:tab="connect.tab.value" v-model:os="connect.os.value" :assets-of="connect.assetsOf" :version-of="connect.versionOf" :locale="locale" :qr="connect.matrix" :pair-qr="connect.pairQr" :count="hostClients.length" :latest="hostClients.length ? hostClients[hostClients.length - 1].name : ''" :close-label="t.m3e.home.done"
+      @pair-pin="(e) => connect.pairPin(e.pin)" @pair-qr-begin="connect.qrBegin()" @pair-qr-stop="connect.qrStop()" @open-url="actions_openExternal" @open-downloads="() => { connect.open.value = false; openRoute(ROUTES.WEB_DOWNLOADS) }" />
+    <MSnackbar :model-value="!!connectNotice" :message="connectNotice" :timeout="4000" @update:model-value="(v) => { if (!v) connectNotice = '' }" />
     <MSupportSheet v-model="sponsorOpen" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" />
     <MThanksLine v-if="thanks.visible.value" :locale="locale" @star="thanksStar" @sponsor="thanksSponsor" @dismiss="thanks.dismiss" />
     <UpdateDialog
@@ -272,11 +276,23 @@ const onSearchResize = () => { compactSearch.value = window.innerWidth < 600 }
 onMounted(() => window.addEventListener('resize', onSearchResize))
 onBeforeUnmount(() => window.removeEventListener('resize', onSearchResize))
 const searchT = computed(() => searchTexts(locale.value))
+// 连接设备: the dialog of the caption button and of the search; the host API through the proxy, like the overview's pairing card
+const connectT = computed(() => connectTexts(locale.value))
+const connectNotice = ref('')
+const hostApiOf = async (path, init) => { const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, ''); return (await fetch(`${base}${path}`, init)).json() }
+const connect = useConnectDialog({
+  hostApi: { getJson: (path) => hostApiOf(path), postJson: (path, body) => hostApiOf(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }) },
+  render: (url) => QRCode.toDataURL(url, { width: 280, margin: 2, color: { dark: '#000000', light: '#ffffff' } }),
+  matrix: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules,
+  say: (kind) => { connectNotice.value = kind === 'sent' ? connectT.value.pinSent : connectT.value.pinFailed },
+  defaultName: locale.value.startsWith('zh') ? '新客户端' : 'New client',
+})
 const actionHandlers = {
   restart: () => tools.restartSunshineService(),
   userMode: () => tools.restartSunshineInUserMode(),
   restartDriver: () => tools.restartGraphicsDriver(),
-  pair: () => openRoute(ROUTES.WEB_CLIENTS),
+  connect: () => connect.show('pair'),
+  download: () => connect.show('install'),
   exportDiag: () => router.navigate(ROUTES.DIAGNOSTICS),
   checkUpdate: () => handleCheckForUpdates(),
   logs: () => router.navigate(ROUTES.DIAGNOSTICS),
