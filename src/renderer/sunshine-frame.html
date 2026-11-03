@@ -47,43 +47,6 @@
         height: 100vh;
       }
 
-      .boot-loading {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        color: var(--boot-foreground);
-        font-family: 'PixelMplus12', 'Segoe UI', sans-serif;
-      }
-
-      .boot-loading .vivi-loading {
-        width: 144px;
-        height: 196px;
-        background: url('./public/vivi/vivi-loading.webp') 0 0 / 576px 196px no-repeat;
-        animation: vivi-bob 840ms step-end infinite;
-      }
-
-      .boot-loading p {
-        margin-top: 20px;
-        font-size: 18px;
-      }
-
-      @keyframes vivi-bob {
-        0% { background-position: 0 0; }
-        16.66% { background-position: -144px 0; }
-        33.33% { background-position: -288px 0; }
-        50% { background-position: -432px 0; }
-        66.66% { background-position: -288px 0; }
-        83.33% { background-position: -144px 0; }
-        100% { background-position: 0 0; }
-      }
-
-      @media (prefers-reduced-motion: reduce) {
-        .boot-loading .vivi-loading { animation: none; background-position: 0 0; }
-      }
-
       @font-face {
         font-family: 'PixelMplus12';
         src: url('./public/fonts/PixelMplus12-Bold.woff2') format('woff2');
@@ -92,12 +55,7 @@
     </style>
   </head>
   <body>
-    <div id="app">
-      <div class="boot-loading" role="status" aria-live="polite">
-        <span class="vivi-loading" role="img" aria-label="Loading"></span>
-        <p>Preparing Sunshine...</p>
-      </div>
-    </div>
+    <div id="app"></div>
     <script type="module" src="./sunshine-frame.js"></script>
   </body>
 </html>

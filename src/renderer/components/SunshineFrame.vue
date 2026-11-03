@@ -6,26 +6,20 @@
     @webui-navigate="handleWebuiNavigate"
   >
     <div class="iframe-container">
-      <transition name="fade-loading">
-        <div v-if="loading" class="loading-overlay">
-          <div class="loading-container">
-            <span class="vivi-loading" role="img" aria-label="Loading"></span>
-            <div class="loading-text">
-              <template v-if="proxyHealthFailed">
-                <p class="proxy-health-error">{{ t.sunshineFrame.proxyUnavailable }}</p>
-                <button class="proxy-health-retry" type="button" @click="retryProxyHealthCheck">
-                  {{ t.sunshineFrame.retry }}
-                </button>
-              </template>
-              <p v-else>{{ t.sunshineFrame.preparing.replace('{path}', currentPath) }}</p>
-            </div>
+      <!-- no loading page: a page switch shows the new shell at once and the page fills in (its own skeletons); only a proxy that does not answer says so -->
+      <div v-if="proxyHealthFailed" class="loading-overlay" role="alert">
+        <div class="loading-container">
+          <div class="loading-text">
+            <p class="proxy-health-error">{{ t.sunshineFrame.proxyUnavailable }}</p>
+            <button class="proxy-health-retry" type="button" @click="retryProxyHealthCheck">
+              {{ t.sunshineFrame.retry }}
+            </button>
           </div>
         </div>
-      </transition>
+      </div>
 
       <iframe
         ref="sunshineIframe"
-        v-show="!loading"
         :src="sunshineUrl"
         class="sunshine-iframe"
         @load="onLoad"
@@ -627,30 +621,6 @@ const onLoad = () => {
   text-align: center;
   padding: 20px;
   max-width: 400px;
-}
-
-/* 薇薇 swimming in her ring: four open-eyed frames of the sprite, 144 x 196 shown (the file is for 2x screens); a still frame when motion is reduced */
-.vivi-loading {
-  display: block;
-  width: 144px;
-  height: 196px;
-  margin: 0 auto 20px;
-  background: url('../public/vivi/vivi-loading.webp') 0 0 / 576px 196px no-repeat;
-  animation: vivi-bob 840ms step-end infinite;
-}
-
-@keyframes vivi-bob {
-  0% { background-position: 0 0; }
-  16.66% { background-position: -144px 0; }
-  33.33% { background-position: -288px 0; }
-  50% { background-position: -432px 0; }
-  66.66% { background-position: -288px 0; }
-  83.33% { background-position: -144px 0; }
-  100% { background-position: 0 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .vivi-loading { animation: none; background-position: 0 0; }
 }
 
 .loading-text {
