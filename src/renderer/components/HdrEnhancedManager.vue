@@ -2,32 +2,51 @@
   <MPage :title="current === 'session' ? text.session : current === 'keys' ? text.keys : current === 'components' ? text.components : text.title" :back="!!current" :back-label="t.m3e.back" @back="goBack">
     <MBanner v-if="error" tone="error" icon="error">{{ enhancementError(text, error) }}</MBanner>
 
-    <!-- Overlay: the two controls of the page, then where the rest lives -->
+    <!-- Overlay: what is running, the overlay as it looks in the game, its two controls, the shortcuts as keys -->
     <template v-if="!current">
+      <div class="m-qstrip" role="group">
+        <button type="button" class="m-qstrip__cell" @click="open('session')">
+          <span class="m-qstrip__icon" :class="{ 'is-on': !!pipelines.length }"><MIcon name="cast_connected" /></span>
+          <span class="m-qstrip__text"><small>{{ text.session }}</small><b>{{ pipelines.length ? `${text.stream} #${pipelines[0].id}` : text.noSession }}</b></span>
+          <MIcon class="m-qstrip__go" name="chevron_right" />
+        </button>
+        <button type="button" class="m-qstrip__cell" @click="open('components')">
+          <span class="m-qstrip__icon"><MIcon name="extension" /></span>
+          <span class="m-qstrip__text"><small>{{ text.components }}</small><b>DLSS NR · RTX HDR</b></span>
+          <MIcon class="m-qstrip__go" name="chevron_right" />
+        </button>
+      </div>
+
+      <figure class="m-qprev" aria-hidden="true">
+        <span class="m-qprev__label"><MIcon name="picture_in_picture" />{{ text.preview }}</span>
+        <div class="m-qprev__scene">
+          <i class="m-qprev__hud m-qprev__hud--a" /><i class="m-qprev__hud m-qprev__hud--b" /><i class="m-qprev__hud m-qprev__hud--c" />
+        </div>
+        <div class="m-qprev__row">
+          <div class="m-qprev__side">
+            <img class="m-qprev__pill" :src="`/nr-overlay/collapsed-${lang}.png`" width="182" alt="">
+            <p>{{ text.previewHint }}</p>
+          </div>
+          <img class="m-qprev__ov" :src="`/nr-overlay/expanded-${lang}-${stepOf(draftOpacity)}.png`" width="292" alt="">
+        </div>
+      </figure>
+
       <MGroup>
-        <MSwitchItem :model-value="visible" icon="picture_in_picture" :title="text.show" :disabled="saving || !loaded" @update:model-value="setVisibility" />
+        <MSwitchItem :model-value="visible" icon="picture_in_picture" :title="text.show" :text="text.showHint" :disabled="saving || !loaded" @update:model-value="setVisibility" />
         <MSliderItem v-model="draftOpacity" icon="opacity" :title="text.opacity" :min="35" :max="95" :step="1" :decimals="0" unit="%" size="m" icon-start="brightness_medium" icon-end="brightness_6" :disabled="saving || !loaded" @commit="save({ opacity: draftOpacity })" />
       </MGroup>
-      <div class="quality-manager m-quality-preview" aria-hidden="true"><div class="preview-stage">
-        <div class="mini-overlay" :style="{ background: `color-mix(in srgb, var(--md-sys-color-surface-container-highest) ${draftOpacity}%, transparent)` }">
-          <header><Rank aria-hidden="true" /><i aria-hidden="true" /> DLSS NR <ArrowUp aria-hidden="true" /></header>
-          <div class="mini-body">
-            <div>{{ text.enhancement }}<span class="mini-toggle" /></div>
-            <p>{{ text.previewState }}</p>
-            <footer><kbd>{{ nrShortcutLabel(registration) || text.disabledKey }}</kbd><span>{{ text.action }}</span></footer>
-          </div>
-        </div>
-      </div></div>
+
       <MSection :title="text.keys">
         <MGroup>
-          <MItem action icon="visibility" :title="text.visibilityKey" @click="open('keys')"><template #trail><kbd class="m-quality-kbd">{{ displayShortcut(settings.overlayShortcut) || text.unset }}</kbd></template></MItem>
-          <MItem action icon="wand_stars" :title="text.nrKey" @click="open('keys')"><template #trail><kbd class="m-quality-kbd">{{ nrShortcutLabel(registration) || text.unset }}</kbd></template></MItem>
+          <MItem action icon="visibility" :title="text.visibilityKey" @click="open('keys')">
+            <template #trail><span class="m-qkeys"><kbd v-for="k in keysOf(displayShortcut(settings.overlayShortcut))" :key="k">{{ k }}</kbd><kbd v-if="!settings.overlayShortcut" class="is-unset">{{ text.unset }}</kbd><kbd v-if="settings.overlayGamepad" class="is-pad"><MIcon name="sports_esports" />{{ displayGamepadShortcut(settings.overlayGamepad) }}</kbd></span></template>
+          </MItem>
+          <MItem action icon="wand_stars" :title="text.nrKey" @click="open('keys')">
+            <template #trail><span class="m-qkeys"><kbd v-for="k in keysOf(displayShortcut(settings.nrShortcut))" :key="k">{{ k }}</kbd><kbd v-if="!settings.nrShortcut" class="is-unset">{{ text.unset }}</kbd><kbd v-if="settings.nrGamepad" class="is-pad"><MIcon name="sports_esports" />{{ displayGamepadShortcut(settings.nrGamepad) }}</kbd></span></template>
+          </MItem>
         </MGroup>
+        <MFooter>{{ text.keyHint }}</MFooter>
       </MSection>
-      <MGroup>
-        <MItem action icon="cast_connected" :title="text.session" :text="pipelines.length ? `${text.stream} #${pipelines[0].id}` : text.noSession" @click="open('session')" />
-        <MItem action icon="extension" :title="text.components" @click="open('components')" />
-      </MGroup>
       <MFooter>{{ saved ? text.saved : text.local }}</MFooter>
     </template>
 
@@ -82,8 +101,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { ArrowUp, Rank } from '@element-plus/icons-vue'
-import { MPage, MGroup, MSection, MItem, MSwitchItem, MSliderItem, MChoiceItem, MBanner, MNotice, MEmpty, MFooter, MButton, MIconButton, useSubpage } from 'foundation-ui/vue'
+import { MIcon, MPage, MGroup, MSection, MItem, MSwitchItem, MSliderItem, MChoiceItem, MBanner, MNotice, MEmpty, MFooter, MButton, MIconButton, useSubpage } from 'foundation-ui/vue'
 import { displayGamepadShortcut, FIXED_GAMEPAD_SHORTCUTS } from '../composables/controllerButtons.js'
 import NrSessionControls from './NrSessionControls.vue'
 import EnhancementManager from './EnhancementManager.vue'
@@ -109,6 +127,12 @@ const { locale } = useI18n()
 const text = computed(() => enhancementControlsText(locale.value)),
   overlayText = computed(() => nrOverlayText(locale.value))
 const t = useI18n().t
+// a shortcut as separate keys: 'Ctrl + Alt + N' -> ['Ctrl', 'Alt', 'N']
+// the real overlay was captured at five background opacities: the nearest one to the slider is shown
+const STEPS = [35, 50, 65, 80, 95]
+const stepOf = (v) => STEPS.reduce((best, n) => (Math.abs(n - v) < Math.abs(best - v) ? n : best), STEPS[0])
+const lang = computed(() => (String(locale.value).startsWith('zh') ? 'zh' : 'en'))
+const keysOf = (label) => String(label || '').split(' + ').map((k) => k.trim()).filter(Boolean)
 const { current, open, back } = useSubpage('quality')
 const settings = ref({ nrShortcut: '', overlayShortcut: '', nrGamepad: '', overlayGamepad: '', opacity: 62 }),
   registration = ref({})
@@ -299,15 +323,27 @@ onUnmounted(() => {
 
 <style src="../styles/EnhancementManager.css"></style>
 <style>
-.m-quality-preview { margin: 4px 0; padding: 0; width: 100%; max-width: none; border-radius: 28px; overflow: hidden; }
-.m-quality-preview svg { width: 14px; height: 14px; flex: none; }
-/* the preview is drawn in the colours of the theme (the real overlay is dark over a game; here it is a sketch of its parts) */
-.m-quality-preview .preview-stage { min-height: 0; height: auto; padding: 20px; border-radius: 28px; width: 100%; background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); }
-.m-quality-preview .mini-overlay { width: min(100%, 380px); border: 0; border-radius: 16px; color: var(--md-sys-color-on-surface); box-shadow: 0 1px 2px color-mix(in srgb, var(--md-sys-color-shadow) 18%, transparent); }
-.m-quality-preview .mini-overlay header { border-bottom-color: var(--md-sys-color-outline-variant); }
-.m-quality-preview .mini-overlay header i { background: var(--md-sys-color-primary); border-radius: 50%; }
-.m-quality-preview .mini-body p { color: var(--md-sys-color-on-surface-variant); }
-.m-quality-preview .mini-body footer { border-top-color: var(--md-sys-color-outline-variant); }
-.m-quality-preview .mini-toggle { border: 0; border-radius: 9999px; background: var(--md-sys-color-primary); width: 32px; height: 18px; }
-.m-quality-kbd { padding: 4px 10px; border-radius: 8px; background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface); font: 12px/16px ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+/* the page: a status strip, the overlay as it looks in the game at a readable size, then its controls as rows */
+.m-qstrip { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px; margin-bottom: 12px; }
+.m-qstrip__cell { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 16px; background: var(--m-card, var(--md-sys-color-surface-container)); cursor: pointer; }
+.m-qstrip__cell:first-child { border-radius: 24px 6px 6px 24px; } .m-qstrip__cell:last-child { border-radius: 6px 24px 24px 6px; }
+.m-qstrip__cell:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, var(--m-card, var(--md-sys-color-surface-container))); } .m-qstrip__cell:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: 2px; }
+.m-qstrip__icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 14px; background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); } .m-qstrip__icon.is-on { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.m-qstrip__icon .m-icon { font-size: 22px; }
+.m-qstrip__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; } .m-qstrip__text small { font: var(--m-label-medium); color: var(--md-sys-color-on-surface-variant); } .m-qstrip__text b { font: var(--m-title-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.m-qstrip__go { color: var(--md-sys-color-on-surface-variant); font-size: 22px; }
+.m-qprev { position: relative; isolation: isolate; margin: 0 0 12px; padding: 44px 28px 32px; min-height: 0; border-radius: 28px; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 14px; background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); }
+.m-qprev__label { position: absolute; z-index: 2; top: 14px; left: 18px; display: inline-flex; align-items: center; gap: 6px; font: var(--m-label-large); color: var(--md-sys-color-on-surface-variant); } .m-qprev__label .m-icon { font-size: 18px; }
+.m-qprev__scene { position: absolute; inset: 0; z-index: -1; background: linear-gradient(135deg, color-mix(in srgb, var(--md-sys-color-tertiary-container) 85%, var(--md-sys-color-surface)) 0%, color-mix(in srgb, var(--md-sys-color-primary-container) 80%, var(--md-sys-color-surface)) 60%, color-mix(in srgb, var(--md-sys-color-secondary-container) 90%, var(--md-sys-color-surface)) 100%); }
+.m-qprev__hud { position: absolute; border-radius: 9999px; background: color-mix(in srgb, var(--md-sys-color-on-surface) 10%, transparent); } .m-qprev__hud--a { left: 7%; bottom: 14%; width: 18%; height: 10px; } .m-qprev__hud--b { left: 7%; bottom: 8%; width: 11%; height: 10px; } .m-qprev__hud--c { right: 8%; bottom: 10%; width: 56px; height: 56px; }
+.m-qprev figcaption { margin-top: auto; font: var(--m-body-small); color: var(--md-sys-color-on-surface-variant); text-align: center; }
+.m-qprev__row { display: flex; align-items: flex-start; justify-content: center; gap: 28px; width: 100%; }
+.m-qprev__side { flex: 1; max-width: 240px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; padding-top: 6px; } .m-qprev__side p { margin: 0; font: var(--m-body-small); color: var(--md-sys-color-on-surface-variant); }
+/* the real overlay, as it is drawn in the game (screenshots of NrOverlayTool, unchanged): the background opacity of the page's slider picks the nearest of five */
+.m-qprev__ov, .m-qprev__pill { display: block; height: auto; filter: drop-shadow(0 8px 20px color-mix(in srgb, var(--md-sys-color-shadow) 38%, transparent)); }
+.m-qkeys { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
+.m-qkeys kbd { display: inline-flex; align-items: center; gap: 4px; min-width: 28px; height: 28px; padding: 0 9px; box-sizing: border-box; justify-content: center; border-radius: 8px; background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface); font: 600 12px/1 ui-monospace, 'Cascadia Mono', Consolas, monospace; box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--md-sys-color-on-surface) 22%, transparent), 0 0 0 1px color-mix(in srgb, var(--md-sys-color-outline-variant) 80%, transparent); }
+.m-qkeys kbd.is-unset { font-family: inherit; font-weight: 500; color: var(--md-sys-color-on-surface-variant); box-shadow: 0 0 0 1px var(--md-sys-color-outline-variant); background: transparent; }
+.m-qkeys kbd.is-pad { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); font-family: inherit; } .m-qkeys kbd .m-icon { font-size: 16px; }
+@media (max-width: 600px) { .m-qprev { padding: 44px 12px 24px; min-height: 0; } .m-qprev__row { flex-direction: column-reverse; align-items: center; gap: 16px; } .m-qprev__side { max-width: none; align-items: center; text-align: center; padding: 0; } }
 </style>
