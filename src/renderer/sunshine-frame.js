@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 import SunshineFrame from './components/SunshineFrame.vue'
 import { invoke } from '@tauri-apps/api/core'
 import { followPanelSurface } from './composables/panelSurface.js'
+import { startWebPrewarm, createHiddenFrameLoader } from './composables/webPrewarm.js'
 import 'element-plus/theme-chalk/el-loading.css'
 import 'element-plus/theme-chalk/el-message.css'
 import 'element-plus/theme-chalk/el-overlay.css'
@@ -25,4 +26,22 @@ app.mount('#app')
 queueMicrotask(() => {
   invoke('panel_content_ready').catch(() => {})
   followPanelSurface(invoke)
+  prewarmWebPages()
 })
+
+// The Web UI pages load their scripts on the first visit (up to 1.6 s on the Skyindows panel): load them once in a hidden frame while nobody uses the window
+function prewarmWebPages() {
+  let lastInput = performance.now()
+  for (const type of ['pointerdown', 'pointermove', 'keydown', 'wheel']) window.addEventListener(type, () => { lastInput = performance.now() }, { capture: true, passive: true })
+  invoke('wait_for_proxy_ready').then((base) => {
+    const frame = createHiddenFrameLoader()
+    startWebPrewarm({
+      base: String(base).replace(/\/$/, ''),
+      load: frame.load,
+      visible: () => document.visibilityState === 'visible',
+      idleFor: () => performance.now() - lastInput,
+      done: frame.remove,
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    })
+  }).catch(() => {})
+}
