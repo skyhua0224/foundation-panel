@@ -1337,9 +1337,12 @@ pub async fn delete_edid_file() -> Result<String, String> {
     Ok("EDID 文件已删除".to_string())
 }
 
+/// Looks for a running trace process (about 20 ms): off the main thread, which a synchronous command would hold.
 #[tauri::command]
-pub fn get_vdd_trace_status() -> VddTraceStatus {
-    build_vdd_trace_status()
+pub async fn get_vdd_trace_status() -> Result<VddTraceStatus, String> {
+    tauri::async_runtime::spawn_blocking(build_vdd_trace_status)
+        .await
+        .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
