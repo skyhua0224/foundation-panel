@@ -58,3 +58,11 @@ test('an older cover is dropped when a newer one arrives, and the page stops ask
   assert.equal(calls.length, 1)
   assert.equal(frames.length, 0)
 })
+
+test('with stable frames the layout has to match for that many frames in a row, however long they take', () => {
+  const judge = createSettleJudge({ width: 960, height: 600, stableMs: 0, stableFrames: 2 })
+  assert.equal(judge.sample(640, 400, 1.5, 0), false)
+  assert.equal(judge.sample(854, 534, 1.5, 16), false) // the wrong layout resets the count
+  assert.equal(judge.sample(640, 400, 1.5, 32), false)
+  assert.equal(judge.sample(640, 400, 1.5, 48), true)
+})

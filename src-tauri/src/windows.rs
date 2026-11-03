@@ -190,7 +190,48 @@ pub fn disable_context_menu<R: Runtime>(_window: &WebviewWindow<R>) {}
 /// The renderer mounted its first view: a window that waits to be shown is shown now.
 #[tauri::command]
 pub fn panel_content_ready(window: tauri::WebviewWindow) {
+    log::info!("[cold] content ready in {}", window.label());
     lifecycle::content_ready(&window);
+}
+
+/// A measurement instance (SUNSHINE_GUI_TEST_OFFSCREEN = 1): its main window opens outside every monitor, is never activated and logs its WM_SIZE timing.
+/// Nothing of it shows on the desk of whoever uses the machine.
+pub(crate) fn test_offscreen() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("SUNSHINE_GUI_TEST_OFFSCREEN").is_some_and(|value| value != "0"))
+}
+
+/// The page is being used (pointer, key, wheel): the warm snapshot of the cover waits for quiet.
+#[tauri::command]
+pub fn panel_activity() {
+    lifecycle::note_activity();
+}
+
+/// Measurement instances only: the message Windows sends when the scale of the window's monitor changes, with the size the window gets at the new scale.
+/// An off-screen window gets none from the system, and the display of whoever uses the machine stays as it is.
+#[tauri::command]
+pub fn test_synthetic_dpi(window: tauri::WebviewWindow, dpi: u32) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
+        use windows::Win32::UI::HiDpi::GetDpiForWindow;
+        use windows::Win32::UI::WindowsAndMessaging::{GetWindowRect, SendMessageW, WM_DPICHANGED};
+        if !test_offscreen() {
+            return Err("only a measurement instance takes a synthetic scale change".to_string());
+        }
+        let hwnd = HWND(window.hwnd().map_err(|e| e.to_string())?.0);
+        let (mut rect, old) = (RECT::default(), unsafe { GetDpiForWindow(hwnd) }.max(1));
+        unsafe { GetWindowRect(hwnd, &mut rect) }.map_err(|e| e.to_string())?;
+        let size = |extent: i32| (i64::from(extent) * i64::from(dpi) / i64::from(old)) as i32;
+        let suggested = RECT { left: rect.left, top: rect.top, right: rect.left + size(rect.right - rect.left), bottom: rect.top + size(rect.bottom - rect.top) };
+        unsafe { SendMessageW(hwnd, WM_DPICHANGED, Some(WPARAM(((dpi << 16) | dpi) as usize)), Some(LPARAM(&suggested as *const RECT as isize))) };
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (window, dpi);
+        Err("windows only".to_string())
+    }
 }
 
 /// The page's layout has matched the window for a while after a change of scale: the cover over it fades out.
@@ -207,6 +248,13 @@ pub fn panel_set_surface(window: tauri::WebviewWindow, r: u8, g: u8, b: u8) -> R
         .set_background_color(Some(tauri::window::Color(r, g, b, 255)))
         .map_err(|e| e.to_string())?;
     surface::store((r, g, b));
+    #[cfg(target_os = "windows")]
+    {
+        static LOGGED: std::sync::Mutex<Option<(u8, u8, u8)>> = std::sync::Mutex::new(None);
+        if test_offscreen() && LOGGED.lock().unwrap().replace((r, g, b)) != Some((r, g, b)) {
+            let _ = window.with_webview(move |webview| lifecycle::log_default_background(&webview.controller(), &format!("reported #{r:02x}{g:02x}{b:02x}")));
+        }
+    }
     Ok(())
 }
 
@@ -340,9 +388,12 @@ pub fn resize_tool_window(window: tauri::Window, width: f64, height: f64) -> Res
 
 /// 显示并激活窗口（解决权限隔离问题）
 pub fn show_and_activate_window<R: Runtime>(window: &WebviewWindow<R>) {
+    log::info!("[cold] window {} shown", window.label());
     let _ = window.unminimize();
     let _ = window.show();
-    let _ = window.set_focus();
+    if !test_offscreen() {
+        let _ = window.set_focus();
+    }
 
     // 恢复 WebView 活跃状态（引擎级 + JS 级）
     lifecycle::presented(window);
@@ -351,7 +402,9 @@ pub fn show_and_activate_window<R: Runtime>(window: &WebviewWindow<R>) {
     proxy_server::reset_fast_fail();
 
     #[cfg(target_os = "windows")]
-    force_activate_window_win32(window);
+    if !test_offscreen() {
+        force_activate_window_win32(window);
+    }
 
     #[cfg(target_os = "windows")]
     if !matches!(window.label(), MAIN_WINDOW_ID | DESKTOP_WINDOW_ID) {
@@ -626,15 +679,16 @@ fn create_main_window_internal<R: Runtime>(
     crate::tray::mark_main_panel_loading();
     let panel = lifecycle::register(MAIN_WINDOW_ID, visible);
     let page_panel = panel.clone();
-    let window = tauri::WebviewWindowBuilder::new(
+    let builder = tauri::WebviewWindowBuilder::new(
         app,
         MAIN_WINDOW_ID,
         tauri::WebviewUrl::App("sunshine-frame.html".into()),
     )
     .title("Sunshine Control Panel")
     .inner_size(1280.0, 800.0)
-    .min_inner_size(480.0, 560.0)
-    .center()
+    .min_inner_size(480.0, 560.0);
+    let builder = if test_offscreen() { builder.position(6000.0, 100.0) } else { builder.center() };
+    let window = builder
     .background_color(surface::startup_color())
     .decorations(false)
     // DWM clips the native window to rounded corners. Keeping WebView2

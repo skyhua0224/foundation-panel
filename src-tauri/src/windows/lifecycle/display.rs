@@ -37,6 +37,8 @@ struct Hook<R: Runtime> {
     class_proc: usize,
     /// the page is hidden while WebView2 settles after a change of scale (mode Fixed)
     covered: AtomicBool,
+    /// the warm snapshot of the mode Warm
+    warm: StdMutex<Warm>,
     /// the DPI of the window, to tell a change of scale from a move between monitors of the same scale
     last_dpi: AtomicU32,
     next_token: AtomicU64,
@@ -45,7 +47,44 @@ struct Hook<R: Runtime> {
 }
 
 #[derive(Default)]
+struct Warm {
+    frame: Option<dpi_cover::Frame>,
+    captured_at: Option<Instant>,
+    /// the page was used (or the window resized) since the frame was taken
+    dirty: bool,
+    in_flight: bool,
+    /// the user drags the window's edge
+    sizing: bool,
+    captures: u32,
+}
+
+/// The page tells that it is being used (pointer, key, wheel): a snapshot is not taken then. Milliseconds since the first call.
+static ACTIVITY: AtomicU64 = AtomicU64::new(0);
+static ACTIVITY_BASE: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+
+pub(super) fn note_activity() {
+    let base = ACTIVITY_BASE.get_or_init(Instant::now);
+    ACTIVITY.store(base.elapsed().as_millis() as u64 + 1, AtomicOrdering::Relaxed);
+}
+
+/// Milliseconds since the page was last used (a page that never was: very long).
+fn idle_ms() -> u64 {
+    let last = ACTIVITY.load(AtomicOrdering::Relaxed);
+    match ACTIVITY_BASE.get() {
+        Some(base) if last > 0 => (base.elapsed().as_millis() as u64).saturating_sub(last - 1),
+        _ => u64::MAX / 2,
+    }
+}
+
+const WARM_TIMER: usize = 0x5353_5745;
+/// a warm snapshot is taken after this much quiet, and at most this often
+const WARM_QUIET_MS: u64 = 1500;
+const WARM_EVERY: Duration = Duration::from_secs(5);
+const WM_WARM: u32 = windows::Win32::UI::WindowsAndMessaging::WM_APP + 0x55;
+
+#[derive(Default)]
 struct Cover {
+    mode: Mode,
     /// HWND of the cover window, 0 for none
     overlay: isize,
     /// which cover the page's report is about; 0 once it is over
@@ -106,6 +145,7 @@ pub(super) fn install<R: Runtime>(window: &WebviewWindow<R>, panel: &Panel) {
         let dpi_of_window = unsafe { windows::Win32::UI::HiDpi::GetDpiForWindow(windows::Win32::Foundation::HWND(hwnd.0)) };
         let _ = window.with_webview(move |webview| {
             let controller = webview.controller();
+            log_default_background(&controller, "startup");
             // the scale is the panel's from here on: the window's own, now and at every WM_DPICHANGED
             if let Ok(controller3) = controller.cast::<ICoreWebView2Controller3>() {
                 unsafe {
@@ -124,7 +164,7 @@ pub(super) fn install<R: Runtime>(window: &WebviewWindow<R>, panel: &Panel) {
             }
             *slot.lock().unwrap() = Some(MainThreadController(controller));
         });
-        let context = Box::into_raw(Box::new(Hook { window, panel, controller, dip, class_proc, covered: AtomicBool::new(false), last_dpi: AtomicU32::new(dpi_of_window), next_token: AtomicU64::new(0), cover: StdMutex::new(Cover::default()) }));
+        let context = Box::into_raw(Box::new(Hook { window, panel, controller, dip, class_proc, covered: AtomicBool::new(false), warm: StdMutex::new(Warm { dirty: true, ..Default::default() }), last_dpi: AtomicU32::new(dpi_of_window), next_token: AtomicU64::new(0), cover: StdMutex::new(Cover::default()) }));
         if !unsafe {
             SetWindowSubclass(
                 windows::Win32::Foundation::HWND(hwnd.0),
@@ -139,6 +179,8 @@ pub(super) fn install<R: Runtime>(window: &WebviewWindow<R>, panel: &Panel) {
                 drop(Box::from_raw(context));
             }
             log::warn!("Failed to install WebView display subclass");
+        } else if dpi_cover::mode() == Mode::Warm {
+            unsafe { windows::Win32::UI::WindowsAndMessaging::SetTimer(Some(windows::Win32::Foundation::HWND(hwnd.0)), WARM_TIMER, 1000, None) };
         }
     });
 }
@@ -199,6 +241,29 @@ unsafe extern "system" fn callback<R: Runtime>(
             fade_tick(hwnd, context);
             return windows::Win32::Foundation::LRESULT(0);
         }
+        windows::Win32::UI::WindowsAndMessaging::WM_TIMER if wparam.0 == WARM_TIMER => {
+            warm_tick(hwnd, context);
+            return windows::Win32::Foundation::LRESULT(0);
+        }
+        WM_WARM => {
+            let frame = (lparam.0 != 0).then(|| unsafe { Box::from_raw(lparam.0 as *mut dpi_cover::Frame) });
+            let mut warm = context.warm.lock().unwrap();
+            warm.in_flight = false;
+            if let Some(frame) = frame {
+                warm.captures += 1;
+                log::info!("[warm] frame {}x{}, {} KB kept, capture {} of this run", frame.width, frame.height, frame.bgra.len() / 1024, warm.captures);
+                warm.frame = Some(*frame);
+                warm.captured_at = Some(Instant::now());
+            }
+            return windows::Win32::Foundation::LRESULT(0);
+        }
+        windows::Win32::UI::WindowsAndMessaging::WM_ENTERSIZEMOVE => context.warm.lock().unwrap().sizing = true,
+        windows::Win32::UI::WindowsAndMessaging::WM_EXITSIZEMOVE => {
+            let mut warm = context.warm.lock().unwrap();
+            warm.sizing = false;
+            warm.dirty = true;
+        }
+        windows::Win32::UI::WindowsAndMessaging::WM_SIZE => context.warm.lock().unwrap().dirty = true,
         WM_SETTLED => {
             if context.cover.lock().unwrap().token == wparam.0 as u64 {
                 start_fade(hwnd, context, "page settled");
@@ -213,7 +278,11 @@ unsafe extern "system" fn callback<R: Runtime>(
         WM_SHOWWINDOW if wparam.0 == 0 => abort_cover(hwnd, context),
         _ => {}
     }
+    let handling = Instant::now();
     let result = unsafe { DefSubclassProc(hwnd, message, wparam, lparam) };
+    if message == windows::Win32::UI::WindowsAndMessaging::WM_SIZE && crate::windows::test_offscreen() {
+        log::info!("[size] {}x{} handled in {} us", lparam.0 & 0xFFFF, (lparam.0 >> 16) & 0xFFFF, handling.elapsed().as_micros());
+    }
     if message == windows::Win32::UI::WindowsAndMessaging::WM_SIZE {
         if wparam.0 == windows::Win32::UI::WindowsAndMessaging::SIZE_MINIMIZED as usize {
             abort_cover(hwnd, context);
@@ -288,11 +357,17 @@ fn begin_cover<R: Runtime>(hwnd: windows::Win32::Foundation::HWND, context: &Hoo
     {
         let mut cover = context.cover.lock().unwrap();
         drop_overlay(&mut cover);
-        *cover = Cover { overlay: 0, token, began: Some(Instant::now()), fading: None };
+        *cover = Cover { mode, overlay: 0, token, began: Some(Instant::now()), fading: None };
     }
     unsafe { SetTimer(Some(hwnd), COVER_TIMER, dpi_cover::CAP_MS, None) };
-    if mode == Mode::Adaptive {
-        let overlay = dpi_cover::create(hwnd, crate::windows::surface::current(), None);
+    if matches!(mode, Mode::Adaptive | Mode::Fast | Mode::Warm) {
+        // Warm: the kept frame lies under the cover from the first moment; without one the surface colour does
+        let warm = context.warm.lock().unwrap();
+        let overlay = dpi_cover::create(hwnd, crate::windows::surface::current(), if mode == Mode::Warm { warm.frame.as_ref() } else { None });
+        if mode == Mode::Warm {
+            log::info!("[warm] cover with {}", if warm.frame.is_some() { "the kept frame" } else { "the surface colour: no frame kept yet" });
+        }
+        drop(warm);
         context.cover.lock().unwrap().overlay = overlay.map_or(0, |overlay| overlay.0 as isize);
         return;
     }
@@ -367,19 +442,20 @@ fn fit_cover<R: Runtime>(hwnd: windows::Win32::Foundation::HWND, context: &Hook<
 /// Tells the page which size its layout has to match, and which cover the report is about.
 fn announce_cover<R: Runtime>(hwnd: windows::Win32::Foundation::HWND, context: &Hook<R>) {
     use tauri::Emitter;
-    let token = {
+    let (token, mode) = {
         let cover = context.cover.lock().unwrap();
         if cover.began.is_none() || cover.fading.is_some() {
             return;
         }
-        cover.token
+        (cover.token, cover.mode)
     };
+    let (stable_ms, stable_frames) = dpi_cover::stable(mode);
     let mut client = windows::Win32::Foundation::RECT::default();
     if unsafe { windows::Win32::UI::WindowsAndMessaging::GetClientRect(hwnd, &mut client) }.is_ok() {
         let _ = context.window.emit_to(
             context.window.label().to_string(),
             "panel-dpi-cover",
-            serde_json::json!({ "width": client.right, "height": client.bottom, "token": token }),
+            serde_json::json!({ "width": client.right, "height": client.bottom, "token": token, "stable_ms": stable_ms, "stable_frames": stable_frames }),
         );
     }
 }
@@ -411,15 +487,72 @@ fn fade_tick<R: Runtime>(hwnd: windows::Win32::Foundation::HWND, context: &Hook<
         return;
     };
     let elapsed = started.elapsed().as_millis();
+    let fade = dpi_cover::fade_ms(cover.mode);
     if cover.overlay != 0 {
-        dpi_cover::set_opacity(windows::Win32::Foundation::HWND(cover.overlay as *mut _), dpi_cover::fade_alpha(elapsed));
+        dpi_cover::set_opacity(windows::Win32::Foundation::HWND(cover.overlay as *mut _), dpi_cover::fade_alpha(elapsed, fade));
     }
-    if elapsed >= dpi_cover::FADE_MS {
+    if elapsed >= fade {
         let total = cover.began.map(|began| began.elapsed().as_millis());
         drop_overlay(&mut cover);
         *cover = Cover::default();
         let _ = unsafe { KillTimer(Some(hwnd), FADE_TIMER) };
         log::info!("[dpi-cover] cover gone {} ms after the change", total.unwrap_or(0));
+        context.warm.lock().unwrap().dirty = true; // the page has a new size: a new frame is wanted
+    }
+}
+
+/// Takes the warm snapshot when the page has been used since the last one, has been quiet for a while, no cover or drag is going on, and the last one is
+/// not just taken.
+fn warm_tick<R: Runtime>(hwnd: windows::Win32::Foundation::HWND, context: &Hook<R>) {
+    use windows::Win32::UI::WindowsAndMessaging::{IsIconic, IsWindowVisible};
+    if dpi_cover::mode() != Mode::Warm || !unsafe { IsWindowVisible(hwnd) }.as_bool() || unsafe { IsIconic(hwnd) }.as_bool() {
+        return;
+    }
+    if context.panel.state.lock().unwrap().phase != Phase::Active || context.cover.lock().unwrap().began.is_some() {
+        return;
+    }
+    let quiet = idle_ms() >= WARM_QUIET_MS;
+    let mut warm = context.warm.lock().unwrap();
+    if !quiet {
+        warm.dirty = true;
+        return;
+    }
+    if warm.sizing || warm.in_flight || !warm.dirty || warm.captured_at.is_some_and(|at| at.elapsed() < WARM_EVERY) {
+        return;
+    }
+    warm.in_flight = true;
+    warm.dirty = false;
+    let (address, asked) = (hwnd.0 as usize, Instant::now());
+    let started = context.controller.lock().unwrap().as_ref().map(|controller| {
+        dpi_cover::capture(&controller.0, move |frame| {
+            log::info!("[warm] capture took {} ms", asked.elapsed().as_millis());
+            let pointer = frame.map_or(0, |frame| Box::into_raw(Box::new(frame)) as isize);
+            let posted = unsafe {
+                windows::Win32::UI::WindowsAndMessaging::PostMessageW(
+                    Some(windows::Win32::Foundation::HWND(address as *mut _)),
+                    WM_WARM,
+                    windows::Win32::Foundation::WPARAM(0),
+                    windows::Win32::Foundation::LPARAM(pointer),
+                )
+            };
+            if posted.is_err() && pointer != 0 {
+                drop(unsafe { Box::from_raw(pointer as *mut dpi_cover::Frame) });
+            }
+        })
+    });
+    if !matches!(started, Some(Ok(()))) {
+        warm.in_flight = false;
+    }
+}
+
+/// What WebView2 shows where it has no frame yet: written to the log (the surface colour; never black).
+pub(crate) fn log_default_background(controller: &ICoreWebView2Controller, when: &str) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{COREWEBVIEW2_COLOR, ICoreWebView2Controller2};
+    if let Ok(controller2) = controller.cast::<ICoreWebView2Controller2>() {
+        let mut color = COREWEBVIEW2_COLOR::default();
+        if unsafe { controller2.DefaultBackgroundColor(&mut color) }.is_ok() {
+            log::info!("[surface] {when}: WebView2 DefaultBackgroundColor #{:02x}{:02x}{:02x} alpha {}", color.R, color.G, color.B, color.A);
+        }
     }
 }
 

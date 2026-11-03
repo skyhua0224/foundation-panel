@@ -29,11 +29,24 @@ app.mount('#app')
 queueMicrotask(() => {
   invoke('panel_content_ready').catch(() => {})
   followPanelSurface(invoke)
+  followPageActivity(invoke)
   followDpiCover({ listen, invoke })  // the native cover after a change of scale fades out when the layout matches the window
   prewarmWebPages()
   // the calls, frames and timers that take long are in the panel's log, with what was waiting when a timer came late
   startSlowCallLog((kind, name, ms, detail) => { if (name !== 'frontend_slow') invoke('frontend_slow', { kind, name, ms, detail }).catch(() => {}) })
 })
+
+// The page is being used: the native side takes no snapshot of it then (at most one report in 250 ms)
+function followPageActivity(invoke) {
+  let last = 0
+  const note = () => {
+    const now = performance.now()
+    if (now - last < 250) return
+    last = now
+    invoke('panel_activity').catch(() => {})
+  }
+  for (const type of ['pointerdown', 'pointermove', 'keydown', 'wheel']) window.addEventListener(type, note, { capture: true, passive: true })
+}
 
 // The Web UI pages load their scripts on the first visit (up to 1.6 s on the Skyindows panel): load them once in a hidden frame while nobody uses the window
 function prewarmWebPages() {

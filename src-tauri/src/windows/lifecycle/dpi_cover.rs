@@ -17,14 +17,19 @@ use windows::Win32::UI::WindowsAndMessaging::{
 use windows::core::{PCWSTR, w};
 
 /// How the page is covered while WebView2 settles after a change of scale (SUNSHINE_GUI_WEBVIEW_DPI_COVER).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(super) enum Mode {
     /// shown throughout
     Off,
     /// the page is hidden (SetIsVisible) for a fixed time
     Fixed,
     /// a cover in the surface colour until the page's layout matches the window, at most the cap
+    #[default]
     Adaptive,
+    /// like Adaptive, but the cover goes after two frames that match and fades in 80 ms
+    Fast,
+    /// the last frame of the page, kept warm in memory while the page is idle, under the cover from the first moment
+    Warm,
     /// the last frame of the page, scaled to the new size, until the page's layout matches the window, at most the cap
     Snapshot,
 }
@@ -33,6 +38,8 @@ pub(super) fn mode_of(value: Option<&str>) -> Mode {
     match value.map(str::to_ascii_lowercase).as_deref() {
         Some("off") => Mode::Off,
         Some("adaptive") => Mode::Adaptive,
+        Some("fast") => Mode::Fast,
+        Some("warm") => Mode::Warm,
         Some("snapshot") => Mode::Snapshot,
         Some("fixed") => Mode::Fixed,
         _ => Mode::Adaptive,
@@ -46,7 +53,14 @@ pub(super) fn mode() -> Mode {
 /// The longest a cover stays (the wrong layout ended 0.26 to 0.45 s after the change of scale in every measured run).
 pub(super) const CAP_MS: u32 = 480;
 /// The fade from the cover to the page.
-pub(super) const FADE_MS: u128 = 120;
+pub(super) fn fade_ms(mode: Mode) -> u128 {
+    if mode == Mode::Fast { 80 } else { 120 }
+}
+
+/// How long the page's layout has to match the window before the cover goes: milliseconds, or frames when that is not 0.
+pub(super) fn stable(mode: Mode) -> (u32, u32) {
+    if mode == Mode::Fast { (0, 2) } else { (130, 0) }
+}
 
 /// A decoded frame, bottom-up BGRA is not needed: CreateBitmap takes top-down 32-bit pixels.
 pub(super) struct Frame {
@@ -185,10 +199,10 @@ pub(super) fn destroy(cover: HWND) {
     let _ = unsafe { DestroyWindow(cover) };
 }
 
-/// The opacity `elapsed_ms` into a fade of `FADE_MS` (255 at the start, 0 at the end).
-pub(super) fn fade_alpha(elapsed_ms: u128) -> u8 {
-    let left = FADE_MS.saturating_sub(elapsed_ms);
-    ((left * 255) / FADE_MS) as u8
+/// The opacity `elapsed_ms` into a fade of `fade_ms` (255 at the start, 0 at the end).
+pub(super) fn fade_alpha(elapsed_ms: u128, fade_ms: u128) -> u8 {
+    let left = fade_ms.saturating_sub(elapsed_ms);
+    ((left * 255) / fade_ms.max(1)) as u8
 }
 
 /// The frame the WebView shows now, decoded to pixels on a thread of its own: `done` gets it (or none) on that thread.
@@ -223,8 +237,16 @@ where
     unsafe { core.CapturePreview(COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG, &stream, &handler) }
 }
 
+/// The widest frame that is kept.
+const MAX_WIDTH: u32 = 1280;
+
 fn decode(png: &[u8]) -> Option<Frame> {
-    let image = image::load_from_memory_with_format(png, image::ImageFormat::Png).ok()?.to_rgba8();
+    let mut image = image::load_from_memory_with_format(png, image::ImageFormat::Png).ok()?.to_rgba8();
+    // a frame wider than MAX_WIDTH is kept at that width: the cover scales it to the window anyway, and a 4K frame would cost 33 MB
+    if image.width() > MAX_WIDTH {
+        let height = (u64::from(image.height()) * u64::from(MAX_WIDTH) / u64::from(image.width())).max(1) as u32;
+        image = image::imageops::resize(&image, MAX_WIDTH, height, image::imageops::FilterType::Triangle);
+    }
     let (width, height) = image.dimensions();
     let mut bgra = image.into_raw();
     for pixel in bgra.chunks_exact_mut(4) {
@@ -246,14 +268,30 @@ mod tests {
         assert_eq!(mode_of(Some("OFF")), Mode::Off);
         assert_eq!(mode_of(Some("adaptive")), Mode::Adaptive);
         assert_eq!(mode_of(Some("Snapshot")), Mode::Snapshot);
+        assert_eq!(mode_of(Some("fast")), Mode::Fast);
+        assert_eq!(mode_of(Some("warm")), Mode::Warm);
     }
 
     #[test]
     fn a_fade_goes_from_opaque_to_clear_over_its_time() {
-        assert_eq!(fade_alpha(0), 255);
-        assert!(fade_alpha(FADE_MS / 2) > 120 && fade_alpha(FADE_MS / 2) < 135);
-        assert_eq!(fade_alpha(FADE_MS), 0);
-        assert_eq!(fade_alpha(FADE_MS * 3), 0);
+        let fade = fade_ms(Mode::Adaptive);
+        assert_eq!(fade_alpha(0, fade), 255);
+        assert!(fade_alpha(fade / 2, fade) > 120 && fade_alpha(fade / 2, fade) < 135);
+        assert_eq!(fade_alpha(fade, fade), 0);
+        assert_eq!(fade_alpha(fade * 3, fade), 0);
+        assert!(fade_ms(Mode::Fast) <= 80);
+        assert_eq!(stable(Mode::Fast), (0, 2));
+        assert_eq!(stable(Mode::Warm), (130, 0));
+    }
+
+    #[test]
+    fn a_wide_frame_is_kept_at_most_1280_px_wide() {
+        let mut png = Vec::new();
+        let source = image::RgbaImage::from_pixel(3840, 2160, image::Rgba([10, 20, 30, 255]));
+        image::DynamicImage::ImageRgba8(source).write_to(&mut std::io::Cursor::new(&mut png), image::ImageFormat::Png).unwrap();
+        let frame = decode(&png).unwrap();
+        assert_eq!((frame.width, frame.height), (1280, 720));
+        assert_eq!(frame.bgra.len(), 1280 * 720 * 4);
     }
 
     #[test]

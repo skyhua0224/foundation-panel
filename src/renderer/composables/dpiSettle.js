@@ -5,18 +5,22 @@
 export const SETTLE = { stableMs: 130, giveUpMs: 700 }
 
 /** Judges layout samples against the window's size in pixels; `sample` is true once the layout has matched for `stableMs`. */
-export function createSettleJudge({ width, height, stableMs = SETTLE.stableMs }) {
+export function createSettleJudge({ width, height, stableMs = SETTLE.stableMs, stableFrames = 0 }) {
   let since = null
+  let frames = 0
   return {
     sample(innerWidth, innerHeight, ratio, now) {
       const slack = Math.ceil(ratio) + 1
       const matches = Math.abs(innerWidth * ratio - width) <= slack && Math.abs(innerHeight * ratio - height) <= slack
       if (!matches) {
         since = null
+        frames = 0
         return false
       }
       if (since === null) since = now
-      return now - since >= stableMs
+      frames += 1
+      // stableFrames: that many frames in a row (one sample per frame); otherwise the time
+      return stableFrames > 0 ? frames >= stableFrames : now - since >= stableMs
     },
   }
 }
@@ -25,10 +29,10 @@ export function createSettleJudge({ width, height, stableMs = SETTLE.stableMs })
 export function followDpiCover({ listen, invoke, raf = (fn) => requestAnimationFrame(fn), now = () => performance.now(), win = window }) {
   let current = 0
   return listen('panel-dpi-cover', (event) => {
-    const { width, height, token } = event.payload || {}
+    const { width, height, token, stable_ms: stableMs, stable_frames: stableFrames } = event.payload || {}
     if (!width || !height || !token) return
     current = token
-    const judge = createSettleJudge({ width, height })
+    const judge = createSettleJudge({ width, height, stableMs: stableMs || SETTLE.stableMs, stableFrames: stableFrames || 0 })
     const started = now()
     const tick = () => {
       if (current !== token) return

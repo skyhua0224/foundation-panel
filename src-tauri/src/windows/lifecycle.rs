@@ -316,8 +316,17 @@ pub(super) fn dpi_settled<R: Runtime>(window: &WebviewWindow<R>, token: u64) {
     display::post_settled(window, token);
 }
 
+#[cfg(target_os = "windows")]
+pub(super) use display::log_default_background;
+
 #[cfg(not(target_os = "windows"))]
 pub(super) fn dpi_settled<R: Runtime>(_window: &WebviewWindow<R>, _token: u64) {}
+
+/// The page is being used: a warm snapshot waits.
+pub(super) fn note_activity() {
+    #[cfg(target_os = "windows")]
+    display::note_activity();
+}
 
 pub(super) fn heartbeat(label: &str, generation: u64) {
     if let Some(panel) = get(label).filter(|panel| panel.generation == generation) {
