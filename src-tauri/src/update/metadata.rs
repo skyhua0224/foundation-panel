@@ -971,13 +971,11 @@ async fn ensure_channel_candidates(
 pub(crate) async fn resolve_catalog(channel: UpdateChannel) -> Result<ReleaseCatalog, String> {
     if current_locale_is_chinese().await {
         let overall_deadline = Instant::now() + METADATA_OVERALL_TIMEOUT;
-        let com = fetch_metadata_endpoint(METADATA_COM_URL, false, overall_deadline);
-        let cn = fetch_metadata_endpoint(METADATA_CN_URL, true, overall_deadline);
-        let (com, cn) = tokio::join!(com, cn);
-        if let Ok(catalog) = com {
+        // One host first, the mirror only when it failed: a check is one request, not two.
+        if let Ok(catalog) = fetch_metadata_endpoint(METADATA_COM_URL, false, overall_deadline).await {
             return ensure_channel_candidates(catalog, channel).await;
         }
-        if let Ok(catalog) = cn {
+        if let Ok(catalog) = fetch_metadata_endpoint(METADATA_CN_URL, true, overall_deadline).await {
             return ensure_channel_candidates(catalog, channel).await;
         }
 

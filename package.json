@@ -11,7 +11,7 @@
     "dev-webui": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-native-plugins.ps1 -Configuration Debug && cross-env WEBUI_DEV_TARGET=https://localhost:3000 tauri dev",
     "dev:toolbar": "npm run build:renderer && cargo build --manifest-path src-tauri/Cargo.toml && src-tauri\\target\\debug\\sunshine-gui.exe --toolbar",
     "dev:renderer": "vite --config vite.config.js",
-    "test:renderer": "node --test",
+    "test:renderer": "node --import foundation-ui/testing/no-network --test",
     "build": "npm run build:native-plugins && tauri build",
     "build:renderer": "vite build --config vite.config.js",
     "build:native-plugins": "powershell -NoProfile -ExecutionPolicy Bypass -File ./scripts/build-native-plugins.ps1",
