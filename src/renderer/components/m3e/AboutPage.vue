@@ -1,5 +1,7 @@
 <template>
-  <MAbout :version="currentVersion" :channel="channel" :update="update" :sponsors="SPONSORS" :locale="locale" @check="runCheck" @open-update="emit('open-update')" @open="(url) => emit('open', url)" />
+  <MAbout :version="currentVersion" :channel="channel" :update="update" :sponsors="SPONSORS" :locale="locale" :on-refresh="onRefresh" @check="runCheck" @open-update="emit('open-update')" @open="(url) => emit('open', url)" @developer-off="options?.off()">
+    <template #developer><DeveloperOptions ref="options" /></template>
+  </MAbout>
 </template>
 
 <script setup>
@@ -7,6 +9,7 @@ import { computed, onMounted, ref } from 'vue'
 import { MAbout } from 'foundation-ui/vue'
 import { channelOfVersion, fetchReleaseMetadata } from 'foundation-ui/update'
 import { SPONSORS } from '../../config/sponsors.js'
+import DeveloperOptions from './DeveloperOptions.vue'
 
 // 关于 of the control panel: the shared page with the panel's data. The update check is the panel's own (`check_for_updates`) and its
 // answer opens the same update sheet as everywhere else; the page only shows the state of the last answer.
@@ -16,7 +19,10 @@ const props = defineProps({
   locale: { type: String, default: 'en' },
   /** the panel's check: resolves true when it produced an answer (the update sheet then opens), false on failure */
   check: { type: Function, required: true },
+  /** fetch the announcements again (the developer entry changes their source) */
+  onRefresh: { type: Function, default: null },
 })
+const options = ref(null)
 const emit = defineEmits(['open-update', 'open'])
 
 const checking = ref(false)

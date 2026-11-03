@@ -241,9 +241,6 @@ const resetAll = async () => {
 
   <MSheet :model-value="sheet === 'expert'" :title="st.advanced" side="end" :close-label="fs.close" @update:model-value="closeSheet">
     <MGroup>
-      <MExpertItem :title="st.devMode" :value="settings.devMode ? X.on : X.off" :changed="Boolean(settings.devMode) !== defaultDesktopSettings.devMode" :desc="st.devModeDesc" :effect="X.devMode" :def-text="defaultDesktopSettings.devMode ? X.on : X.off" :texts="X" data-panel-option="devMode" @reset="reset('devMode')">
-        <MSwitch :model-value="Boolean(settings.devMode)" :label="st.devMode" @update:model-value="set('devMode', $event)" />
-      </MExpertItem>
       <MExpertItem :title="st.textContextEnabled" :value="settings.textContextEnabled ? X.on : X.off" :changed="Boolean(settings.textContextEnabled) !== defaultDesktopSettings.textContextEnabled" :desc="st.textContextEnabledDesc" :effect="X.textContext" :def-text="defaultDesktopSettings.textContextEnabled ? X.on : X.off" :texts="X" data-panel-option="textContextEnabled" @reset="reset('textContextEnabled')">
         <MSwitch :model-value="Boolean(settings.textContextEnabled)" :label="st.textContextEnabled" @update:model-value="set('textContextEnabled', $event)" />
       </MExpertItem>
