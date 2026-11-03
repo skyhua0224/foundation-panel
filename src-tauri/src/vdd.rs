@@ -105,14 +105,38 @@ fn probe_vdd_status() -> VddStatus {
         };
     }
 
-    let output = match run_vdd_probe(&install_script) {
+    // The state of the device node is read directly (registry and Configuration Manager, a few ms); the host's script (PowerShell, 0.45 s) answers
+    // only where the direct read cannot say for sure: a payload that is missing, a node that is not started, more than one node.
+    let fields = match native_vdd_fields(&install_script) {
+        Some(fields) => fields,
+        None => match script_vdd_fields(&install_script) {
+            Ok(fields) => fields,
+            Err(status) => return status,
+        },
+    };
+    vdd_status_from_fields(fields)
+}
+
+/// What the probe of the host's driver script reports (VDD_DEVICE_PRESENT, CURRENT_VDD_*, BUNDLED_VDD_VERSION).
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct VddFields {
+    installed: bool,
+    pnp_status: String,
+    problem_code: u32,
+    installed_version: String,
+    bundled_version: String,
+}
+
+#[cfg(target_os = "windows")]
+fn script_vdd_fields(install_script: &Path) -> Result<VddFields, VddStatus> {
+    let output = match run_vdd_probe(install_script) {
         Ok(output) => output,
         Err(error) => {
-            return VddStatus {
+            return Err(VddStatus {
                 state: "unknown".to_string(),
                 status_text: format!("无法启动 VDD 状态检测: {}", error),
                 ..Default::default()
-            };
+            });
         }
     };
 
@@ -121,7 +145,7 @@ fn probe_vdd_status() -> VddStatus {
     if !output.status.success() || probe_value(&combined, "VDD_PROBE_OK") != "1" {
         let payload_missing = combined.contains("driver payload not found")
             || combined.contains("configuration template not found");
-        return VddStatus {
+        return Err(VddStatus {
             state: if payload_missing {
                 "payload_missing"
             } else {
@@ -134,16 +158,116 @@ fn probe_vdd_status() -> VddStatus {
                 "无法读取 VDD 驱动状态".to_string()
             },
             ..Default::default()
-        };
+        });
     }
 
-    let installed = probe_value(&combined, "VDD_DEVICE_PRESENT") == "1";
-    let pnp_status = probe_value(&combined, "CURRENT_VDD_STATUS");
-    let problem_code = probe_value(&combined, "CURRENT_VDD_PROBLEM")
-        .parse::<u32>()
-        .unwrap_or(0);
-    let installed_version = probe_value(&combined, "CURRENT_VDD_VERSION");
-    let bundled_version = probe_value(&combined, "BUNDLED_VDD_VERSION");
+    Ok(VddFields {
+        installed: probe_value(&combined, "VDD_DEVICE_PRESENT") == "1",
+        pnp_status: probe_value(&combined, "CURRENT_VDD_STATUS"),
+        problem_code: probe_value(&combined, "CURRENT_VDD_PROBLEM")
+            .parse::<u32>()
+            .unwrap_or(0),
+        installed_version: probe_value(&combined, "CURRENT_VDD_VERSION"),
+        bundled_version: probe_value(&combined, "BUNDLED_VDD_VERSION"),
+    })
+}
+
+/// One device node of the driver, as the registry and the Configuration Manager show it.
+#[derive(Debug, Clone)]
+struct VddNode {
+    version: String,
+    state: crate::device_probe::NodeState,
+}
+
+/// The decision the host's script takes in its probe mode (`Get-VddDecision`): one node is the device, more than one is none; only the two cases that
+/// need no judgement are answered here (no node at all, one node that is started without a problem). Anything else returns None for the script to read.
+fn vdd_fields_from_nodes(nodes: &[VddNode], bundled_version: &str) -> Option<VddFields> {
+    use crate::device_probe::NodeState;
+    match nodes {
+        [] => Some(VddFields {
+            installed: false,
+            pnp_status: String::new(),
+            problem_code: 0,
+            installed_version: String::new(),
+            bundled_version: bundled_version.to_string(),
+        }),
+        [node] if node.state == NodeState::Ok => Some(VddFields {
+            installed: true,
+            pnp_status: "OK".to_string(),
+            problem_code: 0,
+            installed_version: node.version.clone(),
+            bundled_version: bundled_version.to_string(),
+        }),
+        _ => None,
+    }
+}
+
+/// `DriverVer = date,version` of an INF: the version (the last field of the first such line), as the script reads it. UTF-16 files are read too.
+fn inf_driver_version(bytes: &[u8]) -> Option<String> {
+    let text = if bytes.starts_with(&[0xFF, 0xFE]) {
+        let units: Vec<u16> = bytes[2..].chunks_exact(2).map(|pair| u16::from_le_bytes([pair[0], pair[1]])).collect();
+        String::from_utf16_lossy(&units)
+    } else {
+        String::from_utf8_lossy(bytes.strip_prefix(&[0xEF, 0xBB, 0xBF]).unwrap_or(bytes)).into_owned()
+    };
+    text.lines().find_map(|line| {
+        let rest = line.trim_start();
+        let (key, value) = rest.split_once('=')?;
+        key.trim().eq_ignore_ascii_case("DriverVer").then(|| value.rsplit(',').next().unwrap_or("").trim().to_string())
+    })
+}
+
+/// The payload directory the host's script uses (`Resolve-VddPayload`): `driver\win10` unless Windows 11 (build 22000) and `driver\latest` exist.
+#[cfg(target_os = "windows")]
+fn vdd_payload_inf(install_script: &Path) -> Option<PathBuf> {
+    let driver_root = install_script.parent()?.join("driver");
+    let latest = driver_root.join("latest");
+    let has_inf = |dir: &Path| dir.join("ZakoVDD.inf").exists();
+    let mut driver_dir = driver_root.join("win10");
+    if !has_inf(&driver_dir) {
+        driver_dir = latest.clone();
+    }
+    if crate::device_probe::windows_build_number().is_some_and(|build| build >= 22000) && has_inf(&latest) {
+        driver_dir = latest;
+    }
+    if !has_inf(&driver_dir) {
+        driver_dir = driver_root.clone();
+    }
+    let config_source = if driver_dir.join("vdd_settings.xml").exists() {
+        driver_dir.join("vdd_settings.xml")
+    } else {
+        driver_root.join("vdd_settings.xml")
+    };
+    (has_inf(&driver_dir) && config_source.exists()).then(|| driver_dir.join("ZakoVDD.inf"))
+}
+
+#[cfg(target_os = "windows")]
+fn native_vdd_fields(install_script: &Path) -> Option<VddFields> {
+    use crate::device_probe as probe;
+    let inf = vdd_payload_inf(install_script)?;
+    let bundled_version = inf_driver_version(&fs::read(inf).ok()?)?;
+    let nodes: Vec<VddNode> = probe::enum_root_devices("DISPLAY")
+        .ok()?
+        .into_iter()
+        .filter(|device| {
+            device.hardware_ids.iter().any(|id| id.eq_ignore_ascii_case("Root\\ZakoVDD") || id.eq_ignore_ascii_case("ZakoVDD"))
+        })
+        .map(|device| VddNode {
+            version: probe::driver_values(&device.driver_key).0,
+            state: probe::node_state(&device.instance_id),
+        })
+        .collect();
+    vdd_fields_from_nodes(&nodes, &bundled_version)
+}
+
+fn vdd_status_from_fields(fields: VddFields) -> VddStatus {
+    let VddFields {
+        installed,
+        pnp_status,
+        problem_code,
+        installed_version,
+        bundled_version,
+    } = fields;
     let running = installed && pnp_status.eq_ignore_ascii_case("OK") && problem_code == 0;
     let version_match = running
         && !installed_version.is_empty()
@@ -1842,5 +1966,53 @@ mod tests {
 
         let out = serialize_vdd_settings(&settings).unwrap();
         assert!(out.contains("<EdidProfile>modern</EdidProfile>"));
+    }
+}
+
+#[cfg(test)]
+mod vdd_probe_tests {
+    use super::*;
+    use crate::device_probe::NodeState;
+
+    fn node(version: &str, state: NodeState) -> VddNode {
+        VddNode { version: version.to_string(), state }
+    }
+
+    #[test]
+    fn no_node_is_not_installed_and_one_started_node_is_the_device() {
+        let none = vdd_fields_from_nodes(&[], "100.0.18.2").unwrap();
+        assert!(!none.installed && none.installed_version.is_empty() && none.bundled_version == "100.0.18.2" && none.problem_code == 0);
+        let one = vdd_fields_from_nodes(&[node("100.0.18.2", NodeState::Ok)], "100.0.18.2").unwrap();
+        assert!(one.installed && one.pnp_status == "OK" && one.installed_version == "100.0.18.2");
+    }
+
+    #[test]
+    fn what_needs_judgement_is_left_to_the_script() {
+        assert_eq!(vdd_fields_from_nodes(&[node("1", NodeState::Error(10))], "2"), None);
+        assert_eq!(vdd_fields_from_nodes(&[node("1", NodeState::Missing)], "2"), None);
+        assert_eq!(vdd_fields_from_nodes(&[node("1", NodeState::Ok), node("1", NodeState::Ok)], "2"), None);
+    }
+
+    #[test]
+    fn the_inf_version_is_the_last_field_of_driverver() {
+        let text = b"[Version]\r\nSignature=\"$Windows NT$\"\r\n  DriverVer = 10/15/2025,100.0.18.2\r\n";
+        assert_eq!(inf_driver_version(text), Some("100.0.18.2".to_string()));
+        let mut utf16 = vec![0xFF, 0xFE];
+        for unit in "DriverVer=01/02/2026,15.1.2.3\r\n".encode_utf16() {
+            utf16.extend(unit.to_le_bytes());
+        }
+        assert_eq!(inf_driver_version(&utf16), Some("15.1.2.3".to_string()));
+        assert_eq!(inf_driver_version(b"[Version]\r\n"), None);
+    }
+
+    /// Run on a machine with the driver installed: `cargo test --bin sunshine-gui -- --ignored vdd_direct_read_matches_the_script`.
+    #[test]
+    #[ignore]
+    #[cfg(target_os = "windows")]
+    fn vdd_direct_read_matches_the_script() {
+        let install_script = get_sunshine_path().join("scripts").join("install-vdd.bat");
+        let direct = native_vdd_fields(&install_script).expect("the direct read answers for a ready or absent driver");
+        let script = script_vdd_fields(&install_script).expect("the script answers");
+        assert_eq!(direct, script);
     }
 }

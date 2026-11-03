@@ -24,6 +24,7 @@ mod logger;
 mod moonlight_web;
 mod native_tools;
 mod power;
+mod device_probe;
 mod probe_cache;
 mod proxy_server;
 mod rtss;
