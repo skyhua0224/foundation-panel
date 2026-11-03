@@ -56,6 +56,8 @@ struct Warm {
     /// the user drags the window's edge
     sizing: bool,
     captures: u32,
+    /// the last change of the page's content that was seen
+    seen_epoch: u64,
 }
 
 /// The page tells that it is being used (pointer, key, wheel): a snapshot is not taken then. Milliseconds since the first call.
@@ -65,6 +67,13 @@ static ACTIVITY_BASE: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
 pub(super) fn note_activity() {
     let base = ACTIVITY_BASE.get_or_init(Instant::now);
     ACTIVITY.store(base.elapsed().as_millis() as u64 + 1, AtomicOrdering::Relaxed);
+}
+
+/// Counts the changes of the page's content that the page reported (`panel_content_changed`).
+static CONTENT_EPOCH: AtomicU64 = AtomicU64::new(0);
+
+pub(super) fn note_content_changed() {
+    CONTENT_EPOCH.fetch_add(1, AtomicOrdering::Relaxed);
 }
 
 /// Milliseconds since the page was last used (a page that never was: very long).
@@ -370,6 +379,9 @@ fn begin_cover<R: Runtime>(hwnd: windows::Win32::Foundation::HWND, context: &Hoo
         if mode == Mode::Warm {
             log::info!("[warm] cover with {}", if warm.frame.is_some() { "the kept frame" } else { "the surface colour: no frame kept yet" });
         }
+        if let (true, Some(overlay)) = (crate::windows::test_offscreen(), overlay) {
+            log::info!("[cover-check] {}", dpi_cover::verify(overlay, crate::windows::surface::current(), if mode == Mode::Warm { warm.frame.as_ref() } else { None }));
+        }
         drop(warm);
         context.cover.lock().unwrap().overlay = overlay.map_or(0, |overlay| overlay.0 as isize);
         return;
@@ -516,8 +528,13 @@ fn warm_tick<R: Runtime>(hwnd: windows::Win32::Foundation::HWND, context: &Hook<
     }
     let quiet = idle_ms() >= WARM_QUIET_MS;
     let mut warm = context.warm.lock().unwrap();
-    if !quiet {
+    // the page says when its content changed: a page that shows the same as when the last frame was taken costs nothing
+    let epoch = CONTENT_EPOCH.load(AtomicOrdering::Relaxed);
+    if epoch != warm.seen_epoch {
+        warm.seen_epoch = epoch;
         warm.dirty = true;
+    }
+    if !quiet {
         return;
     }
     if warm.sizing || warm.in_flight || !warm.dirty || warm.captured_at.is_some_and(|at| at.elapsed() < WARM_EVERY) {

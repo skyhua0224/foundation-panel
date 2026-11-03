@@ -11,7 +11,7 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GWLP_USERDATA, GetClientRect, GetWindowLongPtrW, HWND_TOP, LWA_ALPHA, RegisterClassExW, SWP_NOACTIVATE, SWP_SHOWWINDOW,
-    SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, WM_ERASEBKGND, WM_NCDESTROY, WM_NCHITTEST, WM_PAINT, WNDCLASSEXW, WS_EX_LAYERED,
+    SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, WM_ERASEBKGND, WM_NCDESTROY, WM_NCHITTEST, WM_PAINT, WM_PRINTCLIENT, WNDCLASSEXW, WS_EX_LAYERED,
     WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT, WS_POPUP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
@@ -102,6 +102,28 @@ fn ensure_class() {
     }
 }
 
+/// The cover's face in `hdc`: its colour, and the frame stretched over it when there is one.
+fn draw(hwnd: HWND, hdc: windows::Win32::Graphics::Gdi::HDC) {
+    let face = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as *const Face;
+    let mut client = RECT::default();
+    let _ = unsafe { GetClientRect(hwnd, &mut client) };
+    if let Some(face) = unsafe { face.as_ref() } {
+        unsafe {
+            let brush = CreateSolidBrush(face.color);
+            FillRect(hdc, &client, brush);
+            let _ = DeleteObject(HGDIOBJ(brush.0));
+            if let Some(bitmap) = face.bitmap {
+                let memory = CreateCompatibleDC(Some(hdc));
+                let previous = SelectObject(memory, HGDIOBJ(bitmap.0));
+                SetStretchBltMode(hdc, HALFTONE);
+                let _ = StretchBlt(hdc, 0, 0, client.right, client.bottom, Some(memory), 0, 0, face.size.0, face.size.1, SRCCOPY);
+                SelectObject(memory, previous);
+                let _ = DeleteDC(memory);
+            }
+        }
+    }
+}
+
 unsafe extern "system" fn cover_proc(hwnd: HWND, message: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match message {
         WM_ERASEBKGND => LRESULT(1),
@@ -110,25 +132,13 @@ unsafe extern "system" fn cover_proc(hwnd: HWND, message: u32, wparam: WPARAM, l
         WM_PAINT => {
             let mut paint = PAINTSTRUCT::default();
             let hdc = unsafe { BeginPaint(hwnd, &mut paint) };
-            let face = unsafe { GetWindowLongPtrW(hwnd, GWLP_USERDATA) } as *const Face;
-            let mut client = RECT::default();
-            let _ = unsafe { GetClientRect(hwnd, &mut client) };
-            if let Some(face) = unsafe { face.as_ref() } {
-                unsafe {
-                    let brush = CreateSolidBrush(face.color);
-                    FillRect(hdc, &client, brush);
-                    let _ = DeleteObject(HGDIOBJ(brush.0));
-                    if let Some(bitmap) = face.bitmap {
-                        let memory = CreateCompatibleDC(Some(hdc));
-                        let previous = SelectObject(memory, HGDIOBJ(bitmap.0));
-                        SetStretchBltMode(hdc, HALFTONE);
-                        let _ = StretchBlt(hdc, 0, 0, client.right, client.bottom, Some(memory), 0, 0, face.size.0, face.size.1, SRCCOPY);
-                        SelectObject(memory, previous);
-                        let _ = DeleteDC(memory);
-                    }
-                }
-            }
+            draw(hwnd, hdc);
             let _ = unsafe { EndPaint(hwnd, &paint) };
+            LRESULT(0)
+        }
+        // PrintWindow of the cover's own window (the check of its content) asks the window to draw itself into a device context of ours
+        WM_PRINTCLIENT => {
+            draw(hwnd, windows::Win32::Graphics::Gdi::HDC(wparam.0 as *mut _));
             LRESULT(0)
         }
         WM_NCDESTROY => {
@@ -201,6 +211,74 @@ pub(super) fn create(parent: HWND, color: (u8, u8, u8), frame: Option<&Frame>) -
         log::info!("[dpi-cover] cover window {:?} over {}x{}", hwnd.0, client.right, client.bottom);
     }
     Some(hwnd)
+}
+
+/// The mean colour of the cells of a `columns` x `rows` grid over BGRA pixels of `width` x `height`.
+fn grid_means(bgra: &[u8], width: usize, height: usize, columns: usize, rows: usize) -> Vec<[f64; 3]> {
+    let mut cells = vec![([0u64; 3], 0u64); columns * rows];
+    for y in 0..height {
+        for x in 0..width {
+            let at = (y * width + x) * 4;
+            let cell = &mut cells[(y * rows / height) * columns + x * columns / width];
+            cell.0[0] += u64::from(bgra[at + 2]);
+            cell.0[1] += u64::from(bgra[at + 1]);
+            cell.0[2] += u64::from(bgra[at]);
+            cell.1 += 1;
+        }
+    }
+    cells.into_iter().map(|(sum, n)| { let n = n.max(1) as f64; [sum[0] as f64 / n, sum[1] as f64 / n, sum[2] as f64 / n] }).collect()
+}
+
+/// The mean absolute difference (0 to 255) between two grids, and the mean colour of the first.
+pub(super) fn compare_grids(shown: &[[f64; 3]], expected: &[[f64; 3]]) -> (f64, [u8; 3]) {
+    let n = shown.len().max(1) as f64;
+    let diff = shown.iter().zip(expected).map(|(a, b)| (0..3).map(|c| (a[c] - b[c]).abs()).sum::<f64>() / 3.0).sum::<f64>() / n;
+    let mean = |c: usize| (shown.iter().map(|cell| cell[c]).sum::<f64>() / n).round() as u8;
+    (diff, [mean(0), mean(1), mean(2)])
+}
+
+/// What the cover shows, read back from the cover's own window with PrintWindow into memory (never from the screen): its size, its mean colour, and how far
+/// its 16 x 10 grid of colours is from the grid of the frame it should show stretched over its client area (or from its flat colour). One line for the log.
+pub(super) fn verify(cover: HWND, color: (u8, u8, u8), frame: Option<&Frame>) -> String {
+    use windows::Win32::Graphics::Gdi::{BITMAPINFO, BITMAPINFOHEADER, BI_RGB, CreateDIBSection, DIB_RGB_COLORS, GetDC, ReleaseDC};
+    use windows::Win32::Storage::Xps::{PRINT_WINDOW_FLAGS, PrintWindow};
+    let mut client = RECT::default();
+    if unsafe { GetClientRect(cover, &mut client) }.is_err() || client.right <= 0 || client.bottom <= 0 {
+        return "no client area".to_string();
+    }
+    let (width, height) = (client.right as usize, client.bottom as usize);
+    unsafe {
+        let screen = GetDC(None);
+        let memory = CreateCompatibleDC(Some(screen));
+        let info = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER { biSize: size_of::<BITMAPINFOHEADER>() as u32, biWidth: width as i32, biHeight: -(height as i32), biPlanes: 1, biBitCount: 32, biCompression: BI_RGB.0, ..Default::default() },
+            ..Default::default()
+        };
+        let mut bits = std::ptr::null_mut();
+        let Ok(dib) = CreateDIBSection(Some(memory), &info, DIB_RGB_COLORS, &mut bits, None, 0) else {
+            let _ = DeleteDC(memory);
+            ReleaseDC(None, screen);
+            return "no memory bitmap".to_string();
+        };
+        let previous = SelectObject(memory, HGDIOBJ(dib.0));
+        let printed = PrintWindow(cover, memory, PRINT_WINDOW_FLAGS(1)).as_bool(); // PW_CLIENTONLY
+        let pixels = std::slice::from_raw_parts(bits.cast::<u8>(), width * height * 4).to_vec();
+        SelectObject(memory, previous);
+        let _ = DeleteObject(HGDIOBJ(dib.0));
+        let _ = DeleteDC(memory);
+        ReleaseDC(None, screen);
+        let shown = grid_means(&pixels, width, height, 16, 10);
+        let expected = match frame {
+            Some(frame) => grid_means(&frame.bgra, frame.width as usize, frame.height as usize, 16, 10),
+            None => vec![[f64::from(color.0), f64::from(color.1), f64::from(color.2)]; 160],
+        };
+        let (diff, mean) = compare_grids(&shown, &expected);
+        let (kind, stretch) = match frame {
+            Some(frame) => ("frame", format!("stretch x{:.2} y{:.2} of {}x{}", width as f64 / f64::from(frame.width), height as f64 / f64::from(frame.height), frame.width, frame.height)),
+            None => ("colour", format!("expected #{:02x}{:02x}{:02x}", color.0, color.1, color.2)),
+        };
+        format!("PrintWindow {} {}x{} shows {kind}: mean #{:02x}{:02x}{:02x}, grid difference {diff:.1}/255, {stretch}", if printed { "ok" } else { "failed" }, width, height, mean[0], mean[1], mean[2])
+    }
 }
 
 /// The cover follows the client rectangle of its window.
@@ -306,6 +384,19 @@ mod tests {
         assert_eq!(stable(Mode::Fast), (0, 2));
         assert_eq!(stable(Mode::Warm), (0, 2));
         assert_eq!(stable(Mode::Adaptive), (130, 0));
+    }
+
+    #[test]
+    fn the_grid_of_a_picture_is_compared_with_the_grid_of_what_it_should_show() {
+        // 4 x 2 pixels, the left half red and the right half blue (BGRA)
+        let row = [0, 0, 255, 255, 0, 0, 255, 255, 255, 0, 0, 255, 255, 0, 0, 255];
+        let pixels: Vec<u8> = row.iter().chain(row.iter()).copied().collect();
+        let small = grid_means(&pixels, 4, 2, 2, 1);
+        assert_eq!(small, vec![[255.0, 0.0, 0.0], [0.0, 0.0, 255.0]]);
+        let (same, mean) = compare_grids(&small, &small);
+        assert_eq!((same, mean), (0.0, [128, 0, 128]));
+        let (swapped, _) = compare_grids(&small, &[[0.0, 0.0, 255.0], [255.0, 0.0, 0.0]]);
+        assert!(swapped > 150.0);
     }
 
     #[test]

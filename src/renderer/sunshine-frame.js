@@ -46,6 +46,14 @@ function followPageActivity(invoke) {
     invoke('panel_activity').catch(() => {})
   }
   for (const type of ['pointerdown', 'pointermove', 'keydown', 'wheel']) window.addEventListener(type, note, { capture: true, passive: true })
+  // what the page shows changed (a change of the document; at most one report in 800 ms, the last one after the changes stop): the kept frame of the cover is stale
+  let waiting = false
+  const changed = () => {
+    if (waiting) return
+    waiting = true
+    setTimeout(() => { waiting = false; invoke('panel_content_changed').catch(() => {}) }, 800)
+  }
+  new MutationObserver(changed).observe(document.documentElement, { subtree: true, childList: true, attributes: true, characterData: true })
 }
 
 // The Web UI pages load their scripts on the first visit (up to 1.6 s on the Skyindows panel): load them once in a hidden frame while nobody uses the window
