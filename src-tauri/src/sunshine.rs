@@ -1518,3 +1518,26 @@ pub async fn set_sunshine_locale(locale: String) -> Result<String, String> {
     })
     .await
 }
+
+#[cfg(all(test, target_os = "windows"))]
+mod direct_read_tests {
+    use super::*;
+
+    /// Run on a machine with Sunshine installed: `cargo test --bin sunshine-gui -- --ignored direct_read_matches --nocapture`.
+    #[test]
+    #[ignore]
+    fn version_resource_direct_read_matches_the_version_flag() {
+        use std::os::windows::process::CommandExt;
+        let exe = get_sunshine_path().join("sunshine.exe");
+        let t = std::time::Instant::now();
+        let resource = crate::device_probe::file_version_string(&exe).and_then(|text| crate::device_probe::plain_host_version(&text));
+        let resource_ms = t.elapsed().as_secs_f64() * 1000.0;
+        let t = std::time::Instant::now();
+        let output = Command::new(&exe).arg("--version").creation_flags(0x08000000).output().unwrap();
+        let (stdout, stderr) = crate::text_encoding::decode_output(&output);
+        println!("version: resource {resource_ms:.1} ms {resource:?}; --version {:.1} ms {:?}", t.elapsed().as_secs_f64() * 1000.0, format!("{stdout}{stderr}").trim());
+        let printed = format!("{stdout}{stderr}");
+        let resource = resource.expect("the version resource is the plain form");
+        assert!(printed.contains(&resource), "--version prints {printed:?}, the resource says {resource}");
+    }
+}

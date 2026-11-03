@@ -555,3 +555,49 @@ fn get_sunshine_start_time_impl() -> Result<ProcessStartInfo, String> {
         pid: 0,
     })
 }
+
+#[cfg(all(test, target_os = "windows"))]
+mod direct_read_tests {
+    use super::*;
+    use std::time::Instant;
+
+    /// Run on a machine with Sunshine running: `cargo test --bin sunshine-gui -- --ignored direct_read_matches --nocapture`.
+    #[test]
+    #[ignore]
+    fn start_time_direct_read_matches_wmi() {
+        let t = Instant::now();
+        let direct = get_sunshine_start_time_impl().unwrap();
+        let direct_ms = t.elapsed().as_secs_f64() * 1000.0;
+        let t = Instant::now();
+        let wmi = get_sunshine_start_time_wmi().unwrap();
+        println!("start time: direct {direct_ms:.1} ms, WMI {:.1} ms: {direct:?} / {wmi:?}", t.elapsed().as_secs_f64() * 1000.0);
+        assert!(direct.start_time_ms > 0);
+        assert_eq!((direct.start_time_ms, direct.pid, &direct.process_name), (wmi.start_time_ms, wmi.pid, &wmi.process_name));
+    }
+
+    #[test]
+    #[ignore]
+    fn process_list_direct_read_matches_wmi() {
+        use wmi::WMIConnection;
+        #[derive(Deserialize)]
+        #[serde(rename = "Win32_Process")]
+        #[serde(rename_all = "PascalCase")]
+        struct P { name: String, process_id: u32, working_set_size: Option<u64> }
+        let t = Instant::now();
+        let direct = get_process_memory_info_impl().unwrap();
+        let direct_ms = t.elapsed().as_secs_f64() * 1000.0;
+        let wmi: Vec<P> = WMIConnection::new().unwrap()
+            .raw_query("SELECT Name, ProcessId, WorkingSetSize FROM Win32_Process WHERE Name LIKE '%sunshine%'").unwrap();
+        let mut theirs: Vec<(u32, String, u64)> = wmi.into_iter().filter(|p| { let n = p.name.to_lowercase(); !n.contains("sunshine-gui") && !n.contains("sunshine_gui") }).map(|p| (p.process_id, p.name, p.working_set_size.unwrap_or(0))).collect();
+        theirs.sort();
+        let mut ours: Vec<(u32, String, u64)> = direct.processes.iter().map(|p| (p.pid, p.process_name.clone(), p.working_set)).collect();
+        ours.sort();
+        println!("memory: direct {direct_ms:.1} ms\n  direct {ours:?}\n  wmi    {theirs:?}");
+        assert!(!ours.is_empty());
+        assert_eq!(ours.iter().map(|p| (p.0, &p.1)).collect::<Vec<_>>(), theirs.iter().map(|p| (p.0, &p.1)).collect::<Vec<_>>());
+        for (a, b) in ours.iter().zip(&theirs) {
+            let (a, b) = (a.2 as f64, b.2 as f64);
+            assert!((a - b).abs() <= 0.1 * b.max(1.0) + 4_000_000.0, "working set {a} against {b}");
+        }
+    }
+}
