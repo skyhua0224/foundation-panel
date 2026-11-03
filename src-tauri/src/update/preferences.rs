@@ -6,10 +6,20 @@ use std::sync::{Arc, Mutex};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Manager, Runtime};
 
+/// 更新来源的可选值：自动（CNB 优先）、仅 CNB、仅 GitHub、Mirror酱（CDK 加速下载）。
+pub(crate) const UPDATE_SOURCES: [&str; 4] = ["auto", "cnb", "github", "mirror"];
+
+fn default_update_source() -> String {
+    "auto".to_string()
+}
+
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 struct UpdatePreferences {
     last_check_time: u64,
     include_prerelease: bool,
+    /// 渲染层 foundation-ui/update 的 `SOURCE_KEY` 同款取值；旧文件缺省为 auto。
+    #[serde(default = "default_update_source")]
+    update_source: String,
 }
 
 fn preferences_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
@@ -148,5 +158,84 @@ pub(crate) fn set_include_prerelease<R: Runtime>(app: &AppHandle<R>, include: bo
         };
         info!("📝 更新偏好设置: 包含预发布版本 = {include}");
         persist(app, &snapshot);
+    }
+}
+
+/// 校验并归一化来源值：只有四个已知值，未知值拒绝（不静默回退，
+/// 渲染层自己已做 normalizeSource，这里防 IPC 直调写脏数据）。
+pub(crate) fn normalize_update_source(value: &str) -> Result<&'static str, String> {
+    UPDATE_SOURCES
+        .into_iter()
+        .find(|known| *known == value)
+        .ok_or_else(|| format!("不支持的更新来源: {value}"))
+}
+
+pub(crate) fn update_source<R: Runtime>(app: &AppHandle<R>) -> &'static str {
+    ensure(app);
+    let stored = app
+        .try_state::<Arc<Mutex<UpdatePreferences>>>()
+        .map(|preferences| preferences.lock().unwrap().update_source.clone())
+        .unwrap_or_default();
+    UPDATE_SOURCES
+        .into_iter()
+        .find(|known| *known == stored)
+        .unwrap_or("auto")
+}
+
+pub(crate) fn set_update_source<R: Runtime>(
+    app: &AppHandle<R>,
+    source: &str,
+) -> Result<(), String> {
+    let source = normalize_update_source(source)?;
+    ensure(app);
+    if let Some(preferences) = app.try_state::<Arc<Mutex<UpdatePreferences>>>() {
+        let snapshot = {
+            let mut preferences = preferences.lock().unwrap();
+            preferences.update_source = source.to_string();
+            preferences.clone()
+        };
+        info!("更新偏好设置: 更新来源 = {source}");
+        persist(app, &snapshot);
+        Ok(())
+    } else {
+        Err("更新偏好状态初始化失败".to_string())
+    }
+}
+
+#[cfg(test)]
+mod update_source_tests {
+    use super::*;
+
+    #[test]
+    fn only_the_four_known_sources_are_accepted() {
+        assert_eq!(normalize_update_source("auto").unwrap(), "auto");
+        assert_eq!(normalize_update_source("cnb").unwrap(), "cnb");
+        assert_eq!(normalize_update_source("github").unwrap(), "github");
+        assert_eq!(normalize_update_source("mirror").unwrap(), "mirror");
+        assert!(normalize_update_source("p2p").is_err());
+        assert!(normalize_update_source("").is_err());
+        assert!(normalize_update_source("AUTO").is_err());
+    }
+
+    #[test]
+    fn legacy_preferences_file_defaults_to_auto_and_round_trips_mirror() {
+        let legacy = serde_json::json!({"last_check_time": 5, "include_prerelease": true});
+        let parsed: UpdatePreferences = serde_json::from_value(legacy).expect("legacy file loads");
+        assert_eq!(parsed.update_source, "auto");
+
+        let chosen: UpdatePreferences = serde_json::from_value(serde_json::json!({
+            "last_check_time": 5,
+            "include_prerelease": false,
+            "update_source": "mirror"
+        }))
+        .expect("chosen source loads");
+        assert_eq!(chosen.update_source, "mirror");
+        let serialized = serde_json::to_value(&chosen).expect("serializes");
+        assert_eq!(
+            serialized
+                .get("update_source")
+                .and_then(|value| value.as_str()),
+            Some("mirror")
+        );
     }
 }
