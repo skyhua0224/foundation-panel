@@ -18,6 +18,21 @@
           <MItem icon="system_update_alt" :title="t.sidebar.updateChannel" stack>
             <template #control><MSeg block :label="t.sidebar.updateChannel" :model-value="includePrerelease" :options="channelOptions" @update:model-value="emit('channel-change', $event)" /></template>
           </MItem>
+          <MItem icon="cloud_download" :title="src.source" :text="src.sourceNote" stack>
+            <template #control><MSeg block :label="src.source" :model-value="updateSource.source.value" :options="sourceOptions" @update:model-value="updateSource.setSource" /></template>
+          </MItem>
+          <template v-if="updateSource.source.value === 'mirror'">
+            <MFieldItem v-model="cdkDraft" icon="key" type="password" :label="src.cdk" :supporting="updateSource.available.value ? src.cdkHint : src.unavailable" :disabled="!updateSource.available.value || updateSource.busy.value" autocomplete="off" />
+            <MItem icon="verified_user" :title="src.status[updateSource.status.value.state] || src.status.unknown" :text="cdkExpires">
+              <template #trail>
+                <MButton variant="tonal" size="sm" icon="save" :disabled="!cdkDraft.trim() || !updateSource.available.value || updateSource.busy.value" @click="saveCdk">{{ src.save }}</MButton>
+                <MButton variant="text" size="sm" icon="fact_check" :disabled="!updateSource.hasCdk.value || updateSource.busy.value" @click="updateSource.checkCdk()">{{ src.check }}</MButton>
+                <MButton variant="text" size="sm" icon="delete" :disabled="!updateSource.hasCdk.value || updateSource.busy.value" @click="updateSource.clearCdk()">{{ src.clear }}</MButton>
+              </template>
+            </MItem>
+            <MBanner v-if="cdkError" tone="warn" icon="info">{{ cdkError }}</MBanner>
+          </template>
+          <MFooter>{{ sourceHint }} {{ src.verified }}</MFooter>
           <MItem icon="verified" :title="t.sidebar.currentChannel" :text="includePrerelease ? t.sidebar.betaChannelHint : t.sidebar.stableChannelHint" />
           <MItem icon="info" :title="t.sidebar.currentVersion" :text="currentVersion">
             <template #trail><MButton variant="tonal" icon="refresh" :loading="checkingUpdate" @click="checkUpdate">{{ t.sidebar.checkUpdate }}</MButton></template>
@@ -77,13 +92,15 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFooter, MSupportSheet, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard } from 'foundation-ui/vue'
+import { computed, onMounted, ref } from 'vue'
+import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFooter, MFieldItem, MBanner, MSupportSheet, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import PanelOptions from './m3e/PanelOptions.vue'
 import { ROUTES } from '../composables/useRouter.js'
 import { useUpdateCheckTime } from '../composables/useUpdateCheckTime.js'
+import { useUpdateSource } from '../composables/useUpdateSource.js'
+import { UPDATE_SOURCES, updateSourceTexts } from 'foundation-ui/update'
 const props = defineProps({
   page: { type: String, required: true },
   tools: { type: Array, default: () => [] },
@@ -118,6 +135,16 @@ const themeOptions = computed(() => [
 const localeOptions = [{ value: 'zh', label: '简体中文' }, { value: 'en', label: 'English' }]
 const channelOptions = computed(() => [{ value: false, label: t.value.sidebar.stableChannel }, { value: true, label: t.value.sidebar.betaChannel }])
 const lastCheck = useUpdateCheckTime()
+// the update source and the Mirror酱 CDK (the CDK stays in the native side; this window only sets it and asks about it)
+const updateSource = useUpdateSource()
+const src = computed(() => updateSourceTexts(props.locale))
+const sourceOptions = computed(() => UPDATE_SOURCES.map((value) => ({ value, label: src.value.sources[value] })))
+const cdkDraft = ref('')
+const cdkExpires = computed(() => { const at = updateSource.status.value.expiresAt; return at ? src.value.expires.replace('{time}', new Date(at).toLocaleDateString()) : '' })
+const cdkError = computed(() => (updateSource.status.value.kind && src.value.errors[updateSource.status.value.kind]) || '')
+const sourceHint = computed(() => (updateSource.source.value === 'auto' ? src.value.autoHint + '.' : updateSource.source.value === 'mirror' ? (updateSource.hasCdk.value ? src.value.mirrorCdk : src.value.mirrorNoCdk) : ''))
+const saveCdk = async () => { if (await updateSource.saveCdk(cdkDraft.value)) cdkDraft.value = '' }
+onMounted(() => { void updateSource.refresh() })
 const sponsorOpen = ref(false)
 const checkingUpdate = ref(false)
 const checkUpdate = async () => {
