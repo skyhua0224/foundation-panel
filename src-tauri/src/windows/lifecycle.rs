@@ -18,6 +18,7 @@ use tauri::{AppHandle, Manager, Runtime, WebviewWindow, WindowEvent};
 
 #[cfg(target_os = "windows")]
 mod display;
+mod dpi_cover;
 const DISPLAY_DEBOUNCE: Duration = Duration::from_millis(300);
 
 const STARTUP_GRACE: Duration = Duration::from_secs(90);
@@ -308,6 +309,15 @@ impl Panel {
         });
     }
 }
+
+/// The page's layout matches the window again after a change of scale: the cover over it may go (`token` says which cover).
+#[cfg(target_os = "windows")]
+pub(super) fn dpi_settled<R: Runtime>(window: &WebviewWindow<R>, token: u64) {
+    display::post_settled(window, token);
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(super) fn dpi_settled<R: Runtime>(_window: &WebviewWindow<R>, _token: u64) {}
 
 pub(super) fn heartbeat(label: &str, generation: u64) {
     if let Some(panel) = get(label).filter(|panel| panel.generation == generation) {

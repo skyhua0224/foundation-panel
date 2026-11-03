@@ -342,6 +342,7 @@ fn main() {
             logger::frontend_slow,
             windows::panel_content_ready,
             windows::panel_set_surface,
+            windows::panel_dpi_settled,
             windows::resize_about_window,
             windows::resize_tool_window,
             hdr_enhanced::nr_live_status,

@@ -31,6 +31,14 @@ pub fn startup_color() -> Color {
     Color(r, g, b, 255)
 }
 
+/// The surface colour now: the last one the renderer reported, or the one the window started with.
+pub fn current() -> (u8, u8, u8) {
+    LAST_STORED.lock().unwrap().unwrap_or_else(|| {
+        let Color(r, g, b, _) = startup_color();
+        (r, g, b)
+    })
+}
+
 /// Remembers the surface for the next start (written only when it changed).
 pub fn store(color: (u8, u8, u8)) {
     let mut last = LAST_STORED.lock().unwrap();

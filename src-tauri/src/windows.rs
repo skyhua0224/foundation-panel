@@ -193,6 +193,12 @@ pub fn panel_content_ready(window: tauri::WebviewWindow) {
     lifecycle::content_ready(&window);
 }
 
+/// The page's layout has matched the window for a while after a change of scale: the cover over it fades out.
+#[tauri::command]
+pub fn panel_dpi_settled(window: tauri::WebviewWindow, token: u64) {
+    lifecycle::dpi_settled(&window, token);
+}
+
 /// The renderer's theme surface colour: the colour the window and WebView2 show before a
 /// frame is painted (resize, restore, first start). Kept for the next start.
 #[tauri::command]

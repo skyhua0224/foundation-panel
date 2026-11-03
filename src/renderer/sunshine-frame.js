@@ -4,6 +4,8 @@ import { invoke } from '@tauri-apps/api/core'
 import { followPanelSurface } from './composables/panelSurface.js'
 import { startWebPrewarm, createHiddenFrameLoader } from './composables/webPrewarm.js'
 import { startSlowCallLog } from './composables/slowCalls.js'
+import { followDpiCover } from './composables/dpiSettle.js'
+import { listen } from '@tauri-apps/api/event'
 import 'element-plus/theme-chalk/el-loading.css'
 import 'element-plus/theme-chalk/el-message.css'
 import 'element-plus/theme-chalk/el-overlay.css'
@@ -27,6 +29,7 @@ app.mount('#app')
 queueMicrotask(() => {
   invoke('panel_content_ready').catch(() => {})
   followPanelSurface(invoke)
+  followDpiCover({ listen, invoke })  // the native cover after a change of scale fades out when the layout matches the window
   prewarmWebPages()
   // the calls, frames and timers that take long are in the panel's log, with what was waiting when a timer came late
   startSlowCallLog((kind, name, ms, detail) => { if (name !== 'frontend_slow') invoke('frontend_slow', { kind, name, ms, detail }).catch(() => {}) })
