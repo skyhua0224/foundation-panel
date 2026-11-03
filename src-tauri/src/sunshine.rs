@@ -243,6 +243,14 @@ fn read_sunshine_version() -> Result<String, String> {
         return Ok("Unknown".to_string());
     }
 
+    // The version resource of the executable says what `--version` prints (60 ms to start the program): no process is started for it.
+    #[cfg(target_os = "windows")]
+    if let Some(version) = crate::device_probe::file_version_string(&sunshine_exe)
+        .and_then(|text| crate::device_probe::plain_host_version(&text))
+    {
+        return Ok(version);
+    }
+
     #[cfg(target_os = "windows")]
     let output = {
         use std::os::windows::process::CommandExt;
