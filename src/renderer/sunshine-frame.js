@@ -8,6 +8,7 @@ import 'element-plus/theme-chalk/el-overlay.css'
 import 'element-plus/theme-chalk/el-message-box.css'
 import 'element-plus/theme-chalk/el-notification.css'
 import 'foundation-ui/all.css'  // Material 3 Expressive tokens, components and the Element Plus skin
+import './styles/pressed.css'  // pressed state at pointerdown for the controls that had none
 import './styles/m3e-compat.less'  // restyles the pages that still use their own markup
 // 导入 Tauri polyfill
 import './tauri-polyfill.js'
