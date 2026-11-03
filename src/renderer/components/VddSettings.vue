@@ -244,8 +244,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { ElMessage } from '../composables/notifyMessage.js'
+import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
 import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards, MDialog, MPrepArt, MFieldItem, MSeg, MChip, MTile, MIcon, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, MPageLoading, useSubpage, vddPageTexts, vddTexts, VDD_PREP, VDD_RULES, vddOn } from 'foundation-ui/vue'
 import { useHostVdd } from '../composables/useHostVdd.js'
 import { useEditableOptionField } from '../composables/useEditableOptionField.js'

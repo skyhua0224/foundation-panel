@@ -58,8 +58,8 @@
         <MItem action icon="memory" :title="t.aiAssistant.model" :text="config.model || t.aiAssistant.modelPlaceholder" @click="open('model')" />
       </MGroup>
       <div class="m-actions-row">
-        <MButton icon="wifi" :loading="isLoading" @click="testConnection">{{ t.aiAssistant.testConnection }}</MButton>
-        <MButton variant="tonal" icon="save" :disabled="isClearingApiKey" @click="saveConfig()">{{ t.aiAssistant.saveConfig }}</MButton>
+        <MButton variant="tonal" icon="wifi" :loading="isLoading" @click="testConnection">{{ t.aiAssistant.testConnection }}</MButton>
+        <MButton icon="save" :disabled="isClearingApiKey" @click="saveConfig()">{{ t.aiAssistant.saveConfig }}</MButton>
         <MChip v-if="isConnected" tone="ok" icon="check_circle">{{ t.aiAssistant.connected }}</MChip>
       </div>
     </template>
@@ -71,7 +71,7 @@
         <MChoiceItem v-model="config.compatibility" icon="swap_horiz" title="Compatibility" :options="[{ value: 'openai-chat', label: 'OpenAI Chat Completions' }, { value: 'anthropic-messages', label: 'Anthropic Messages' }]" :cancel-label="t.common.cancel" />
         <MItem v-if="config.apiKeyConfigured" action icon="delete" :title="t.aiAssistant.clearApiKey" :disabled="isClearingApiKey" @click="clearApiKey" />
       </MGroup>
-      <div class="m-actions-row"><MButton variant="tonal" icon="save" :disabled="isClearingApiKey" @click="saveConfig()">{{ t.aiAssistant.saveConfig }}</MButton></div>
+      <div class="m-actions-row"><MButton icon="save" :disabled="isClearingApiKey" @click="saveConfig()">{{ t.aiAssistant.saveConfig }}</MButton></div>
     </template>
 
     <template v-else-if="current === 'model'">
@@ -80,7 +80,7 @@
         <MChoiceItem v-if="availableModels.length" :model-value="config.model" icon="list" :title="t.aiAssistant.availableModels" :options="availableModels.map((m) => ({ value: m, label: m }))" :cancel-label="t.common.cancel" @update:model-value="(v) => { config.model = v }" />
         <MItem action icon="refresh" :title="t.aiAssistant.fetchModels" :disabled="isFetchingModels" @click="fetchRemoteModels" />
       </MGroup>
-      <div class="m-actions-row"><MButton variant="tonal" icon="save" @click="saveConfig()">{{ t.aiAssistant.saveConfig }}</MButton></div>
+      <div class="m-actions-row"><MButton icon="save" @click="saveConfig()">{{ t.aiAssistant.saveConfig }}</MButton></div>
     </template>
   </MPage>
 </template>

@@ -5,8 +5,7 @@
 </template>
 
 <script setup>
-import { ElMessageBox } from 'element-plus'
-import { ElMessage } from '../composables/notifyMessage.js'
+import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
 import { tools } from '@/tauri-adapter.js'
 import { useI18n } from '../desktop/i18n/index.js'
 

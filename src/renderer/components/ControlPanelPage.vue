@@ -21,7 +21,7 @@
             <MItem action icon="link" :title="src.getCdk" @click="actions.openUrl(MIRRORCHYAN_CDK_URL)"><template #trail><MIcon name="open_in_new" /></template></MItem>
             <MItem icon="verified_user" :title="cdkResult.label" :text="cdkResult.lines.join(' ')">
               <template #trail>
-                <MButton variant="tonal" size="sm" icon="save" :disabled="!cdkDraft.trim() || !updateSource.available.value || updateSource.busy.value" @click="saveCdk">{{ src.save }}</MButton>
+                <MButton size="sm" icon="save" :disabled="!cdkDraft.trim() || !updateSource.available.value || updateSource.busy.value" @click="saveCdk">{{ src.save }}</MButton>
                 <MButton variant="text" size="sm" icon="fact_check" :disabled="!updateSource.hasCdk.value || updateSource.busy.value" @click="updateSource.checkCdk()">{{ src.check }}</MButton>
                 <MButton variant="text" size="sm" icon="delete" :disabled="!updateSource.hasCdk.value || updateSource.busy.value" @click="updateSource.clearCdk()">{{ src.clear }}</MButton>
               </template>

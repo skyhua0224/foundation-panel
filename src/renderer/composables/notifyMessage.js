@@ -9,3 +9,19 @@ const show = (tone) => (options) => {
 }
 export const ElMessage = Object.assign(show('info'), { success: show('success'), warning: show('warning'), error: show('error'), info: show('info'), closeAll: () => {} })
 export const ElNotification = Object.assign(show('info'), { success: show('success'), warning: show('warning'), error: show('error'), info: show('info'), closeAll: () => {} })
+
+// The message boxes of the earlier windows (confirm, alert, and the call with an options object), answered by the Material 3 dialog of the window
+// (foundation-ui dialog): same call shapes and the same results (resolves 'confirm'; rejects 'cancel' or, for a caller that tells them apart, 'close').
+const ask = (options) => import('foundation-ui/dialog').then(({ useDialogs }) => useDialogs().ask({
+  ...options,
+  type: options.type || '',
+  cancel: options.showCancelButton !== false && options.cancel !== false,
+  distinguish: !!options.distinguishCancelAndClose,
+  persistent: options.closeOnClickModal === false,
+}))
+const box = (options) => ask(options || {})
+export const ElMessageBox = Object.assign(box, {
+  confirm: (message, title, options = {}) => ask({ ...options, message, title, cancel: true }),
+  alert: (message, title, options = {}) => ask({ ...options, message, title, cancel: false }),
+  prompt: () => Promise.reject(new Error('prompt is not offered')),
+})

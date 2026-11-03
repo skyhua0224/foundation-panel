@@ -1,6 +1,6 @@
 <script setup>
 import { onBeforeUnmount, onMounted } from 'vue'
-import { MNotifyHost, MPendingHost, mountPendingBridge, usePending } from 'foundation-ui/vue'
+import { MDialogHost, MNotifyHost, MPendingHost, mountPendingBridge, usePending } from 'foundation-ui/vue'
 import { tools } from '../tauri-adapter.js'
 import { defineVddSource } from '../composables/useVddPending.js'
 import { defineUsbSource } from '../composables/useUsbPending.js'
@@ -46,5 +46,6 @@ function go(page) {
 
 <template>
   <MNotifyHost />
+  <MDialogHost :locale="locale" />
   <MPendingHost :locale="locale" @go="go" />
 </template>

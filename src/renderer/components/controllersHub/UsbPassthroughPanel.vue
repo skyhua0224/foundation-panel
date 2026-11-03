@@ -35,8 +35,7 @@
 <script setup>
 import { MSection, MGroup, MItem, MNotice, MButton, MIcon, MInfo, MChip, MEmpty } from 'foundation-ui/vue'
 import { computed, ref, watch } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { ElMessage } from '../../composables/notifyMessage.js'
+import { ElMessage, ElMessageBox } from '../../composables/notifyMessage.js'
 import { usbip } from '../../tauri-adapter.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 import { useUsbTransport } from '../../composables/useUsbTransport.js'

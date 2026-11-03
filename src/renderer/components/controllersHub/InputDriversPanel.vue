@@ -26,7 +26,7 @@
 <script setup>
 import { MSection, MGroup, MItem, MChip, MButton, MSkeleton } from 'foundation-ui/vue'
 import { onMounted } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox } from '../../composables/notifyMessage.js'
 import { useInputDrivers } from '../../composables/useInputDrivers.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 

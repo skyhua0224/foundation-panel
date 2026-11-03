@@ -22,7 +22,8 @@ async function write(entries, side) {
 
 /** Once, at start. */
 export function defineUsbSource({ pageLabel }) {
-  usePending().define('usb', { page: 'usb', pageLabel, restart: () => false, save: (entries) => write(entries, 'after'), revertSaved: (entries) => write(entries, 'before') })
+  // the host reads the forwarding settings at start: the page's own toast said to restart Sunshine
+  usePending().define('usb', { page: 'usb', pageLabel, restart: () => true, save: (entries) => write(entries, 'after'), revertSaved: (entries) => write(entries, 'before') })
 }
 
 /** On the page: `state()` = { enabled, port }, `baseline()` the saved values, `ready` a ref, `set(key, value)` puts a value in the page. */

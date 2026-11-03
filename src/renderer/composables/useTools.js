@@ -1,6 +1,6 @@
 import { ref } from 'vue'
-import { ElMessageBox, ElLoading } from 'element-plus'
-import { ElMessage, ElNotification } from './notifyMessage.js'
+import { ElLoading } from 'element-plus'
+import { ElMessage, ElNotification, ElMessageBox } from './notifyMessage.js'
 import { openExternalUrl, tools, controllerMeta } from '@/tauri-adapter.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { formatMessage } from '../shared/format-message.js'

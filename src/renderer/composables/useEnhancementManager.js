@@ -1,6 +1,5 @@
 import { computed, onMounted, ref } from 'vue'
-import { ElMessageBox } from 'element-plus'
-import { ElMessage } from './notifyMessage.js'
+import { ElMessage, ElMessageBox } from './notifyMessage.js'
 import { open } from '@tauri-apps/plugin-dialog'
 import { openExternalUrl, sunshine } from '../tauri-adapter.js'
 
