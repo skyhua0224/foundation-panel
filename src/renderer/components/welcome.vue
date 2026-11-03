@@ -63,7 +63,6 @@ const data = createGuideData({
   reach: useHostReach(),
   // The apps page of the Web UI takes the request from the address (#guide-scan, #guide-add, #guide-restore)
   openApps: (mode) => emit('webui-navigate', `/apps#guide-${mode}`),
-  navigate: (to) => { window.location.href = to },
 })
 const { state, probeAccount } = data
 // the update method (the last step): the same source and CDK the 更新 page keeps; the CDK itself stays in the native side
@@ -83,22 +82,23 @@ const callbacks = {
 const steps = computed(() => buildGuideSteps({ skip: state.account.exists ? ['account'] : [] }))
 const qrMatrix = (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules
 
-// The credential form keeps the texts of the welcome page, in every language it has
+// The credential form keeps the texts of the welcome page, in every language it has. The title and the lead of the step say it is the Web UI account (the shared
+// texts do that in Chinese and English); the other languages keep the welcome page's own words
 const accountTexts = computed(() => {
   void locale.value
+  const shared = /^(zh|en)/i.test(String(locale.value))
   return {
-    titles: { account: t('greeting') },
-    leads: { account: t('create_creds') },
+    ...(shared ? {} : { titles: { account: t('greeting') }, leads: { account: t('create_creds') } }),
     account: {
-      username: t('username'), password: t('password'), confirm: t('confirm_password'), create: t('login'),
-      mismatch: t('password_mismatch'), match: t('password_match'), note: t('create_creds_alert'), local: t('creds_local_only'),
-      done: `${t('success')} ${t('welcome_success')}`,
+      username: t('username'), password: t('password'), confirm: t('confirm_password'),
+      mismatch: t('password_mismatch'), match: t('password_match'),
+      ...(shared ? {} : { create: t('login'), note: t('create_creds_alert'), local: t('creds_local_only') }),
     },
   }
 })
 
-// the presentation of the first-run window: the bottom sheet (default) or the floating dialog; ?onboard=dialog previews the other
-const onboardMode = 'sheet'
+// the presentation of the first-run window: the floating dialog (default) or the bottom sheet; ?onboard=sheet previews the other
+const onboardMode = 'dialog'
 const closeGuide = () => {
   try { window.sessionStorage.setItem(GUIDE_DISMISSED_KEY, '1') } catch { /* not remembered */ }
   emit('close')

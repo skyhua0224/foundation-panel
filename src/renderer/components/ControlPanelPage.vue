@@ -18,7 +18,7 @@
           <MItem icon="system_update_alt" :title="t.sidebar.updateChannel" stack>
             <template #control><MSeg block :label="t.sidebar.updateChannel" :model-value="includePrerelease" :options="channelOptions" @update:model-value="emit('channel-change', $event)" /></template>
           </MItem>
-          <MItem icon="cloud_download" :title="src.source" :text="src.sourceNote" stack>
+          <MItem icon="cloud_download" :title="src.source" stack>
             <template #control><MSeg block :label="src.source" :model-value="updateSource.source.value" :options="sourceOptions" @update:model-value="updateSource.setSource" /></template>
           </MItem>
           <template v-if="updateSource.source.value === 'mirror'">
@@ -33,7 +33,6 @@
             </MItem>
           </template>
           <MFooter>{{ sourceHint }} {{ src.verified }}</MFooter>
-          <MItem icon="verified" :title="t.sidebar.currentChannel" :text="includePrerelease ? t.sidebar.betaChannelHint : t.sidebar.stableChannelHint" />
           <MItem icon="info" :title="t.sidebar.currentVersion" :text="currentVersion">
             <template #trail><MButton variant="tonal" icon="refresh" :loading="checkingUpdate" @click="checkUpdate">{{ t.sidebar.checkUpdate }}</MButton></template>
           </MItem>

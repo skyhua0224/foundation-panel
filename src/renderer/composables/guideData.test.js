@@ -35,14 +35,11 @@ test('a host with an account answers the config, one without sends a page: the a
   assert.equal(down.state.account.exists, false)
 })
 
-test('creating the account posts the credentials and leaves for the host page', async () => {
+test('creating the account posts the credentials and the guide goes on: this computer needs no sign-in', async () => {
   const calls = []
-  const moved = []
-  const data = make({ '/api/password': { status: 'true' } }, { navigate: (to) => moved.push(to) }, calls)
+  const data = make({ '/api/password': { status: 'true' } }, {}, calls)
   const result = await data.createAccount((key) => key)({ username: 'sunshine', password: 'pw', confirm: 'pw' })
-  await new Promise((resolve) => setTimeout(resolve, 5))
-  assert.deepEqual(result, { ok: true, leave: true })
-  assert.deepEqual(moved, ['http://proxy/'])
+  assert.deepEqual(result, { ok: true })
   assert.deepEqual(calls[0].body, { newUsername: 'sunshine', newPassword: 'pw', confirmNewPassword: 'pw' })
 })
 
@@ -148,6 +145,14 @@ test('first run: setup not completed and nobody paired opens the guide', async (
   assert.equal(await ask(routes(false, []), { dismissed: true }), false)
 })
 
+test('a host that has no account yet sends the page for creating it: the first run opens, at the account step', async () => {
+  const page = host({ '/api/config': () => new Response('<html>create account</html>', { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } }) })
+  const ask = (extra = {}) => shouldOpenGuide({ proxyUrl: async () => 'http://proxy', fetchImpl: page, progress: { finished: false }, ...extra })
+  assert.equal(await ask(), true)
+  assert.equal(await ask({ dismissed: true }), false)
+  assert.equal(await ask({ progress: { finished: true } }), false)
+})
+
 test('a host that answers badly or not at all never opens the guide', async () => {
   const ask = (fetchImpl) => shouldOpenGuide({ proxyUrl: async () => 'http://proxy', fetchImpl, progress: { finished: false } })
   assert.equal(await ask(host({})), false)
@@ -156,6 +161,7 @@ test('a host that answers badly or not at all never opens the guide', async () =
   assert.equal(await ask(host({ '/api/config': { setup_wizard_completed: false }, '/api/clients/list': { status: false, named_certs: [] } })), false)
   assert.equal(await ask(host({ '/api/config': () => new Response('<html>', { status: 200 }) })), false)
   assert.equal(await ask(async () => { throw new Error('refused') }), false)
+  assert.equal(await ask(host({ '/api/config': () => new Response('<html>create account</html>', { status: 500, headers: { 'content-type': 'text/html' } }) })), false)
   assert.equal(await shouldOpenGuide({ proxyUrl: async () => { throw new Error('no proxy') }, fetchImpl: host({}) }), false)
 })
 

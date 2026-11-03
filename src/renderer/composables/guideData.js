@@ -12,7 +12,7 @@ const okStatus = (value) => value === true || value === 'true' || value === 1 ||
  * value. All outside access is injected, so the rules can be tested without a window.
  *
  * deps: { proxyUrl(): Promise<string>, fetchImpl, vddStatus(): Promise<object>, activeSessions(): Promise<array>,
- *         openUrl(url), copy(text), openApps(mode), navigate(url), redirectMs, reach (the shared reachability check, composables/useHostReach.js) }
+ *         openUrl(url), copy(text), openApps(mode), reach (the shared reachability check, composables/useHostReach.js) }
  */
 export function createGuideData(deps) {
   const fetchImpl = deps.fetchImpl || ((...args) => globalThis.fetch(...args))
@@ -175,14 +175,15 @@ export function createGuideData(deps) {
     }
   }
 
-  /** The account step: the host's own password route, as the welcome page did. The panel then opens the host page after a moment. */
+  /**
+   * The account step: the host's own password route, as the welcome page did. The host trusts this computer without a sign-in, so the panel goes on with the
+   * next step at once (the Web UI page of the host, which has to reload for the sign-in, leaves).
+   */
   const createAccount = (translate) => async (form) => {
     try {
       const { data } = await postJson('/api/password', { newUsername: form.username, newPassword: form.password, confirmNewPassword: form.confirm })
       if (!okStatus(data.status)) return { ok: false, error: `${translate('error')} ${data.error || translate('server_error')}` }
-      const target = await url('/')
-      setTimeout(() => deps.navigate(target), deps.redirectMs ?? 2000)
-      return { ok: true, leave: true }
+      return { ok: true }
     } catch (error) {
       return { ok: false, error: `${translate('error')} ${error?.message || translate('network_error')}` }
     }
@@ -220,6 +221,8 @@ export async function shouldOpenGuide({ proxyUrl, fetchImpl, progress, dismissed
     const base = await proxyUrl()
     const configResponse = await get(`${base}/api/config`)
     if (!configResponse.ok) return false
+    // a host that has no account yet answers with the page for creating it (a web page, not the configuration): the first run starts with the account step
+    if (/^text\/html/i.test(configResponse.headers?.get?.('content-type') || '')) return true
     const config = await configResponse.json()
     const completed = isSetupCompleted(config)
     const resuming = !!progress && !progress.finished && progress.visited?.length > 0
