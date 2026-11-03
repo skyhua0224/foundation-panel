@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
-import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, starCardData, useSystemInfo, reachProblemOf, registeredComponentStatus, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
+import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, useSystemInfo, reachProblemOf, registeredComponentStatus, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
 import { usePanelHome } from '../composables/usePanelHome.js'
 import { useHostReach } from '../composables/useHostReach.js'
@@ -143,7 +143,7 @@ const catalogueInput = computed(() => {
 const catalogue = computed(() => buildCatalogue(catalogueInput.value, T.value).data)
 const allDetails = computed(() => ({ ...model.value.details, ...buildCatalogueDetails(catalogueInput.value, T.value) }))
 const isNew = computed(() => guide.visible.value)
-const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue: catalogue.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value, { locale: locale.value, assetsOf: releases.assetsOf, versionOf: releases.versionOf, qr: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules }), sponsor: sponsorCardData(T.value, SPONSORS), journey: journey.data.value, star: star.visible.value ? starCardData(T.value) : null, sysinfo: nics.info.value, temps: state.hw.available ? { cpu: state.hw.cpuTemp, gpu: state.hw.gpuTemp } : null }))
+const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue: catalogue.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value, { locale: locale.value, assetsOf: releases.assetsOf, versionOf: releases.versionOf, qr: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules }), sponsor: sponsorCardData(T.value, SPONSORS), journey: journey.data.value, sysinfo: nics.info.value, temps: state.hw.available ? { cpu: state.hw.cpuTemp, gpu: state.hw.gpuTemp } : null }))
 const compRows = () => registeredComponentStatus()?.rows?.value || []
 const smartSignals = computed(() => ({
   pairedCount: state.clients ? state.clients.length : null, streaming: !!session.value, lastStreamAt: 0,
@@ -152,7 +152,7 @@ const smartSignals = computed(() => ({
   wifiHost: nics.defaultNic.value?.type === 'wifi', linkSlowMbps: nics.defaultNic.value?.link_speed_mbps && nics.defaultNic.value.link_speed_mbps < 1000 ? nics.defaultNic.value.link_speed_mbps : 0,
   reachBad: reachProblem.value,
 }))
-const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value, star: star.visible.value, signals: smartSignals.value }))
+const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value, star: star.visible.value, starNames: (state.clients || []).map((c) => c.name), signals: smartSignals.value }))
 
 function onAction(a) {
   switch (a.type) {
