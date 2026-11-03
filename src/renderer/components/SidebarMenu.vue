@@ -68,7 +68,7 @@
       </template>
       <template #overlay>
         <!-- the frame stays mounted while the host is away (it only is hidden): it loads again when the host is back -->
-        <div v-show="!offlineShown" class="panel-web-keep"><PanelWebHost :sub="frameSub"><slot /></PanelWebHost></div>
+        <div v-show="!offlineShown" class="panel-web-keep"><PanelWebHost :sub="frameSub" :page="isWebPage ? router.currentRoute.value : ''"><slot /></PanelWebHost></div>
         <MHostOffline v-if="offlineShown" :state="hostConn.state" :locale="locale" can-restart can-user-mode can-logs @retry="hostConn.retry" @restart="hostConn.restart('service')" @user-mode="hostConn.restart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" />
       </template>
     </MScene>
@@ -392,6 +392,9 @@ const pushDs5Status = () => {
   for (const frame of document.querySelectorAll('iframe')) frame.contentWindow?.postMessage(message, '*')
 }
 watch(() => ds5.status.value?.state, pushDs5Status)
+  const first = nav.list.value && nav.defaultDetailOf(nav.list.value)
+  const path = first && webPathOf(first.id)
+  if (path) emit('webui-navigate', path)
 const onFrameMessage = (event) => {
   const data = event.data
   if (![...document.querySelectorAll('iframe')].some((frame) => frame.contentWindow === event.source)) return
