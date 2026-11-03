@@ -111,7 +111,7 @@ import { computed, defineAsyncComponent, getCurrentInstance, ref, toRef, watch, 
 import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
-import { MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, useNotify, useSystemNotices, MStatusBell, connectTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, useNotify, useSystemNotices, MStatusBell, connectTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -229,6 +229,8 @@ const hostConn = useHostConnection({
   restartService: () => tools.restartSunshineService(),
   restartUser: () => tools.restartSunshineInUserMode(),
   onRecovered: () => { for (const frame of document.querySelectorAll('iframe')) { const src = frame.src; frame.src = src } },
+  // the host answered and stopped without a request from this window: the error surface in its 「Sunshine 意外停止」 variant (telemetry/crash.js has the interface for the crash bundle the host leaves)
+  onLost: ({ at }) => reportHostStop({ at }),
 })
 const NEEDS_NO_HOST = new Set([ROUTES.PANEL_SETTINGS, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
 const offlineShown = computed(() => hostConn.state.status !== 'online' && !NEEDS_NO_HOST.has(router.currentRoute.value))
@@ -240,7 +242,8 @@ const telemetry = useTelemetryConsent({ api: telemetryApi })
 const consentOpen = ref(false)
 const errorBack = () => { if (nav.canPop.value) nav.pop(); else router.navigate(ROUTES.HOME) }
 const osName = () => (typeof navigator === 'undefined' ? '' : String(navigator.userAgentData?.platform || navigator.platform || ''))
-setErrorContext(() => ({ product: 'panel', version: currentVersion.value || '', os: osName(), page: String(router.currentRoute.value || ''), locale: String(locale.value), logs: '' }))
+const errorContext = () => ({ product: 'panel', version: currentVersion.value || '', os: osName(), page: String(router.currentRoute.value || ''), locale: String(locale.value), logs: '', components: `panel=${currentVersion.value || '?'}` })
+setErrorContext(errorContext)
 let removeErrorHandlers = null
 const shellApp = getCurrentInstance()?.appContext.app
 // the remote access tutorials (help page, and the fix of a reason of the reachability check)
@@ -338,7 +341,7 @@ onMounted(async () => {
   try { const { listen } = await import('@tauri-apps/api/event'); unlistenConnect = await listen('open-connect', (event) => connect.show(event.payload?.tab === 'install' ? 'install' : 'pair')) } catch { /* not in the app window */ }
 })
 onBeforeUnmount(() => { pairing.stop(); window.removeEventListener('message', onFramePin); if (unlistenConnect) unlistenConnect(); removeErrorHandlers?.() })
-onMounted(async () => { removeErrorHandlers = installErrorHandlers({ app: shellApp }); await telemetry.refresh(); telemetry.askWhenQuiet(consentOpen) })
+onMounted(async () => { removeErrorHandlers = installErrorHandlers({ app: shellApp }); startAutoReport({ context: errorContext }); await telemetry.refresh(); telemetry.askWhenQuiet(consentOpen) })
 const actionHandlers = {
   restart: () => tools.restartSunshineService(),
   userMode: () => tools.restartSunshineInUserMode(),
