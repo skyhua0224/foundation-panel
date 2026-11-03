@@ -152,7 +152,7 @@ const smartSignals = computed(() => ({
   wifiHost: nics.defaultNic.value?.type === 'wifi', linkSlowMbps: nics.defaultNic.value?.link_speed_mbps && nics.defaultNic.value.link_speed_mbps < 1000 ? nics.defaultNic.value.link_speed_mbps : 0,
   reachBad: reachProblem.value,
 }))
-const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value, star: star.visible.value, starNames: (state.clients || []).map((c) => c.name), clientApps: (state.clients || []).map((c) => c.app || c.client_app || c.clientApp || ''), sessionClient: session.value ? { name: session.value.client_name || '', app: session.value.client_app || session.value.app || '' } : null, signals: smartSignals.value }))
+const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value, star: star.visible.value, starNames: (state.clients || []).map((c) => c.name), clientList: (state.clients || []).map((c) => ({ name: c.name, uuid: c.uuid, family: c.family, official: c.official, os: c.os, version: c.version, last_seen: c.last_seen })), sessionClient: session.value ? { uuid: session.value.uuid || session.value.client_uuid || '', name: session.value.client_name || '' } : null, signals: smartSignals.value }))
 
 // the date of a post in the 资讯 tile, YYYY-MM-DD
 const dateOfPost = (at) => { if (!at) return ''; const d = new Date(at); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
