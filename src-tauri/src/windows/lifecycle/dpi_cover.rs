@@ -23,10 +23,10 @@ pub(super) enum Mode {
     Off,
     /// the page is hidden (SetIsVisible) for a fixed time
     Fixed,
-    /// a cover in the surface colour until the page's layout matches the window, at most the cap
-    #[default]
+    /// a cover in the surface colour until the page's layout has matched the window for 130 ms, at most the cap
     Adaptive,
     /// like Adaptive, but the cover goes after two frames that match and fades in 80 ms
+    #[default]
     Fast,
     /// the last frame of the page, kept warm in memory while the page is idle, under the cover from the first moment; settles like Fast
     Warm,
@@ -37,12 +37,12 @@ pub(super) enum Mode {
 pub(super) fn mode_of(value: Option<&str>) -> Mode {
     match value.map(str::to_ascii_lowercase).as_deref() {
         Some("off") => Mode::Off,
-        Some("adaptive") => Mode::Adaptive,
         Some("fast") => Mode::Fast,
         Some("warm") => Mode::Warm,
         Some("snapshot") => Mode::Snapshot,
         Some("fixed") => Mode::Fixed,
-        _ => Mode::Adaptive,
+        Some("adaptive") => Mode::Adaptive,
+        _ => Mode::Fast,
     }
 }
 
@@ -284,9 +284,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_mode_comes_from_the_switch_and_adaptive_is_the_default() {
-        assert_eq!(mode_of(None), Mode::Adaptive);
-        assert_eq!(mode_of(Some("")), Mode::Adaptive);
+    fn the_mode_comes_from_the_switch_and_fast_is_the_default() {
+        assert_eq!(mode_of(None), Mode::Fast);
+        assert_eq!(mode_of(Some("")), Mode::Fast);
         assert_eq!(mode_of(Some("fixed")), Mode::Fixed);
         assert_eq!(mode_of(Some("OFF")), Mode::Off);
         assert_eq!(mode_of(Some("adaptive")), Mode::Adaptive);
