@@ -491,7 +491,7 @@ defineExpose({
 
 <style lang="less">
 .panel-shell { position: relative; height: 100vh; height: 100dvh; min-height: 0; overflow: clip; }
-.panel-caption { position: absolute; top: 0; left: var(--m-rail-w, 0px); right: 0; z-index: 40; transition: left var(--m-spring-default-spatial-duration, .4s) var(--m-spring-default-spatial, ease); display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(180px, 560px) minmax(max-content, 1fr); align-items: stretch; height: 48px; background: transparent; user-select: none; }
+.panel-caption { position: absolute; top: 0; left: var(--m-rail-w, 0px); right: 0; z-index: 40; transition: left var(--m-spring-default-spatial-duration, .4s) var(--m-spring-default-spatial, ease); display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(0, 560px) minmax(max-content, 1fr); align-items: stretch; height: 48px; background: transparent; user-select: none; }
 .panel-caption__brand { align-self: center; padding-inline-start: 16px; pointer-events: none; }
 .panel-caption__controls { display: flex; justify-self: end; }
 .panel-caption__search { display: flex; align-items: center; justify-content: center; min-width: 0; padding: 0 12px; }
