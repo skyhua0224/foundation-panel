@@ -103,7 +103,7 @@
                 </div>
               </template>
             </MItem>
-            <MFieldItem v-if="!gpuOptions.length" v-model="gpuFriendlyName" :label="t.vddSettings.gpuBinding" :placeholder="t.vddSettings.gpuPlaceholder" @change="saveGpuEdit" @keyup.enter="saveGpuEdit" />
+            <MValueItem v-if="!gpuOptions.length" :model-value="gpuFriendlyName" :label="t.vddSettings.gpuBinding" :placeholder="t.vddSettings.gpuPlaceholder" :ok-label="t.common.confirm" :cancel-label="t.common.cancel" @update:model-value="(v) => { gpuFriendlyName = v; saveGpuEdit() }" />
             <MChoiceItem v-if="gpuOptions.length" :model-value="gpuFriendlyName" icon="developer_board" :title="t.vddSettings.gpuBinding" :options="gpuOptions.map((g) => ({ value: g, label: g }))" :cancel-label="t.common.cancel" @update:model-value="(v) => { gpuFriendlyName = v; saveGpuEdit() }" />
             <MItem icon="monitor" :title="t.vddSettings.monitorCount" :text="t.vddSettings.monitorCountTip" :value="String(settings.monitors.count)" />
             <MSwitchItem v-model="settings.edid.Vrr" icon="sync" :title="t.vddSettings.vrr" :text="t.vddSettings.vrrTip" />
@@ -114,11 +114,11 @@
             <MItem icon="aspect_ratio" :title="vt.resolution" stack data-cfg="resolution_change">
               <template #control><MSeg v-model="ruleResolution" block :label="vt.resolution" :options="ruleOptions" /></template>
             </MItem>
-            <MFieldItem v-if="ruleResolution === 'manual'" v-model="manualResolution" :label="vt.manualResolution" placeholder="2560x1440" />
+            <MValueItem v-if="ruleResolution === 'manual'" v-model="manualResolution" :label="vt.manualResolution" placeholder="2560x1440" :ok-label="t.common.confirm" :cancel-label="t.common.cancel" />
             <MItem icon="speed" :title="vt.refresh" stack data-cfg="refresh_rate_change">
               <template #control><MSeg v-model="ruleRefresh" block :label="vt.refresh" :options="ruleOptions" /></template>
             </MItem>
-            <MFieldItem v-if="ruleRefresh === 'manual'" v-model="manualRefresh" :label="vt.manualRefresh" placeholder="59.95" />
+            <MValueItem v-if="ruleRefresh === 'manual'" v-model="manualRefresh" :label="vt.manualRefresh" placeholder="59.95" :ok-label="t.common.confirm" :cancel-label="t.common.cancel" />
             <MSwitchItem v-model="followModel" icon="sync" :title="vp.follow" />
           </MGroup>
           <MFooter>{{ vp.rulesFooter }}</MFooter>
@@ -245,7 +245,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
-import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards, MDialog, MPrepArt, MFieldItem, MSeg, MChip, MTile, MIcon, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, MPageLoading, useSubpage, vddPageTexts, vddTexts, VDD_PREP, VDD_RULES, vddOn } from 'foundation-ui/vue'
+import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards, MDialog, MPrepArt, MValueItem, MSeg, MChip, MTile, MIcon, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, MPageLoading, useSubpage, vddPageTexts, vddTexts, VDD_PREP, VDD_RULES, vddOn } from 'foundation-ui/vue'
 import { useHostVdd } from '../composables/useHostVdd.js'
 import { useEditableOptionField } from '../composables/useEditableOptionField.js'
 import { useVddEdid } from '../composables/useVddEdid.js'

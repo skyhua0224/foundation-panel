@@ -35,11 +35,11 @@
     <!-- Service configuration -->
     <template v-else-if="current === 'config'">
       <MGroup>
-        <MFieldItem v-model="config.web_server.bind_address" :label="t.webStream.bindAddress" placeholder="0.0.0.0:8080" />
+        <MValueItem v-model="config.web_server.bind_address" :label="t.webStream.bindAddress" placeholder="0.0.0.0:8080" :ok-label="t.common.confirm" :cancel-label="t.common.cancel" />
         <MSwitchItem v-model="httpsEnabled" icon="lock" :title="t.webStream.httpsCert" :text="httpsEnabled ? t.webStream.httpsEnabled : t.webStream.httpsDisabled" />
         <template v-if="httpsEnabled">
-          <MFieldItem v-model="certKeyPath" :label="t.webStream.privateKey" placeholder="./server/key.pem" />
-          <MFieldItem v-model="certPemPath" :label="t.webStream.certFile" placeholder="./server/cert.pem" />
+          <MValueItem v-model="certKeyPath" :label="t.webStream.privateKey" placeholder="./server/key.pem" :ok-label="t.common.confirm" :cancel-label="t.common.cancel" />
+          <MValueItem v-model="certPemPath" :label="t.webStream.certFile" placeholder="./server/cert.pem" :ok-label="t.common.confirm" :cancel-label="t.common.cancel" />
           <MItem action icon="key" :title="t.webStream.generateCert" :text="t.webStream.generateCertTip" :disabled="generatingCert" @click="handleGenerateCert" />
         </template>
       </MGroup>
@@ -63,7 +63,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
-import { MPage, MGroup, MSection, MItem, MSwitchItem, MSliderItem, MChoiceItem, MFieldItem, MFooter, MStatusPill, MProgress, MButton, MIconButton, MChip, useSubpage } from 'foundation-ui/vue'
+import { MPage, MGroup, MSection, MItem, MSwitchItem, MSliderItem, MChoiceItem, MValueItem, MFooter, MStatusPill, MProgress, MButton, MIconButton, MChip, useSubpage } from 'foundation-ui/vue'
 import { moonlightWeb } from '../tauri-adapter.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
