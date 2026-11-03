@@ -9,8 +9,11 @@
       <template #actions><MButton variant="text" size="sm" icon="download" :loading="isInstallingDriver" @click="installOrRepairDriver">{{ t.vddSettings.installRepairDriver }}</MButton></template>
     </MBanner>
 
-    <!-- Driver check -->
-    <template v-if="isDriverCheckPending">
+    <!-- opening the page: the one loading state, nothing else (no wave, no explaining rows) -->
+    <MPageLoading v-if="isDriverCheckPending && openingCheck" :rows="5" />
+
+    <!-- Driver check (asked for: 重新检测, installing) -->
+    <template v-else-if="isDriverCheckPending">
       <MStatusPill icon="sync" :label="driverDetectionTitle" :action="false" />
       <MProgress :label="driverDetectionTitle" />
       <MGroup>
@@ -250,7 +253,7 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards, MDialog, MPrepArt, MFieldItem, MSeg, MChip, MTile, MIcon, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, useSubpage, vddPageTexts, vddTexts, VDD_PREP, VDD_RULES, vddOn } from 'foundation-ui/vue'
+import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards, MDialog, MPrepArt, MFieldItem, MSeg, MChip, MTile, MIcon, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, MPageLoading, useSubpage, vddPageTexts, vddTexts, VDD_PREP, VDD_RULES, vddOn } from 'foundation-ui/vue'
 import { useHostVdd } from '../composables/useHostVdd.js'
 import { useEditableOptionField } from '../composables/useEditableOptionField.js'
 import { useVddEdid } from '../composables/useVddEdid.js'
@@ -356,6 +359,8 @@ const vddStatus = reactive({
 const isLoading = ref(false)
 const isCheckingDriver = ref(false)
 const hasCompletedDriverCheck = ref(false)
+// the first check, made when the page opens
+const openingCheck = ref(true)
 const driverCheckPhase = ref('detecting')
 const isInstallingDriver = ref(false)
 const isSaving = ref(false)
@@ -967,6 +972,7 @@ const recheckDriver = async () => {
     }
   } finally {
     hasCompletedDriverCheck.value = true
+    openingCheck.value = false
   }
 }
 
