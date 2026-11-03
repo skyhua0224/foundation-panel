@@ -81,15 +81,19 @@ fn class_name() -> PCWSTR {
     w!("SunshinePanelDpiCover")
 }
 
+/// The module that registered the cover's class: a window of the class is made with the same handle.
+fn instance() -> windows::Win32::Foundation::HINSTANCE {
+    unsafe { windows::Win32::System::LibraryLoader::GetModuleHandleW(None) }.map(|module| windows::Win32::Foundation::HINSTANCE(module.0)).unwrap_or_default()
+}
+
 fn ensure_class() {
     if REGISTERED.swap(true, Ordering::SeqCst) {
         return;
     }
-    let instance = unsafe { windows::Win32::System::LibraryLoader::GetModuleHandleW(None) }.map(|module| windows::Win32::Foundation::HINSTANCE(module.0)).unwrap_or_default();
     let class = WNDCLASSEXW {
         cbSize: size_of::<WNDCLASSEXW>() as u32,
         lpfnWndProc: Some(cover_proc),
-        hInstance: instance,
+        hInstance: instance(),
         lpszClassName: class_name(),
         ..Default::default()
     };
@@ -145,7 +149,11 @@ unsafe extern "system" fn cover_proc(hwnd: HWND, message: u32, wparam: WPARAM, l
 pub(super) fn create(parent: HWND, color: (u8, u8, u8), frame: Option<&Frame>) -> Option<HWND> {
     ensure_class();
     let mut client = RECT::default();
-    unsafe { GetClientRect(parent, &mut client) }.ok()?;
+    if let Err(error) = unsafe { GetClientRect(parent, &mut client) } {
+        log::warn!("[dpi-cover] the client rectangle of the window is not known: {error}");
+        return None;
+    }
+    log::info!("[dpi-cover] making a cover over {}x{}", client.right, client.bottom);
     let bitmap = frame.map(|frame| unsafe { CreateBitmap(frame.width, frame.height, 1, 32, Some(frame.bgra.as_ptr().cast())) });
     let face = Box::new(Face {
         color: COLORREF(u32::from(color.0) | (u32::from(color.1) << 8) | (u32::from(color.2) << 16)),
@@ -165,7 +173,7 @@ pub(super) fn create(parent: HWND, color: (u8, u8, u8), frame: Option<&Frame>) -
             client.bottom.max(1),
             Some(parent),
             None,
-            None,
+            Some(instance()),
             None,
         )
     };
