@@ -29,7 +29,7 @@
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
-        <SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" @select="onRail" />
+        <SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" :lines="settingsList.lines.value" @select="onRail" />
         <HdrEnhancedManager v-else-if="entry.id === ROUTES.HDR_ENHANCED" />
         <AppearancePage v-else-if="entry.id === ROUTES.CFG_APPEARANCE" />
         <MicrophonePage v-else-if="entry.id === ROUTES.MICROPHONE" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
@@ -75,8 +75,8 @@
     <MSheet v-model="moreOpen" :title="t.m3e.nav.moreTitle" side="end" :close-label="t.m3e.home.done">
       <MGroup>
         <MItem action icon="search" :title="t.m3e.search" @click="moreGo(() => uni.show())" />
-        <MItem action icon="settings" :title="t.m3e.nav.settings" @click="moreGo(() => onRail({ id: 'settings' }))" />
-        <MItem action icon="help" :title="t.m3e.nav.help" :tone="updateWaiting ? 'warn' : ''" @click="moreGo(() => onRail({ id: 'help' }))" />
+        <MItem action icon="settings" :title="t.m3e.nav.settings" :text="settingsList.lines.value.panel" @click="moreGo(() => onRail({ id: 'settings' }))" />
+        <MItem action icon="help" :title="t.m3e.nav.help" :text="settingsList.lines.value.help" :tone="updateWaiting ? 'warn' : ''" @click="moreGo(() => onRail({ id: 'help' }))" />
         <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="moreGo(() => { sponsorOpen = true })" />
       </MGroup>
     </MSheet>
@@ -116,7 +116,6 @@ import ComponentStatusPage from './m3e/ComponentStatusPage.vue'
 import { useComponentStatus } from '../composables/useComponentStatus.js'
 import ToolboxPage from './m3e/ToolboxPage.vue'
 import DiagnosticsPage from './m3e/DiagnosticsPage.vue'
-import { microphoneOverviewState } from '../composables/deviceHubStatus.js'
 import { useDeviceRuntime } from '../composables/useDeviceRuntime.js'
 import { useGuideAutoOpen } from '../composables/useGuideAutoOpen.js'
 import { useSidebarState } from '../composables/useSidebarState.js'
@@ -125,7 +124,8 @@ import { useTools } from '../composables/useTools.js'
 import { useTouchWindowDrag } from '../composables/useTouchWindowDrag.js'
 import { createUtilityTools } from '../composables/toolsRegistry.js'
 import { ROUTES, PAGES, routeForWebPath, webPathOf } from '../composables/useRouter.js'
-import { railItems, pageItems, barItems, barCurrent } from '../composables/panelNav.js'
+import { ROW_OF_ROUTE, railItems, pageItems, barItems, barCurrent } from '../composables/panelNav.js'
+import { rowKeywords } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { useDualSenseStatus } from '../composables/useDualSenseStatus.js'
 import { useDualSenseText } from '../composables/useDualSenseText.js'
@@ -217,15 +217,14 @@ const thanks = useThanks({ guideKey: 'foundation.guide.panel' })
 const thanksStar = () => { actions_openExternal('https://github.com/AlkaidLab/foundation-sunshine'); thanks.dismiss() }
 const thanksSponsor = () => { thanks.dismiss(); router.navigate(ROUTES.ABOUT) }
 const railLabel = (id) => t.value.m3e.nav[id]
-const runtimeView = computed(() => ({ ...runtime, micLabel: micLabel.value, statusTitle: statusTexts(locale.value).title, diagTitle: diagnosticsTexts(locale.value).title }))
-const micLabel = computed(() => t.value.deviceHub.microphone.statusLabels[microphoneOverviewState(runtime.mic || {})] || '')
+const runtimeView = computed(() => ({ ...runtime, lines: settingsList.lines.value, statusTitle: statusTexts(locale.value).title, diagTitle: diagnosticsTexts(locale.value).title }))
 const listItems = (id) => pageItems(t.value, id, runtimeView.value)
 // The stream settings are the shared model (categories in groups with a live line, search of every setting, recently used)
 const hostConfig = ref(null)
 const dualsenseKeys = ref([])
 const hostClients = ref([])
 const hostApps = ref([])
-const settingsList = useSettingsList({ locale, config: hostConfig, dualsenseKeys })
+const settingsList = useSettingsList({ locale, config: hostConfig, dualsenseKeys, sources: { clients: hostClients, apps: hostApps, components: computed(() => componentStatus.rows.value), ds: computed(() => runtime.ds), mic: computed(() => runtime.mic), usb: computed(() => runtime.usb) } })
 const loadHostData = async () => {
   try {
     const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')
@@ -250,10 +249,10 @@ const searchItems = computed(() => [
     .filter((id) => PAGES[id].list !== false)
     .flatMap((id) => {
       const item = pageItems(t.value, PAGES[id].rail, runtimeView.value).find((p) => p.id === id)
-      return item ? [{ id, title: item.label, path: railLabel(PAGES[id].rail), icon: item.icon, route: id }] : []
+      return item ? [{ id, title: item.label, path: railLabel(PAGES[id].rail), icon: item.icon, route: id, keywords: rowKeywords(ROW_OF_ROUTE[id]) }] : []
     }),
   // 米塔 AI is a destination of the rail (no list pane): a result of its own, and one for the settings behind the gear of its chat
-  { id: ROUTES.AI_ASSISTANT, title: t.value.m3e.nav.assistant, path: t.value.m3e.nav.main, icon: 'smart_toy', route: ROUTES.AI_ASSISTANT },
+  { id: ROUTES.AI_ASSISTANT, title: t.value.m3e.nav.assistant, path: t.value.m3e.nav.main, icon: 'smart_toy', route: ROUTES.AI_ASSISTANT, keywords: rowKeywords('assistant') },
   ...settingsList.searchItems.value,
 ])
 // ---- the unified search: one entry in the caption bar (an icon and a full-screen view on a narrow window) over everything a person can look for ----

@@ -1,8 +1,8 @@
 import { ROUTES, RAILS } from './useRouter.js'
 
 /**
- * What the list pane of the panel shows: the pages of a category with the icon, tone and one line of live data.
- * `live` text comes only from real sources (the device runtime); a page without one shows no second line.
+ * What the list pane of the panel shows: the pages of a category with the icon, tone and a second line (`runtime.lines`, from foundation-ui's rowLines: the live
+ * state where the page has one, otherwise what is inside; never blank).
  */
 export function railItems(t) {
   const n = t.m3e.nav
@@ -10,29 +10,35 @@ export function railItems(t) {
   return RAILS.map((id) => ({ id, icon: icons[id], label: n[id] }))
 }
 
+/** The row id of foundation-ui's rowLines for a page of the list panes (the second line and the search words of the page). */
+export const ROW_OF_ROUTE = {
+  [ROUTES.WEB_CLIENTS]: 'clients', [ROUTES.WEB_APPS]: 'apps', [ROUTES.WEB_DOWNLOADS]: 'downloads', [ROUTES.GAMEPAD]: 'gamepad', [ROUTES.MICROPHONE]: 'microphone', [ROUTES.USB]: 'usb',
+  [ROUTES.VDD_SETTINGS]: 'vdd', [ROUTES.HDR_ENHANCED]: 'quality', [ROUTES.COMPONENT_STATUS]: 'components', [ROUTES.DIAGNOSTICS]: 'diagnostics', [ROUTES.TOOLBOX]: 'toolbox',
+  [ROUTES.PANEL_SETTINGS]: 'panel', [ROUTES.HELP]: 'help', [ROUTES.AI_ASSISTANT]: 'assistant',
+}
+
 export function pageItems(t, rail, runtime = {}) {
   const c = t.m3e
-  const ds = runtime.ds?.state || ''
-  const dsReady = ['ready', 'active'].includes(ds)
+  const lines = runtime.lines || {}
   const pages = {
     stream: [
-      { id: ROUTES.WEB_CLIENTS, icon: 'devices', tone: 'tertiary', label: c.stream.clients[0] },
-      { id: ROUTES.WEB_APPS, icon: 'apps', tone: 'secondary', label: c.stream.apps[0] },
-      { id: ROUTES.WEB_DOWNLOADS, icon: 'download', tone: 'success', label: c.stream.downloads[0] },
+      { id: ROUTES.WEB_CLIENTS, icon: 'devices', tone: 'tertiary', label: c.stream.clients[0], text: lines.clients },
+      { id: ROUTES.WEB_APPS, icon: 'apps', tone: 'secondary', label: c.stream.apps[0], text: lines.apps },
+      { id: ROUTES.WEB_DOWNLOADS, icon: 'download', tone: 'success', label: c.stream.downloads[0], text: lines.downloads },
     ],
     input: [
-      { id: ROUTES.GAMEPAD, icon: 'sports_esports', tone: 'primary', label: c.input.gamepad, text: dsReady ? (t.dualSense.status.states[ds] || t.deviceHub.available) : '' },
-      { id: ROUTES.MICROPHONE, icon: 'mic', tone: 'tertiary', label: c.input.microphone, text: runtime.micLabel || '' },
-      { id: ROUTES.USB, icon: 'usb', tone: 'success', label: c.input.usb, text: runtime.usb?.ready ? t.deviceHub.available : '' },
+      { id: ROUTES.GAMEPAD, icon: 'sports_esports', tone: 'primary', label: c.input.gamepad, text: lines.gamepad },
+      { id: ROUTES.MICROPHONE, icon: 'mic', tone: 'tertiary', label: c.input.microphone, text: lines.microphone },
+      { id: ROUTES.USB, icon: 'usb', tone: 'success', label: c.input.usb, text: lines.usb },
     ],
     display: [
-      { id: ROUTES.VDD_SETTINGS, icon: 'desktop_windows', tone: 'primary', label: c.display.vdd },
-      { id: ROUTES.HDR_ENHANCED, icon: 'wand_stars', tone: 'tertiary', label: c.display.quality },
+      { id: ROUTES.VDD_SETTINGS, icon: 'desktop_windows', tone: 'primary', label: c.display.vdd, text: lines.vdd },
+      { id: ROUTES.HDR_ENHANCED, icon: 'wand_stars', tone: 'tertiary', label: c.display.quality, text: lines.quality },
     ],
     system: [
-      { id: ROUTES.COMPONENT_STATUS, icon: 'monitor_heart', tone: 'success', label: runtime.statusTitle || 'Components' },
-      { id: ROUTES.DIAGNOSTICS, icon: 'stethoscope', tone: 'warn', label: runtime.diagTitle || c.system.diagnostics },
-      { id: ROUTES.TOOLBOX, icon: 'build', tone: 'secondary', label: t.sidebar.toolbox },
+      { id: ROUTES.COMPONENT_STATUS, icon: 'monitor_heart', tone: 'success', label: runtime.statusTitle || 'Components', text: lines.components },
+      { id: ROUTES.DIAGNOSTICS, icon: 'stethoscope', tone: 'warn', label: runtime.diagTitle || c.system.diagnostics, text: lines.diagnostics },
+      { id: ROUTES.TOOLBOX, icon: 'build', tone: 'secondary', label: t.sidebar.toolbox, text: lines.toolbox },
     ],
   }
   return pages[rail] || []
