@@ -60,7 +60,7 @@ fn dip_wanted() -> bool {
     std::env::var("SUNSHINE_GUI_WEBVIEW_BOUNDS").is_ok_and(|value| value.eq_ignore_ascii_case("dip"))
 }
 
-/// While WebView2 settles after a change of scale the page is covered (SUNSHINE_GUI_WEBVIEW_DPI_COVER = off | fixed | adaptive | snapshot, see dpi_cover):
+/// While WebView2 settles after a change of scale the page is covered (SUNSHINE_GUI_WEBVIEW_DPI_COVER = off | fixed | adaptive | snapshot; adaptive when unset, see dpi_cover):
 /// for 70 to 170 ms after the first right layout, WebView2 laid the page out for the old size at the new scale, whatever bounds mode or order of calls was used.
 const COVER_TIMER: usize = 0x5353_5743;
 const FADE_TIMER: usize = 0x5353_5744;

@@ -34,7 +34,8 @@ pub(super) fn mode_of(value: Option<&str>) -> Mode {
         Some("off") => Mode::Off,
         Some("adaptive") => Mode::Adaptive,
         Some("snapshot") => Mode::Snapshot,
-        _ => Mode::Fixed,
+        Some("fixed") => Mode::Fixed,
+        _ => Mode::Adaptive,
     }
 }
 
@@ -238,9 +239,10 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_mode_comes_from_the_switch_and_fixed_is_the_default() {
-        assert_eq!(mode_of(None), Mode::Fixed);
-        assert_eq!(mode_of(Some("")), Mode::Fixed);
+    fn the_mode_comes_from_the_switch_and_adaptive_is_the_default() {
+        assert_eq!(mode_of(None), Mode::Adaptive);
+        assert_eq!(mode_of(Some("")), Mode::Adaptive);
+        assert_eq!(mode_of(Some("fixed")), Mode::Fixed);
         assert_eq!(mode_of(Some("OFF")), Mode::Off);
         assert_eq!(mode_of(Some("adaptive")), Mode::Adaptive);
         assert_eq!(mode_of(Some("Snapshot")), Mode::Snapshot);
