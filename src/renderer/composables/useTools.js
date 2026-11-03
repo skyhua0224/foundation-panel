@@ -108,9 +108,10 @@ export function useTools() {
         t.value.toolActions.cleanupConfirm,
         t.value.toolActions.cleanupTitle,
         {
-          confirmButtonText: t.value.common.confirm,
+          confirmButtonText: t.value.systemTools.cleanup,
           cancelButtonText: t.value.common.cancel,
           type: 'warning',
+          danger: true,
         },
       )
 

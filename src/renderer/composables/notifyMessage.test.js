@@ -30,3 +30,12 @@ test('cancel rejects cancel, an alert has no cancel button, and a caller that te
   useDialogs().settle(choice.id, 'close')
   await assert.rejects(c, (e) => e === 'close')
 })
+
+test('a destructive call carries danger and its verb to the dialog, so the host draws the error-colour button', async () => {
+  const answer = ElMessageBox.confirm('会从这台电脑上移除驱动', '卸载？', { type: 'warning', danger: true, confirmButtonText: '卸载' })
+  const dialog = await next()
+  assert.equal(dialog.danger, true)
+  assert.equal(dialog.confirmButtonText, '卸载')
+  useDialogs().settle(dialog.id, 'cancel')
+  await assert.rejects(answer, (e) => e === 'cancel')
+})

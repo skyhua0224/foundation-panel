@@ -50,7 +50,7 @@ export function enhancementActions(id, { texts, refresh }) {
         const status = data(await api.getStatus()) || {}
         if (!status.installed) return
         if (status.in_use || status.maintenance) { ElMessage.warning(T().inUse); return }
-        try { await ElMessageBox.confirm(fill(T().removeConfirm, vars()), fill(T().removeTitle, vars()), { type: 'warning', confirmButtonText: T().remove }) } catch { return }
+        try { await ElMessageBox.confirm(fill(T().removeConfirm, vars()), fill(T().removeTitle, vars()), { type: 'warning', danger: true, confirmButtonText: T().remove }) } catch { return }
         try {
           const result = await api.uninstall()
           if (!result?.success) throw new Error(result?.message || '')

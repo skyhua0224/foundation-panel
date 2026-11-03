@@ -30,7 +30,7 @@ function removeAction(id, uninstall) {
     run: async () => {
       const S = controller.text()
       const name = S.names[id]
-      try { await ElMessageBox.confirm(S.uninstall.text.replaceAll('{name}', name), S.uninstall.title.replace('{name}', name), { type: 'warning', confirmButtonText: S.uninstall.yes }) } catch { return }
+      try { await ElMessageBox.confirm(S.uninstall.text.replaceAll('{name}', name), S.uninstall.title.replace('{name}', name), { type: 'warning', danger: true, confirmButtonText: S.uninstall.yes }) } catch { return }
       try {
         const result = await uninstall()
         if (result && result.success === false) throw new Error(result.message || '')

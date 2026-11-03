@@ -19,9 +19,10 @@ defineExpose({
         t.value.systemTools.vddUninstallConfirm,
         t.value.systemTools.vddUninstallTitle,
         {
-          confirmButtonText: t.value.systemTools.confirm,
+          confirmButtonText: t.value.systemTools.uninstall,
           cancelButtonText: t.value.systemTools.cancel,
           type: 'warning',
+          danger: true,
         }
       )
       

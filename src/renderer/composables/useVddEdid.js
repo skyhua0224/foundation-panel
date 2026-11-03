@@ -171,9 +171,10 @@ export function useVddEdid({ t, settings }) {
         t.value.vddSettings.deleteEdidConfirm,
         t.value.vddSettings.deleteEdidTitle,
         {
-          confirmButtonText: t.value.systemTools.confirm,
+          confirmButtonText: t.value.systemTools.delete,
           cancelButtonText: t.value.systemTools.cancel,
           type: 'warning',
+          danger: true,
         }
       )
 

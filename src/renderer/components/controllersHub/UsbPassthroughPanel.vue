@@ -105,7 +105,7 @@ async function detachDevice(device) {
     await ElMessageBox.confirm(
       t.value.deviceHub.usb.detachConfirm.replace('{device}', device.description || device.remote_bus_id),
       t.value.deviceHub.usb.detach,
-      { confirmButtonText: t.value.deviceHub.usb.detach, cancelButtonText: t.value.deviceHub.usb.cancel, type: 'warning' },
+      { confirmButtonText: t.value.deviceHub.usb.detach, cancelButtonText: t.value.deviceHub.usb.cancel, type: 'warning', danger: true },
     )
   } catch { return }
   detachingPort.value = device.port

@@ -1677,6 +1677,9 @@ export const zh = {
   systemTools: {
     vddUninstallConfirm: '确定要卸载基地显示器驱动（ZakoVDD）吗？此操作需要管理员权限。',
     vddUninstallTitle: '确认卸载',
+    uninstall: '卸载',
+    delete: '删除',
+    cleanup: '清理',
     confirm: '确定',
     cancel: '取消',
     vddUninstallSuccess: '卸载请求已发送',

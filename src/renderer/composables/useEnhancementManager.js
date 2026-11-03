@@ -113,6 +113,7 @@ export function useEnhancementManager({ api, messages: text, runtimeName }) {
     try {
       await ElMessageBox.confirm(text.value.uninstallConfirm, text.value.uninstallTitle, {
         type: 'warning',
+        danger: true,
         confirmButtonText: text.value.uninstall,
       })
     } catch {

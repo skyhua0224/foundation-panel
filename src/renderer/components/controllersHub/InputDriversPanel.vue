@@ -46,6 +46,8 @@ async function confirmToggle(tool) {
   try {
     await ElMessageBox.confirm(strings[action === 'install' ? 'confirmInstall' : 'confirmUninstall'], t.value.controllersHub.peripherals.confirmTitle, {
       type: action === 'uninstall' ? 'warning' : 'info',
+      // removing a driver is destructive: the error-colour button with the verb
+      ...(action === 'uninstall' ? { danger: true, confirmButtonText: t.value.systemTools.uninstall } : {}),
     })
   } catch {
     return
