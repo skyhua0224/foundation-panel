@@ -37,7 +37,7 @@
       <PanelOptions :locale="locale" />
       <MSection :title="t.sidebar.syncFeatures">
         <MGroup>
-          <MItem icon="content_paste" :title="t.sidebar.clipboardSync" :text="t.sidebar.clipboardDescription">
+          <MItem icon="content_paste" :title="t.sidebar.clipboardSync">
             <template #trail>
               <MChip :tone="clipboardSyncEnabled ? 'ok' : 'neutral'" :icon="clipboardSyncEnabled ? 'check_circle' : ''">{{ clipboardSyncEnabled ? t.sidebar.connected : t.sidebar.notConnected }}</MChip>
               <MButton variant="outlined" size="sm" @click="actions.showClipboardSyncStatus">{{ t.sidebar.viewStatus }}</MButton>
@@ -47,7 +47,7 @@
       </MSection>
       <MSection :title="t.sidebar.accountSettings">
         <MGroup>
-          <MItem action icon="key" :title="t.sidebar.accountCredentials" :text="t.sidebar.accountDescription" @click="emit('webui-navigate', '/password')" />
+          <MItem action icon="key" :title="t.sidebar.accountCredentials" @click="emit('webui-navigate', '/password')" />
           <MItem action icon="logout" :title="t.sidebar.logout" :text="t.sidebar.logoutDescription" @click="emit('webui-navigate', '/password#logout')" />
         </MGroup>
       </MSection>
@@ -67,8 +67,8 @@
         <MGroup>
           <MItem action icon="info" :title="aboutText.title" :text="'Foundation Sunshine ' + currentVersion" @click="emit('open-about')" />
           <MItem action icon="rocket_launch" :title="guide.guide" :text="guide.helpRow" @click="emit('open-guide')" />
-          <MItem action icon="lightbulb" :title="coach.rerun" :text="coach.rerunText" @click="startCoach" />
-          <MItem action icon="public" :title="remote.openText" :text="remote.lead" @click="emit('open-remote')" />
+          <MItem action icon="lightbulb" :title="coach.rerun" @click="startCoach" />
+          <MItem action icon="public" :title="remote.openText" @click="emit('open-remote')" />
           <MItem action icon="checklist" :title="startText.guideTitle" :text="startText.guideSub" @click="startCard.reopen()" />
         </MGroup>
       </MSection>

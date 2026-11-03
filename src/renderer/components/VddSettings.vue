@@ -54,7 +54,7 @@
         <MSection v-if="isVirtualMode" :title="vp.options">
           <MGroup>
             <MSwitchItem v-model="reuseModel" icon="devices" :title="vp.reuse" :text="vp.reuseText" :disabled="hostVdd.store.busy.vdd_reuse" />
-            <MSwitchItem v-model="headlessModel" icon="desktop_access_disabled" :title="vp.headless" :text="hostVdd.store.canSaveProtected ? vp.headlessText : `${vp.headlessText} ${vt.trayOnly}`" :disabled="!hostVdd.store.canSaveProtected || hostVdd.store.busy.vdd_headless_create" />
+            <MSwitchItem v-model="headlessModel" icon="desktop_access_disabled" :title="vp.headless" :text="hostVdd.store.canSaveProtected ? '' : vt.trayOnly" :disabled="!hostVdd.store.canSaveProtected || hostVdd.store.busy.vdd_headless_create" />
           </MGroup>
         </MSection>
         <MGroup>
@@ -177,7 +177,7 @@
             <MItem :icon="vulkanView.icon" :title="vp.vulkanStatus[vulkanView.key]" />
             <MItem v-if="vulkanView.showValidate" action icon="play_arrow" :disabled="!vulkanView.canValidate" :title="vulkan.validating.value ? vp.vulkanValidating : vp.vulkanValidate" :text="vulkanView.hint ? vp.vulkanHint : ''" @click="vulkan.validate" />
           </MGroup>
-          <MFooter>{{ vp.advancedHint }}</MFooter>
+          
         </MSection>
         <MSection :title="t.vddSettings.driverTools">
           <MGroup>
