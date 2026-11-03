@@ -23,14 +23,14 @@
           </MItem>
           <template v-if="updateSource.source.value === 'mirror'">
             <MFieldItem v-model="cdkDraft" icon="key" type="password" :label="src.cdk" :supporting="updateSource.available.value ? src.cdkHint : src.unavailable" :disabled="!updateSource.available.value || updateSource.busy.value" autocomplete="off" />
-            <MItem icon="verified_user" :title="src.status[updateSource.status.value.state] || src.status.unknown" :text="cdkExpires">
+            <MItem action icon="link" :title="src.getCdk" @click="actions.openUrl(MIRRORCHYAN_CDK_URL)"><template #trail><MIcon name="open_in_new" /></template></MItem>
+            <MItem icon="verified_user" :title="cdkResult.label" :text="cdkResult.lines.join(' ')">
               <template #trail>
                 <MButton variant="tonal" size="sm" icon="save" :disabled="!cdkDraft.trim() || !updateSource.available.value || updateSource.busy.value" @click="saveCdk">{{ src.save }}</MButton>
                 <MButton variant="text" size="sm" icon="fact_check" :disabled="!updateSource.hasCdk.value || updateSource.busy.value" @click="updateSource.checkCdk()">{{ src.check }}</MButton>
                 <MButton variant="text" size="sm" icon="delete" :disabled="!updateSource.hasCdk.value || updateSource.busy.value" @click="updateSource.clearCdk()">{{ src.clear }}</MButton>
               </template>
             </MItem>
-            <MBanner v-if="cdkError" tone="warn" icon="info">{{ cdkError }}</MBanner>
           </template>
           <MFooter>{{ sourceHint }} {{ src.verified }}</MFooter>
           <MItem icon="verified" :title="t.sidebar.currentChannel" :text="includePrerelease ? t.sidebar.betaChannelHint : t.sidebar.stableChannelHint" />
@@ -100,7 +100,7 @@ import PanelOptions from './m3e/PanelOptions.vue'
 import { ROUTES } from '../composables/useRouter.js'
 import { useUpdateCheckTime } from '../composables/useUpdateCheckTime.js'
 import { useUpdateSource } from '../composables/useUpdateSource.js'
-import { UPDATE_SOURCES, updateSourceTexts } from 'foundation-ui/update'
+import { MIRRORCHYAN_CDK_URL, UPDATE_SOURCES, cdkView, updateSourceTexts } from 'foundation-ui/update'
 const props = defineProps({
   page: { type: String, required: true },
   tools: { type: Array, default: () => [] },
@@ -140,9 +140,9 @@ const updateSource = useUpdateSource()
 const src = computed(() => updateSourceTexts(props.locale))
 const sourceOptions = computed(() => UPDATE_SOURCES.map((value) => ({ value, label: src.value.sources[value] })))
 const cdkDraft = ref('')
-const cdkExpires = computed(() => { const at = updateSource.status.value.expiresAt; return at ? src.value.expires.replace('{time}', new Date(at).toLocaleDateString()) : '' })
-const cdkError = computed(() => (updateSource.status.value.kind && src.value.errors[updateSource.status.value.kind]) || '')
-const sourceHint = computed(() => (updateSource.source.value === 'auto' ? src.value.autoHint + '.' : updateSource.source.value === 'mirror' ? (updateSource.hasCdk.value ? src.value.mirrorCdk : src.value.mirrorNoCdk) : ''))
+// the state of the CDK and its sentences are the same words as in the first run (foundation-ui/update cdkView)
+const cdkResult = computed(() => cdkView(updateSource.status.value, src.value, { lastValid: updateSource.lastValid.value }))
+const sourceHint = computed(() => (updateSource.source.value === 'auto' ? src.value.autoHint + '.' : updateSource.source.value === 'mirror' ? src.value.mirrorTip : ''))
 const saveCdk = async () => { if (await updateSource.saveCdk(cdkDraft.value)) cdkDraft.value = '' }
 onMounted(() => { void updateSource.refresh() })
 const sponsorOpen = ref(false)

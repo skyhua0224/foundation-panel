@@ -11,6 +11,9 @@ const source = ref(read())
 const available = ref(true)
 const hasCdk = ref(false)
 const status = ref({ state: 'none', expiresAt: null, kind: '' })
+// the last check that found the CDK valid: shown when a later check cannot reach the service
+const lastValid = ref(null)
+const setStatus = (value) => { status.value = value; if (value.state === 'valid') lastValid.value = { expiresAt: value.expiresAt } }
 const busy = ref(false)
 const call = async (command, args) => { try { return await invoke(command, args) } catch (error) { if (/not found|unknown|not allowed|command/i.test(String(error))) available.value = false; throw error } }
 
@@ -27,7 +30,7 @@ export function useUpdateSource() {
   }
   const refresh = async () => {
     try { hasCdk.value = !!(await call('update_cdk_present')); available.value = true } catch { hasCdk.value = false }
-    status.value = available.value ? await client.cdkStatus() : { state: 'none', expiresAt: null, kind: '' }
+    setStatus(available.value ? await client.cdkStatus() : { state: 'none', expiresAt: null, kind: '' })
   }
   const saveCdk = async (value) => {
     busy.value = true
@@ -35,8 +38,8 @@ export function useUpdateSource() {
   }
   const clearCdk = async () => {
     busy.value = true
-    try { await call('update_cdk_clear'); hasCdk.value = false; status.value = { state: 'none', expiresAt: null, kind: '' }; return true } catch { return false } finally { busy.value = false }
+    try { await call('update_cdk_clear'); hasCdk.value = false; lastValid.value = null; status.value = { state: 'none', expiresAt: null, kind: '' }; return true } catch { return false } finally { busy.value = false }
   }
-  const checkCdk = async () => { busy.value = true; try { status.value = await client.cdkStatus() } finally { busy.value = false } }
-  return { source: computed(() => source.value), available: computed(() => available.value), hasCdk: computed(() => hasCdk.value), status: computed(() => status.value), busy: computed(() => busy.value), setSource, refresh, saveCdk, clearCdk, checkCdk }
+  const checkCdk = async () => { busy.value = true; try { setStatus(await client.cdkStatus()) } finally { busy.value = false } }
+  return { source: computed(() => source.value), available: computed(() => available.value), hasCdk: computed(() => hasCdk.value), status: computed(() => status.value), lastValid: computed(() => lastValid.value), busy: computed(() => busy.value), setSource, refresh, saveCdk, clearCdk, checkCdk }
 }

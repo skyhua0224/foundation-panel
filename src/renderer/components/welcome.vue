@@ -5,7 +5,7 @@
     <MGuideFlow
       v-else
       :steps="steps"
-      :state="state"
+      :state="flowState"
       :callbacks="callbacks"
       :locale="locale"
       :texts="accountTexts"
@@ -37,6 +37,7 @@ import { supportedLocales, setLocale as setI18nLocale, getDefaultLocale, useWelc
 import { openExternalUrl, sunshine } from '../tauri-adapter.js'
 import { GUIDE_DISMISSED_KEY, GUIDE_STORAGE_KEY, createGuideData } from '../composables/guideData.js'
 import { useHostReach } from '../composables/useHostReach.js'
+import { useUpdateSource } from '../composables/useUpdateSource.js'
 
 // The guided first run of the panel. It opens by itself on a first run, when the host serves its account page (no account yet), and from
 // the help page. The account step is part of the flow only while the host has no account.
@@ -65,7 +66,20 @@ const data = createGuideData({
   navigate: (to) => { window.location.href = to },
 })
 const { state, probeAccount } = data
-const callbacks = { ...data.callbacks, createAccount: data.createAccount(t) }
+// the update method (the last step): the same source and CDK the 更新 page keeps; the CDK itself stays in the native side
+const updateSource = useUpdateSource()
+const flowState = computed(() => ({
+  ...state,
+  update: { source: updateSource.source.value, available: updateSource.available.value, cdk: true, hasCdk: updateSource.hasCdk.value, status: updateSource.status.value, lastValid: updateSource.lastValid.value, busy: updateSource.busy.value },
+}))
+const callbacks = {
+  ...data.callbacks,
+  createAccount: data.createAccount(t),
+  loadUpdate: () => updateSource.refresh(),
+  setUpdateSource: (value) => updateSource.setSource(value),
+  saveCdk: async (cdk) => ({ ok: await updateSource.saveCdk(cdk) }),
+  clearCdk: () => updateSource.clearCdk(),
+}
 const steps = computed(() => buildGuideSteps({ skip: state.account.exists ? ['account'] : [] }))
 const qrMatrix = (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules
 
