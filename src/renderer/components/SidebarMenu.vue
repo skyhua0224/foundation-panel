@@ -30,7 +30,7 @@
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
         <SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" :lines="settingsList.lines.value" @select="onRail" />
-        <HdrEnhancedManager v-else-if="entry.id === ROUTES.HDR_ENHANCED" />
+        <HdrEnhancedManager v-else-if="entry.id === ROUTES.HDR_ENHANCED" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <AppearancePage v-else-if="entry.id === ROUTES.CFG_APPEARANCE" />
         <MicrophonePage v-else-if="entry.id === ROUTES.MICROPHONE" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <UsbPage v-else-if="entry.id === ROUTES.USB" @manage-components="router.navigate(ROUTES.COMPONENTS)" />

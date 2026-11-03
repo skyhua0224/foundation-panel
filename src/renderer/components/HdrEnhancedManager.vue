@@ -1,5 +1,5 @@
 <template>
-  <MPage :title="current === 'session' ? text.session : current === 'keys' ? text.keys : current === 'components' ? text.components : text.title" :back="!!current" :back-label="t.m3e.back" @back="goBack">
+  <MPage :title="current === 'session' ? text.session : current === 'keys' ? text.keys : text.title" :back="!!current" :back-label="t.m3e.back" @back="goBack">
     <MBanner v-if="error" tone="error" icon="error">{{ enhancementError(text, error) }}</MBanner>
 
     <!-- Overlay: what is running, the overlay as it looks in the game, its two controls, the shortcuts as keys -->
@@ -10,26 +10,14 @@
           <span class="m-qstrip__text"><small>{{ text.session }}</small><b>{{ pipelines.length ? `${text.stream} #${pipelines[0].id}` : text.noSession }}</b></span>
           <MIcon class="m-qstrip__go" name="chevron_right" />
         </button>
-        <button type="button" class="m-qstrip__cell" @click="open('components')">
-          <span class="m-qstrip__icon"><MIcon name="extension" /></span>
-          <span class="m-qstrip__text"><small>{{ text.components }}</small><b>DLSS NR · RTX HDR</b></span>
+        <button type="button" class="m-qstrip__cell" @click="emit('manage-components')">
+          <span class="m-qstrip__icon" :class="{ 'is-warn': missing.length }"><MIcon name="extension" /></span>
+          <span class="m-qstrip__text"><small>{{ text.components }}</small><b>{{ missing.length ? `${missing.join(' · ')} · ${text.needsInstall}` : 'DLSS NR · RTX HDR' }}</b></span>
           <MIcon class="m-qstrip__go" name="chevron_right" />
         </button>
       </div>
 
-      <figure class="m-qprev" aria-hidden="true">
-        <span class="m-qprev__label"><MIcon name="picture_in_picture" />{{ text.preview }}</span>
-        <div class="m-qprev__scene">
-          <i class="m-qprev__hud m-qprev__hud--a" /><i class="m-qprev__hud m-qprev__hud--b" /><i class="m-qprev__hud m-qprev__hud--c" />
-        </div>
-        <div class="m-qprev__row">
-          <div class="m-qprev__side">
-            <img class="m-qprev__pill" :src="`/nr-overlay/collapsed-${lang}.png`" width="182" alt="">
-            <p>{{ text.previewHint }}</p>
-          </div>
-          <img class="m-qprev__ov" :src="`/nr-overlay/expanded-${lang}-${stepOf(draftOpacity)}.png`" width="292" alt="">
-        </div>
-      </figure>
+      <MBanner v-if="missing.length" tone="info" icon="extension">{{ text.componentsMissing }}<template #actions><MButton variant="text" size="sm" @click="emit('manage-components')">{{ text.openComponents }}</MButton></template></MBanner>
 
       <MGroup>
         <MSwitchItem :model-value="visible" icon="picture_in_picture" :title="text.show" :text="text.showHint" :disabled="saving || !loaded" @update:model-value="setVisibility" />
@@ -90,21 +78,16 @@
       <MButton variant="text" icon="restart_alt" :disabled="saving || !loaded" @click="resetShortcuts">{{ text.reset }}</MButton>
     </div>
 
-    <!-- Components -->
-    <template v-else-if="current === 'components'">
-      <div class="enhancement-stack"><EnhancementManager kind="nr" /><EnhancementManager kind="hdr" /></div>
-      <MFooter>{{ text.componentHint }}</MFooter>
-    </template>
   </MPage>
 </template>
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { dlssNr, rtxHdr } from '../tauri-adapter.js'
 import { listen } from '@tauri-apps/api/event'
 import { MIcon, MPage, MGroup, MSection, MItem, MSwitchItem, MSliderItem, MChoiceItem, MBanner, MNotice, MEmpty, MFooter, MButton, MIconButton, useSubpage } from 'foundation-ui/vue'
 import { displayGamepadShortcut, FIXED_GAMEPAD_SHORTCUTS } from '../composables/controllerButtons.js'
 import NrSessionControls from './NrSessionControls.vue'
-import EnhancementManager from './EnhancementManager.vue'
 import { useI18n } from '../desktop/i18n/index.js'
 import {
   DEFAULT_NR_SHORTCUT,
@@ -128,12 +111,17 @@ const text = computed(() => enhancementControlsText(locale.value)),
   overlayText = computed(() => nrOverlayText(locale.value))
 const t = useI18n().t
 // a shortcut as separate keys: 'Ctrl + Alt + N' -> ['Ctrl', 'Alt', 'N']
-// the real overlay was captured at five background opacities: the nearest one to the slider is shown
-const STEPS = [35, 50, 65, 80, 95]
-const stepOf = (v) => STEPS.reduce((best, n) => (Math.abs(n - v) < Math.abs(best - v) ? n : best), STEPS[0])
-const lang = computed(() => (String(locale.value).startsWith('zh') ? 'zh' : 'en'))
 const keysOf = (label) => String(label || '').split(' + ').map((k) => k.trim()).filter(Boolean)
+const emit = defineEmits(['manage-components'])
 const { current, open, back } = useSubpage('quality')
+// the two runtimes are installed on the component status page (not here): this page only reads whether they are there
+const installed = ref({ nr: null, hdr: null })
+async function readComponents() {
+  for (const [key, api] of [['nr', dlssNr], ['hdr', rtxHdr]]) {
+    try { const result = await api.getStatus(); installed.value[key] = result?.success ? !!result.data?.installed : null } catch { installed.value[key] = null }
+  }
+}
+const missing = computed(() => [['nr', 'DLSS NR'], ['hdr', 'RTX HDR']].filter(([key]) => installed.value[key] === false).map(([, name]) => name))
 const settings = ref({ nrShortcut: '', overlayShortcut: '', nrGamepad: '', overlayGamepad: '', opacity: 62 }),
   registration = ref({})
 const draftOpacity = ref(62),
@@ -278,6 +266,7 @@ async function poll() {
   if (!disposed) timer = setTimeout(poll, 1200)
 }
 onMounted(async () => {
+  void readComponents()
   let settingsRevision = 0
   window.addEventListener('blur', cancelRecording)
   for (const [name, handler] of [
@@ -328,22 +317,12 @@ onUnmounted(() => {
 .m-qstrip__cell { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 16px; background: var(--m-card, var(--md-sys-color-surface-container)); cursor: pointer; }
 .m-qstrip__cell:first-child { border-radius: 24px 6px 6px 24px; } .m-qstrip__cell:last-child { border-radius: 6px 24px 24px 6px; }
 .m-qstrip__cell:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, var(--m-card, var(--md-sys-color-surface-container))); } .m-qstrip__cell:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: 2px; }
-.m-qstrip__icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 14px; background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); } .m-qstrip__icon.is-on { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.m-qstrip__icon { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 14px; background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); } .m-qstrip__icon.is-warn { background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); } .m-qstrip__icon.is-on { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
 .m-qstrip__icon .m-icon { font-size: 22px; }
 .m-qstrip__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; } .m-qstrip__text small { font: var(--m-label-medium); color: var(--md-sys-color-on-surface-variant); } .m-qstrip__text b { font: var(--m-title-small); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .m-qstrip__go { color: var(--md-sys-color-on-surface-variant); font-size: 22px; }
-.m-qprev { position: relative; isolation: isolate; margin: 0 0 12px; padding: 44px 28px 32px; min-height: 0; border-radius: 28px; overflow: hidden; display: flex; flex-direction: column; align-items: center; gap: 14px; background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); }
-.m-qprev__label { position: absolute; z-index: 2; top: 14px; left: 18px; display: inline-flex; align-items: center; gap: 6px; font: var(--m-label-large); color: var(--md-sys-color-on-surface-variant); } .m-qprev__label .m-icon { font-size: 18px; }
-.m-qprev__scene { position: absolute; inset: 0; z-index: -1; background: linear-gradient(135deg, color-mix(in srgb, var(--md-sys-color-tertiary-container) 85%, var(--md-sys-color-surface)) 0%, color-mix(in srgb, var(--md-sys-color-primary-container) 80%, var(--md-sys-color-surface)) 60%, color-mix(in srgb, var(--md-sys-color-secondary-container) 90%, var(--md-sys-color-surface)) 100%); }
-.m-qprev__hud { position: absolute; border-radius: 9999px; background: color-mix(in srgb, var(--md-sys-color-on-surface) 10%, transparent); } .m-qprev__hud--a { left: 7%; bottom: 14%; width: 18%; height: 10px; } .m-qprev__hud--b { left: 7%; bottom: 8%; width: 11%; height: 10px; } .m-qprev__hud--c { right: 8%; bottom: 10%; width: 56px; height: 56px; }
-.m-qprev figcaption { margin-top: auto; font: var(--m-body-small); color: var(--md-sys-color-on-surface-variant); text-align: center; }
-.m-qprev__row { display: flex; align-items: flex-start; justify-content: center; gap: 28px; width: 100%; }
-.m-qprev__side { flex: 1; max-width: 240px; display: flex; flex-direction: column; gap: 12px; align-items: flex-start; padding-top: 6px; } .m-qprev__side p { margin: 0; font: var(--m-body-small); color: var(--md-sys-color-on-surface-variant); }
-/* the real overlay, as it is drawn in the game (screenshots of NrOverlayTool, unchanged): the background opacity of the page's slider picks the nearest of five */
-.m-qprev__ov, .m-qprev__pill { display: block; height: auto; filter: drop-shadow(0 8px 20px color-mix(in srgb, var(--md-sys-color-shadow) 38%, transparent)); }
 .m-qkeys { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; justify-content: flex-end; }
 .m-qkeys kbd { display: inline-flex; align-items: center; gap: 4px; min-width: 28px; height: 28px; padding: 0 9px; box-sizing: border-box; justify-content: center; border-radius: 8px; background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface); font: 600 12px/1 ui-monospace, 'Cascadia Mono', Consolas, monospace; box-shadow: inset 0 -2px 0 color-mix(in srgb, var(--md-sys-color-on-surface) 22%, transparent), 0 0 0 1px color-mix(in srgb, var(--md-sys-color-outline-variant) 80%, transparent); }
 .m-qkeys kbd.is-unset { font-family: inherit; font-weight: 500; color: var(--md-sys-color-on-surface-variant); box-shadow: 0 0 0 1px var(--md-sys-color-outline-variant); background: transparent; }
 .m-qkeys kbd.is-pad { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); font-family: inherit; } .m-qkeys kbd .m-icon { font-size: 16px; }
-@media (max-width: 600px) { .m-qprev { padding: 44px 12px 24px; min-height: 0; } .m-qprev__row { flex-direction: column-reverse; align-items: center; gap: 16px; } .m-qprev__side { max-width: none; align-items: center; text-align: center; padding: 0; } }
 </style>

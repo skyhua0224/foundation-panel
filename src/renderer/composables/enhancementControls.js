@@ -74,6 +74,8 @@ const messages = {
     components: '增强功能',
     session: '当前串流',
     settings: '浮层与快捷键',
+    componentsMissing: '运行库尚未安装。DLSS NR 和 RTX HDR 在“组件状态”中安装。',
+    openComponents: '前往组件状态',
     componentHint: '默认增强方案按应用配置；这里统一管理组件与实时控制。',
     hdrIntro: '将 SDR 内容转换为 HDR 输出。',
     nrIntro: '增强画面细节，支持 SDR 与原生 HDR。',
@@ -160,6 +162,8 @@ const messages = {
     components: 'Enhancements',
     session: 'Current streams',
     settings: 'Overlay & shortcuts',
+    componentsMissing: 'The runtime is not installed. DLSS NR and RTX HDR are installed under Component status.',
+    openComponents: 'Component status',
     componentHint:
       'Default effects are configured per app. Manage components and live controls here.',
     hdrIntro: 'Convert SDR content to HDR output.',
