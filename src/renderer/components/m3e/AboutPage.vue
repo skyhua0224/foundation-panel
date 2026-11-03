@@ -1,5 +1,5 @@
 <template>
-  <MAbout :version="currentVersion" :channel="channel" :update="update" :sponsors="SPONSORS" :locale="locale" :on-refresh="onRefresh" @check="runCheck" @open-update="emit('open-update')" @open="(url) => emit('open', url)" @developer-off="options?.off()">
+  <MAbout :version="currentVersion" :channel="channel" :update="update" :sponsors="SPONSORS" :locale="locale" :on-refresh="onRefresh" :consent="consent" @consent="(v) => emit('consent', v)" @check="runCheck" @open-update="emit('open-update')" @open="(url) => emit('open', url)" @developer-off="options?.off()">
     <template #developer><DeveloperOptions ref="options" /></template>
   </MAbout>
 </template>
@@ -21,9 +21,10 @@ const props = defineProps({
   check: { type: Function, required: true },
   /** fetch the announcements again (the developer entry changes their source) */
   onRefresh: { type: Function, default: null },
+  consent: { type: String, default: '' },
 })
 const options = ref(null)
-const emit = defineEmits(['open-update', 'open'])
+const emit = defineEmits(['open-update', 'open', 'consent'])
 
 const checking = ref(false)
 const failed = ref(false)

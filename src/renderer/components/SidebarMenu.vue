@@ -45,7 +45,7 @@
           @open-guide="openWelcome"
         />
         <MAnnouncementPage v-else-if="entry.id === ROUTES.ANNOUNCEMENTS" :items="announcements.list.value" :locale="locale" :acked-at="ackedAt" :open-id="entry.params?.id || ''" :on-refresh="() => announcements.refresh(true)" @dismiss="announcements.dismiss" @read="announcements.read" @open-url="actions_openExternal" @back="back" />
-        <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" :on-refresh="() => announcements.refresh(true)" @open-update="showUpdateDialog = true" @open="actions_openExternal" />
+        <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" :on-refresh="() => announcements.refresh(true)" :consent="telemetry.consent.value" @consent="telemetry.answer" @open-update="showUpdateDialog = true" @open="actions_openExternal" />
         <ControlPanelPage
           v-else-if="entry.id === ROUTES.PANEL_SETTINGS || entry.id === ROUTES.HELP"
           :page="entry.id"
@@ -74,6 +74,9 @@
     </MScene>
     </div>
     <MContextMenu ref="contextMenu" @select="onContextSelect" />
+    <!-- every uncaught error is drawn in our own surface: the way back, the restart of Sunshine, then copy, download and the report to the developers -->
+    <MTelemetryConsent v-model="consentOpen" :locale="locale" @answer="telemetry.answer" />
+    <MErrorHost :locale="locale" :can-go-back="nav.canPop.value" :host-online="hostConn.state.status === 'online'" :restart="() => hostConn.restart('service')" :open-url="actions_openExternal" @back="errorBack" />
     <!-- 更多 of the bottom bar: what the bar has no room for -->
     <MSheet v-model="moreOpen" :title="t.m3e.nav.moreTitle" side="end" :close-label="t.m3e.home.done">
       <MGroup>
@@ -104,11 +107,11 @@
 </template>
 
 <script setup>
-import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
+import { computed, defineAsyncComponent, getCurrentInstance, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
-import { useNotify, useSystemNotices, MStatusBell, connectTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, useNotify, useSystemNotices, MStatusBell, connectTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -231,6 +234,16 @@ const hostConn = useHostConnection({
 const NEEDS_NO_HOST = new Set([ROUTES.PANEL_SETTINGS, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
 const offlineShown = computed(() => hostConn.state.status !== 'online' && !NEEDS_NO_HOST.has(router.currentRoute.value))
 const back = () => nav.pop()
+// the way out of the error surface: the previous page, or the overview when there is none
+// The choice about usage counts and error information: the host keeps it, the Web UI and this window agree; asked once when nothing else is on screen, changed later in 关于
+const telemetryApi = { getJson: async (path) => (await fetch(`${String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')}${path}`)).json(), postJson: async (path, body) => (await fetch(`${String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json() }
+const telemetry = useTelemetryConsent({ api: telemetryApi })
+const consentOpen = ref(false)
+const errorBack = () => { if (nav.canPop.value) nav.pop(); else router.navigate(ROUTES.HOME) }
+const osName = () => (typeof navigator === 'undefined' ? '' : String(navigator.userAgentData?.platform || navigator.platform || ''))
+setErrorContext(() => ({ product: 'panel', version: currentVersion.value || '', os: osName(), page: String(router.currentRoute.value || ''), locale: String(locale.value), logs: '' }))
+let removeErrorHandlers = null
+const shellApp = getCurrentInstance()?.appContext.app
 // the remote access tutorials (help page, and the fix of a reason of the reachability check)
 const remoteOpen = ref(false)
 const remoteData = createGuideData({ proxyUrl: () => sunshine.getProxyUrl(), openUrl: (url) => actions_openExternal(url), copy: (text) => navigator.clipboard.writeText(text), reach: useHostReach(), vddStatus: async () => null, openApps: () => {}, navigate: () => {} })
@@ -325,7 +338,8 @@ onMounted(async () => {
   window.addEventListener('message', onFramePin)
   try { const { listen } = await import('@tauri-apps/api/event'); unlistenConnect = await listen('open-connect', (event) => connect.show(event.payload?.tab === 'install' ? 'install' : 'pair')) } catch { /* not in the app window */ }
 })
-onBeforeUnmount(() => { pairing.stop(); window.removeEventListener('message', onFramePin); if (unlistenConnect) unlistenConnect() })
+onBeforeUnmount(() => { pairing.stop(); window.removeEventListener('message', onFramePin); if (unlistenConnect) unlistenConnect(); removeErrorHandlers?.() })
+onMounted(async () => { removeErrorHandlers = installErrorHandlers({ app: shellApp }); await telemetry.refresh(); telemetry.askWhenQuiet(consentOpen) })
 const actionHandlers = {
   restart: () => tools.restartSunshineService(),
   userMode: () => tools.restartSunshineInUserMode(),
