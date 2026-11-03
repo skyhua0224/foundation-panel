@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
-import { buildCatalogue, buildCatalogueDetails, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
+import { buildCatalogue, buildCatalogueDetails, useJourneyHome, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
 import { usePanelHome } from '../composables/usePanelHome.js'
 import { useGamepadType } from '../composables/useGamepadType.js'
@@ -135,8 +135,8 @@ const catalogueInput = computed(() => {
 const catalogue = computed(() => buildCatalogue(catalogueInput.value, T.value).data)
 const allDetails = computed(() => ({ ...model.value.details, ...buildCatalogueDetails(catalogueInput.value, T.value) }))
 const isNew = computed(() => guide.visible.value)
-const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue: catalogue.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value), sponsor: sponsorCardData(T.value, SPONSORS) }))
-const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value }))
+const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue: catalogue.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value), sponsor: sponsorCardData(T.value, SPONSORS), journey: journey.data.value }))
+const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value }))
 
 function onAction(a) {
   switch (a.type) {
@@ -150,6 +150,7 @@ function onAction(a) {
     case 'pair-qr-stop': pairQr.stop(); break
     case 'table-row': onTableRow(a.value); break
     case 'app': emit('open', 'apps'); break
+    case 'open-url': openExternalUrl(a.value); break
     case 'add-app': emit('open', 'apps:add'); break
     case 'open': emit('open', a.value); break
     case 'detail-external': break
@@ -179,6 +180,8 @@ onBeforeUnmount(() => pairQr.stop())
 async function pairPin(pin) {
   if (!/^\d{4}$/.test(String(pin || ''))) return
   try { const data = await hostApi.postJson('/api/pin', { pin: String(pin), name: dashTexts.value.pairDefaultName }); say(String(data.status) === 'true' ? dashTexts.value.pairSent : dashTexts.value.pairFailed) } catch { say(dashTexts.value.pairFailed) }
+// the connect journey card: on by default while no client is paired (choose the device, install, pair, done)
+const journey = useJourneyHome({ storageKey: 'panel-home', count: () => (state.clients ? state.clients.length : null), latest: () => (state.clients?.length ? state.clients[state.clients.length - 1].name : ''), locale: () => locale.value, qr: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules, pairQr: pairQr.view })
 }
 async function saveSetting({ key, value }) { const r = await saveSettingKey(hostApi, key, value); if (r.ok) state.config = r.config }
 async function onStripGroup(v) { pad.selectedMode.value = v }
