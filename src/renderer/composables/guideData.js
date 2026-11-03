@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
 import { isSetupCompleted, mergeSetupConfig, normalizeClients, normalizeSessions, setupStateFromConfig, shouldAutoOpen } from 'foundation-ui/vue/guide.js'
+import { endpointsOfConfig } from 'foundation-ui/settings'
 
 export const GUIDE_STORAGE_KEY = 'foundation.guide.panel'
 export const GUIDE_DISMISSED_KEY = 'foundation.guide.dismissed'
@@ -20,7 +21,7 @@ export function createGuideData(deps) {
     account: { exists: null },
     setup: { completed: false, locale: '', showLanguage: true, adapters: [], displayDevices: [], adapter: '', display: '', prep: 'ensure_only_display', virtual: true },
     host: { platform: '', addresses: null },
-    network: { port: 47989, upnpActive: null, upnpSaved: null, loaded: false, externalIp: '' },
+    network: { port: 47989, upnpActive: null, upnpSaved: null, loaded: false, endpoints: '' },
     reach: deps.reach ? deps.reach.view : { report: null, status: 'idle' },
     clients: null,
     sessions: null,
@@ -103,7 +104,7 @@ export function createGuideData(deps) {
       if (!okStatus(data.status)) throw new Error('listeners')
       Object.assign(state.network, { port: Number(data.saved?.port || data.active?.port) || 47989, upnpActive: !!data.active?.upnp, upnpSaved: !!data.saved?.upnp, loaded: true })
       state.host.addresses = Array.isArray(data.addresses) ? data.addresses : state.host.addresses
-      try { state.network.externalIp = String((await getJson('/api/config')).external_ip || '') } catch { /* the field stays as it was */ }
+      try { state.network.endpoints = endpointsOfConfig(await getJson('/api/config')).join(', ') } catch { /* the field stays as it was */ }
     } catch {
       state.network.loaded = false
     }
@@ -120,13 +121,13 @@ export function createGuideData(deps) {
     }
   }
 
-  /** The public address (`external_ip`: an IP or a DDNS name) in the saved configuration. */
-  async function setPublicAddress(value) {
+  /** The public endpoints (`external_endpoints`: `host[:port]` entries, comma separated) in the saved configuration; the old single `external_ip` is cleared with the first save. */
+  async function setPublicEndpoints(value) {
     try {
-      const config = { ...(await getJson('/api/config')), external_ip: value }
+      const config = { ...(await getJson('/api/config')), external_endpoints: value, external_ip: '' }
       const { response } = await postJson('/api/config', config)
       if (!response.ok) return { ok: false, error: await response.text().catch(() => '') }
-      state.network.externalIp = value
+      state.network.endpoints = value
       return { ok: true }
     } catch (error) {
       return { ok: false, error: error?.message || '' }
@@ -201,7 +202,7 @@ export function createGuideData(deps) {
     loadNetwork,
     checkReach: (force) => deps.reach?.refresh(force),
     setUpnp,
-    setPublicAddress,
+    setPublicEndpoints,
     restartHost,
     pairQr,
     pair,

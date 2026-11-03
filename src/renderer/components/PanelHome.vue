@@ -163,7 +163,7 @@ function onAction(a) {
     case 'pair-pin': pairPin(a.value?.pin); break
     case 'pair-qr': emit('open', 'pair:qr'); break
     case 'star-dismiss': star.dismiss(); break
-    case 'address-save': saveSetting({ key: 'external_ip', value: a.value?.value ?? '' }).then(() => hostReach.refresh(true)); break
+    case 'address-save': saveSetting({ key: 'external_endpoints', value: a.value?.value ?? '' }).then(() => saveSetting({ key: 'external_ip', value: '' })).then(() => hostReach.refresh(true)); break
     case 'reach-check': hostReach.refresh(true); break
     case 'pin-open': emit('open', `setting:${a.value?.key}`); break
     case 'detail-external': emit('open', 'check-update'); break
