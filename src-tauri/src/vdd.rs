@@ -15,7 +15,7 @@ const VDD_TRACE_FILE_PREFIX: &str = "zako-vdd";
 static VDD_SETTINGS_OPERATION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
 /// The driver probe runs a script (0.5 s): once for the pages that ask together, kept a few seconds; every command that changes the driver drops it.
 static VDD_STATUS: crate::probe_cache::ProbeCache<VddStatus> =
-    crate::probe_cache::ProbeCache::new(std::time::Duration::from_secs(8));
+    crate::probe_cache::ProbeCache::new("vdd status", std::time::Duration::from_secs(8));
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VddTraceStatus {

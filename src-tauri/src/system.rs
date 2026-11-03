@@ -340,10 +340,10 @@ pub async fn get_process_memory_info() -> Result<MemoryMonitorSnapshot, String> 
 
 /// Two WMI connections and a query for every process (0.2 s): once for the pages that ask together, kept a moment.
 static PROCESS_MEMORY: crate::probe_cache::ProbeCache<MemoryMonitorSnapshot> =
-    crate::probe_cache::ProbeCache::new(std::time::Duration::from_secs(3));
+    crate::probe_cache::ProbeCache::new("process memory", std::time::Duration::from_secs(3));
 /// The start time of the host process changes only when it restarts (WMI, 70 ms).
 static SUNSHINE_START: crate::probe_cache::ProbeCache<ProcessStartInfo> =
-    crate::probe_cache::ProbeCache::new(std::time::Duration::from_secs(10));
+    crate::probe_cache::ProbeCache::new("sunshine start time", std::time::Duration::from_secs(10));
 
 #[cfg(target_os = "windows")]
 fn get_process_memory_info_impl() -> Result<MemoryMonitorSnapshot, String> {

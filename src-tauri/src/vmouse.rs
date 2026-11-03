@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 /// The probe starts PowerShell (1.7 s): once for the pages that ask together, kept a few seconds; every command that changes the device drops it.
 static VMOUSE_STATUS: crate::probe_cache::ProbeCache<VmouseStatus> =
-    crate::probe_cache::ProbeCache::new(std::time::Duration::from_secs(8));
+    crate::probe_cache::ProbeCache::new("vmouse status", std::time::Duration::from_secs(8));
 
 #[cfg(target_os = "windows")]
 use crate::bat_runner;

@@ -337,6 +337,7 @@ fn main() {
             file_mapping::uninstall_file_mapping_menu,
             file_transfer::send_file_to_client,
             windows::webview_heartbeat,
+            logger::frontend_slow,
             windows::panel_content_ready,
             windows::panel_set_surface,
             windows::resize_about_window,

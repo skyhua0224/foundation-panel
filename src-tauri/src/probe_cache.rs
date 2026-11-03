@@ -8,6 +8,9 @@ use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
+/// A probe that takes longer than this is written to the log (the pages wait for it).
+const SLOW_PROBE: Duration = Duration::from_millis(250);
+
 struct Entry<T> {
     at: Instant,
     epoch: u64,
@@ -15,6 +18,7 @@ struct Entry<T> {
 }
 
 pub struct ProbeCache<T> {
+    name: &'static str,
     ttl: Duration,
     epoch: AtomicU64,
     slot: tokio::sync::Mutex<Option<Entry<T>>>,
@@ -30,8 +34,9 @@ impl<T> Drop for Invalidating<'_, T> {
 }
 
 impl<T> ProbeCache<T> {
-    pub const fn new(ttl: Duration) -> Self {
+    pub const fn new(name: &'static str, ttl: Duration) -> Self {
         Self {
+            name,
             ttl,
             epoch: AtomicU64::new(0),
             slot: tokio::sync::Mutex::const_new(None),
@@ -62,7 +67,12 @@ impl<T: Clone> ProbeCache<T> {
                 return Ok(entry.value.clone());
             }
         }
+        let started = Instant::now();
         let value = load().await?;
+        let took = started.elapsed();
+        if took >= SLOW_PROBE {
+            log::warn!("probe {} took {} ms", self.name, took.as_millis());
+        }
         *slot = Some(Entry {
             at: Instant::now(),
             epoch,
@@ -89,7 +99,7 @@ mod tests {
     #[test]
     fn callers_that_ask_together_share_one_probe_and_a_fresh_answer_is_kept() {
         run(async {
-            let cache = Arc::new(ProbeCache::new(Duration::from_secs(60)));
+            let cache = Arc::new(ProbeCache::new("test", Duration::from_secs(60)));
             let runs = Arc::new(AtomicUsize::new(0));
             let ask = |cache: Arc<ProbeCache<u32>>, runs: Arc<AtomicUsize>| async move {
                 cache
@@ -114,7 +124,7 @@ mod tests {
     #[test]
     fn an_old_answer_is_probed_again() {
         run(async {
-            let cache = ProbeCache::new(Duration::from_millis(10));
+            let cache = ProbeCache::new("test", Duration::from_millis(10));
             assert_eq!(cache.get(|| async { Ok(1) }).await.unwrap(), 1);
             tokio::time::sleep(Duration::from_millis(30)).await;
             assert_eq!(cache.get(|| async { Ok(2) }).await.unwrap(), 2);
@@ -124,7 +134,7 @@ mod tests {
     #[test]
     fn a_failure_is_not_kept() {
         run(async {
-            let cache = ProbeCache::new(Duration::from_secs(60));
+            let cache = ProbeCache::new("test", Duration::from_secs(60));
             assert!(cache.get(|| async { Err::<u32, _>("no".into()) }).await.is_err());
             assert_eq!(cache.get(|| async { Ok(3) }).await.unwrap(), 3);
         });
@@ -133,7 +143,7 @@ mod tests {
     #[test]
     fn a_changing_command_drops_the_answer_and_one_that_read_meanwhile_cannot_keep_it() {
         run(async {
-            let cache = ProbeCache::new(Duration::from_secs(60));
+            let cache = ProbeCache::new("test", Duration::from_secs(60));
             assert_eq!(cache.get(|| async { Ok(1) }).await.unwrap(), 1);
             {
                 let _changing = cache.invalidating();

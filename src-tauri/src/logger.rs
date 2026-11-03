@@ -264,6 +264,12 @@ pub fn get_all_logs() -> Vec<LogEntry> {
     }
 }
 
+/// A call of the renderer that took long (a fetch, a native command, a frame that was blocked): the log of the panel has it with the others.
+#[tauri::command]
+pub fn frontend_slow(kind: String, name: String, ms: f64, detail: Option<String>) {
+    log::warn!("[renderer] {kind} {name} {ms:.0} ms {}", detail.unwrap_or_default());
+}
+
 /// Clear all collected logs.
 #[tauri::command]
 pub fn clear_logs() {

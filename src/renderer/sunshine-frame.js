@@ -3,6 +3,7 @@ import SunshineFrame from './components/SunshineFrame.vue'
 import { invoke } from '@tauri-apps/api/core'
 import { followPanelSurface } from './composables/panelSurface.js'
 import { startWebPrewarm, createHiddenFrameLoader } from './composables/webPrewarm.js'
+import { startSlowCallLog } from './composables/slowCalls.js'
 import 'element-plus/theme-chalk/el-loading.css'
 import 'element-plus/theme-chalk/el-message.css'
 import 'element-plus/theme-chalk/el-overlay.css'
@@ -27,6 +28,8 @@ queueMicrotask(() => {
   invoke('panel_content_ready').catch(() => {})
   followPanelSurface(invoke)
   prewarmWebPages()
+  // the calls, frames and timers that take long are in the panel's log, with what was waiting when a timer came late
+  startSlowCallLog((kind, name, ms, detail) => { if (name !== 'frontend_slow') invoke('frontend_slow', { kind, name, ms, detail }).catch(() => {}) })
 })
 
 // The Web UI pages load their scripts on the first visit (up to 1.6 s on the Skyindows panel): load them once in a hidden frame while nobody uses the window

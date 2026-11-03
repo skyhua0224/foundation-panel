@@ -223,7 +223,7 @@ pub fn assets_dir() -> PathBuf {
 
 /// `sunshine.exe --version` starts the host program (60 ms); the version of an installed program stays the same while the panel runs.
 static SUNSHINE_VERSION: crate::probe_cache::ProbeCache<String> =
-    crate::probe_cache::ProbeCache::new(std::time::Duration::from_secs(600));
+    crate::probe_cache::ProbeCache::new("sunshine version", std::time::Duration::from_secs(600));
 
 #[tauri::command]
 pub async fn get_sunshine_version() -> Result<String, String> {
