@@ -261,8 +261,19 @@ pub(super) fn verify(cover: HWND, color: (u8, u8, u8), frame: Option<&Frame>) ->
             return "no memory bitmap".to_string();
         };
         let previous = SelectObject(memory, HGDIOBJ(dib.0));
-        let printed = PrintWindow(cover, memory, PRINT_WINDOW_FLAGS(1)).as_bool(); // PW_CLIENTONLY
-        let pixels = std::slice::from_raw_parts(bits.cast::<u8>(), width * height * 4).to_vec();
+        // a layered window is printed from what DWM holds for it (PW_RENDERFULLCONTENT, 2); where that gives nothing, the window is asked to draw itself (WM_PRINT)
+        let mut printed = false;
+        let mut pixels = Vec::new();
+        let mut used = 0;
+        for flags in [2u32, 1, 0] {
+            std::ptr::write_bytes(bits.cast::<u8>(), 0, width * height * 4);
+            printed = PrintWindow(cover, memory, PRINT_WINDOW_FLAGS(flags)).as_bool();
+            pixels = std::slice::from_raw_parts(bits.cast::<u8>(), width * height * 4).to_vec();
+            used = flags;
+            if pixels.chunks_exact(4).any(|pixel| pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0) {
+                break;
+            }
+        }
         SelectObject(memory, previous);
         let _ = DeleteObject(HGDIOBJ(dib.0));
         let _ = DeleteDC(memory);
@@ -277,7 +288,7 @@ pub(super) fn verify(cover: HWND, color: (u8, u8, u8), frame: Option<&Frame>) ->
             Some(frame) => ("frame", format!("stretch x{:.2} y{:.2} of {}x{}", width as f64 / f64::from(frame.width), height as f64 / f64::from(frame.height), frame.width, frame.height)),
             None => ("colour", format!("expected #{:02x}{:02x}{:02x}", color.0, color.1, color.2)),
         };
-        format!("PrintWindow {} {}x{} shows {kind}: mean #{:02x}{:02x}{:02x}, grid difference {diff:.1}/255, {stretch}", if printed { "ok" } else { "failed" }, width, height, mean[0], mean[1], mean[2])
+        format!("PrintWindow(flags {used}) {} {}x{} shows {kind}: mean #{:02x}{:02x}{:02x}, grid difference {diff:.1}/255, {stretch}", if printed { "ok" } else { "failed" }, width, height, mean[0], mean[1], mean[2])
     }
 }
 
