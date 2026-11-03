@@ -197,9 +197,12 @@
         </MSection>
         <MSection :title="t.vddSettings.edidSection">
           <MGroup>
+            <MChoiceItem :model-value="settings.edid.EdidProfile" icon="tune" :title="vp.edidProfile" :text="settings.edid.CustomEdid ? vp.edidProfileIgnored : `${vp.edidProfiles[settings.edid.EdidProfile]?.text || ''}. ${vp.edidProfileText}`" :options="edidProfileOptions" :disabled="settings.edid.CustomEdid" :cancel-label="t.common.cancel" data-cfg="EdidProfile" @update:model-value="(v) => confirmThen('edidProfile', vp.edidProfile, () => (settings.edid.EdidProfile = v))" />
             <MSwitchItem :model-value="settings.edid.DolbyVision" icon="hdr_on" :title="t.vddSettings.dolbyVision" :text="settings.edid.CustomEdid && !settings.edid.EdidCeaOverride ? t.vddSettings.dolbyVisionCustomEdidTip : t.vddSettings.dolbyVisionTip" :disabled="settings.edid.CustomEdid && !settings.edid.EdidCeaOverride" @update:model-value="(v) => confirmThen('dolby', t.vddSettings.dolbyVision, () => (settings.edid.DolbyVision = v))" />
             <MSwitchItem :model-value="settings.edid.CustomEdid" icon="description" :title="t.vddSettings.customEdid" :text="t.vddSettings.customEdidTip" @update:model-value="(v) => confirmThen('customEdid', t.vddSettings.customEdid, () => { settings.edid.CustomEdid = v; handleEdidToggle(v) })" />
             <template v-if="settings.edid.CustomEdid">
+              <MSwitchItem v-model="settings.edid.PreventSpoof" icon="verified_user" :title="vp.preventSpoof" :text="vp.preventSpoofText" data-cfg="PreventSpoof" />
+              <MSwitchItem v-model="settings.edid.EdidCeaOverride" icon="hdr_on" :title="vp.ceaOverride" :text="vp.ceaOverrideText" data-cfg="EdidCeaOverride" />
               <MItem icon="description" :title="edidFileExists ? t.vddSettings.edidUploaded : t.vddSettings.edidNotUploaded" :text="edidFilePath" />
               <MItem action icon="upload" :title="t.vddSettings.edidSelectFile" @click="edidInput?.click()" />
               <MItem action icon="download" :title="t.vddSettings.edidDownload" :disabled="!edidFileExists" @click="downloadEdid" />
@@ -214,6 +217,14 @@
           <MBanner v-if="settings.edid.CustomEdid" tone="warn" icon="warning">{{ t.vddSettings.edidWarning }}</MBanner>
           <MFooter>{{ t.vddSettings.edidSectionHint }}</MFooter>
           <input ref="edidInput" type="file" accept=".bin" hidden @change="onEdidPicked">
+        </MSection>
+        <MSection :title="vp.cursorTitle">
+          <MGroup>
+            <MChoiceItem :model-value="settings.cursor.CursorMaxX" icon="mouse" :title="vp.cursorMax" :text="vp.cursorMaxText" :options="cursorMaxOptions" :cancel-label="t.common.cancel" data-cfg="CursorMax" @update:model-value="(v) => confirmThen('cursor', vp.cursorMax, () => { settings.cursor.CursorMaxX = v; settings.cursor.CursorMaxY = v })" />
+            <MSwitchItem :model-value="settings.cursor.AlphaCursorSupport" icon="blur_on" :title="vp.alphaCursor" :text="vp.alphaCursorText" data-cfg="AlphaCursorSupport" @update:model-value="(v) => confirmThen('cursor', vp.alphaCursor, () => (settings.cursor.AlphaCursorSupport = v))" />
+            <MChoiceItem :model-value="settings.cursor.XorCursorSupportLevel" icon="tune" :title="vp.xorCursor" :text="vp.xorCursorText" :options="xorLevelOptions" :cancel-label="t.common.cancel" data-cfg="XorCursorSupportLevel" @update:model-value="(v) => confirmThen('cursor', vp.xorCursor, () => (settings.cursor.XorCursorSupportLevel = v))" />
+          </MGroup>
+          <MFooter>{{ vp.cursorHint }}</MFooter>
         </MSection>
       </template>
 
@@ -287,6 +298,7 @@ const createInitialSettings = () => ({
     DolbyVision: false,
     PreventSpoof: false,
     EdidCeaOverride: false,
+    EdidProfile: 'auto',
     Vrr: false,
   },
 })
@@ -415,6 +427,9 @@ const confirm = reactive({ open: false, name: '', text: '', apply: null })
 const confirmThen = (riskKey, name, apply) => { Object.assign(confirm, { open: true, name, text: vp.value.risk[riskKey] || '', apply }) }
 const confirmApply = () => { const run = confirm.apply; confirm.open = false; confirm.apply = null; if (run) run() }
 const displaySummary = computed(() => [`${sortedResolutionOptions.value.length} ${t.value.vddSettings.resolutionPresets}`, `${sortedRefreshRateOptions.value.length} ${t.value.vddSettings.refreshRatePresets}`].join(' · '))
+const edidProfileOptions = computed(() => ['auto', 'legacy', 'modern'].map((value) => ({ value, label: vp.value.edidProfiles[value].title })))
+const cursorMaxOptions = computed(() => [...new Set([64, 128, 256, Number(settings.cursor.CursorMaxX) || 128])].sort((x, y) => x - y).map((value) => ({ value, label: `${value} × ${value}` })))
+const xorLevelOptions = computed(() => [0, 1, 2, 3].map((value) => ({ value, label: vp.value.xorLevels[value] })))
 const qualitySummary = computed(() => [colorDepthOptions.value.find((o) => o.value === colorDepthProfile.value)?.label, settings.colour.ColourFormat].filter(Boolean).join(' · '))
 onMounted(() => { void hostVdd.load(); void vulkan.refresh() })
 const activeSection = computed({
