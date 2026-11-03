@@ -8,6 +8,7 @@ use tauri::{
 };
 
 pub(crate) mod lifecycle;
+mod surface;
 
 #[derive(Default)]
 struct ToolWindowMoveSave {
@@ -185,6 +186,23 @@ pub fn disable_context_menu<R: Runtime>(window: &WebviewWindow<R>) {
 /// 开发环境不执行任何操作
 #[cfg(debug_assertions)]
 pub fn disable_context_menu<R: Runtime>(_window: &WebviewWindow<R>) {}
+
+/// The renderer mounted its first view: a window that waits to be shown is shown now.
+#[tauri::command]
+pub fn panel_content_ready(window: tauri::WebviewWindow) {
+    lifecycle::content_ready(&window);
+}
+
+/// The renderer's theme surface colour: the colour the window and WebView2 show before a
+/// frame is painted (resize, restore, first start). Kept for the next start.
+#[tauri::command]
+pub fn panel_set_surface(window: tauri::WebviewWindow, r: u8, g: u8, b: u8) -> Result<(), String> {
+    window
+        .set_background_color(Some(tauri::window::Color(r, g, b, 255)))
+        .map_err(|e| e.to_string())?;
+    surface::store((r, g, b));
+    Ok(())
+}
 
 /// WebView 心跳命令：由前端 JS 定期调用，表明渲染进程仍然存活
 #[tauri::command]
@@ -611,6 +629,7 @@ fn create_main_window_internal<R: Runtime>(
     .inner_size(1280.0, 800.0)
     .min_inner_size(480.0, 560.0)
     .center()
+    .background_color(surface::startup_color())
     .decorations(false)
     // DWM clips the native window to rounded corners. Keeping WebView2
     // opaque avoids stale transparent composition surfaces after restore.
