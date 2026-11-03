@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
+import { firstImage, micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
 import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, useSystemInfo, reachProblemOf, registeredComponentStatus, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
 import { usePanelHome } from '../composables/usePanelHome.js'
@@ -137,7 +137,7 @@ const catalogueInput = computed(() => {
     display: vddInput.value && vddInput.value.hdr !== undefined ? { hdr: vddInput.value.hdr } : null,
     temps: state.hw.available ? { cpu: state.hw.cpuTemp, gpu: state.hw.gpuTemp } : null,
     pairQr: pairQr.view,
-    announcements: announcements.list.value.map((a) => ({ id: a.id, title: a.title || a.text || '' })),
+    announcements: announcements.list.value.map((a) => ({ id: a.id, title: a.title || a.text || '', category: a.category, banner: a.banner || firstImage(a.body), date: dateOfPost(a.published), read: a.read || a.snoozed, hasText: !!a.body, url: a.url || '' })),
   }
 })
 const catalogue = computed(() => buildCatalogue(catalogueInput.value, T.value).data)
@@ -154,8 +154,11 @@ const smartSignals = computed(() => ({
 }))
 const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value, star: star.visible.value, starNames: (state.clients || []).map((c) => c.name), signals: smartSignals.value }))
 
+// the date of a post in the 资讯 tile, YYYY-MM-DD
+const dateOfPost = (at) => { if (!at) return ''; const d = new Date(at); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
 function onAction(a) {
   switch (a.type) {
+    case 'news-open': emit('open', `announcement:${a.value?.id}`); break
     case 'hero': onHero(); break
     case 'group': onStripGroup(a.value); break
     case 'switch': onStripSwitch(a.value); break

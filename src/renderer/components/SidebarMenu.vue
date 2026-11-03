@@ -443,6 +443,7 @@ const actions_openUrl = async (item) => {
 // Old call sites speak in short ids; each maps to a destination.
 const openDestination = (id) => {
   if (id === 'check-update') { handleCheckForUpdates(); return }
+  if (id.startsWith('announcement:')) { router.navigate(ROUTES.ANNOUNCEMENTS, { id: id.slice(13) }); return }
   if (id.startsWith('setting:')) { const entry = searchItems.value.find((e) => e.keyName === id.slice(8)); if (entry) onSearch(entry); return }
   if (id === 'welcome') { openWelcome(); return }
   // the pairing sheet and the new application editor open at once: the Web pages read #pairing and #guide-add
