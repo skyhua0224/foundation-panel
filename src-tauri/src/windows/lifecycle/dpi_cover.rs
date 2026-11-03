@@ -28,7 +28,7 @@ pub(super) enum Mode {
     Adaptive,
     /// like Adaptive, but the cover goes after two frames that match and fades in 80 ms
     Fast,
-    /// the last frame of the page, kept warm in memory while the page is idle, under the cover from the first moment
+    /// the last frame of the page, kept warm in memory while the page is idle, under the cover from the first moment; settles like Fast
     Warm,
     /// the last frame of the page, scaled to the new size, until the page's layout matches the window, at most the cap
     Snapshot,
@@ -54,12 +54,12 @@ pub(super) fn mode() -> Mode {
 pub(super) const CAP_MS: u32 = 480;
 /// The fade from the cover to the page.
 pub(super) fn fade_ms(mode: Mode) -> u128 {
-    if mode == Mode::Fast { 80 } else { 120 }
+    if matches!(mode, Mode::Fast | Mode::Warm) { 80 } else { 120 }
 }
 
 /// How long the page's layout has to match the window before the cover goes: milliseconds, or frames when that is not 0.
 pub(super) fn stable(mode: Mode) -> (u32, u32) {
-    if mode == Mode::Fast { (0, 2) } else { (130, 0) }
+    if matches!(mode, Mode::Fast | Mode::Warm) { (0, 2) } else { (130, 0) }
 }
 
 /// A decoded frame, bottom-up BGRA is not needed: CreateBitmap takes top-down 32-bit pixels.
@@ -281,7 +281,8 @@ mod tests {
         assert_eq!(fade_alpha(fade * 3, fade), 0);
         assert!(fade_ms(Mode::Fast) <= 80);
         assert_eq!(stable(Mode::Fast), (0, 2));
-        assert_eq!(stable(Mode::Warm), (130, 0));
+        assert_eq!(stable(Mode::Warm), (0, 2));
+        assert_eq!(stable(Mode::Adaptive), (130, 0));
     }
 
     #[test]
