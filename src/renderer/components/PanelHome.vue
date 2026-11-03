@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
-import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, starCardData, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
+import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, starCardData, useSystemInfo, reachProblemOf, registeredComponentStatus, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
 import { usePanelHome } from '../composables/usePanelHome.js'
 import { useHostReach } from '../composables/useHostReach.js'
@@ -113,15 +113,19 @@ const vddAdapter = createHttpVddAdapter({
 })
 const vddStore = createVddStore(vddAdapter, { autosave: true })
 onMounted(async () => { try { await vddAdapter.load() } catch { /* the card then shows the defaults */ } vddStore.refresh() })
+const sysJson = async (path) => { const r = await fetch(`${proxyUrl.value}${path}`); if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}`), { status: r.status }); return r.json() }
+const nics = useSystemInfo({ fetchJson: sysJson })
 const hostReach = useHostReach()
-onMounted(() => { void hostReach.refresh() })
+const reachProblem = computed(() => reachProblemOf(hostReach.view.report))
+onMounted(() => { void hostReach.refresh(); nics.start() })
 const catalogueInput = computed(() => {
   void historyTick.value
   const s = session.value
   const p = perfSession.value
   return {
     sampleSec: SAMPLE_SEC, vddStore: state.vdd && state.vdd.installed !== false ? vddStore : null,
-    reach: hostReach.view.report,
+    reach: hostReach.view.report, reachChecking: hostReach.view.status === 'loading',
+    sysinfo: nics.info.value,
     host: { version: state.version, update: props.updateAvailable ? h.value.update : '' },
     session: s ? { ...s, fpsMeasured: p?.frame_rates?.encoded?.fps, latencyMs: p?.host_latency?.avg_ms, latencyP95Ms: p?.host_latency?.p95_ms, uptimeMs: p?.uptime_ms ?? s.uptimeMs } : null,
     history: { samples: history.samples, sessions: history.sessions, days: history.days, last: () => history.last() },
@@ -139,8 +143,16 @@ const catalogueInput = computed(() => {
 const catalogue = computed(() => buildCatalogue(catalogueInput.value, T.value).data)
 const allDetails = computed(() => ({ ...model.value.details, ...buildCatalogueDetails(catalogueInput.value, T.value) }))
 const isNew = computed(() => guide.visible.value)
-const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue: catalogue.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value, { locale: locale.value, assetsOf: releases.assetsOf, versionOf: releases.versionOf, qr: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules }), sponsor: sponsorCardData(T.value, SPONSORS), journey: journey.data.value, star: star.visible.value ? starCardData(T.value) : null }))
-const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value, star: star.visible.value }))
+const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue: catalogue.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value, { locale: locale.value, assetsOf: releases.assetsOf, versionOf: releases.versionOf, qr: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules }), sponsor: sponsorCardData(T.value, SPONSORS), journey: journey.data.value, star: star.visible.value ? starCardData(T.value) : null, sysinfo: nics.info.value, temps: state.hw.available ? { cpu: state.hw.cpuTemp, gpu: state.hw.gpuTemp } : null }))
+const compRows = () => registeredComponentStatus()?.rows?.value || []
+const smartSignals = computed(() => ({
+  pairedCount: state.clients ? state.clients.length : null, streaming: !!session.value, lastStreamAt: 0,
+  problems: 0, problemComponents: compRows().filter((r) => r.state === 'error' || r.state === 'warn').map((r) => r.id),
+  recentErrors: (state.errorLog?.rows || state.errorLog || []).length || 0, isNew: isNew.value,
+  wifiHost: nics.defaultNic.value?.type === 'wifi', linkSlowMbps: nics.defaultNic.value?.link_speed_mbps && nics.defaultNic.value.link_speed_mbps < 1000 ? nics.defaultNic.value.link_speed_mbps : 0,
+  reachBad: reachProblem.value,
+}))
+const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value, star: star.visible.value, signals: smartSignals.value }))
 
 function onAction(a) {
   switch (a.type) {
@@ -151,6 +163,8 @@ function onAction(a) {
     case 'pair-pin': pairPin(a.value?.pin); break
     case 'pair-qr': emit('open', 'pair:qr'); break
     case 'star-dismiss': star.dismiss(); break
+    case 'address-save': saveSetting({ key: 'external_ip', value: a.value?.value ?? '' }).then(() => hostReach.refresh(true)); break
+    case 'reach-check': hostReach.refresh(true); break
     case 'pin-open': emit('open', `setting:${a.value?.key}`); break
     case 'detail-external': emit('open', 'check-update'); break
     case 'open-url': openExternalUrl(a.value); break
@@ -217,7 +231,7 @@ const supportSections = computed(() => [
 </script>
 
 <template>
-  <MPage :title="t.m3e.nav.overview" wide>
+  <MPage :title="t.m3e.nav.overview" wide full>
     <template #actions>
       <MButton v-if="edit" variant="tonal" icon="check" @click="edit = false">{{ h.done }}</MButton>
       <MIconButton v-else icon="edit" data-coach="home-edit" :label="h.edit" @click="edit = true" />
