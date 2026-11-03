@@ -1,5 +1,5 @@
 <template>
-  <MPage :title="t.m3e.input.microphone" :lead="text.intro" :eyebrow="t.m3e.input.title">
+  <MPage notices="microphone" :title="t.m3e.input.microphone" :lead="text.intro" :eyebrow="t.m3e.input.title">
     <template #actions>
       <MIconButton icon="refresh" :label="t.deviceHub.refresh" :disabled="loading || testing" @click="refresh({ force: true })" />
     </template>
@@ -17,16 +17,6 @@
       </template>
       <span v-if="status.buffered_bytes != null" class="mic-flow__buffer"><MProgress :value="Math.min(1, bufferedMs / 200)" :label="t.m3e.micFlow.buffer" /><small>{{ t.m3e.micFlow.buffer }} {{ Math.round(bufferedMs) }} ms</small></span>
     </div>
-
-    <MBanner v-if="!loadError && componentMissing" tone="warn" icon="warning">
-      <b>{{ text.missingTitle }}</b><br>{{ status.configured_backend === 'auto' ? text.missingHintAuto : text.missingHintUsb }}
-      <template #actions>
-        <MButton v-if="status.configured_backend === 'usbip_experimental'" size="sm" variant="text" :loading="savingBackend" @click="chooseBackend('vb_cable')">{{ text.useVbCable }}</MButton>
-        <MButton size="sm" variant="text" @click="emit('manage-components')">{{ text.installTransport }}</MButton>
-      </template>
-    </MBanner>
-    <MBanner v-if="!loadError && status.fallback_reason" tone="info" icon="info"><b>{{ text.fallback }}</b><br>{{ text.fallbackReason.replace('{reason}', errorText(status.fallback_reason)) }}</MBanner>
-    <MBanner v-if="!loadError && problemCode" tone="error" icon="error"><b>{{ text.problem }}</b><br>{{ errorText(problemCode) }}</MBanner>
 
     <MSection>
       <MGroup>
@@ -57,9 +47,9 @@
 </template>
 
 <script setup>
-import { computed, onActivated, onDeactivated, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onActivated, onDeactivated, onMounted, onUnmounted, reactive, ref, watch, watchEffect } from 'vue'
 import { ElMessage } from '../../composables/notifyMessage.js'
-import { MPage, MSection, MGroup, MItem, MChip, MStatusPill, MBanner, MFooter, MSeg, MNotice, MButton, MIconButton, MSkeleton, MIcon, MProgress, MStatusPills } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MChip, MStatusPill, MFooter, useNotify, MSeg, MNotice, MButton, MIconButton, MSkeleton, MIcon, MProgress, MStatusPills } from 'foundation-ui/vue'
 import { virtualMicrophone } from '../../tauri-adapter.js'
 import { micStatusChannel } from '../../composables/deviceStatusStore.js'
 import {
@@ -96,6 +86,26 @@ const savingBackend = ref(false)
 const errorText = code => text.value.errors[code] || text.value.errors.unknown
 // 活动后端是 VB-CABLE 时，USB 端的残留错误码不描述当前路径。
 const problemCode = computed(() => status.active_backend === 'vb_cable' ? '' : status.error_code)
+// the standing problems of this page go to its banner place (under the title), not to a banner of their own
+const notify = useNotify()
+const clearBanners = () => { for (const id of ['component', 'fallback', 'problem']) notify.clearBanner('microphone', id) }
+watchEffect(() => {
+  const shown = !loadError.value
+  if (shown && componentMissing.value) {
+    notify.banner('microphone', {
+      id: 'component', tone: 'warn', icon: 'warning', title: text.value.missingTitle, text: status.configured_backend === 'auto' ? text.value.missingHintAuto : text.value.missingHintUsb,
+      actions: [
+        ...(status.configured_backend === 'usbip_experimental' ? [{ id: 'vb', label: text.value.useVbCable, onClick: () => chooseBackend('vb_cable') }] : []),
+        { id: 'install', label: text.value.installTransport, onClick: () => emit('manage-components') },
+      ],
+    })
+  } else notify.clearBanner('microphone', 'component')
+  if (shown && status.fallback_reason) notify.banner('microphone', { id: 'fallback', tone: 'info', icon: 'info', title: text.value.fallback, text: text.value.fallbackReason.replace('{reason}', errorText(status.fallback_reason)) })
+  else notify.clearBanner('microphone', 'fallback')
+  if (shown && problemCode.value) notify.banner('microphone', { id: 'problem', tone: 'error', icon: 'error', title: text.value.problem, text: errorText(problemCode.value) })
+  else notify.clearBanner('microphone', 'problem')
+})
+onUnmounted(clearBanners)
 watch(() => status.configured_backend, backend => { if (backend && !savingBackend.value) backendChoice.value = backend }, { immediate: true })
 
 async function refresh(options = {}) {
