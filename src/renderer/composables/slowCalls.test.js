@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { trackCalls } from './slowCalls.js'
+import { startSlowCallLog, trackCalls } from './slowCalls.js'
 
 const clock = () => { let t = 0; return { now: () => t, advance: (ms) => { t += ms } } }
 
@@ -29,4 +29,18 @@ test('a call that throws is reported and rethrown', () => {
   const { wrapped } = trackCalls(() => { c.advance(700); throw new Error('no') }, { report: (...l) => lines.push(l), now: c.now, kind: 'invoke', limit: 500 })
   assert.throws(() => wrapped('cmd'), /no/)
   assert.equal(lines.length, 1)
+})
+
+test('a read-only invoke (the Tauri runtime) does not stop the start: the late-timer report still runs', () => {
+  const internals = {}
+  Object.defineProperty(internals, 'invoke', { value: () => Promise.resolve(), writable: false, enumerable: true })
+  let intervals = 0
+  const win = {
+    __TAURI_INTERNALS__: internals,
+    setInterval: () => { intervals += 1; return 1 },
+    clearInterval: () => {},
+  }
+  const stop = startSlowCallLog(() => {}, win)
+  assert.equal(intervals, 1)
+  stop()
 })

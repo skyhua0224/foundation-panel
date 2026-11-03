@@ -45,8 +45,11 @@ export function startSlowCallLog(report, win = window) {
   if (internals && typeof internals.invoke === 'function') {
     const original = internals.invoke.bind(internals)
     const { wrapped, pending } = trackCalls(original, { report, kind: 'invoke', nameOf: (args) => String(args[0]) })
-    internals.invoke = wrapped
-    watch.push(pending)
+    // the Tauri runtime keeps invoke read-only: assigning throws, so invoke calls go untimed there and the frame and timer reports below still start
+    try {
+      internals.invoke = wrapped
+      watch.push(pending)
+    } catch { /* read-only */ }
   }
   // a frame that was blocked: its scripts say by what
   try {
