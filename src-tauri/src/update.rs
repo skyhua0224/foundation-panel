@@ -1907,7 +1907,7 @@ pub async fn download_update(
     } else {
         None
     };
-    let mut candidates = download_candidates(mirror_candidate, &url, fallback_url.as_deref());
+    let candidates = download_candidates(mirror_candidate, &url, fallback_url.as_deref());
 
     let mut last_progress_percent = 0;
     let outcome = github_download::download_to_file_from_candidates(

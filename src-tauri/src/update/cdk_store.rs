@@ -209,6 +209,10 @@ mod tests {
 
         const TEST_TARGET: &str = "foundation-sunshine-panel/mirrorchyan-cdk-test";
 
+        // 真实系统测试：需要交互式登录会话。ssh 会话是网络登录会话，没有
+        // 凭据集，CredWriteW 会以 ERROR_NO_SUCH_LOGON_SESSION(1312) 拒绝
+        //（Microsoft Learn CredWriteW；panel-ms-credwritew-20261103）。
+        #[ignore = "needs an interactive logon session (ssh/network logon sessions have no credential set)"]
         #[test]
         fn set_present_read_clear_roundtrip_in_credential_manager() {
             let _ = clear(TEST_TARGET);

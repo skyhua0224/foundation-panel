@@ -85,7 +85,7 @@ enum FetchError {
 
 /// 用注入的传输执行一次检查。`fetch` 收到完整 URL（含 CDK，调用方不得记录），
 /// 返回 `(HTTP 状态码, 解析后的 JSON 主体)`；任何失败都归为无回答。
-pub(crate) async fn check_with<F, Fut>(
+async fn check_with<F, Fut>(
     fetch: F,
     current_version: &str,
     cdk: Option<&str>,
