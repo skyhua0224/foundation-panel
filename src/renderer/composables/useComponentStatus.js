@@ -1,5 +1,6 @@
 import { createComponentStatus, microphoneState, registerComponentStatus } from 'foundation-ui/vue'
-import { sunshine, vdd, vigem } from '../tauri-adapter.js'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { sunshine, vdd, vigem, vmouse } from '../tauri-adapter.js'
 import { enhancementActions, enhancementSources } from './useEnhancementComponents.js'
 import { dualsenseStatusChannel, micStatusChannel, usbipStatusChannel, vigemStatusChannel } from './deviceStatusStore.js'
 
@@ -10,7 +11,6 @@ let controller = null
 
 const data = (result) => (result?.success ? result.data : null)
 const channel = (ch) => ({ read: async () => data(await ch.fetch({ force: false })), fresh: async () => data(await ch.fetch({ force: true })) })
-const signedOf = (usb) => (usb?.signature === 'signed' ? true : usb?.signature === 'unsigned' || usb?.signature === 'invalid' ? false : null)
 
 async function hostConfig() {
   const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')
@@ -23,6 +23,26 @@ async function hostConfig() {
  * `go` = { vdd, components, microphone, gamepad, page } navigation callbacks; `update()` returns { state, version, next };
  * `check()` runs the panel's update check and opens its update dialog.
  */
+// Uninstalling a driver is tier 3: it says what stops working and asks first; the card is read again afterwards.
+function removeAction(id, uninstall) {
+  return {
+    label: (S) => S.uninstall.yes,
+    run: async () => {
+      const S = controller.text()
+      const name = S.names[id]
+      try { await ElMessageBox.confirm(S.uninstall.text.replaceAll('{name}', name), S.uninstall.title.replace('{name}', name), { type: 'warning', confirmButtonText: S.uninstall.yes }) } catch { return }
+      try {
+        const result = await uninstall()
+        if (result && result.success === false) throw new Error(result.message || '')
+        ElMessage.success(S.uninstall.done.replace('{name}', name))
+      } catch (error) {
+        ElMessage.error(`${S.uninstall.failed.replace('{name}', name)} ${String(error?.message || '')}`.trim())
+      }
+      await controller.check(id)
+    },
+  }
+}
+
 export function useComponentStatus({ locale, go = {}, update = () => ({}), check = () => {} } = {}) {
   if (controller) return controller
   const open = (fn, label) => ({ run: () => fn?.(), ...(label ? { label } : {}) })
@@ -35,11 +55,11 @@ export function useComponentStatus({ locale, go = {}, update = () => ({}), check
     sources: {
       vdd: async () => data(await vdd.getStatus()),
       usb: channel(usbipStatusChannel),
+      vigem: channel(vigemStatusChannel),
+      mouse: async () => data(await vmouse.getStatus()),
+      vulkan: async () => { try { const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, ''); const r = await fetch(`${base}/api/vulkan-hdr-bridge`, { signal: AbortSignal.timeout(4000) }); return r.ok ? r.json() : null } catch { return null } },
+      // what Sunshine has built in is not a component: these three checks feed the 手柄 page, the 编码器 page and 关于 / 软件更新
       dualsense: channel(dualsenseStatusChannel),
-      drivers: {
-        read: async () => driversRaw(false),
-        fresh: async () => driversRaw(true),
-      },
       mic: async () => { const s = data(await micStatusChannel.fetch({ force: false })); return s ? { state: microphoneState(s), backend: s.active_backend || s.configured_backend } : null },
       ...enhancementSources(),
       encoder: async () => { const c = await hostConfig(); return { active: c.active_encoder, hevc: c.hevc_mode, av1: c.av1_mode } },
@@ -53,10 +73,11 @@ export function useComponentStatus({ locale, go = {}, update = () => ({}), check
       },
     },
     actions: {
-      vdd: both(go.vdd),
+      vdd: { ...both(go.vdd), remove: removeAction('vdd', () => vdd.uninstall()) },
       usb: both(maintenance),
-      dualsense: both(maintenance),
-      drivers: both(maintenance),
+      vigem: { ...both(maintenance), remove: removeAction('vigem', () => vigem.uninstall()) },
+      mouse: { ...both(maintenance), remove: removeAction('mouse', () => vmouse.uninstall()) },
+      vulkan: { open: open(go.vdd) },
       mic: { open: open(go.microphone) },
       dlssnr: enhancementActions('dlssnr', { texts: () => controller.text(), refresh: () => controller.check('dlssnr') }),
       rtxhdr: enhancementActions('rtxhdr', { texts: () => controller.text(), refresh: () => controller.check('rtxhdr') }),
@@ -64,21 +85,4 @@ export function useComponentStatus({ locale, go = {}, update = () => ({}), check
     },
   }))
   return controller
-}
-
-// The drivers the panel can see: the USB/IP transport (signed by the signer it reports), ViGEmBus, the virtual display driver
-async function driversRaw(force) {
-  const [usb, pad, display] = await Promise.all([
-    force ? usbipStatusChannel.fetch({ force: true }) : usbipStatusChannel.fetch({ force: false }),
-    force ? vigemStatusChannel.fetch({ force: true }) : vigemStatusChannel.fetch({ force: false }),
-    vdd.getStatus(),
-  ])
-  const u = data(usb)
-  const g = data(pad)
-  const v = data(display)
-  const items = []
-  if (u && u.supported !== false) items.push({ id: 'usbip', name: 'USB/IP', installed: !!u.installed, signed: signedOf(u), signer: u.signer || '', version: u.version || '' })
-  if (g) items.push({ id: 'vigem', name: 'ViGEmBus', installed: !!g.installed, signed: null, version: g.version || '' })
-  if (v) items.push({ id: 'vdd', name: 'ZakoDisplay', installed: !!v.installed, signed: null, version: v.installed_version || v.version || '' })
-  return { items }
 }
