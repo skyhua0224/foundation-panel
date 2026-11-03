@@ -86,11 +86,12 @@
 </template>
 
 <script setup>
-import { ref, nextTick, watch, computed, onMounted } from 'vue'
+import { ref, nextTick, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { MPage, MGroup, MItem, MChoiceItem, MFieldItem, MSwitchItem, MButton, MIconButton, MChip, MIcon, MLoading, useSubpage } from 'foundation-ui/vue'
 import { useAiAssistant, AI_PROVIDERS } from '../composables/useAiAssistant.js'
 import { useI18n } from '../desktop/i18n/index.js'
+import { mitaOpened } from '../composables/mitaState.js'
 
 const { t, locale } = useI18n()
 
@@ -116,6 +117,9 @@ const {
 } = useAiAssistant()
 
 const providers = AI_PROVIDERS
+// the caption bar's Mita button shows an unread answer only while the chat is closed
+onMounted(() => mitaOpened(true))
+onBeforeUnmount(() => mitaOpened(false))
 const chatContainer = ref(null)
 const scrolled = ref(false) // the header gains its surface only when the conversation scrolls under it
 const chatInput = ref(null)

@@ -5,6 +5,7 @@
       <template #brand><MBrand class="panel-caption__brand" :size="20" data-tauri-drag-region /></template>
       <template #announcements><MAnnouncementButton :unread="announcements.unread.value" :locale="locale" @open="router.navigate(ROUTES.ANNOUNCEMENTS)" /></template>
       <template #search><div class="panel-caption__search" data-tauri-drag-region><MUnifiedSearch :search="uni" :texts="searchT" :compact="compactSearch" :height="38" /></div></template>
+      <template #mita><MCaptionAvatar src="/mita-pixel-16.png" :label="mitaT.label" :thinking="mitaState.thinking > 0" :unread="mitaState.unread" :state-labels="mitaT" @click="router.navigate(ROUTES.AI_ASSISTANT)" /></template>
       <template #connect><button type="button" class="m-caption-connect" :class="{ 'is-icon': hostClients.length > 0 }" :aria-label="connectT.title" :data-tip="connectT.title" @click="connect.show('pair')"><MIcon name="person_add" /><span v-if="hostClients.length === 0">{{ connectT.title }}</span></button></template>
       <template #controls><div class="panel-caption__controls">
         <button type="button" class="panel-caption__btn" :aria-label="t.sidebar.minimize" :data-tip="t.sidebar.minimize" @click="minimizeWindow"><MIcon name="remove" /></button>
@@ -108,7 +109,7 @@ import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeU
 import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
-import { connectTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { MCaptionAvatar, connectTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -116,6 +117,7 @@ import VddSettings from './VddSettings.vue'
 import Welcome from './welcome.vue'
 import WebStreamSettings from './WebStreamSettings.vue'
 import AiAssistant from './AiAssistant.vue'
+import { mitaState, mitaTexts } from '../composables/mitaState.js'
 import SettingsHubPage from './m3e/SettingsHubPage.vue'
 import HdrEnhancedManager from './HdrEnhancedManager.vue'
 import ControlPanelPage from './ControlPanelPage.vue'
@@ -226,6 +228,7 @@ const remoteOpen = ref(false)
 const remoteData = createGuideData({ proxyUrl: () => sunshine.getProxyUrl(), openUrl: (url) => actions_openExternal(url), copy: (text) => navigator.clipboard.writeText(text), reach: useHostReach(), vddStatus: async () => null, openApps: () => {}, navigate: () => {} })
 const announceVersion = ref('')
 onMounted(async () => { try { announceVersion.value = (await sunshine.getVersion()) || '' } catch { /* the version only narrows version-bound notices */ } })
+const mitaT = computed(() => mitaTexts(locale.value))
 const announcements = useAnnouncements({ locale, version: announceVersion })
 const announcementsUnread = announcements.unread
 // a dot on the help rail while an update is waiting (the about page checks and opens the update sheet)
