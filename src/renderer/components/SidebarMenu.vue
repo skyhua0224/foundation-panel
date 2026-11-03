@@ -108,7 +108,7 @@ import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeU
 import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
-import { connectTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { connectTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -301,12 +301,19 @@ const pairingApi = {
 const pairing = createPairingPending({ hostApi: pairingApi })
 const onPairSubmit = async (e) => { const ok = await pairing.submit(e.id, e.pin, e.name); connectNotice.value = ok ? connectT.value.pinSent : connectT.value.pinFailed }
 // the tray's entries 配对新设备 and 下载客户端 open the dialog on a tab (the native side emits `open-connect` once the panel is ready)
+// a Web page inside the panel pins to the panel's overview through the shell (it has no home of its own)
+const onFramePin = (event) => {
+  const d = event.data
+  if (!d || d.type !== 'm3e-pin' || !d.spec || !([...document.querySelectorAll('iframe')].some((f) => f.contentWindow === event.source))) return
+  if (d.op === 'pin') pinToHome('panel-home', d.spec); else if (d.op === 'unpin') unpinFromHome('panel-home', d.spec)
+}
 let unlistenConnect = null
 onMounted(async () => {
   pairing.start()
+  window.addEventListener('message', onFramePin)
   try { const { listen } = await import('@tauri-apps/api/event'); unlistenConnect = await listen('open-connect', (event) => connect.show(event.payload?.tab === 'install' ? 'install' : 'pair')) } catch { /* not in the app window */ }
 })
-onBeforeUnmount(() => { pairing.stop(); if (unlistenConnect) unlistenConnect() })
+onBeforeUnmount(() => { pairing.stop(); window.removeEventListener('message', onFramePin); if (unlistenConnect) unlistenConnect() })
 const actionHandlers = {
   restart: () => tools.restartSunshineService(),
   userMode: () => tools.restartSunshineInUserMode(),
@@ -319,20 +326,20 @@ const actionHandlers = {
   addApp: () => openRoute(ROUTES.WEB_APPS),
 }
 const searchDocs = computed(() => [
-  ...settingDocs(searchItems.value, { prefix: railLabel('config') }),
+  ...settingDocs(searchItems.value, { prefix: railLabel('config'), locale: locale.value }),
   ...actionDocs(locale.value, actionHandlers, searchT.value.types.action),
   ...clientDocs(hostClients.value, { place: `${railLabel('stream')}` }),
   ...appDocs(hostApps.value, { place: `${railLabel('stream')}` }),
   ...tileDocs(locale.value),
 ])
-const recentSettingDocs = computed(() => settingDocs(settingsList.recentView.value.items.map((r) => r.entry), { prefix: railLabel('config') }))
+const recentSettingDocs = computed(() => settingDocs(settingsList.recentView.value.items.map((r) => r.entry), { prefix: railLabel('config'), locale: locale.value }))
 const onUnifiedChoose = (doc) => {
   if (doc.type === 'setting' || doc.type === 'page') onSearch(doc.entry)
   else if (doc.type === 'client') { emit('webui-navigate', `/pin${filterHash(doc.client?.name || doc.title)}`); router.navigate(ROUTES.WEB_CLIENTS) }
   else if (doc.type === 'app') { emit('webui-navigate', `/apps${filterHash(doc.app?.name || doc.title)}`); router.navigate(ROUTES.WEB_APPS) }
   else if (doc.type === 'tile') { addTileToHome('panel-home', doc.tile); router.navigate(ROUTES.HOME) }
 }
-const uni = useUnifiedSearch({ docs: searchDocs, recentSettings: recentSettingDocs, onChoose: onUnifiedChoose })
+const uni = useUnifiedSearch({ docs: searchDocs, onPin: (doc) => pinToHome('panel-home', doc.pin), isPinned: (doc) => isPinnedOnHome('panel-home', doc.pin), recentSettings: recentSettingDocs, onChoose: onUnifiedChoose })
 // Where an error of the diagnostics page leads
 const goDiagnosticsPlace = (place) => {
   if (place === 'drivers') router.navigate(ROUTES.COMPONENTS)
@@ -414,6 +421,8 @@ const actions_openUrl = async (item) => {
 }
 // Old call sites speak in short ids; each maps to a destination.
 const openDestination = (id) => {
+  if (id === 'check-update') { handleCheckForUpdates(); return }
+  if (id.startsWith('setting:')) { const entry = searchItems.value.find((e) => e.keyName === id.slice(8)); if (entry) onSearch(entry); return }
   if (id === 'welcome') { openWelcome(); return }
   // the pairing sheet and the new application editor open at once: the Web pages read #pairing and #guide-add
   if (id === 'pair') { emit('webui-navigate', '/pin#pairing'); router.navigate(ROUTES.WEB_CLIENTS); return }

@@ -150,6 +150,8 @@ function onAction(a) {
     case 'table-action': emit('open', 'pair'); break
     case 'pair-pin': pairPin(a.value?.pin); break
     case 'pair-qr': emit('open', 'pair:qr'); break
+    case 'pin-open': emit('open', `setting:${a.value?.key}`); break
+    case 'detail-external': emit('open', 'check-update'); break
     case 'open-url': openExternalUrl(a.value); break
     case 'pair-qr-begin': pairQr.begin(); break
     case 'pair-qr-stop': pairQr.stop(); break
@@ -157,7 +159,6 @@ function onAction(a) {
     case 'app': emit('open', 'apps'); break
     case 'add-app': emit('open', 'apps:add'); break
     case 'open': emit('open', a.value); break
-    case 'detail-external': break
     case 'guide-go': guideStepGo(a.value); break
     case 'guide-skip': guide.toggle(a.value); break
     case 'download': emit('open', `downloads:${a.value}`); break
