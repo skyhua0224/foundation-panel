@@ -1068,6 +1068,7 @@ export const zh = {
     stableChannel: '稳定版',
     betaChannel: '测试版',
     currentVersion: '当前版本',
+    currentChannel: '当前通道', stableChannelHint: '稳定版：只收到正式发布的版本。', betaChannelHint: '测试版：稳定版和测试版里更新的那个，测试版可能还有未发现的问题。', lastCheck: '上次检查', notChecked: '还没有检查过',
     syncFeatures: '同步功能',
     clipboardDescription: '查看串流剪贴板同步的连接状态。',
     connected: '已连接',

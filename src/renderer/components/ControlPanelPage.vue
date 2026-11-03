@@ -18,9 +18,11 @@
           <MItem icon="system_update_alt" :title="t.sidebar.updateChannel" stack>
             <template #control><MSeg block :label="t.sidebar.updateChannel" :model-value="includePrerelease" :options="channelOptions" @update:model-value="emit('channel-change', $event)" /></template>
           </MItem>
+          <MItem icon="verified" :title="t.sidebar.currentChannel" :text="includePrerelease ? t.sidebar.betaChannelHint : t.sidebar.stableChannelHint" />
           <MItem icon="info" :title="t.sidebar.currentVersion" :text="currentVersion">
             <template #trail><MButton variant="tonal" icon="refresh" :loading="checkingUpdate" @click="checkUpdate">{{ t.sidebar.checkUpdate }}</MButton></template>
           </MItem>
+          <MItem icon="schedule" :title="t.sidebar.lastCheck" :text="lastCheck.text() || t.sidebar.notChecked" />
         </MGroup>
       </MSection>
       <PanelOptions :locale="locale" />
@@ -68,22 +70,19 @@
           <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="sponsorOpen = true" />
         </MGroup>
       </MSection>
-      <MSheet v-model="sponsorOpen" :title="t.m3e.home.sponsorTitle" side="end" :close-label="t.m3e.home.done">
-        <MGroup>
-          <MItem v-for="s in SPONSORS" :key="s.id" action icon="favorite" :title="s.label" @click="actions.openUrl(s.url)"><template #trail><MIcon name="open_in_new" /></template></MItem>
-        </MGroup>
-      </MSheet>
+      <MSupportSheet v-model="sponsorOpen" :title="t.m3e.home.sponsorTitle" :sections="[{ title: t.m3e.home.sponsorTitle, items: SPONSORS.map((s) => ({ id: s.id, icon: 'favorite', title: s.label, url: s.url })) }]" :close-label="t.m3e.home.done" @open="(it) => actions.openUrl(it.url)" />
     </template>
   </MPage>
 </template>
 
 <script setup>
 import { computed, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFooter, MSheet, aboutTexts, guideTexts, homeTexts, remoteTexts, useGuideCard } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFooter, MSupportSheet, aboutTexts, guideTexts, homeTexts, remoteTexts, useGuideCard } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import PanelOptions from './m3e/PanelOptions.vue'
 import { ROUTES } from '../composables/useRouter.js'
+import { useUpdateCheckTime } from '../composables/useUpdateCheckTime.js'
 const props = defineProps({
   page: { type: String, required: true },
   tools: { type: Array, default: () => [] },
@@ -115,6 +114,7 @@ const themeOptions = computed(() => [
 ])
 const localeOptions = [{ value: 'zh', label: '简体中文' }, { value: 'en', label: 'English' }]
 const channelOptions = computed(() => [{ value: false, label: t.value.sidebar.stableChannel }, { value: true, label: t.value.sidebar.betaChannel }])
+const lastCheck = useUpdateCheckTime()
 const sponsorOpen = ref(false)
 const checkingUpdate = ref(false)
 const checkUpdate = async () => {
