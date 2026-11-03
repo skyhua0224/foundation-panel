@@ -1,18 +1,18 @@
-//! The cover of a panel while WebView2 settles after a change of scale: a child window of the panel's window that lies over the WebView and shows either the
+//! The cover of a panel while WebView2 settles after a change of scale: a layered window owned by the panel's window that lies over its client area and shows either the
 //! panel's surface colour (adaptive) or the last frame of the page, scaled to the new size (snapshot). The page keeps running underneath, tells the host when its
 //! layout has matched the window for a while (`panel_dpi_settled`) and the cover fades out over it.
 //! The frame comes from the WebView's own CapturePreview into memory (PNG) and is never written anywhere:
 //! https://learn.microsoft.com/microsoft-edge/webview2/reference/win32/icorewebview2#capturepreview
 use std::sync::atomic::{AtomicBool, Ordering};
-use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, RECT, WPARAM};
+use windows::Win32::Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM};
 use windows::Win32::Graphics::Gdi::{
-    BeginPaint, CreateBitmap, CreateCompatibleDC, CreateSolidBrush, DeleteDC, DeleteObject, EndPaint, FillRect, HALFTONE, HBITMAP, HGDIOBJ, PAINTSTRUCT, SRCCOPY,
+    BeginPaint, ClientToScreen, CreateBitmap, CreateCompatibleDC, CreateSolidBrush, DeleteDC, DeleteObject, EndPaint, FillRect, HALFTONE, HBITMAP, HGDIOBJ, PAINTSTRUCT, SRCCOPY,
     SelectObject, SetStretchBltMode, StretchBlt,
 };
 use windows::Win32::UI::WindowsAndMessaging::{
     CreateWindowExW, DefWindowProcW, DestroyWindow, GWLP_USERDATA, GetClientRect, GetWindowLongPtrW, HWND_TOP, LWA_ALPHA, RegisterClassExW, SWP_NOACTIVATE, SWP_SHOWWINDOW,
-    SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, WM_ERASEBKGND, WM_NCDESTROY, WM_NCHITTEST, WM_PAINT, WNDCLASSEXW, WS_CHILD, WS_CLIPSIBLINGS, WS_EX_LAYERED,
-    WS_VISIBLE,
+    SetLayeredWindowAttributes, SetWindowLongPtrW, SetWindowPos, WM_ERASEBKGND, WM_NCDESTROY, WM_NCHITTEST, WM_PAINT, WNDCLASSEXW, WS_EX_LAYERED,
+    WS_EX_NOACTIVATE, WS_EX_TOOLWINDOW, WS_EX_TRANSPARENT, WS_POPUP, WS_VISIBLE,
 };
 use windows::core::{PCWSTR, w};
 
@@ -153,6 +153,8 @@ pub(super) fn create(parent: HWND, color: (u8, u8, u8), frame: Option<&Frame>) -
         log::warn!("[dpi-cover] the client rectangle of the window is not known: {error}");
         return None;
     }
+    let mut origin = POINT::default();
+    let _ = unsafe { ClientToScreen(parent, &mut origin) };
     log::info!("[dpi-cover] making a cover over {}x{}", client.right, client.bottom);
     let bitmap = frame.map(|frame| unsafe { CreateBitmap(frame.width, frame.height, 1, 32, Some(frame.bgra.as_ptr().cast())) });
     let face = Box::new(Face {
@@ -163,12 +165,12 @@ pub(super) fn create(parent: HWND, color: (u8, u8, u8), frame: Option<&Frame>) -
     let face = Box::into_raw(face);
     let created = unsafe {
         CreateWindowExW(
-            WS_EX_LAYERED,
+            WS_EX_LAYERED | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW | WS_EX_TRANSPARENT,
             class_name(),
             PCWSTR::null(),
-            WS_CHILD | WS_VISIBLE | WS_CLIPSIBLINGS,
-            0,
-            0,
+            WS_POPUP | WS_VISIBLE,
+            origin.x,
+            origin.y,
             client.right.max(1),
             client.bottom.max(1),
             Some(parent),
@@ -193,7 +195,7 @@ pub(super) fn create(parent: HWND, color: (u8, u8, u8), frame: Option<&Frame>) -
         if let Err(error) = SetLayeredWindowAttributes(hwnd, COLORREF(0), 255, LWA_ALPHA) {
             log::warn!("[dpi-cover] the cover is not layered: {error}");
         }
-        if let Err(error) = SetWindowPos(hwnd, Some(HWND_TOP), 0, 0, client.right.max(1), client.bottom.max(1), SWP_NOACTIVATE | SWP_SHOWWINDOW) {
+        if let Err(error) = SetWindowPos(hwnd, Some(HWND_TOP), origin.x, origin.y, client.right.max(1), client.bottom.max(1), SWP_NOACTIVATE | SWP_SHOWWINDOW) {
             log::warn!("[dpi-cover] the cover was not placed: {error}");
         }
         log::info!("[dpi-cover] cover window {:?} over {}x{}", hwnd.0, client.right, client.bottom);
@@ -205,7 +207,9 @@ pub(super) fn create(parent: HWND, color: (u8, u8, u8), frame: Option<&Frame>) -
 pub(super) fn fit(cover: HWND, parent: HWND) {
     let mut client = RECT::default();
     if unsafe { GetClientRect(parent, &mut client) }.is_ok() && client.right > 0 && client.bottom > 0 {
-        let _ = unsafe { SetWindowPos(cover, Some(HWND_TOP), 0, 0, client.right, client.bottom, SWP_NOACTIVATE) };
+        let mut origin = POINT::default();
+        let _ = unsafe { ClientToScreen(parent, &mut origin) };
+        let _ = unsafe { SetWindowPos(cover, Some(HWND_TOP), origin.x, origin.y, client.right, client.bottom, SWP_NOACTIVATE) };
     }
 }
 

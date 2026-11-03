@@ -283,6 +283,9 @@ unsafe extern "system" fn callback<R: Runtime>(
     if message == windows::Win32::UI::WindowsAndMessaging::WM_SIZE && crate::windows::test_offscreen() {
         log::info!("[size] {}x{} handled in {} us", lparam.0 & 0xFFFF, (lparam.0 >> 16) & 0xFFFF, handling.elapsed().as_micros());
     }
+    if message == windows::Win32::UI::WindowsAndMessaging::WM_MOVE {
+        fit_cover(hwnd, context);
+    }
     if message == windows::Win32::UI::WindowsAndMessaging::WM_SIZE {
         if wparam.0 == windows::Win32::UI::WindowsAndMessaging::SIZE_MINIMIZED as usize {
             abort_cover(hwnd, context);
