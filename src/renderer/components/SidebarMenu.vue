@@ -142,7 +142,6 @@ import { ROUTES, PAGES, routeForWebPath, webPathOf } from '../composables/useRou
 import { createGuideData } from '../composables/guideData.js'
 import PanelPending from './PanelPending.vue'
 import { recordUpdateCheck } from '../composables/useUpdateCheckTime.js'
-import { createGuideData } from '../composables/guideData.js'
 import { useHostReach } from '../composables/useHostReach.js'
 import { ROW_OF_ROUTE, railItems, pageItems, barItems, barCurrent } from '../composables/panelNav.js'
 import { rowKeywords } from 'foundation-ui/settings/index.js'
