@@ -379,7 +379,7 @@ const pickOf = (key, def, list) => computed({ get: () => (list.includes(hostConf
 const textOf = (key) => computed({ get: () => hostConfig.value[key] ?? '', set: (value) => { void hostVdd.store.set({ [key]: value }) } })
 const isVirtualMode = computed(() => hostVdd.store.mode.value !== 'physical')
 const sourceModel = computed({ get: () => hostVdd.store.mode.value, set: (value) => { void hostVdd.store.setMode(value) } })
-const SOURCE_ICONS = { physical: 'monitor', ondemand: 'screen_share', persistent: 'push_pin' }
+const SOURCE_ICONS = { physical: 'monitor', ondemand: 'screen_share', persistent: 'keep' }
 const sourceOptions = computed(() => hostVdd.store.modes.value.map((m) => ({ value: m.id, label: vt.value.modes[m.id], icon: SOURCE_ICONS[m.id], disabled: m.disabled })))
 const prepModel = pickOf('display_device_prep', 'no_operation', VDD_PREP)
 const prepOptions = computed(() => VDD_PREP.map((value) => ({ value, label: vp.value.preps[value].title, text: vp.value.preps[value].text })))
