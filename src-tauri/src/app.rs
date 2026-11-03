@@ -56,7 +56,8 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
     let mut tasks = BackgroundTasks(vec![windows::lifecycle::start_monitor(app_handle.clone())]);
     #[cfg(target_os = "windows")]
     crate::vdd::start_hardware_cursor_migration();
-    let start_minimized = explicit_minimized || desktop_settings.start_minimized;
+    // a measurement instance (SUNSHINE_GUI_TEST_OFFSCREEN) shows its window, off screen, whatever the person's setting: a page of a hidden window sleeps
+    let start_minimized = (explicit_minimized || desktop_settings.start_minimized) && !windows::test_offscreen();
 
     // Agent-only startup keeps tray and session services alive without
     // allocating a hidden WebView. UI windows are created on demand.
