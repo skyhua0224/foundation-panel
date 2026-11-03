@@ -82,6 +82,7 @@
       </MGroup>
     </MSheet>
     <MRemoteWindow v-model="remoteOpen" :locale="locale" :state="remoteData.state" :callbacks="remoteData.callbacks" />
+    <MCoachMarks :locale="locale" storage-key="foundation.coach.panel" guide-key="foundation.guide.panel" />
     <MSupportSheet v-model="sponsorOpen" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" />
     <MThanksLine v-if="thanks.visible.value" :locale="locale" @star="thanksStar" @sponsor="thanksSponsor" @dismiss="thanks.dismiss" />
     <UpdateDialog
@@ -99,7 +100,8 @@
 import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
 import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
-import { filterHash, MCaption, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import QRCode from 'qrcode'
+import { connectTexts, filterHash, MConnectDialog, MSnackbar, useConnectDialog, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'

@@ -215,7 +215,7 @@ const supportSections = computed(() => [
   <MPage :title="t.m3e.nav.overview" wide>
     <template #actions>
       <MButton v-if="edit" variant="tonal" icon="check" @click="edit = false">{{ h.done }}</MButton>
-      <MIconButton v-else icon="edit" :label="h.edit" @click="edit = true" />
+      <MIconButton v-else icon="edit" data-coach="home-edit" :label="h.edit" @click="edit = true" />
     </template>
     <MAnnouncementStrip v-if="announcements.top.value" :item="announcements.top.value" :total="announcements.list.value.length" :texts="announceTexts" @dismiss="announcements.dismiss" @open-url="openExternalUrl" @open-list="announceOpen = true" />
     <MHomeDash v-model:edit="edit" :cards="cards" :details="allDetails" :ctx="dashCtx" storage-key="panel-home" :texts="dashTexts" @action="onAction" />

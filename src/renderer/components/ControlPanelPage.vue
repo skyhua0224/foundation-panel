@@ -58,6 +58,7 @@
         <MGroup>
           <MItem action icon="info" :title="aboutText.title" :text="'Foundation Sunshine ' + currentVersion" @click="emit('open-about')" />
           <MItem action icon="rocket_launch" :title="guide.guide" :text="guide.helpRow" @click="emit('open-guide')" />
+          <MItem action icon="lightbulb" :title="coach.rerun" :text="coach.rerunText" @click="startCoach" />
           <MItem action icon="public" :title="remote.openText" :text="remote.lead" @click="emit('open-remote')" />
           <MItem action icon="checklist" :title="startText.guideTitle" :text="startText.guideSub" @click="startCard.reopen()" />
         </MGroup>
@@ -77,7 +78,7 @@
 
 <script setup>
 import { computed, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFooter, MSupportSheet, aboutTexts, guideTexts, homeTexts, remoteTexts, useGuideCard } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFooter, MSupportSheet, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import PanelOptions from './m3e/PanelOptions.vue'
@@ -99,6 +100,8 @@ const { t } = useI18n()
 // The guided first run can be opened again from here; its texts come with the package (zh and en)
 const guide = computed(() => guideTexts(props.locale))
 const remote = computed(() => remoteTexts(props.locale))
+const coach = computed(() => coachTexts(props.locale))
+const startCoach = () => window.dispatchEvent(new CustomEvent('foundation-coach-start'))
 const aboutText = computed(() => aboutTexts(props.locale))
 // the get started card of the overview comes back from here
 const startText = computed(() => homeTexts(props.locale))
