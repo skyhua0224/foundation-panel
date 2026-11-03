@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
-import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
+import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, starCardData, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
 import { usePanelHome } from '../composables/usePanelHome.js'
 import { useHostReach } from '../composables/useHostReach.js'
@@ -139,8 +139,8 @@ const catalogueInput = computed(() => {
 const catalogue = computed(() => buildCatalogue(catalogueInput.value, T.value).data)
 const allDetails = computed(() => ({ ...model.value.details, ...buildCatalogueDetails(catalogueInput.value, T.value) }))
 const isNew = computed(() => guide.visible.value)
-const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue: catalogue.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value, { locale: locale.value, assetsOf: releases.assetsOf, versionOf: releases.versionOf, qr: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules }), sponsor: sponsorCardData(T.value, SPONSORS), journey: journey.data.value }))
-const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value }))
+const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue: catalogue.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value, { locale: locale.value, assetsOf: releases.assetsOf, versionOf: releases.versionOf, qr: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules }), sponsor: sponsorCardData(T.value, SPONSORS), journey: journey.data.value, star: star.visible.value ? starCardData(T.value) : null }))
+const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value, star: star.visible.value }))
 
 function onAction(a) {
   switch (a.type) {
@@ -150,6 +150,7 @@ function onAction(a) {
     case 'table-action': emit('open', 'pair'); break
     case 'pair-pin': pairPin(a.value?.pin); break
     case 'pair-qr': emit('open', 'pair:qr'); break
+    case 'star-dismiss': star.dismiss(); break
     case 'pin-open': emit('open', `setting:${a.value?.key}`); break
     case 'detail-external': emit('open', 'check-update'); break
     case 'open-url': openExternalUrl(a.value); break
@@ -184,6 +185,8 @@ onBeforeUnmount(() => pairQr.stop())
 // the connect journey card: on by default while no client is paired (choose the device, install, pair, done)
 const releases = useReleaseAssets()
 const journey = useJourneyHome({ storageKey: 'panel-home', assetsOf: releases.assetsOf, versionOf: releases.versionOf, count: () => (state.clients ? state.clients.length : null), latest: () => (state.clients?.length ? state.clients[state.clients.length - 1].name : ''), locale: () => locale.value, qr: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules, pairQr: pairQr.view })
+// the star card: once, after the first pairing or the first stream
+const star = useStarCard({ storageKey: 'panel-home', triggered: () => journey.done.value || sessionSeen.value })
 // the PIN typed on the pairing card goes to the host like the pairing sheet sends it
 async function pairPin(pin) {
   if (!/^\d{4}$/.test(String(pin || ''))) return
