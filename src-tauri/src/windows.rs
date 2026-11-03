@@ -2,6 +2,7 @@ use crate::proxy_server;
 use log::{debug, error, info, warn};
 use std::sync::LazyLock;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use tauri::{
     AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, WebviewWindow,
     webview::PageLoadEvent,
@@ -201,6 +202,58 @@ pub(crate) fn test_offscreen() -> bool {
     *ON.get_or_init(|| std::env::var_os("SUNSHINE_GUI_TEST_OFFSCREEN").is_some_and(|value| value != "0"))
 }
 
+/// Whether the first show of the main window is cloaked (DWM) until the page has painted its first frame (SUNSHINE_GUI_COLD_CLOAK = on | off).
+const COLD_CLOAK_DEFAULT: bool = false;
+
+fn cold_cloak_wanted() -> bool {
+    match std::env::var("SUNSHINE_GUI_COLD_CLOAK").ok().as_deref() {
+        Some("on") => true,
+        Some("off") => false,
+        _ => COLD_CLOAK_DEFAULT,
+    }
+}
+
+/// The main window is cloaked and shown to WebView2 (it renders) but not to the person.
+static COLD_CLOAK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static COLD_CLOAK_SINCE: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+/// How long the window stays cloaked after the page exists if its first paint does not come.
+const COLD_CLOAK_CAP: Duration = Duration::from_millis(600);
+
+#[cfg(target_os = "windows")]
+fn set_cloak<R: Runtime>(window: &WebviewWindow<R>, cloaked: bool) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Graphics::Dwm::{DWMWINDOWATTRIBUTE, DwmSetWindowAttribute};
+    use windows::core::BOOL;
+    if let Ok(hwnd) = window.hwnd() {
+        let value = BOOL::from(cloaked);
+        // DWMWA_CLOAK = 13
+        if let Err(error) = unsafe { DwmSetWindowAttribute(HWND(hwnd.0), DWMWINDOWATTRIBUTE(13), (&value as *const BOOL).cast(), size_of::<BOOL>() as u32) } {
+            warn!("DwmSetWindowAttribute(DWMWA_CLOAK, {cloaked}) failed: {error}");
+        }
+    }
+}
+
+/// Uncloaks the main window (once) and takes the focus as the first show would have.
+fn uncloak_cold<R: Runtime>(window: &WebviewWindow<R>, why: &str) {
+    if !COLD_CLOAK.swap(false, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+    #[cfg(target_os = "windows")]
+    set_cloak(window, false);
+    log::info!("[cold] uncloaked {} ms after the window was made ({why})", COLD_CLOAK_SINCE.get().map_or(0, |since| since.elapsed().as_millis()));
+    if !test_offscreen() {
+        let _ = window.set_focus();
+        #[cfg(target_os = "windows")]
+        force_activate_window_win32(window);
+    }
+}
+
+/// The page painted its first frame: the cloaked window shows it.
+#[tauri::command]
+pub fn panel_first_paint(window: tauri::WebviewWindow) {
+    uncloak_cold(&window, "first paint");
+}
+
 /// The page is being used (pointer, key, wheel): the warm snapshot of the cover waits for quiet.
 #[tauri::command]
 pub fn panel_activity() {
@@ -398,9 +451,17 @@ pub fn resize_tool_window(window: tauri::Window, width: f64, height: f64) -> Res
 /// 显示并激活窗口（解决权限隔离问题）
 pub fn show_and_activate_window<R: Runtime>(window: &WebviewWindow<R>) {
     log::info!("[cold] window {} shown", window.label());
+    let cloaked = COLD_CLOAK.load(std::sync::atomic::Ordering::SeqCst) && window.label() == MAIN_WINDOW_ID;
     let _ = window.unminimize();
     let _ = window.show();
-    if !test_offscreen() {
+    if cloaked {
+        // the person sees the window when the page has painted; if that does not come, after the cap
+        let capped = window.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(COLD_CLOAK_CAP).await;
+            uncloak_cold(&capped, "cap");
+        });
+    } else if !test_offscreen() {
         let _ = window.set_focus();
     }
 
@@ -411,7 +472,7 @@ pub fn show_and_activate_window<R: Runtime>(window: &WebviewWindow<R>) {
     proxy_server::reset_fast_fail();
 
     #[cfg(target_os = "windows")]
-    if !test_offscreen() {
+    if !test_offscreen() && !cloaked {
         force_activate_window_win32(window);
     }
 
@@ -727,6 +788,22 @@ fn create_main_window_internal<R: Runtime>(
     // 禁用自动填充和密码保存提示
     #[cfg(target_os = "windows")]
     configure_webview_security(&window);
+
+    // A window that is to be shown is shown at once, cloaked: WebView2 renders for a window that is shown, and the person sees it when the page has painted
+    // (panel_first_paint), not before, so the frames between are never the bare surface colour.
+    #[cfg(target_os = "windows")]
+    if visible && cold_cloak_wanted() {
+        COLD_CLOAK_SINCE.get_or_init(Instant::now);
+        COLD_CLOAK.store(true, std::sync::atomic::Ordering::SeqCst);
+        set_cloak(&window, true);
+        let _ = window.show();
+        info!("[cold] window main shown cloaked");
+        let safety = window.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            uncloak_cold(&safety, "safety");
+        });
+    }
 
     disable_context_menu(&window);
     info!("✅ {}主窗口创建成功", visibility_desc);

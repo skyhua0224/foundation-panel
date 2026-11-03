@@ -28,6 +28,12 @@ app.mount('#app')
 // the load event, which waits for every frame inside the page) and learns the theme's surface colour for its first frame
 queueMicrotask(() => {
   invoke('panel_content_ready').catch(() => {})
+  // the window may be cloaked until the first frame is painted: tell the host when it is
+  try {
+    new PerformanceObserver((list, observer) => {
+      if (list.getEntries().some((entry) => entry.name === 'first-contentful-paint')) { observer.disconnect(); invoke('panel_first_paint').catch(() => {}) }
+    }).observe({ type: 'paint', buffered: true })
+  } catch { invoke('panel_first_paint').catch(() => {}) }
   followPanelSurface(invoke)
   followPageActivity(invoke)
   followDpiCover({ listen, invoke })  // the native cover after a change of scale fades out when the layout matches the window
