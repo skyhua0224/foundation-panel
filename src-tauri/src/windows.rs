@@ -220,7 +220,10 @@ pub fn test_synthetic_dpi(window: tauri::WebviewWindow, dpi: u32) -> Result<(), 
             return Err("only a measurement instance takes a synthetic scale change".to_string());
         }
         let hwnd = HWND(window.hwnd().map_err(|e| e.to_string())?.0);
-        let (mut rect, old) = (RECT::default(), unsafe { GetDpiForWindow(hwnd) }.max(1));
+        // the system's DPI of the window never changes here: the scale the last synthetic message set is the one this one changes from
+        static CURRENT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let known = CURRENT.swap(dpi, std::sync::atomic::Ordering::SeqCst);
+        let (mut rect, old) = (RECT::default(), if known == 0 { unsafe { GetDpiForWindow(hwnd) }.max(1) } else { known });
         unsafe { GetWindowRect(hwnd, &mut rect) }.map_err(|e| e.to_string())?;
         let size = |extent: i32| (i64::from(extent) * i64::from(dpi) / i64::from(old)) as i32;
         let suggested = RECT { left: rect.left, top: rect.top, right: rect.left + size(rect.right - rect.left), bottom: rect.top + size(rect.bottom - rect.top) };
