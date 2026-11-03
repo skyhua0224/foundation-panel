@@ -33,7 +33,7 @@ export const ROUTES = {
   WEB_APPS: 'web-apps',
   WEB_CONFIG: 'web-config',
   CAT_CONFIG: 'cat-config',
-  CFG_APPEARANCE: 'cfg-appearance', // 个性化 among the stream settings
+  CFG_APPEARANCE: 'cfg-appearance', // 个性化: a destination of its own, the palette button in the foot of the rail
   WEB_DOWNLOADS: 'web-downloads',
   WEB_PASSWORD: 'web-password',
   WEB_TROUBLESHOOTING: 'web-troubleshooting',
@@ -48,7 +48,7 @@ export const PAGES = {
   [ROUTES.WEB_APPS]: { rail: 'stream' },
   [ROUTES.WEB_DOWNLOADS]: { rail: 'stream' },
   [ROUTES.WEB_CONFIG]: { rail: 'config' },
-  [ROUTES.CFG_APPEARANCE]: { rail: 'config' },
+  [ROUTES.CFG_APPEARANCE]: { rail: 'appearance', list: false },
   [ROUTES.WEB_PASSWORD]: { rail: 'config' },
   [ROUTES.GAMEPAD]: { rail: 'input' },
   [ROUTES.MICROPHONE]: { rail: 'input' },
@@ -64,8 +64,8 @@ export const PAGES = {
   [ROUTES.PANEL_SETTINGS]: { rail: 'settings', list: false },
   [ROUTES.SETTINGS_HUB]: { rail: 'config', list: false },
   [ROUTES.HELP]: { rail: 'help', list: false },
-  [ROUTES.ABOUT]: { rail: 'help', list: false },
-  [ROUTES.ANNOUNCEMENTS]: { rail: 'overview', list: false },
+  [ROUTES.ABOUT]: { rail: 'help', list: false, push: true },
+  [ROUTES.ANNOUNCEMENTS]: { rail: 'overview', list: false, push: true },
 }
 export const RAILS = ['overview', 'stream', 'config', 'input', 'display', 'system', 'assistant', 'settings', 'help']
 
@@ -97,7 +97,7 @@ export const webPathOf = (route) => ({
 
 const routes = {}
 for (const rail of new Set(Object.values(PAGES).filter((p) => p.list !== false).map((p) => p.rail))) routes[`${rail}:list`] = { role: 'list', rail }
-for (const [id, p] of Object.entries(PAGES)) routes[id] = { role: 'detail', rail: p.rail, list: p.list, supporting: p.supporting }
+for (const [id, p] of Object.entries(PAGES)) routes[id] = { role: 'detail', rail: p.rail, list: p.list, supporting: p.supporting, push: p.push }
 
 let nav = null
 const shared = () => (nav ||= createNav({ routes, home: ROUTES.HOME }))

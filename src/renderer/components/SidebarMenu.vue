@@ -14,7 +14,7 @@
     </MCaption>
     <div class="panel-body">
     <MScene :nav="nav" :caption-height="48" :rail-items="rail" :bar-items="bar" :bar-current="barCur" :texts="sceneTexts" :overlay="isWebPage" storage-key="foundation-ui.panel.list" @rail="onRail">
-      <template #rail-foot><MIconButton icon="info" :label="aboutTexts(locale).title" @click="router.navigate(ROUTES.ABOUT)" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
+      <template #rail-foot><MIconButton icon="palette" :label="appearanceLabel" :current="router.currentRoute.value === ROUTES.CFG_APPEARANCE" @click="router.navigate(ROUTES.CFG_APPEARANCE)" /><MIconButton icon="info" :label="aboutTexts(locale).title" :current="router.currentRoute.value === ROUTES.ABOUT" @click="router.navigate(ROUTES.ABOUT)" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
       <template #list="{ entry }">
         <MNavList
           :groups="listGroups(entry.rail)"
@@ -64,7 +64,6 @@
           @open-guide="openWelcome"
           @open-remote="remoteOpen = true"
           @open-about="router.navigate(ROUTES.ABOUT)"
-          @open-appearance="router.navigate(ROUTES.CFG_APPEARANCE)"
         />
       </template>
       <template #overlay>
@@ -80,6 +79,7 @@
       <MGroup>
         <MItem action icon="search" :title="t.m3e.search" @click="moreGo(() => uni.show())" />
         <MItem action icon="settings" :title="t.m3e.nav.settings" :text="settingsList.lines.value.panel" @click="moreGo(() => onRail({ id: 'settings' }))" />
+        <MItem action icon="palette" :title="appearanceLabel" @click="moreGo(() => router.navigate(ROUTES.CFG_APPEARANCE))" />
         <MItem action icon="help" :title="t.m3e.nav.help" :text="settingsList.lines.value.help" :tone="updateWaiting ? 'warn' : ''" @click="moreGo(() => onRail({ id: 'help' }))" />
         <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="moreGo(() => { sponsorOpen = true })" />
       </MGroup>
@@ -109,7 +109,7 @@ import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
 import { connectTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
-import { settingsHash } from 'foundation-ui/settings/index.js'
+import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
 import VddSettings from './VddSettings.vue'
@@ -228,6 +228,7 @@ const remoteData = createGuideData({ proxyUrl: () => sunshine.getProxyUrl(), ope
 const announceVersion = ref('')
 onMounted(async () => { try { announceVersion.value = (await sunshine.getVersion()) || '' } catch { /* the version only narrows version-bound notices */ } })
 const announcements = useAnnouncements({ locale, version: announceVersion })
+const appearanceLabel = computed(() => labelOf(locale.value, 'shell.appearance'))
 const announcementsUnread = announcements.unread
 // a dot on the help rail while an update is waiting (the about page checks and opens the update sheet)
 const updateWaiting = computed(() => !!updateInfo.value && !updateInfo.value.is_latest)
@@ -260,7 +261,6 @@ const listGroups = (rail) => (rail === 'config' ? settingsList.groups.value : [{
 const currentRow = computed(() => {
   const route = nav.current.value
   if (route === ROUTES.WEB_CONFIG) return `config:${nav.detail.value?.params?.tab || 'general'}`
-  if (route === ROUTES.CFG_APPEARANCE) return 'config:appearance'
   if (route === ROUTES.WEB_PASSWORD) return 'password'
   return route
 })
@@ -354,7 +354,7 @@ const openConfig = (params = { tab: 'general' }) => {
   router.navigate(ROUTES.WEB_CONFIG, params)
 }
 const openSettingsRoute = (item) => {
-  if (item.route === 'config' && item.params?.tab === 'appearance') router.navigate(ROUTES.CFG_APPEARANCE)
+  if (item.route === 'appearance' || (item.route === 'config' && item.params?.tab === 'appearance')) router.navigate(ROUTES.CFG_APPEARANCE)
   else if (item.route === 'config') openConfig(item.params)
   else if (item.route === 'password') openRoute(ROUTES.WEB_PASSWORD)
   else openRoute(item.route || item.id)
