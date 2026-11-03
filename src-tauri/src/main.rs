@@ -81,17 +81,24 @@ fn configure_loopback_proxy_bypass() {
     // This runs before any helper path or async worker can create an HTTP
     // client, so every GUI-owned loopback request gets the same direct route.
     unsafe {
-        // WebView2 uses Chromium's bypass syntax. Keep external requests on the
-        // user's configured proxy while forcing every loopback form to direct.
+        // A caller-provided value (for example --remote-debugging-port to trace
+        // a separately launched instance) stays in front of ours.
+        let mut browser_arguments = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .into_iter()
+            .collect::<Vec<_>>();
+        browser_arguments.extend([
+            // WebView2 uses Chromium's bypass syntax. Keep external requests on the
+            // user's configured proxy while forcing every loopback form to direct.
+            "--proxy-bypass-list=localhost;*.localhost;127.0.0.0/8;[::1]".to_owned(),
+            // UI 音效：手柄输入不属于「用户手势」，不解锁 AudioContext；
+            // 应用自身的导航反馈音不是网页自动播放媒体
+            "--autoplay-policy=no-user-gesture-required".to_owned(),
+        ]);
         std::env::set_var(
             "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-            [
-                "--proxy-bypass-list=localhost;*.localhost;127.0.0.0/8;[::1]",
-                // UI 音效：手柄输入不属于「用户手势」，不解锁 AudioContext；
-                // 应用自身的导航反馈音不是网页自动播放媒体
-                "--autoplay-policy=no-user-gesture-required",
-            ]
-            .join(" "),
+            browser_arguments.join(" "),
         );
 
         // reqwest follows NO_PROXY/no_proxy. Preserve the user's existing
