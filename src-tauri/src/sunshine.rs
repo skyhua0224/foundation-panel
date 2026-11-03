@@ -221,8 +221,22 @@ pub fn assets_dir() -> PathBuf {
     get_sunshine_path().join("assets")
 }
 
+/// `sunshine.exe --version` starts the host program (60 ms); the version of an installed program stays the same while the panel runs.
+static SUNSHINE_VERSION: crate::probe_cache::ProbeCache<String> =
+    crate::probe_cache::ProbeCache::new(std::time::Duration::from_secs(600));
+
 #[tauri::command]
 pub async fn get_sunshine_version() -> Result<String, String> {
+    SUNSHINE_VERSION
+        .get(|| async {
+            tokio::task::spawn_blocking(read_sunshine_version)
+                .await
+                .map_err(|e| e.to_string())?
+        })
+        .await
+}
+
+fn read_sunshine_version() -> Result<String, String> {
     let sunshine_exe = get_sunshine_path().join("sunshine.exe");
 
     if !sunshine_exe.exists() {

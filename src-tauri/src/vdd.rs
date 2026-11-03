@@ -13,6 +13,9 @@ const VDD_TRACE_SESSION_NAME: &str = "ZakoVDD-Diagnostics";
 const VDD_TRACE_PROVIDER_GUID: &str = "{B254994F-46E6-4719-80A0-0A3AA50D6CE5}";
 const VDD_TRACE_FILE_PREFIX: &str = "zako-vdd";
 static VDD_SETTINGS_OPERATION_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+/// The driver probe runs a script (0.5 s): once for the pages that ask together, kept a few seconds; every command that changes the driver drops it.
+static VDD_STATUS: crate::probe_cache::ProbeCache<VddStatus> =
+    crate::probe_cache::ProbeCache::new(std::time::Duration::from_secs(8));
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct VddTraceStatus {
@@ -210,13 +213,17 @@ fn probe_vdd_status() -> VddStatus {
 
 #[tauri::command]
 pub async fn get_vdd_status() -> Result<VddStatus, String> {
-    let mut status = tokio::task::spawn_blocking(probe_vdd_status)
+    VDD_STATUS
+        .get(|| async {
+            let mut status = tokio::task::spawn_blocking(probe_vdd_status)
+                .await
+                .map_err(|error| format!("虚拟显示器驱动状态检测失败，请重试: {error}"))?;
+            if let Ok(tray_state) = sunshine::get_tray_state().await {
+                status.monitor_active = tray_state.vdd.active;
+            }
+            Ok(status)
+        })
         .await
-        .map_err(|error| format!("虚拟显示器驱动状态检测失败，请重试: {error}"))?;
-    if let Ok(tray_state) = sunshine::get_tray_state().await {
-        status.monitor_active = tray_state.vdd.active;
-    }
-    Ok(status)
 }
 
 async fn set_vdd_tray_option(action: &str, enabled: bool) -> Result<String, String> {
@@ -237,11 +244,13 @@ async fn set_vdd_tray_option(action: &str, enabled: bool) -> Result<String, Stri
 
 #[tauri::command]
 pub async fn set_vdd_keep_enabled(enabled: bool) -> Result<String, String> {
+    let _status_changes = VDD_STATUS.invalidating();
     set_vdd_tray_option("vdd_toggle_keep_enabled", enabled).await
 }
 
 #[tauri::command]
 pub async fn set_vdd_headless_create_enabled(enabled: bool) -> Result<String, String> {
+    let _status_changes = VDD_STATUS.invalidating();
     set_vdd_tray_option("vdd_toggle_headless_create", enabled).await
 }
 
@@ -266,6 +275,7 @@ async fn ensure_vdd_driver_uninstall_is_safe() -> Result<(), String> {
 
 #[tauri::command]
 pub async fn install_vdd_driver() -> Result<String, String> {
+    let _status_changes = VDD_STATUS.invalidating();
     #[cfg(target_os = "windows")]
     {
         let install_script = get_sunshine_path().join("scripts").join("install-vdd.bat");
@@ -1108,6 +1118,7 @@ pub(crate) fn try_handle_elevated_ioctl_command() -> Option<i32> {
 
 #[tauri::command]
 pub async fn exec_vdd_cmd(command: String) -> Result<bool, String> {
+    let _status_changes = VDD_STATUS.invalidating();
     #[cfg(target_os = "windows")]
     {
         if !is_allowed_elevated_vdd_command(&command) {
@@ -1429,6 +1440,7 @@ pub fn open_vdd_trace_folder() -> Result<String, String> {
 
 #[tauri::command]
 pub async fn uninstall_vdd_driver() -> Result<String, String> {
+    let _status_changes = VDD_STATUS.invalidating();
     #[cfg(target_os = "windows")]
     {
         ensure_vdd_driver_uninstall_is_safe().await?;

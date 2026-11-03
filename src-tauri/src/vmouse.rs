@@ -3,6 +3,10 @@ use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// The probe starts PowerShell (1.7 s): once for the pages that ask together, kept a few seconds; every command that changes the device drops it.
+static VMOUSE_STATUS: crate::probe_cache::ProbeCache<VmouseStatus> =
+    crate::probe_cache::ProbeCache::new(std::time::Duration::from_secs(8));
+
 #[cfg(target_os = "windows")]
 use crate::bat_runner;
 
@@ -175,22 +179,32 @@ fn read_vmouse_config() -> bool {
 /// 获取 vmouse 驱动状态
 #[tauri::command]
 pub async fn get_vmouse_status() -> Result<VmouseStatus, String> {
-    let (installed, running, status_text) = check_device_installed();
-    let driver_path = get_vmouse_tools_path().to_string_lossy().to_string();
-    let config_enabled = read_vmouse_config();
+    VMOUSE_STATUS
+        .get(|| async {
+            // PowerShell is waited for on the blocking pool, not on a worker of the async runtime
+            tokio::task::spawn_blocking(|| {
+                let (installed, running, status_text) = check_device_installed();
+                let driver_path = get_vmouse_tools_path().to_string_lossy().to_string();
+                let config_enabled = read_vmouse_config();
 
-    Ok(VmouseStatus {
-        installed,
-        running,
-        status_text,
-        driver_path,
-        config_enabled,
-    })
+                VmouseStatus {
+                    installed,
+                    running,
+                    status_text,
+                    driver_path,
+                    config_enabled,
+                }
+            })
+            .await
+            .map_err(|error| error.to_string())
+        })
+        .await
 }
 
 /// 安装 vmouse 驱动（复用 install-vmouse.bat）
 #[tauri::command]
 pub async fn install_vmouse_driver() -> Result<String, String> {
+    let _status_changes = VMOUSE_STATUS.invalidating();
     #[cfg(target_os = "windows")]
     {
         let scripts_dir = get_vmouse_scripts_path();
@@ -222,6 +236,7 @@ pub async fn install_vmouse_driver() -> Result<String, String> {
 /// 卸载 vmouse 驱动（复用 uninstall-vmouse.bat）
 #[tauri::command]
 pub async fn uninstall_vmouse_driver() -> Result<String, String> {
+    let _status_changes = VMOUSE_STATUS.invalidating();
     #[cfg(target_os = "windows")]
     {
         let scripts_dir = get_vmouse_scripts_path();
@@ -252,6 +267,7 @@ pub async fn uninstall_vmouse_driver() -> Result<String, String> {
 /// 设置 sunshine.conf 中的 virtual_mouse 配置
 #[tauri::command]
 pub async fn set_vmouse_config(enabled: bool) -> Result<String, String> {
+    let _status_changes = VMOUSE_STATUS.invalidating();
     // /api/config 是整表替换语义：读文件与 POST 之间必须与其他全表写者互斥，
     // 否则并发写者的字段会被旧快照覆盖丢失（见 controller_hub.rs 的锁约定）。
     let _config_guard = crate::device_config::DEVICE_CONFIG_LOCK.lock().await;

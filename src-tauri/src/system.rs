@@ -19,7 +19,7 @@ pub struct ProcessMemoryInfo {
 }
 
 /// 内存监控快照，包含所有 Sunshine 相关进程
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct MemoryMonitorSnapshot {
     /// 各进程内存详情
     pub processes: Vec<ProcessMemoryInfo>,
@@ -36,7 +36,7 @@ pub struct MemoryMonitorSnapshot {
 }
 
 /// Sunshine 进程的启动时间信息
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ProcessStartInfo {
     /// 进程启动时间（Unix 毫秒时间戳），0 表示未找到
     pub start_time_ms: u64,
@@ -329,19 +329,32 @@ pub async fn set_desktop_dpi(dpi: u32) -> Result<(), String> {
 /// 获取 Sunshine 相关进程的内存使用信息
 #[tauri::command]
 pub async fn get_process_memory_info() -> Result<MemoryMonitorSnapshot, String> {
-    tokio::task::spawn_blocking(get_process_memory_info_impl)
+    PROCESS_MEMORY
+        .get(|| async {
+            tokio::task::spawn_blocking(get_process_memory_info_impl)
+                .await
+                .map_err(|e| e.to_string())?
+        })
         .await
-        .map_err(|e| e.to_string())?
 }
+
+/// Two WMI connections and a query for every process (0.2 s): once for the pages that ask together, kept a moment.
+static PROCESS_MEMORY: crate::probe_cache::ProbeCache<MemoryMonitorSnapshot> =
+    crate::probe_cache::ProbeCache::new(std::time::Duration::from_secs(3));
+/// The start time of the host process changes only when it restarts (WMI, 70 ms).
+static SUNSHINE_START: crate::probe_cache::ProbeCache<ProcessStartInfo> =
+    crate::probe_cache::ProbeCache::new(std::time::Duration::from_secs(10));
 
 #[cfg(target_os = "windows")]
 fn get_process_memory_info_impl() -> Result<MemoryMonitorSnapshot, String> {
     // 用 tasklist 查找 Sunshine 相关进程的 PID
     let pids = find_sunshine_pids()?;
+    let wmi_working_sets: std::collections::HashMap<u32, u64> =
+        pids.iter().map(|(pid, _, ws)| (*pid, *ws)).collect();
 
     let mut processes = Vec::new();
 
-    for (pid, name) in &pids {
+    for (pid, name, _) in &pids {
         match get_single_process_memory(*pid) {
             Ok(info) => processes.push(ProcessMemoryInfo {
                 process_name: name.clone(),
@@ -357,7 +370,7 @@ fn get_process_memory_info_impl() -> Result<MemoryMonitorSnapshot, String> {
                     "WinAPI 获取进程 {} (PID {}) 内存失败: {}，回退 WMI",
                     name, pid, e
                 );
-                if let Ok(ws) = get_process_memory_via_wmi(*pid) {
+                if let Some(ws) = wmi_working_sets.get(pid).copied().filter(|ws| *ws > 0) {
                     processes.push(ProcessMemoryInfo {
                         process_name: name.clone(),
                         pid: *pid,
@@ -388,7 +401,7 @@ fn get_process_memory_info_impl() -> Result<MemoryMonitorSnapshot, String> {
 }
 
 #[cfg(target_os = "windows")]
-fn find_sunshine_pids() -> Result<Vec<(u32, String)>, String> {
+fn find_sunshine_pids() -> Result<Vec<(u32, String, u64)>, String> {
     use wmi::WMIConnection;
 
     #[derive(Deserialize)]
@@ -397,52 +410,28 @@ fn find_sunshine_pids() -> Result<Vec<(u32, String)>, String> {
     struct ProcessInfo {
         name: String,
         process_id: u32,
+        working_set_size: Option<u64>,
     }
 
     let wmi_con = WMIConnection::new().map_err(|e| e.to_string())?;
 
-    // 查询所有 sunshine 相关进程（不区分大小写）
+    // 查询所有 sunshine 相关进程（不区分大小写）；工作集一并取回，WinAPI 无权读取时用它，不再逐进程再查一次
     let results: Vec<ProcessInfo> = wmi_con
-        .raw_query("SELECT Name, ProcessId FROM Win32_Process WHERE Name LIKE '%sunshine%'")
+        .raw_query("SELECT Name, ProcessId, WorkingSetSize FROM Win32_Process WHERE Name LIKE '%sunshine%'")
         .map_err(|e| e.to_string())?;
 
-    let pids: Vec<(u32, String)> = results
+    let pids: Vec<(u32, String, u64)> = results
         .into_iter()
         .filter(|p| {
             let lower = p.name.to_lowercase();
             // 排除 GUI 自身进程
             !lower.contains("sunshine-gui") && !lower.contains("sunshine_gui")
         })
-        .map(|p| (p.process_id, p.name))
+        .map(|p| (p.process_id, p.name, p.working_set_size.unwrap_or(0)))
         .collect();
 
     debug!("找到 {} 个 Sunshine 相关进程: {:?}", pids.len(), pids);
     Ok(pids)
-}
-
-/// 通过 WMI 获取进程工作集（fallback，权限不足时使用）
-#[cfg(target_os = "windows")]
-fn get_process_memory_via_wmi(pid: u32) -> Result<u64, String> {
-    use wmi::WMIConnection;
-
-    #[derive(Deserialize)]
-    #[serde(rename = "Win32_Process")]
-    #[serde(rename_all = "PascalCase")]
-    struct ProcMem {
-        working_set_size: Option<u64>,
-    }
-
-    let wmi_con = WMIConnection::new().map_err(|e| e.to_string())?;
-    let query = format!(
-        "SELECT WorkingSetSize FROM Win32_Process WHERE ProcessId = {}",
-        pid
-    );
-    let results: Vec<ProcMem> = wmi_con.raw_query(&query).map_err(|e| e.to_string())?;
-
-    results
-        .first()
-        .and_then(|p| p.working_set_size)
-        .ok_or_else(|| "WMI 未返回工作集数据".to_string())
 }
 
 /// 通过 Windows API 获取单个进程的精确内存信息
@@ -529,9 +518,13 @@ fn get_process_memory_info_impl() -> Result<MemoryMonitorSnapshot, String> {
 /// 获取 Sunshine 主进程的启动时间
 #[tauri::command]
 pub async fn get_sunshine_start_time() -> Result<ProcessStartInfo, String> {
-    tokio::task::spawn_blocking(get_sunshine_start_time_impl)
+    SUNSHINE_START
+        .get(|| async {
+            tokio::task::spawn_blocking(get_sunshine_start_time_impl)
+                .await
+                .map_err(|e| e.to_string())?
+        })
         .await
-        .map_err(|e| e.to_string())?
 }
 
 #[cfg(target_os = "windows")]
