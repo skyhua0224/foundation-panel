@@ -3,6 +3,7 @@
     <!-- slim caption bar over the whole window: draggable, the window controls at the end; the pages start below it -->
     <MCaption bem="panel-caption" data-tauri-drag-region @pointerdown="onTouchWindowDragStart">
       <template #brand><MBrand class="panel-caption__brand" :size="20" data-tauri-drag-region /></template>
+      <template #announcements><MAnnouncementButton :unread="announcements.unread.value" :locale="locale" @open="router.navigate(ROUTES.ANNOUNCEMENTS)" /></template>
       <template #search><div class="panel-caption__search" data-tauri-drag-region><MUnifiedSearch :search="uni" :texts="searchT" :compact="compactSearch" :height="38" /></div></template>
       <template #connect><button type="button" class="m-caption-connect" :class="{ 'is-icon': hostClients.length > 0 }" :aria-label="connectT.title" :data-tip="connectT.title" @click="connect.show('pair')"><MIcon name="person_add" /><span v-if="hostClients.length === 0">{{ connectT.title }}</span></button></template>
       <template #controls><div class="panel-caption__controls">
@@ -43,6 +44,7 @@
           @webui-navigate="openWebUi"
           @open-guide="openWelcome"
         />
+        <MAnnouncementPage v-else-if="entry.id === ROUTES.ANNOUNCEMENTS" :items="announcements.list.value" :locale="locale" :acked-at="ackedAt" :on-refresh="() => announcements.refresh(true)" @dismiss="announcements.dismiss" @open-url="actions_openExternal" @back="back" />
         <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" @open-update="showUpdateDialog = true" @open="actions_openExternal" />
         <ControlPanelPage
           v-else-if="entry.id === ROUTES.PANEL_SETTINGS || entry.id === ROUTES.HELP"
@@ -82,7 +84,7 @@
         <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="moreGo(() => { sponsorOpen = true })" />
       </MGroup>
     </MSheet>
-    <MRemoteWindow v-model="remoteOpen" :locale="locale" :state="remoteData.state" :callbacks="remoteData.callbacks" />
+    <MAnnouncementPopup :item="announcements.popup.value" :locale="locale" @shown="announcements.markShown" @acknowledge="announcements.acknowledge" @open-url="actions_openExternal" />
     <MCoachMarks :locale="locale" storage-key="foundation.coach.panel" guide-key="foundation.guide.panel" />
     <MConnectDialog v-model="connect.open.value" v-model:tab="connect.tab.value" v-model:os="connect.os.value" :assets-of="connect.assetsOf" :version-of="connect.versionOf" :locale="locale" :qr="connect.matrix" :pair-qr="connect.pairQr" :count="hostClients.length" :latest="hostClients.length ? hostClients[hostClients.length - 1].name : ''" :close-label="t.m3e.home.done"
       @pair-pin="(e) => connect.pairPin(e.pin)" @pair-qr-begin="connect.qrBegin()" @pair-qr-stop="connect.qrStop()" @open-url="actions_openExternal" @open-downloads="() => { connect.open.value = false; openRoute(ROUTES.WEB_DOWNLOADS) }" />
@@ -106,7 +108,7 @@ import { computed, defineAsyncComponent, ref, toRef, watch, onMounted, onBeforeU
 import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
-import { connectTexts, filterHash, MConnectDialog, MPairPrompt, createPairingPending, MSnackbar, useConnectDialog, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { connectTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -224,7 +226,8 @@ const remoteOpen = ref(false)
 const remoteData = createGuideData({ proxyUrl: () => sunshine.getProxyUrl(), openUrl: (url) => actions_openExternal(url), copy: (text) => navigator.clipboard.writeText(text), reach: useHostReach(), vddStatus: async () => null, openApps: () => {}, navigate: () => {} })
 const announceVersion = ref('')
 onMounted(async () => { try { announceVersion.value = (await sunshine.getVersion()) || '' } catch { /* the version only narrows version-bound notices */ } })
-const { unread: announcementsUnread } = useAnnouncementBadge({ locale, version: announceVersion })
+const announcements = useAnnouncements({ locale, version: announceVersion })
+const announcementsUnread = announcements.unread
 // a dot on the help rail while an update is waiting (the about page checks and opens the update sheet)
 const updateWaiting = computed(() => !!updateInfo.value && !updateInfo.value.is_latest)
 const rail = computed(() => railItems(t.value).map((item) => (item.id === 'overview' && announcementsUnread.value ? { ...item, badge: announcementsUnread.value } : item.id === 'help' && updateWaiting.value ? { ...item, badge: 'dot' } : item)))

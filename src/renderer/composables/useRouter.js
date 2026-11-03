@@ -17,6 +17,7 @@ export const ROUTES = {
   SETTINGS_HUB: 'settings-hub', // the bottom bar's one entry for 串流设置, 输入与外设, 显示 and 系统: a list of those four
   HELP: 'help',
   ABOUT: 'about',
+  ANNOUNCEMENTS: 'announcements', // 公告: every announcement, opened from the bell of the caption bar
   CAT_STREAM: 'cat-stream',
   CAT_INPUT: 'cat-input',
   CAT_DISPLAY: 'cat-display',
@@ -64,6 +65,7 @@ export const PAGES = {
   [ROUTES.SETTINGS_HUB]: { rail: 'config', list: false },
   [ROUTES.HELP]: { rail: 'help', list: false },
   [ROUTES.ABOUT]: { rail: 'help', list: false },
+  [ROUTES.ANNOUNCEMENTS]: { rail: 'overview', list: false },
 }
 export const RAILS = ['overview', 'stream', 'config', 'input', 'display', 'system', 'assistant', 'settings', 'help']
 
