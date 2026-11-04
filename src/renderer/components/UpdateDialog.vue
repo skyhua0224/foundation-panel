@@ -27,7 +27,8 @@
     @later="handleCancel"
     @skip="handleSkipVersion"
     @retry="handleRetry"
-    @open-release="handleOpenBrowser"
+    @open-release="handleOpenBrowser()"
+    @open-changelog="handleOpenBrowser"
   />
 </template>
 
@@ -296,8 +297,9 @@ const handleRetry = () => {
   else handleDownload()
 }
 
-const handleOpenBrowser = async () => {
-  const releasePage = sheet.value?.releasePage
+const handleOpenBrowser = async (url) => {
+  // the release page, or the address a link of the sheet asks for (the full changelog)
+  const releasePage = typeof url === 'string' ? url : sheet.value?.releasePage
   if (!releasePage) {
     ElMessage.warning(t.value.updateDialog.noReleasePage)
     return
