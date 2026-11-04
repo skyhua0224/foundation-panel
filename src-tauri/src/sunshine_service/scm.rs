@@ -231,6 +231,18 @@ fn start(service: &ScHandle) -> Result<(), i32> {
     wait_for_state(service, 4)
 }
 
+/// Stop the service and end whatever sunshine.exe of the install is left (the wrapper ends its child; a
+/// user-mode or orphan one is ended here), as `net stop` plus `taskkill /F` did.
+fn stop_all(service: &ScHandle, install_dir: &std::path::Path) -> Result<(), i32> {
+    stop(service)?;
+    super::probe::end_install_processes(install_dir).map_err(super::model::exit::from_win32)
+}
+
+/// `<root>` of the panel executable `<root>\assets\gui\<exe>` (checked by panel_belongs_to_service first).
+fn install_dir_of(executable: &std::path::Path) -> Option<std::path::PathBuf> {
+    Some(executable.parent()?.parent()?.parent()?.to_path_buf())
+}
+
 /// Run one allowlisted operation; the result is a helper exit code.
 pub(crate) fn apply(operation: Operation) -> i32 {
     use super::model::exit;
@@ -243,7 +255,7 @@ pub(crate) fn apply(operation: Operation) -> i32 {
             Operation::SetStartType(_) => SERVICE_CHANGE_CONFIG,
             Operation::Start => SERVICE_START,
             Operation::Stop => SERVICE_STOP,
-            Operation::Restart => SERVICE_START | SERVICE_STOP,
+            Operation::Restart | Operation::UserMode => SERVICE_START | SERVICE_STOP,
         };
     let service = match open_service(access) {
         Ok(Some(service)) => service,
@@ -251,17 +263,27 @@ pub(crate) fn apply(operation: Operation) -> i32 {
         Err(code) => return exit::from_win32(code),
     };
     // The service must be the one of the install this executable belongs to.
-    match (query_config(&service), std::env::current_exe()) {
+    let install_dir = match (query_config(&service), std::env::current_exe()) {
         (Ok(config), Ok(executable))
-            if super::model::panel_belongs_to_service(&executable.to_string_lossy(), &config.binary_path) => {}
+            if super::model::panel_belongs_to_service(&executable.to_string_lossy(), &config.binary_path) =>
+        {
+            match install_dir_of(&executable) {
+                Some(dir) => dir,
+                None => return exit::FOREIGN_SERVICE,
+            }
+        }
         (Err(code), _) => return exit::from_win32(code),
         _ => return exit::FOREIGN_SERVICE,
-    }
+    };
     let result = match operation {
         Operation::SetStartType(start_type) => set_start_type(&service, start_type).map_err(exit::from_win32),
         Operation::Start => start(&service),
         Operation::Stop => stop(&service),
-        Operation::Restart => stop(&service).and_then(|()| start(&service)),
+        Operation::Restart => stop_all(&service, &install_dir).and_then(|()| start(&service)),
+        Operation::UserMode => stop_all(&service, &install_dir).and_then(|()| {
+            // the helper is elevated, so sunshine.exe runs with administrator rights as the old RunAs start did
+            super::probe::start_install_process(&install_dir).map_err(|_| exit::PROCESS_START)
+        }),
     };
     match result {
         Ok(()) => exit::OK,

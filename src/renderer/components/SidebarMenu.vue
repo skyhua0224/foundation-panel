@@ -83,7 +83,7 @@
       <template #overlay>
         <!-- the frame stays mounted while the host is away (it only is hidden): it loads again when the host is back -->
         <div v-show="!offlineShown" class="panel-web-keep" :inert="offlineShown ? '' : undefined"><PanelWebHost :sub="frameSub" :page="isWebPage ? router.currentRoute.value : ''"><slot /></PanelWebHost></div>
-        <MHostOffline v-if="offlineShown" :cause="offlineCause" :state="offlineState" :locale="locale" :port="hostPort" :can-restart="offlineCause !== 'proxy'" :can-user-mode="offlineCause !== 'proxy'" can-logs @retry="retryOffline" @restart="hostConn.restart('service')" @user-mode="hostConn.restart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" />
+        <MHostOffline v-if="offlineShown" :cause="offlineCause" :state="offlineState" :locale="locale" :port="hostPort" :can-restart="offlineCause !== 'proxy'" :can-user-mode="offlineCause !== 'proxy'" can-logs @retry="retryOffline" @restart="confirmedRestart('service')" @user-mode="confirmedRestart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" />
       </template>
     </MScene>
     </div>
@@ -125,12 +125,12 @@
 
 <script setup>
 import { computed, defineAsyncComponent, getCurrentInstance, ref, toRef, watch, onMounted, onBeforeUnmount } from 'vue'
-import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
+import { sunshine, sunshineService, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
 import { openBigScreenWithNotice } from '../composables/openBigScreen.js'
-import { MButton, homeTexts, MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode } from 'foundation-ui/vue'
+import { MButton, homeTexts, MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode, useDialogs } from 'foundation-ui/vue'
 import { developerOverlays, developerTexts, DEFAULT_FLAGS } from 'foundation-ui/developer'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
@@ -152,6 +152,7 @@ import DeveloperPage from './m3e/DeveloperPage.vue'
 import ComponentStatusPage from './m3e/ComponentStatusPage.vue'
 import SunshineServicePage from './m3e/SunshineServicePage.vue'
 import { serviceTexts } from 'foundation-ui/service'
+import { createHostRestart } from '../composables/hostRestart.js'
 import { useComponentStatus } from '../composables/useComponentStatus.js'
 import ToolboxPage from './m3e/ToolboxPage.vue'
 import LatencyClockPage from './m3e/LatencyClockPage.vue'
@@ -267,10 +268,13 @@ const probeHost = async () => {
   const status = await sunshine.probeHost(2500)
   return status !== 502 && status !== 503
 }
+// 重启 and 用户模式 of the offline page and the search actions confirm first, as 系统 › Sunshine 服务 does, and pass the acknowledgement on
+const hostRestart = createHostRestart({ locale, ask: (options) => useDialogs().ask(options), status: () => sunshineService.status(), restart: (ack) => tools.restartSunshineService(ack), userMode: (ack) => tools.restartSunshineInUserMode(ack) })
+let restartAck = false
 const hostConn = useHostConnection({
   probe: probeHost,
-  restartService: () => tools.restartSunshineService(),
-  restartUser: () => tools.restartSunshineInUserMode(),
+  restartService: () => tools.restartSunshineService(restartAck),
+  restartUser: () => tools.restartSunshineInUserMode(restartAck),
   onRecovered: () => { for (const frame of document.querySelectorAll('iframe')) { const src = frame.src; frame.src = src } },
   // A silence is not a stop. The connection reads what the operating system says about the host (the process and its start, the service, whether the panel asked for a stop) and the
   // error surface in its 「Sunshine 意外停止」 variant opens only when the process is gone or is a new one and nobody asked (m3e status/hostLoss.js; telemetry/crash.js has the interface
@@ -460,10 +464,15 @@ const hostAction = async (path, doneText, method = 'POST') => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     useNotify().snack(doneText)
   } catch { useNotify().snack(diagnosticsTexts(locale.value).failed) }
+async function confirmedRestart(mode) {
+  const answer = await hostRestart.confirm(mode === 'user' ? 'user-mode' : 'restart')
+  if (!answer) return
+  restartAck = answer.acknowledgeLiveStream
+  await hostConn.restart(mode)
 }
 const actionHandlers = {
-  restart: () => tools.restartSunshineService(),
-  userMode: () => tools.restartSunshineInUserMode(),
+  restart: () => hostRestart.run('restart'),
+  userMode: () => hostRestart.run('user-mode'),
   restartDriver: () => tools.restartGraphicsDriver(),
   connect: () => connect.show('pair'),
   download: () => connect.show('install'),

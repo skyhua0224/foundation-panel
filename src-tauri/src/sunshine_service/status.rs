@@ -225,13 +225,46 @@ pub(crate) fn require_live_stream_acknowledgement(
     acknowledged: bool,
 ) -> Result<(), String> {
     use super::model::Operation;
-    let interrupts = matches!(operation, Operation::Stop | Operation::Restart);
+    let interrupts = matches!(operation, Operation::Stop | Operation::Restart | Operation::UserMode);
     match live_streams {
         Some(count) if interrupts && count > 0 && !acknowledged => Err(format!(
             "SVC-CONFIRM-002: {count} live stream(s) would end; confirm to continue"
         )),
         _ => Ok(()),
     }
+}
+
+/// How a restart or a mode switch is carried out.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum HostPlan {
+    /// Through the elevated helper (the service of this install exists).
+    Elevated(super::model::Operation),
+    /// No service of this install: end and start sunshine.exe of this install
+    /// as the current user (a portable install).
+    UserProcess,
+}
+
+/// 重启 (the offline page, the tray recovery, the home tile): with the
+/// service of this install, the helper's Restart, which also ends a
+/// user-mode or orphan sunshine.exe; without it, the user process.
+pub(crate) fn plan_restart(scm: &ScmLayer) -> HostPlan {
+    if scm.installed && scm.belongs_to_install {
+        HostPlan::Elevated(super::model::Operation::Restart)
+    } else {
+        HostPlan::UserProcess
+    }
+}
+
+/// The tray's mode switch: running in user mode (sunshine.exe of this
+/// install that the service did not start, the service not running) goes
+/// back to the service; otherwise to user mode. Both need the service of
+/// this install.
+pub(crate) fn plan_toggle(scm: &ScmLayer, process: &ProcessLayer) -> Result<super::model::Operation, String> {
+    if !(scm.installed && scm.belongs_to_install) {
+        return Err("SVC-SCM-002: this install has no Sunshine service, so there is no mode to switch to".to_string());
+    }
+    let user_mode = process.running && !process.child_of_service && scm.state != Some(ScmState::Running);
+    Ok(if user_mode { super::model::Operation::Restart } else { super::model::Operation::UserMode })
 }
 
 #[cfg(test)]
@@ -336,9 +369,35 @@ mod tests {
     }
 
     #[test]
+    fn restarts_go_through_the_helper_only_with_our_service() {
+        assert_eq!(plan_restart(&scm(ScmState::Running)), HostPlan::Elevated(Operation::Restart));
+        assert_eq!(plan_restart(&scm(ScmState::Stopped)), HostPlan::Elevated(Operation::Restart));
+        assert_eq!(plan_restart(&ScmLayer::default()), HostPlan::UserProcess);
+        let foreign = ScmLayer { installed: true, belongs_to_install: false, ..Default::default() };
+        assert_eq!(plan_restart(&foreign), HostPlan::UserProcess);
+    }
+
+    #[test]
+    fn the_mode_switch_goes_the_other_way() {
+        let service_child = ProcessLayer { running: true, pid: Some(1), child_of_service: true, ..Default::default() };
+        let user = ProcessLayer { running: true, pid: Some(2), child_of_service: false, ..Default::default() };
+        // service mode (also with the process gone) -> user mode
+        assert_eq!(plan_toggle(&scm(ScmState::Running), &service_child), Ok(Operation::UserMode));
+        assert_eq!(plan_toggle(&scm(ScmState::Running), &process(false)), Ok(Operation::UserMode));
+        assert_eq!(plan_toggle(&scm(ScmState::Stopped), &process(false)), Ok(Operation::UserMode));
+        // user mode -> the service
+        assert_eq!(plan_toggle(&scm(ScmState::Stopped), &user), Ok(Operation::Restart));
+        // a stray user process beside a running service: the service wins, so the switch is to user mode
+        assert_eq!(plan_toggle(&scm(ScmState::Running), &user), Ok(Operation::UserMode));
+        assert!(plan_toggle(&ScmLayer::default(), &user).is_err());
+    }
+
+    #[test]
     fn stop_and_restart_need_consent_while_streaming() {
         assert!(require_live_stream_acknowledgement(Operation::Stop, Some(1), false).is_err());
         assert!(require_live_stream_acknowledgement(Operation::Restart, Some(2), false).is_err());
+        assert!(require_live_stream_acknowledgement(Operation::UserMode, Some(1), false).is_err());
+        assert!(require_live_stream_acknowledgement(Operation::UserMode, Some(1), true).is_ok());
         assert!(require_live_stream_acknowledgement(Operation::Stop, Some(1), true).is_ok());
         assert!(require_live_stream_acknowledgement(Operation::Stop, Some(0), false).is_ok());
         assert!(require_live_stream_acknowledgement(Operation::Stop, None, false).is_ok());

@@ -141,17 +141,9 @@ async fn live_streams() -> Option<usize> {
 #[tauri::command]
 pub async fn get_sunshine_service_status() -> Result<status::ServiceStatus, String> {
     #[cfg(target_os = "windows")]
-    let (scm, process) = {
-        let install_dir = crate::sunshine::install_dir();
-        tokio::task::spawn_blocking(move || {
-            let scm = probe::scm_layer(&install_dir);
-            let service_pid = scm.service_pid.filter(|_| scm.belongs_to_install);
-            let process = probe::process_layer(&install_dir, service_pid);
-            (scm, process)
-        })
+    let (scm, process) = tokio::task::spawn_blocking(local_layers)
         .await
-        .map_err(|error| format!("SVC-SCM-001: status task failed: {error}"))?
-    };
+        .map_err(|error| format!("SVC-SCM-001: status task failed: {error}"))?;
     #[cfg(not(target_os = "windows"))]
     let (scm, process) = (status::ScmLayer::default(), status::ProcessLayer::default());
     let (api, live_streams) = tokio::join!(api_layer(), live_streams());
@@ -185,6 +177,89 @@ pub async fn control_sunshine_service(action: ServiceAction, acknowledge_live_st
     }
     #[cfg(not(target_os = "windows"))]
     {
+        Err("SVC-OS-001: the Sunshine service exists only on Windows".to_string())
+    }
+}
+
+/// The SCM and process layers (blocking).
+#[cfg(target_os = "windows")]
+fn local_layers() -> (status::ScmLayer, status::ProcessLayer) {
+    let install_dir = crate::sunshine::install_dir();
+    let scm = probe::scm_layer(&install_dir);
+    let service_pid = scm.service_pid.filter(|_| scm.belongs_to_install);
+    let process = probe::process_layer(&install_dir, service_pid);
+    (scm, process)
+}
+
+/// Whether Sunshine runs in user mode: sunshine.exe of this install runs and the service of this install is
+/// not running (SCM and process snapshot; no `sc query` or `tasklist` text). Blocking.
+pub(crate) fn running_in_user_mode() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        let (scm, process) = local_layers();
+        let service_running = scm.installed && scm.belongs_to_install && scm.state == Some(status::ScmState::Running);
+        process.running && !service_running
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        false
+    }
+}
+
+/// 重启 Sunshine for the offline page, the tray recovery, the home tile and the old pages: through the elevated
+/// helper (stop the service, end any leftover sunshine.exe of this install, start the service) when the install
+/// has its service, else ending and starting sunshine.exe of this install as the current user. No PowerShell,
+/// no `net stop`. With live streams the caller must pass `acknowledge_live_stream` (SVC-CONFIRM-002).
+pub(crate) async fn restart_host(acknowledge_live_stream: bool) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let (scm, _) = tokio::task::spawn_blocking(local_layers)
+            .await
+            .map_err(|error| format!("SVC-SCM-001: status task failed: {error}"))?;
+        let plan = status::plan_restart(&scm);
+        let operation = match plan {
+            status::HostPlan::Elevated(operation) => operation,
+            status::HostPlan::UserProcess => Operation::Restart,
+        };
+        status::require_live_stream_acknowledgement(operation, live_streams().await, acknowledge_live_stream)?;
+        match plan {
+            status::HostPlan::Elevated(operation) => elevated::run(operation).await.map(|()| "success".to_string()),
+            status::HostPlan::UserProcess => tokio::task::spawn_blocking(|| {
+                let install_dir = crate::sunshine::install_dir();
+                probe::end_install_processes(&install_dir).map_err(|code| {
+                    format!(
+                        "SVC-PROC-002: sunshine.exe could not be ended ({}); it may run with administrator rights",
+                        model::win32_service_error(code)
+                    )
+                })?;
+                probe::start_install_process(&install_dir).map(|()| "success".to_string())
+            })
+            .await
+            .map_err(|error| format!("SVC-PROC-001: restart task failed: {error}"))?,
+        }
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = acknowledge_live_stream;
+        Err("SVC-OS-001: the Sunshine service exists only on Windows".to_string())
+    }
+}
+
+/// The tray's mode switch (用户模式 ↔ 服务模式) through the elevated helper. Returns the mode switched to.
+pub(crate) async fn toggle_host_mode(acknowledge_live_stream: bool) -> Result<&'static str, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let (scm, process) = tokio::task::spawn_blocking(local_layers)
+            .await
+            .map_err(|error| format!("SVC-SCM-001: status task failed: {error}"))?;
+        let operation = status::plan_toggle(&scm, &process)?;
+        status::require_live_stream_acknowledgement(operation, live_streams().await, acknowledge_live_stream)?;
+        elevated::run(operation).await?;
+        Ok(if operation == Operation::UserMode { "user" } else { "service" })
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = acknowledge_live_stream;
         Err("SVC-OS-001: the Sunshine service exists only on Windows".to_string())
     }
 }

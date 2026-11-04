@@ -204,8 +204,10 @@ export const tools = {
   restartGraphicsDriver: () => invoke('restart_graphics_driver'),
   // what the operating system says about the host (process, service, whether a stop was asked for): the 「Sunshine 意外停止」 surface is decided on it, not on a silence
   getHostFacts: () => invoke('get_sunshine_host_facts'),
-  restartSunshineService: () => invoke('restart_sunshine_service'),
-  restartSunshineInUserMode: () => invoke('restart_sunshine_in_user_mode'),
+  // through the hardened elevated helper (src-tauri/src/sunshine_service); during a live stream the back end needs acknowledgeLiveStream,
+  // which a caller passes only after its own confirmation said that streams end
+  restartSunshineService: (acknowledgeLiveStream = false) => invoke('restart_sunshine_service', { acknowledgeLiveStream }),
+  restartSunshineInUserMode: (acknowledgeLiveStream = false) => invoke('restart_sunshine_in_user_mode', { acknowledgeLiveStream }),
   uninstallVddDriver: () => invoke('uninstall_vdd_driver'),
   openNativeTool: (toolId) => invoke('open_native_tool', { toolId }),
 }

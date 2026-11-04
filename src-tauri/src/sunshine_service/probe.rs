@@ -99,37 +99,31 @@ fn process_image(pid: u32) -> Option<String> {
     }
 }
 
-/// Process layer: the sunshine.exe of this install (Toolhelp snapshot), its
-/// start time, and whether the service process is its parent.
-pub(crate) fn process_layer(install_dir: &Path, service_pid: Option<u32>) -> ProcessLayer {
+/// sunshine.exe processes of this install as (pid, parent pid), from a Toolhelp snapshot. A process whose
+/// image cannot be read (another session, protected) is counted as ours only when `include_unreadable`.
+pub(crate) fn install_processes(install_dir: &Path, include_unreadable: bool) -> Result<Vec<(u32, u32)>, String> {
     use windows::Win32::Foundation::CloseHandle;
     use windows::Win32::System::Diagnostics::ToolHelp::{
         CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
     };
     let expected = install_dir.join("sunshine.exe").to_string_lossy().to_ascii_lowercase();
-    let snapshot = match unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) } {
-        Ok(snapshot) => snapshot,
-        Err(error) => {
-            return ProcessLayer { error: Some(format!("SVC-PROC-001: process snapshot failed: {error}")), ..Default::default() };
-        }
-    };
+    let snapshot = unsafe { CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0) }
+        .map_err(|error| format!("SVC-PROC-001: process snapshot failed: {error}"))?;
     let mut entry = PROCESSENTRY32W { dwSize: std::mem::size_of::<PROCESSENTRY32W>() as u32, ..Default::default() };
-    let mut found: Option<(u32, u32)> = None;
+    let mut found = Vec::new();
     let mut more = unsafe { Process32FirstW(snapshot, &mut entry) }.is_ok();
     while more {
         let length = entry.szExeFile.iter().position(|&c| c == 0).unwrap_or(entry.szExeFile.len());
         let name = String::from_utf16_lossy(&entry.szExeFile[..length]);
         if name.eq_ignore_ascii_case("sunshine.exe") {
             let pid = entry.th32ProcessID;
-            // Another install's sunshine.exe is not this host; an image we
-            // cannot read (another session, protected) still counts.
-            let ours = process_image(pid).is_none_or(|image| image.to_ascii_lowercase() == expected);
+            // another install's sunshine.exe is not this host
+            let ours = match process_image(pid) {
+                Some(image) => image.to_ascii_lowercase() == expected,
+                None => include_unreadable,
+            };
             if ours {
-                let candidate = (pid, entry.th32ParentProcessID);
-                // Prefer the child of the service when there are several.
-                if found.is_none() || Some(entry.th32ParentProcessID) == service_pid {
-                    found = Some(candidate);
-                }
+                found.push((pid, entry.th32ParentProcessID));
             }
         }
         more = unsafe { Process32NextW(snapshot, &mut entry) }.is_ok();
@@ -137,7 +131,22 @@ pub(crate) fn process_layer(install_dir: &Path, service_pid: Option<u32>) -> Pro
     unsafe {
         let _ = CloseHandle(snapshot);
     }
-    match found {
+    Ok(found)
+}
+
+/// Process layer: the sunshine.exe of this install, its start time, and whether the service process is its parent.
+pub(crate) fn process_layer(install_dir: &Path, service_pid: Option<u32>) -> ProcessLayer {
+    let processes = match install_processes(install_dir, true) {
+        Ok(processes) => processes,
+        Err(error) => return ProcessLayer { error: Some(error), ..Default::default() },
+    };
+    // prefer the child of the service when there are several
+    let chosen = processes
+        .iter()
+        .find(|(_, parent)| Some(*parent) == service_pid)
+        .or_else(|| processes.first())
+        .copied();
+    match chosen {
         Some((pid, parent)) => ProcessLayer {
             running: true,
             pid: Some(pid),
@@ -147,4 +156,43 @@ pub(crate) fn process_layer(install_dir: &Path, service_pid: Option<u32>) -> Pro
         },
         None => ProcessLayer::default(),
     }
+}
+
+/// End every sunshine.exe of this install (TerminateProcess, then wait up to 5 s for each). Only images that
+/// read as `<install_dir>\sunshine.exe` are ended. `Err(win32 code)` on the first one that cannot be ended.
+pub(crate) fn end_install_processes(install_dir: &Path) -> Result<(), u32> {
+    use windows::Win32::Foundation::{CloseHandle, WAIT_OBJECT_0};
+    use windows::Win32::System::Threading::{
+        OpenProcess, PROCESS_SYNCHRONIZE, PROCESS_TERMINATE, TerminateProcess, WaitForSingleObject,
+    };
+    const ERROR_INVALID_PARAMETER: u32 = 87; // the process is already gone
+    for (pid, _) in install_processes(install_dir, false).map_err(|_| 1u32)? {
+        unsafe {
+            let handle = match OpenProcess(PROCESS_TERMINATE | PROCESS_SYNCHRONIZE, false, pid) {
+                Ok(handle) => handle,
+                Err(error) if super::scm::win32_code(&error) == ERROR_INVALID_PARAMETER => continue,
+                Err(error) => return Err(super::scm::win32_code(&error)),
+            };
+            let ended = TerminateProcess(handle, 1).map_err(|error| super::scm::win32_code(&error));
+            let waited = WaitForSingleObject(handle, 5000);
+            let _ = CloseHandle(handle);
+            ended?;
+            if waited != WAIT_OBJECT_0 {
+                return Err(1053);
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Start `<install_dir>\sunshine.exe` in its folder, hidden, as the calling process's user and token.
+pub(crate) fn start_install_process(install_dir: &Path) -> Result<(), String> {
+    use std::os::windows::process::CommandExt;
+    const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+    std::process::Command::new(install_dir.join("sunshine.exe"))
+        .current_dir(install_dir)
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("SVC-PROC-003: sunshine.exe did not start: {error}"))
 }

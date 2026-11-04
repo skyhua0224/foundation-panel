@@ -81,3 +81,23 @@
 - How User Account Control works：https://learn.microsoft.com/windows/security/application-security/application-control/user-account-control/how-it-works
 - Dynamic-Link Library Security（程序目录在搜索顺序第一位；提权进程从可被控制的目录加载 DLL 会导致本地提权）：
   https://learn.microsoft.com/windows/win32/dlls/dynamic-link-library-security
+
+## 重启和运行模式切换（离线页、托盘、首页、搜索）
+
+原来的 `restart_sunshine_service` / `toggle_sunshine_mode` 用 `utils::execute_powershell_command` 以管理员身份跑
+`net stop SunshineService; taskkill /IM sunshine.exe /F; net start …` 或 `Start-Process -Verb RunAs`。现在都走同一个提权 helper，
+PowerShell 提权入口 `execute_powershell_command` 已删除，用户模式检测也不再解析 `sc query` / `tasklist` 文本。
+
+| 入口 | 做法 |
+|---|---|
+| 重启（离线页「重启服务」、托盘恢复、首页、搜索动作、待生效更改、旧页面） | 本安装有服务：helper `restart` = 停止服务 → 结束本安装残留的 sunshine.exe（用户模式或孤儿进程，只认 `<安装目录>\sunshine.exe` 这个映像）→ 启动服务。没有服务（便携版）：以当前用户结束并重新启动本安装的 sunshine.exe，不提权 |
+| 切到用户模式（离线页「用户模式」、托盘） | helper `user-mode` = 停止服务 → 结束残留 → 由已提权的 helper 直接启动 `<安装目录>\sunshine.exe`（相当于原来的 RunAs） |
+| 从用户模式切回服务 | helper `restart` |
+
+模式判断（`status::plan_toggle`）：本安装的 sunshine.exe 在跑、不是服务拉起的、服务也没在运行，就是用户模式，切回服务；否则切到用户模式。
+
+确认：
+- 离线页和搜索动作用 `composables/hostRestart.js`：先读 `get_sunshine_service_status` 拿到串流数，弹出与服务页相同的确认框（需要管理员授权、有几路串流会断；切用户模式还会说明重启电脑后不会自动运行）。
+- 托盘「以用户模式运行 Sunshine」先弹确认框，写明会先停再启、串流会断、需要管理员授权。
+- 首页「重启主机」和待生效更改有各自的确认框（已写明串流会中断 / 列出会结束的会话），确认后带上确认标记。
+- 后端：有直播串流时，`restart_sunshine_service` / `toggle_sunshine_mode` 没有 `acknowledge_live_stream` 就拒绝（`SVC-CONFIRM-002`）。

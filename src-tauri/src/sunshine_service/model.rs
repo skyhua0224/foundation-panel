@@ -95,7 +95,13 @@ pub(crate) enum Operation {
     SetStartType(StartType),
     Start,
     Stop,
+    /// Stop the service, end any sunshine.exe of this install that is left
+    /// (a user-mode one or an orphan), start the service: also the way from
+    /// user mode back to the service.
     Restart,
+    /// Stop the service, end any sunshine.exe of this install that is left,
+    /// start sunshine.exe of this install with administrator rights.
+    UserMode,
 }
 
 impl Operation {
@@ -106,6 +112,7 @@ impl Operation {
             Operation::Start => vec!["start"],
             Operation::Stop => vec!["stop"],
             Operation::Restart => vec!["restart"],
+            Operation::UserMode => vec!["user-mode"],
         }
     }
 
@@ -129,6 +136,7 @@ pub(crate) fn parse_helper_arguments<S: AsRef<str>>(
         ["start"] => Ok(Operation::Start),
         ["stop"] => Ok(Operation::Stop),
         ["restart"] => Ok(Operation::Restart),
+        ["user-mode"] => Ok(Operation::UserMode),
         _ => Err("SVC-ARG-001: unsupported service helper arguments".to_string()),
     };
     Some(operation)
@@ -160,6 +168,7 @@ pub(crate) mod exit {
     pub(crate) const UNTRUSTED_LOCATION: i32 = 5;
     pub(crate) const TIMEOUT: i32 = 6;
     pub(crate) const RUNTIME: i32 = 7;
+    pub(crate) const PROCESS_START: i32 = 8;
     pub(crate) const WIN32_BASE: i32 = 0x2000_0000;
 
     pub(crate) fn from_win32(code: u32) -> i32 {
@@ -181,6 +190,7 @@ pub(crate) fn describe_helper_exit(code: i32) -> Result<(), String> {
         ),
         exit::TIMEOUT => Err("SVC-SCM-005: the service did not reach the requested state in time".into()),
         exit::RUNTIME => Err("SVC-UAC-002: the service helper could not start".into()),
+        exit::PROCESS_START => Err("SVC-PROC-003: sunshine.exe did not start in user mode".into()),
         code if code & exit::WIN32_BASE != 0 => {
             let win32 = (code & 0xFFFF) as u32;
             Err(format!("SVC-SCM-002: {}", win32_service_error(win32)))
@@ -292,7 +302,7 @@ mod tests {
     fn helper_arguments_round_trip_for_every_operation() {
         let mut operations: Vec<Operation> =
             StartType::ALL.into_iter().map(Operation::SetStartType).collect();
-        operations.extend([Operation::Start, Operation::Stop, Operation::Restart]);
+        operations.extend([Operation::Start, Operation::Stop, Operation::Restart, Operation::UserMode]);
         for operation in operations {
             let mut line = vec![HELPER_VERB];
             line.extend(operation.arguments());
@@ -326,6 +336,9 @@ mod tests {
             &[HELPER_VERB, "delete"],
             &[HELPER_VERB, "config", "binPath=", r"C:\evil.exe"],
             &[HELPER_VERB, "START"],
+            &[HELPER_VERB, "user-mode", "--port", "1"],
+            &[HELPER_VERB, "user-mode", r"C:\evil.exe"],
+            &[HELPER_VERB, "usermode"],
             &[HELPER_VERB, ""],
         ];
         for line in rejected {
@@ -383,6 +396,7 @@ mod tests {
         assert!(describe_helper_exit(exit::BAD_ARGUMENTS).unwrap_err().starts_with("SVC-ARG"));
         assert!(describe_helper_exit(exit::UNTRUSTED_LOCATION).unwrap_err().starts_with("SVC-UAC-003"));
         assert!(describe_helper_exit(1).unwrap_err().starts_with("SVC-UAC-002"));
+        assert!(describe_helper_exit(exit::PROCESS_START).unwrap_err().starts_with("SVC-PROC-003"));
     }
 
     #[test]
