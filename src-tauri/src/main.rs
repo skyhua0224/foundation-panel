@@ -19,6 +19,8 @@ mod file_transfer;
 mod fs_utils;
 mod game_session;
 mod github_download;
+mod host_facts;
+mod host_facts_math;
 mod hwinfo;
 mod logger;
 mod moonlight_web;
@@ -239,6 +241,7 @@ fn main() {
             system::get_process_memory_info,
             system_load::system_load,
             system::get_sunshine_start_time,
+            host_facts::get_sunshine_host_facts,
             sunshine::get_sunshine_install_path,
             sunshine::get_sunshine_version,
             sunshine::parse_sunshine_config,

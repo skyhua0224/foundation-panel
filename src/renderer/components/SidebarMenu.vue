@@ -235,7 +235,10 @@ const hostConn = useHostConnection({
   restartService: () => tools.restartSunshineService(),
   restartUser: () => tools.restartSunshineInUserMode(),
   onRecovered: () => { for (const frame of document.querySelectorAll('iframe')) { const src = frame.src; frame.src = src } },
-  // the host answered and stopped without a request from this window: the error surface in its 「Sunshine 意外停止」 variant (telemetry/crash.js has the interface for the crash bundle the host leaves)
+  // A silence is not a stop. The connection reads what the operating system says about the host (the process and its start, the service, whether the panel asked for a stop) and the
+  // error surface in its 「Sunshine 意外停止」 variant opens only when the process is gone or is a new one and nobody asked (m3e status/hostLoss.js; telemetry/crash.js has the interface
+  // for the crash bundle the host leaves). A host that is silent while its process runs is 「主机无响应」 in the offline state, without the stop surface.
+  facts: () => tools.getHostFacts(),
   onLost: ({ at }) => reportHostStop({ at }),
 })
 const NEEDS_NO_HOST = new Set([ROUTES.PANEL_SETTINGS, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
