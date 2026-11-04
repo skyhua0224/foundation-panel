@@ -54,6 +54,7 @@ export function pageItems(t, rail, runtime = {}) {
       { id: ROUTES.SUNSHINE_SERVICE, icon: 'dns', tone: 'primary', label: runtime.serviceTitle || 'Sunshine', text: lines.service },
       { id: ROUTES.COMPONENT_STATUS, icon: 'monitor_heart', tone: 'success', label: runtime.statusTitle || 'Components', text: lines.components },
       { id: ROUTES.DIAGNOSTICS, icon: 'stethoscope', tone: 'warn', label: runtime.diagTitle || c.system.diagnostics, text: lines.diagnostics },
+      { id: ROUTES.DOCTOR, icon: 'health_and_safety', tone: 'success', label: runtime.doctorTitle || 'Health check', text: lines.doctor },
       { id: ROUTES.TOOLBOX, icon: 'build', tone: 'secondary', label: t.sidebar.toolbox, text: lines.toolbox },
       // the tools people come for have a row of their own: 系统 then the tool is two presses (inside the toolbox it was three)
       { id: ROUTES.LATENCY_CLOCK, icon: 'speed', tone: 'primary', label: t.sidebar.latencyClock, text: lines['latency-clock'] },
