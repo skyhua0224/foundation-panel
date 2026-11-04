@@ -453,6 +453,13 @@ pub fn handle_toolbar_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str)
         }
     }
 
+    // the old tool windows of these items are pages of the main window now (renderer composables/panelParts.js)
+    fn open_panel_page<R: Runtime>(app: &AppHandle<R>, page: &str) {
+        if let Some(window) = ensure_main_window(app) {
+            let _ = window.emit("open-panel-page", serde_json::json!({ "page": page }));
+        }
+    }
+
     match event_id {
         "main" | "toolbar_main" => {
             ensure_main_window(app);
@@ -462,31 +469,15 @@ pub fn handle_toolbar_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str)
                 let _ = window.emit("open-vdd-settings", ());
             }
         }
-        "dpi" | "toolbar_dpi" => {
-            if let Err(e) = create_tool_window_internal(app, "dpi") {
-                error!("创建工具窗口失败: {}", e);
-            }
-        }
-        "bitrate" | "toolbar_bitrate" => {
-            if let Err(e) = create_tool_window_internal(app, "bitrate") {
-                error!("创建工具窗口失败: {}", e);
-            }
-        }
+        "dpi" | "toolbar_dpi" => open_panel_page(app, "desktop-scale"),
+        "bitrate" | "toolbar_bitrate" => open_panel_page(app, "live-session"),
         "performance" | "toolbar_performance" => {
             if let Err(e) = create_tool_window_internal(app, "performance") {
                 error!("创建工具窗口失败: {}", e);
             }
         }
-        "shortcuts" | "toolbar_shortcuts" => {
-            if let Err(e) = create_tool_window_internal(app, "shortcuts") {
-                error!("创建工具窗口失败: {}", e);
-            }
-        }
-        "pet" | "toolbar_pet" => {
-            if let Err(e) = create_tool_window_internal(app, "pet") {
-                error!("创建工具窗口失败: {}", e);
-            }
-        }
+        "shortcuts" | "toolbar_shortcuts" => open_panel_page(app, "shortcuts"),
+        "pet" | "toolbar_pet" => open_panel_page(app, "pet"),
         "close" | "toolbar_close" => {
             if let Some(window) = app.get_webview_window("toolbar") {
                 let _ = window.close();

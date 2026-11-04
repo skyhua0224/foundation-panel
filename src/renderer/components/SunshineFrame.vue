@@ -541,6 +541,10 @@ onMounted(async () => {
       sidebarMenuRef.value?.openVddSettings?.()
     })
 
+    await currentWindow.listen('open-panel-page', (event) => {
+      sidebarMenuRef.value?.openPanelPage?.(event.payload?.page)
+    })
+
     await currentWindow.listen('open-web-stream', () => {
       sidebarMenuRef.value?.openWebStream?.()
     })

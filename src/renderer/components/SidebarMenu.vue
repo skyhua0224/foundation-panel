@@ -92,7 +92,7 @@
     <MAnnouncementPopup :item="announcements.popup.value" :locale="locale" @shown="announcements.markShown" @acknowledge="announcements.acknowledge" @hide="announcements.hide" @open-url="actions_openExternal" />
     <MCoachMarks :locale="locale" storage-key="foundation.coach.panel" guide-key="foundation.guide.panel" />
     <MConnectDialog v-model="connect.open.value" v-model:tab="connect.tab.value" v-model:os="connect.os.value" :assets-of="connect.assetsOf" :version-of="connect.versionOf" :locale="locale" :qr="connect.matrix" :pair-qr="connect.pairQr" :count="hostClients.length" :latest="hostClients.length ? hostClients[hostClients.length - 1].name : ''" :close-label="t.m3e.home.done"
-      @pair-pin="(e) => connect.pairPin(e.pin)" @pair-qr-begin="connect.qrBegin()" @pair-qr-stop="connect.qrStop()" @open-url="actions_openExternal" @open-downloads="() => { connect.open.value = false; openRoute(ROUTES.WEB_DOWNLOADS) }" />
+      @pair-pin="(e) => connect.pairPin(e.pin, e.name)" @pair-qr-begin="connect.qrBegin()" @pair-qr-stop="connect.qrStop()" @open-url="actions_openExternal" @open-downloads="() => { connect.open.value = false; openRoute(ROUTES.WEB_DOWNLOADS) }" />
     <MPairPrompt :requests="pairing.requests.value" :locale="locale" @submit="onPairSubmit" @reject="(id) => pairing.reject(id)" @install="connect.show('install')" />
     <PanelPending :locale="locale" @go="onPendingGo" />
     <MSupportSheet v-model="sponsorOpen" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" />
@@ -143,6 +143,7 @@ import { useTools } from '../composables/useTools.js'
 import { useTouchWindowDrag } from '../composables/useTouchWindowDrag.js'
 import { createUtilityTools } from '../composables/toolsRegistry.js'
 import { ROUTES, PAGES, routeForWebPath, routeOfPlace, webPathOf } from '../composables/useRouter.js'
+import { requestPanelPage } from '../composables/panelParts.js'
 import { createGuideData } from '../composables/guideData.js'
 import PanelPending from './PanelPending.vue'
 import { recordUpdateCheck } from '../composables/useUpdateCheckTime.js'
@@ -509,8 +510,10 @@ watch(
     if (to !== from) emit('route-change', { from, to })
   },
 )
+// a page another window opens here (the toolbar menu: toolbar.rs `open-panel-page`, SunshineFrame passes it on)
+const openPanelPage = (page) => { const route = requestPanelPage(page); if (route) router.navigate(route) }
 defineExpose({
-  openVddSettings, openWelcome, openWebStream, openAiAssistant, openControllers, openRtxHdr,
+  openVddSettings, openWelcome, openWebStream, openAiAssistant, openControllers, openRtxHdr, openPanelPage,
   goHome, checkForUpdates: handleCheckForUpdates, router,
 })
 </script>

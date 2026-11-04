@@ -166,7 +166,7 @@ function onAction(a) {
     case 'group': onStripGroup(a.value); break
     case 'switch': onStripSwitch(a.value); break
     case 'table-action': emit('open', 'pair'); break
-    case 'pair-pin': pairPin(a.value?.pin); break
+    case 'pair-pin': pairPin(a.value?.pin, a.value?.name); break
     case 'pair-qr': emit('open', 'pair:qr'); break
     case 'star-dismiss': star.dismiss(); break
     case 'address-save': saveSetting({ key: 'external_endpoints', value: a.value?.value ?? '' }).then(() => saveSetting({ key: 'external_ip', value: '' })).then(() => hostReach.refresh(true)); break
@@ -208,9 +208,9 @@ const journey = useJourneyHome({ storageKey: 'panel-home', assetsOf: releases.as
 // the star card: once, after the first pairing or the first stream
 const star = useStarCard({ storageKey: 'panel-home', triggered: () => journey.done.value || sessionSeen.value })
 // the PIN typed on the pairing card goes to the host like the pairing sheet sends it
-async function pairPin(pin) {
+async function pairPin(pin, name = '') {
   if (!/^\d{4}$/.test(String(pin || ''))) return
-  try { const data = await hostApi.postJson('/api/pin', { pin: String(pin), name: dashTexts.value.pairDefaultName }); say(String(data.status) === 'true' ? dashTexts.value.pairSent : dashTexts.value.pairFailed) } catch { say(dashTexts.value.pairFailed) }
+  try { const data = await hostApi.postJson('/api/pin', { pin: String(pin), name: String(name || '').trim() || dashTexts.value.pairDefaultName }); say(String(data.status) === 'true' ? dashTexts.value.pairSent : dashTexts.value.pairFailed) } catch { say(dashTexts.value.pairFailed) }
 }
 async function saveSetting({ key, value }) { const r = await saveSettingKey(hostApi, key, value); if (r.ok) state.config = r.config }
 async function onStripGroup(v) { pad.selectedMode.value = v }

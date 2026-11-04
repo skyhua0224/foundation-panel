@@ -250,6 +250,7 @@ import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
 import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards, MDialog, MPrepArt, MValueItem, MSeg, MChip, MTile, MIcon, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, MPageLoading, useSubpage, vddPageTexts, vddTexts, VDD_PREP, VDD_RULES, vddOn } from 'foundation-ui/vue'
 import { useHostVdd } from '../composables/useHostVdd.js'
 import DpiScaleSection from './m3e/DpiScaleSection.vue'
+import { usePanelPart } from '../composables/panelParts.js'
 import { useEditableOptionField } from '../composables/useEditableOptionField.js'
 import { useVddEdid } from '../composables/useVddEdid.js'
 import { useVddStatusLabel } from '../composables/useVddStatusLabel.js'
@@ -437,6 +438,8 @@ const activeSection = computed({
   get: () => vddSub.value || 'overview',
   set: (value) => { if (value === 'overview') { if (vddSub.value) backVdd() } else openVddSub(value) },
 })
+// the toolbar menu's 调整 DPI: the overview, scrolled to 桌面缩放
+usePanelPart('desktop-scale', () => { activeSection.value = 'overview'; setTimeout(() => document.getElementById('m-desktop-scale')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 60) })
 const pageTitle = computed(() => ({ display: t.value.vddSettings.tabDisplay, quality: vp.value.qualityTitle, calibration: t.value.vddSettings.calibrationTitle, driver: vp.value.driverTitle }[activeSection.value] || t.value.m3e.display.vdd))
 const edidInput = ref(null)
 const onEdidPicked = (event) => {

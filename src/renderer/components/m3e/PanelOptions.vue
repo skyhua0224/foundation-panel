@@ -6,6 +6,7 @@ import { defaultDesktopSettings, desktopSettings, loadDesktopSettings, saveDeskt
 import { bigScreenSettings, defaultBigScreenSettings, setBigScreenSetting } from '../../desktop/composables/useBigScreenSettings.js'
 import { useLaunchHelpers } from '../../desktop/composables/useLaunchHelpers.js'
 import { useDesktopPet } from '../../composables/useDesktopPet.js'
+import { usePanelPart } from '../../composables/panelParts.js'
 import { isTauriRuntime } from '../../desktop/composables/useTauri.js'
 import { fileMapping, sunshine } from '../../tauri-adapter.js'
 
@@ -27,6 +28,8 @@ const open = (id) => { sheet.value = id }
 const onCount = (rows, source) => { const o = unref(source) || {}; return `${rows.filter(([key]) => Boolean(o[key])).length} / ${rows.length}` }
 const bigOn = computed(() => bigScreen.value.filter(([key]) => Boolean(unref(bigScreenSettings)?.[key])).length + (autoLaunchDesktop.value ? 1 : 0))
 const closeSheet = (value) => { if (!value) sheet.value = '' }
+// the toolbar menu's 桌宠设置 opens the pet sheet here
+usePanelPart('pet', () => open('pet'))
 
 onMounted(async () => {
   hasTauri.value = await isTauriRuntime()

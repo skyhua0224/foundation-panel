@@ -75,11 +75,13 @@
       <MSection>
         <MGroup>
           <MItem action icon="download" :title="t.sidebar.clientDownloads" @click="emit('webui-navigate', '/downloads')" />
+          <MItem action icon="keyboard" :title="t.toolbar.shortcutGuide" @click="shortcutsOpen = true" />
           <MItem action icon="bug_report" :title="t.sidebar.diagnostics" @click="emit('webui-navigate', '/troubleshooting')" />
           <MItem action icon="public" :title="t.sidebar.officialWebsite" @click="actions.openUrl('https://www.alkaidlab.com/')"><template #trail><MIcon name="open_in_new" /></template></MItem>
           <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="sponsorOpen = true" />
         </MGroup>
       </MSection>
+      <ShortcutsSheet v-model="shortcutsOpen" />
       <MSupportSheet v-model="sponsorOpen" :title="t.m3e.home.sponsorTitle" :sections="[{ title: t.m3e.home.sponsorTitle, items: SPONSORS.map((s) => ({ id: s.id, icon: 'favorite', title: s.label, url: s.url })) }]" :close-label="t.m3e.home.done" @open="(it) => actions.openUrl(it.url)" />
     </template>
   </MPage>
@@ -89,6 +91,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFooter, MFieldItem, MBanner, MSupportSheet, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
+import ShortcutsSheet from './m3e/ShortcutsSheet.vue'
+import { usePanelPart } from '../composables/panelParts.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import PanelOptions from './m3e/PanelOptions.vue'
 import { ROUTES } from '../composables/useRouter.js'
@@ -144,6 +148,9 @@ const sourceHint = computed(() => (updateSource.source.value === 'auto' ? src.va
 const saveCdk = async () => { if (await updateSource.saveCdk(cdkDraft.value)) cdkDraft.value = '' }
 onMounted(() => { void updateSource.refresh() })
 const sponsorOpen = ref(false)
+// 快捷键手册 (帮助与关于, and the toolbar menu's item of the same name)
+const shortcutsOpen = ref(false)
+usePanelPart('shortcuts', () => (props.page === ROUTES.HELP ? (shortcutsOpen.value = true) : false))
 const checkingUpdate = ref(false)
 const checkUpdate = async () => {
   if (checkingUpdate.value) return

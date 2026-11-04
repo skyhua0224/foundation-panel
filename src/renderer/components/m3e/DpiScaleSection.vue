@@ -1,5 +1,5 @@
 <template>
-  <MSection :title="d.title">
+  <MSection id="m-desktop-scale" :title="d.title">
     <MBanner v-if="problem" tone="error" icon="error">{{ problem }}</MBanner>
     <MGroup>
       <MSliderItem v-model="dpi" icon="format_size" :title="d.scale" :min="100" :max="300" :step="25" :decimals="0" unit="%" :readout-text="loading ? d.loading : ''" :disabled="applying || loading" />
