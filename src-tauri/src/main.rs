@@ -3,6 +3,7 @@
 
 mod app;
 mod bat_runner;
+mod build_identity;
 mod client_fingerprint_rules;
 mod clipboard;
 mod commands;
@@ -247,6 +248,7 @@ fn main() {
             host_facts::get_sunshine_host_facts,
             sunshine::get_sunshine_install_path,
             sunshine::get_sunshine_version,
+            sunshine::get_sunshine_build_info,
             sunshine::parse_sunshine_config,
             sunshine::get_sunshine_url,
             sunshine::get_command_line_url,

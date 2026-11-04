@@ -1,5 +1,5 @@
 <template>
-  <MAbout :version="currentVersion" :channel="channel" :update="update" :sponsors="SPONSORS" :locale="locale" :on-refresh="onRefresh" :consent="consent" @consent="(v) => emit('consent', v)" :update-channel="includePrerelease ? 'prerelease' : 'stable'" @channel-change="(value) => emit('channel-change', value === 'prerelease')" @check="runCheck" @open-update="emit('open-update')" @open="(url) => emit('open', url)" @developer-off="options?.off()">
+  <MAbout :version="currentVersion" :channel="channel" :build="build" :update="update" :sponsors="SPONSORS" :locale="locale" :on-refresh="onRefresh" :consent="consent" @consent="(v) => emit('consent', v)" :update-channel="includePrerelease ? 'prerelease' : 'stable'" @channel-change="(value) => emit('channel-change', value === 'prerelease')" @check="runCheck" @open-update="emit('open-update')" @open="(url) => emit('open', url)" @developer-off="options?.off()">
     <template #developer><DeveloperOptions ref="options" /></template>
   </MAbout>
 </template>
@@ -10,6 +10,7 @@ import { MAbout } from 'foundation-ui/vue'
 import { channelOfVersion, fetchReleaseMetadata } from 'foundation-ui/update'
 import { SPONSORS } from '../../config/sponsors.js'
 import DeveloperOptions from './DeveloperOptions.vue'
+import { sunshine } from '../../tauri-adapter.js'
 
 // 关于 of the control panel: the shared page with the panel's data. The update check is the panel's own (`check_for_updates`) and its
 // answer opens the same update sheet as everywhere else; the page only shows the state of the last answer.
@@ -31,6 +32,7 @@ const emit = defineEmits(['open-update', 'open', 'consent', 'channel-change'])
 const checking = ref(false)
 const failed = ref(false)
 const channel = ref('')
+const build = ref(null)
 const update = computed(() => {
   if (checking.value) return { state: 'checking', version: '' }
   if (failed.value) return { state: 'error', version: '' }
@@ -44,8 +46,11 @@ async function runCheck() {
   failed.value = false
   try { failed.value = !(await props.check()) } finally { checking.value = false }
 }
-// The channel of the installed build is what the public release metadata says about its version; unknown builds show no channel.
+// The channel and the build time are what the host recorded when it was built (its build identity, read from sunshine.exe without a
+// request). Only a host that predates the identity falls back to the public release metadata for its version; then unknown builds show none.
 onMounted(async () => {
+  try { build.value = await sunshine.getBuildInfo() } catch { build.value = null }
+  if (build.value) return
   try { const result = await fetchReleaseMetadata(); if (result.ok) channel.value = channelOfVersion(result.metadata, props.currentVersion) } catch { /* no channel is shown */ }
 })
 defineExpose({ runCheck })

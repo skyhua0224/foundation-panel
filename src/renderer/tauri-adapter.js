@@ -170,6 +170,8 @@ export const dlssNr = {
 
 export const sunshine = {
   getVersion: () => wrapDefault('get_sunshine_version', 'Unknown'),
+  // the build identity of sunshine.exe (commit, channel, UTC build time, variant, package): its VERSIONINFO keys, else `--version --json`; null for an older host
+  getBuildInfo: () => wrapDefault('get_sunshine_build_info', null),
   parseConfig: () => wrapDefault('parse_sunshine_config', {}),
   getUrl: () => wrapDefault('get_sunshine_url', 'https://localhost:47990/'),
   getCommandLineUrl: () => wrapDefault('get_command_line_url', null),

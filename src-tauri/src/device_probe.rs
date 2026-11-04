@@ -274,6 +274,13 @@ mod imp {
 
     /// The FileVersion string of an executable (VS_VERSION_INFO StringFileInfo), if it has one.
     pub fn file_version_string(path: &std::path::Path) -> Option<String> {
+        file_version_strings(path, &["FileVersion"])?.remove("FileVersion")
+    }
+
+    /// Several String values of the first language/code page of the VERSIONINFO, read with one
+    /// GetFileVersionInfoW (the predefined names and custom keys such as the host's `Commit`).
+    /// Keys the resource lacks are absent from the map; `None` when the file has no version resource.
+    pub fn file_version_strings(path: &std::path::Path, keys: &[&str]) -> Option<std::collections::HashMap<String, String>> {
         use windows::Win32::Storage::FileSystem::{GetFileVersionInfoSizeW, GetFileVersionInfoW, VerQueryValueW};
         let file = wide(&path.to_string_lossy());
         unsafe {
@@ -291,15 +298,19 @@ mod imp {
                 return None;
             }
             let pair = std::slice::from_raw_parts(translation as *const u16, 2);
-            let sub_block = wide(&format!(r"\StringFileInfo\{:04x}{:04x}\FileVersion", pair[0], pair[1]));
-            let mut value: *mut core::ffi::c_void = std::ptr::null_mut();
-            let mut value_len = 0u32;
-            if !VerQueryValueW(data.as_ptr().cast(), PCWSTR(sub_block.as_ptr()), &mut value, &mut value_len).as_bool() || value_len == 0 {
-                return None;
+            let mut found = std::collections::HashMap::new();
+            for name in keys {
+                let sub_block = wide(&format!(r"\StringFileInfo\{:04x}{:04x}\{name}", pair[0], pair[1]));
+                let mut value: *mut core::ffi::c_void = std::ptr::null_mut();
+                let mut value_len = 0u32;
+                if !VerQueryValueW(data.as_ptr().cast(), PCWSTR(sub_block.as_ptr()), &mut value, &mut value_len).as_bool() {
+                    continue;
+                }
+                let units = std::slice::from_raw_parts(value as *const u16, value_len as usize);
+                let end = units.iter().position(|&unit| unit == 0).unwrap_or(units.len());
+                found.insert(name.to_string(), String::from_utf16_lossy(&units[..end]).trim().to_string());
             }
-            let units = std::slice::from_raw_parts(value as *const u16, value_len as usize);
-            let end = units.iter().position(|&unit| unit == 0).unwrap_or(units.len());
-            Some(String::from_utf16_lossy(&units[..end]).trim().to_string())
+            Some(found)
         }
     }
 

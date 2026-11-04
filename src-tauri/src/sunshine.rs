@@ -236,6 +236,56 @@ pub async fn get_sunshine_version() -> Result<String, String> {
         .await
 }
 
+/// The build identity of sunshine.exe (crate::build_identity): the VERSIONINFO keys first (no process), then
+/// `sunshine.exe --version --json`; `None` for a host that predates both. Cached like the version.
+static SUNSHINE_BUILD: crate::probe_cache::ProbeCache<Option<crate::build_identity::BuildIdentity>> =
+    crate::probe_cache::ProbeCache::new("sunshine build identity", std::time::Duration::from_secs(600));
+
+#[tauri::command]
+pub async fn get_sunshine_build_info() -> Result<Option<crate::build_identity::BuildIdentity>, String> {
+    SUNSHINE_BUILD
+        .get(|| async {
+            tokio::task::spawn_blocking(read_sunshine_build_info)
+                .await
+                .map_err(|e| e.to_string())
+        })
+        .await
+}
+
+fn read_sunshine_build_info() -> Option<crate::build_identity::BuildIdentity> {
+    let install_dir = get_sunshine_path();
+    let sunshine_exe = install_dir.join("sunshine.exe");
+    if !sunshine_exe.exists() {
+        return None;
+    }
+    let has_uninstaller = std::fs::read_dir(&install_dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .any(|entry| crate::build_identity::is_inno_uninstaller(&entry.file_name().to_string_lossy()))
+        })
+        .unwrap_or(false);
+
+    #[cfg(target_os = "windows")]
+    if let Some(info) = crate::device_probe::file_version_strings(&sunshine_exe, &crate::build_identity::VERSIONINFO_KEYS)
+        .and_then(|strings| crate::build_identity::from_versioninfo(&strings, has_uninstaller))
+    {
+        return Some(info);
+    }
+    let _ = has_uninstaller;
+
+    let mut command = Command::new(&sunshine_exe);
+    command.args(["--version", "--json"]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    let output = command.output().ok()?;
+    let (stdout, _) = crate::text_encoding::decode_output(&output);
+    crate::build_identity::from_version_json(&stdout)
+}
+
 fn read_sunshine_version() -> Result<String, String> {
     let sunshine_exe = get_sunshine_path().join("sunshine.exe");
 
