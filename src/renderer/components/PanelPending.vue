@@ -1,4 +1,5 @@
 <script setup>
+import { frameOrigin, postToFrame } from '../composables/frameOrigin.js'
 import { onBeforeUnmount, onMounted } from 'vue'
 import { MDialogHost, MNotifyHost, MPendingHost, mountPendingBridge, usePending } from 'foundation-ui/vue'
 import { tools } from '../tauri-adapter.js'
@@ -17,13 +18,13 @@ defineVddSource({ pageLabel: t.value.m3e.nav.display })
 defineUsbSource({ pageLabel: t.value.m3e.input.usb })
 
 const frame = () => document.querySelector('.panel-web__frame iframe')
-const originOf = (el) => { try { return new URL(el.src, location.href).origin } catch { return '*' } }
+const originOf = (el) => frameOrigin(el)
 let stop = () => {}
 let last = null
 let timer = 0
 onMounted(() => {
   stop = mountPendingBridge(pending, {
-    post: (message) => { const el = frame(); el?.contentWindow?.postMessage(message, originOf(el)) },
+    post: (message) => { postToFrame(frame(), message) },
     listen: (fn) => {
       const on = (event) => { const el = frame(); if (el && event.source === el.contentWindow && event.origin === originOf(el)) fn(event.data) }
       window.addEventListener('message', on)
@@ -31,7 +32,7 @@ onMounted(() => {
     },
   })
   // the frame loads again when it opens another page of the Web UI: it is asked for what it holds
-  timer = setInterval(() => { const w = frame()?.contentWindow; if (w && w !== last) { last = w; frame()?.contentWindow?.postMessage({ type: 'foundation-pending', op: 'hello' }, originOf(frame())) } }, 600)
+  timer = setInterval(() => { const w = frame()?.contentWindow; if (w && w !== last && originOf(frame())) { last = w; postToFrame(frame(), { type: 'foundation-pending', op: 'hello' }) } }, 600)
 })
 onBeforeUnmount(() => { stop(); clearInterval(timer) })
 
