@@ -1320,6 +1320,7 @@ fn validate_update_service_image(image: &Path, install_dir: &Path) -> Result<(),
 /// Stop only this installation's service. Its existing shutdown handler owns Core cleanup.
 #[cfg(target_os = "windows")]
 fn stop_sunshine_for_update() -> Result<(), String> {
+    crate::host_facts::expect_stop(900_000);
     use std::os::windows::ffi::OsStringExt;
     use windows::Win32::Foundation::{WAIT_OBJECT_0, WAIT_TIMEOUT};
     use windows::Win32::System::Services::*;

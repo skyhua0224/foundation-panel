@@ -851,6 +851,7 @@ pub async fn post_tray_action(
 }
 
 pub async fn post_tray_restart_action() -> Result<Option<TrayActionResponse>, String> {
+    crate::host_facts::expect_stop(180_000);
     match post_tray_action_request("restart", None, None, None).await {
         Ok(response) => Ok(Some(response)),
         Err(error) => handle_restart_action_error(error),
@@ -1395,6 +1396,7 @@ fn build_start_service_command(sunshine_path: &std::path::Path) -> String {
 /// 切换 Sunshine 运行模式（用户模式 ↔ 服务模式）
 #[tauri::command]
 pub async fn toggle_sunshine_mode() -> Result<String, String> {
+    crate::host_facts::expect_stop(180_000);
     #[cfg(target_os = "windows")]
     {
         let is_user_mode = tokio::task::spawn_blocking(is_sunshine_running_in_user_mode_impl)
@@ -1438,6 +1440,8 @@ pub async fn toggle_sunshine_mode() -> Result<String, String> {
 
 #[tauri::command]
 pub async fn restart_sunshine_service() -> Result<String, String> {
+    // the stop that follows is asked for: the panel must not call it a crash
+    crate::host_facts::expect_stop(180_000);
     #[cfg(target_os = "windows")]
     {
         info!("🔄 开始重启 Sunshine 服务...");

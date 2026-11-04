@@ -1004,6 +1004,11 @@ async fn proxy_handler(req: Request) -> Response {
         debug!("📡 代理请求: {} {}", method, path);
     }
 
+    // the Web UI's restart or quit button: the stop that follows is asked for, the panel must not call it a crash (host_facts.rs)
+    if crate::host_facts_math::is_stop_request(method.as_str(), &path) {
+        crate::host_facts::expect_stop(180_000);
+    }
+
     // 快速失败检查：在冷却时间内直接返回错误，避免大量无效请求。
     // AI 入口除外：它是用户显式触发的共享代理能力，需要真实尝试一次，
     // 否则会因为旧的全局不可用状态误报 "Sunshine service is unavailable"。
