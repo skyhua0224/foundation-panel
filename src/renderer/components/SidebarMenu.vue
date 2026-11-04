@@ -97,7 +97,6 @@
     <MPairPrompt :requests="pairing.requests.value" :locale="locale" @submit="onPairSubmit" @reject="(id) => pairing.reject(id)" @install="connect.show('install')" />
     <PanelPending :locale="locale" @go="onPendingGo" />
     <MSupportSheet v-model="sponsorOpen" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" />
-    <MThanksLine v-if="thanks.visible.value" :locale="locale" @star="thanksStar" @sponsor="thanksSponsor" @dismiss="thanks.dismiss" />
     <UpdateDialog
       v-if="showUpdateDialog"
       v-model="showUpdateDialog"
@@ -115,7 +114,7 @@ import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
-import { MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton } from 'foundation-ui/vue'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -286,9 +285,6 @@ const announcementsUnread = announcements.unread
 const updateWaiting = computed(() => !!updateInfo.value && !updateInfo.value.is_latest)
 const rail = computed(() => railItems(t.value).map((item) => (item.id === 'overview' && announcementsUnread.value ? { ...item, badge: announcementsUnread.value } : item.id === 'help' && updateWaiting.value ? { ...item, badge: 'dot' } : item.id === 'assistant' && mitaState.unread ? { ...item, badge: 'dot' } : item)))
 // the one-time thank-you line after the guided first run
-const thanks = useThanks({ guideKey: 'foundation.guide.panel' })
-const thanksStar = () => { actions_openExternal('https://github.com/AlkaidLab/foundation-sunshine'); thanks.dismiss() }
-const thanksSponsor = () => { thanks.dismiss(); router.navigate(ROUTES.ABOUT) }
 const railLabel = (id) => t.value.m3e.nav[id]
 const runtimeView = computed(() => ({ ...runtime, lines: settingsList.lines.value, statusTitle: statusTexts(locale.value).title, diagTitle: diagnosticsTexts(locale.value).title }))
 const listItems = (id) => pageItems(t.value, id, runtimeView.value)
