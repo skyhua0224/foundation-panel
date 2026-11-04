@@ -1,5 +1,5 @@
 <template>
-  <MAbout :version="currentVersion" :channel="channel" :update="update" :sponsors="SPONSORS" :locale="locale" :on-refresh="onRefresh" :consent="consent" @consent="(v) => emit('consent', v)" @check="runCheck" @open-update="emit('open-update')" @open="(url) => emit('open', url)" @developer-off="options?.off()">
+  <MAbout :version="currentVersion" :channel="channel" :update="update" :sponsors="SPONSORS" :locale="locale" :on-refresh="onRefresh" :consent="consent" @consent="(v) => emit('consent', v)" :update-channel="includePrerelease ? 'prerelease' : 'stable'" @channel-change="(value) => emit('channel-change', value === 'prerelease')" @check="runCheck" @open-update="emit('open-update')" @open="(url) => emit('open', url)" @developer-off="options?.off()">
     <template #developer><DeveloperOptions ref="options" /></template>
   </MAbout>
 </template>
@@ -22,9 +22,11 @@ const props = defineProps({
   /** fetch the announcements again (the developer entry changes their source) */
   onRefresh: { type: Function, default: null },
   consent: { type: String, default: '' },
+  /** the person's update channel (测试版 when true): the same preference as 面板设置; 更新通道 of the page changes it through `channel-change` */
+  includePrerelease: { type: Boolean, default: false },
 })
 const options = ref(null)
-const emit = defineEmits(['open-update', 'open', 'consent'])
+const emit = defineEmits(['open-update', 'open', 'consent', 'channel-change'])
 
 const checking = ref(false)
 const failed = ref(false)
