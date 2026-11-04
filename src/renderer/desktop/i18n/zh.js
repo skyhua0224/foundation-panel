@@ -882,6 +882,7 @@ export const zh = {
     driverStateUnsupported: '当前平台不支持',
     driverStateUnknown: '驱动状态未知',
     installRepairDriver: '安装 / 修复驱动',
+    installingDriver: '正在安装虚拟显示器驱动',
     recheckDriver: '重新检测',
     driverStatusCheckFailed: '检测基地显示器（ZakoVDD）驱动失败',
     installRepairTitle: '安装或修复基地显示器驱动（ZakoVDD）',
@@ -1703,6 +1704,8 @@ export const zh = {
       comingSoonHint: '该控制器类型已规划，专属设置正在开发中。',
     },
     peripherals: {
+      installingDriver: '正在安装{name}',
+      uninstallingDriver: '正在卸载{name}',
       installed: '已安装',
       notInstalled: '未安装',
       install: '安装',

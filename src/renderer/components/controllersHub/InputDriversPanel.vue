@@ -19,15 +19,18 @@
           <template #trail><MButton size="sm" :variant="vmouseEnabled ? 'filled' : 'outlined'" :loading="vmouseConfigSaving" :disabled="refreshing || !vmouseStatusKnown" @click="toggleVmouse">{{ !vmouseStatusKnown ? t.stream.vmouseUnknown : vmouseEnabled ? t.stream.vmouseOn : t.stream.vmouseOff }}</MButton></template>
         </MItem>
       </MGroup>
+      <!-- a driver being installed or removed: the wavy progress under the list (the button keeps its own busy state) -->
+      <MProgress v-for="d in ['vigem', 'vmouse'].filter((k) => ops[k])" :key="d" class="input-drivers__busy" :label="busyLabel(d)" />
     </template>
   </MSection>
 </template>
 
 <script setup>
-import { MSection, MGroup, MItem, MChip, MButton, MSkeleton } from 'foundation-ui/vue'
+import { MSection, MGroup, MItem, MChip, MButton, MSkeleton, MProgress } from 'foundation-ui/vue'
 import { onMounted } from 'vue'
 import { ElMessageBox } from '../../composables/notifyMessage.js'
 import { useInputDrivers } from '../../composables/useInputDrivers.js'
+import { formatMessage } from '../../shared/format-message.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
 const { t } = useI18n()
@@ -38,6 +41,9 @@ const {
   installVmouse, uninstallVmouse,
   vmouseEnabled, vmouseStatusKnown, vmouseNotice, vmouseConfigSaving, toggleVmouse,
 } = useInputDrivers(t)
+
+// the label of the wave while a driver is installed or removed (the status is still the one before the operation)
+const busyLabel = (d) => { const p = t.value.controllersHub.peripherals; const installed = d === 'vigem' ? vigemStatus.installed : vmouseStatus.value.installed; return formatMessage(installed ? p.uninstallingDriver : p.installingDriver, { name: p[d].title }) }
 
 async function confirmToggle(tool) {
   const strings = t.value.controllersHub.peripherals[tool]
