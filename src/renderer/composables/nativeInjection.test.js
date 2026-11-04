@@ -23,7 +23,7 @@ function createHarness({ pathname = '/config', hash = '', embedded = true } = {}
   const document = {
     referrer: 'http://tauri.localhost/',
     readyState: 'complete',
-    documentElement: { dataset: {} },
+    documentElement: { dataset: {}, getAttribute: () => null, style: {} },
     body: {},
     querySelectorAll: () => tabs,
     querySelector: () => logoutButton,

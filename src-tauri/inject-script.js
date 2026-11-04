@@ -324,9 +324,26 @@
     }
   }
 
+  // The Web page writes the colour scheme and a background colour on its root in the first lines of its <head> (the system's light or dark, to avoid a flash) and never again; the choice of
+  // the panel arrives later, as data-bs-theme. A frame whose colour scheme differs from the panel's is painted on an opaque dark canvas: a black pane in the light theme, after the theme was
+  // changed with a page open, or at the start when the system is dark and the panel is light. In the frame the root follows data-bs-theme and paints no background (the panel paints behind it).
+  const followPanelScheme = () => {
+    if (window.parent === window) return
+    const root = document.documentElement
+    const apply = () => {
+      const theme = root.getAttribute('data-bs-theme')
+      if (theme !== 'light' && theme !== 'dark') return
+      if (root.style.colorScheme !== theme) root.style.colorScheme = theme
+      if (root.style.backgroundColor) root.style.backgroundColor = ''
+    }
+    apply()
+    new MutationObserver(apply).observe(root, { attributes: true, attributeFilter: ['data-bs-theme', 'style'] })
+  }
+
   // 初始化
   const init = () => {
     initReports()
+    followPanelScheme()
     disableContextMenu()
     initNavigation()
     postToParent('request-theme')

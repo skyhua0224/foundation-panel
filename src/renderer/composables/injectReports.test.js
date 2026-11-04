@@ -7,7 +7,7 @@ import { normalizeFrameReport } from './frameReport.js'
 // The script the proxy puts into every Web UI page, run against a page that is not there: what it posts to the panel when the page fails, is slow or is blocked.
 const code = fs.readFileSync(new URL('../../../src-tauri/inject-script.js', import.meta.url), 'utf8')
 
-function page({ framed = true } = {}) {
+function page({ framed = true, root = null } = {}) {
   let clock = 0
   const posts = []
   const listeners = {}
@@ -17,12 +17,13 @@ function page({ framed = true } = {}) {
     observe(options) { this.options = options }
     disconnect() {}
   }
-  class MutationObserver { observe() {} }
+  const mutations = []
+  class MutationObserver { constructor(callback) { this.callback = callback; mutations.push(this) } observe() {} }
   const sandbox = {
     URL, setTimeout, clearTimeout, console,
     performance: { now: () => clock },
     PerformanceObserver, MutationObserver,
-    document: { referrer: 'http://tauri.localhost/', readyState: 'complete', addEventListener() {}, body: {}, documentElement: { dataset: {}, setAttribute() {} }, querySelectorAll: () => [] },
+    document: { referrer: 'http://tauri.localhost/', readyState: 'complete', addEventListener() {}, body: {}, documentElement: root || { dataset: {}, setAttribute() {}, getAttribute: () => null, style: {} }, querySelectorAll: () => [] },
     location: { pathname: '/pin', search: '', hash: '', href: 'http://127.0.0.1:48081/pin', ancestorOrigins: ['http://tauri.localhost'] },
     localStorage: { setItem() {}, getItem: () => null },
     addEventListener: (type, fn) => { (listeners[type] ||= []).push(fn) },
@@ -33,7 +34,7 @@ function page({ framed = true } = {}) {
   sandbox.parent = framed ? { postMessage: (message) => posts.push(message) } : sandbox
   vm.runInNewContext(code, sandbox)
   const reports = () => posts.filter((p) => p.type === 'panel-frame-report')
-  return { sandbox, posts, reports, listeners, observers, advance: (ms) => { clock += ms } }
+  return { sandbox, posts, reports, listeners, observers, mutations, advance: (ms) => { clock += ms } }
 }
 
 test('an error of the page is posted with its message and where it was', () => {
@@ -76,4 +77,33 @@ test('the first paint carries its time, and a page that is not in a frame posts 
   assert.deepEqual(p.posts.filter((m) => m.type === 'panel-painted').map((m) => m.fcp), [640])
   const alone = page({ framed: false })
   assert.equal(alone.listeners.error, undefined, 'no handler in a page that is its own window')
+})
+
+function rootElement(attrs = {}, style = {}) {
+  return { dataset: {}, setAttribute(k, v) { attrs[k] = v }, getAttribute: (k) => (k in attrs ? attrs[k] : null), style, attrs }
+}
+test('the root of a framed page follows the theme of the panel: no stale dark scheme, no background of its own', () => {
+  // the Web page wrote the system's scheme in its <head> (dark); the panel is light
+  const root = rootElement({ 'data-bs-theme': 'light' }, { colorScheme: 'dark', backgroundColor: 'rgb(20, 18, 24)' })
+  page({ root })
+  assert.equal(root.style.colorScheme, 'light'); assert.equal(root.style.backgroundColor, '')
+})
+test('a theme change while the page is open reaches its colour scheme', () => {
+  const root = rootElement({ 'data-bs-theme': 'dark' }, { colorScheme: 'dark', backgroundColor: 'rgb(20, 18, 24)' })
+  const p = page({ root })
+  assert.equal(root.style.colorScheme, 'dark')
+  root.attrs['data-bs-theme'] = 'light'
+  p.mutations.find((m) => m.callback.name === 'apply').callback([])
+  assert.equal(root.style.colorScheme, 'light')
+  root.style.backgroundColor = 'rgb(1, 2, 3)'  // a script of the page writes one again
+  p.mutations.find((m) => m.callback.name === 'apply').callback([])
+  assert.equal(root.style.backgroundColor, '')
+})
+test('a page without a theme attribute, or one that is not in a frame, keeps what it wrote', () => {
+  const none = rootElement({}, { colorScheme: 'dark', backgroundColor: 'rgb(20, 18, 24)' })
+  page({ root: none })
+  assert.equal(none.style.colorScheme, 'dark'); assert.equal(none.style.backgroundColor, 'rgb(20, 18, 24)')
+  const top = rootElement({ 'data-bs-theme': 'light' }, { colorScheme: 'dark', backgroundColor: 'rgb(20, 18, 24)' })
+  page({ framed: false, root: top })
+  assert.equal(top.style.colorScheme, 'dark')
 })
