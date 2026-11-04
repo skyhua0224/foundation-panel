@@ -35,6 +35,7 @@ export const ROUTES = {
   WEB_INPUT_MOUSE: 'web-input-mouse',
   COMPONENTS: 'components',
   COMPONENT_STATUS: 'component-status',
+  SUNSHINE_SERVICE: 'sunshine-service', // 系统 › Sunshine 服务: the SCM, process and API layers, the startup type, start, stop, restart
   DIAGNOSTICS: 'diagnostics',
   // Pages of the Web UI shown in the embedded frame
   WEB_CLIENTS: 'web-clients',
@@ -81,6 +82,7 @@ export const PAGES = {
   [ROUTES.WEB_DISPLAY_HDR]: { rail: 'display' },
   [ROUTES.VDD_SETTINGS]: { rail: 'display' },
   [ROUTES.HDR_ENHANCED]: { rail: 'display' },
+  [ROUTES.SUNSHINE_SERVICE]: { rail: 'system' }, // the first page of 系统
   [ROUTES.COMPONENT_STATUS]: { rail: 'system' },
   [ROUTES.COMPONENTS]: { rail: 'system' },
   [ROUTES.TOOLBOX]: { rail: 'system' },

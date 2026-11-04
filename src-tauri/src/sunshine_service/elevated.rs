@@ -134,6 +134,12 @@ pub(crate) fn run_blocking(operation: Operation) -> Result<(), String> {
     describe_helper_exit(code)
 }
 
+pub(crate) async fn run(operation: Operation) -> Result<(), String> {
+    tokio::task::spawn_blocking(move || run_blocking(operation))
+        .await
+        .map_err(|error| format!("SVC-UAC-002: service helper task failed: {error}"))?
+}
+
 /// Entry point of the helper process, checked first thing in `main`.
 pub(crate) fn try_handle_elevated_command() -> Option<i32> {
     let arguments: Vec<String> = std::env::args().skip(1).collect();

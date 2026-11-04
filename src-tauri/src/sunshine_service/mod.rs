@@ -1,4 +1,5 @@
-//! SunshineService: its start type and the elevated path that changes it.
+//! SunshineService: its state in three layers (SCM, process, API), its start
+//! type, and the elevated path that changes them.
 //!
 //! The tray and the settings pages share this back end. Reads go to the SCM
 //! (QueryServiceConfigW / QueryServiceConfig2W), not the registry and not
@@ -8,8 +9,11 @@
 //! Microsoft documents followed: docs/sunshine-service-control.md.
 
 mod model;
+mod status;
 #[cfg(target_os = "windows")]
 mod elevated;
+#[cfg(target_os = "windows")]
+mod probe;
 #[cfg(target_os = "windows")]
 mod scm;
 
@@ -97,4 +101,90 @@ pub async fn set_sunshine_service_start_type(
         start_type,
         starts_at_boot: start_type.starts_at_boot(),
     })
+}
+
+/// API layer: does the host web server answer at all.
+async fn api_layer() -> status::ApiLayer {
+    let started = std::time::Instant::now();
+    let request = async {
+        let url = crate::sunshine::get_sunshine_url().await?;
+        let client = crate::sunshine::create_https_client()?;
+        client
+            .get(url.trim_end_matches('/').to_string() + "/")
+            .send()
+            .await
+            .map(|response| response.status().as_u16())
+            .map_err(|error| error.to_string())
+    };
+    match tokio::time::timeout(std::time::Duration::from_secs(3), request).await {
+        Ok(Ok(code)) => status::ApiLayer {
+            answers: status::api_answers(code),
+            http_status: Some(code),
+            latency_ms: Some(started.elapsed().as_millis() as u64),
+            error: None,
+        },
+        Ok(Err(error)) => status::ApiLayer { error: Some(error), ..Default::default() },
+        Err(_) => status::ApiLayer { error: Some("no answer within 3 s".to_string()), ..Default::default() },
+    }
+}
+
+async fn live_streams() -> Option<usize> {
+    let sessions = tokio::time::timeout(std::time::Duration::from_secs(3), crate::sunshine::get_active_sessions())
+        .await
+        .ok()?
+        .ok()?;
+    Some(sessions.len())
+}
+
+/// 系统 › Sunshine 服务: the SCM record, the sunshine.exe process and the API
+/// answer, each on its own, plus the verdict and the live streams.
+#[tauri::command]
+pub async fn get_sunshine_service_status() -> Result<status::ServiceStatus, String> {
+    #[cfg(target_os = "windows")]
+    let (scm, process) = {
+        let install_dir = crate::sunshine::install_dir();
+        tokio::task::spawn_blocking(move || {
+            let scm = probe::scm_layer(&install_dir);
+            let service_pid = scm.service_pid.filter(|_| scm.belongs_to_install);
+            let process = probe::process_layer(&install_dir, service_pid);
+            (scm, process)
+        })
+        .await
+        .map_err(|error| format!("SVC-SCM-001: status task failed: {error}"))?
+    };
+    #[cfg(not(target_os = "windows"))]
+    let (scm, process) = (status::ScmLayer::default(), status::ProcessLayer::default());
+    let (api, live_streams) = tokio::join!(api_layer(), live_streams());
+    let (verdict, failing_layer) = status::summarize(&scm, &process, &api);
+    Ok(status::ServiceStatus { verdict, failing_layer, scm, process, api, live_streams })
+}
+
+#[derive(Clone, Copy, Debug, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ServiceAction {
+    Start,
+    Stop,
+    Restart,
+}
+
+/// Start, stop or restart SunshineService through the elevated helper.
+/// Stop and restart end live streams: with any live stream the caller must
+/// pass `acknowledge_live_stream` (SVC-CONFIRM-002 otherwise).
+#[tauri::command]
+pub async fn control_sunshine_service(action: ServiceAction, acknowledge_live_stream: bool) -> Result<(), String> {
+    let operation = match action {
+        ServiceAction::Start => Operation::Start,
+        ServiceAction::Stop => Operation::Stop,
+        ServiceAction::Restart => Operation::Restart,
+    };
+    let streams = if matches!(operation, Operation::Start) { None } else { live_streams().await };
+    status::require_live_stream_acknowledgement(operation, streams, acknowledge_live_stream)?;
+    #[cfg(target_os = "windows")]
+    {
+        elevated::run(operation).await
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("SVC-OS-001: the Sunshine service exists only on Windows".to_string())
+    }
 }

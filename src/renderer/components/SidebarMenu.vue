@@ -42,6 +42,7 @@
         <AppearancePage v-else-if="entry.id === ROUTES.CFG_APPEARANCE" />
         <MicrophonePage v-else-if="entry.id === ROUTES.MICROPHONE" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <UsbPage v-else-if="entry.id === ROUTES.USB" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
+        <SunshineServicePage v-else-if="entry.id === ROUTES.SUNSHINE_SERVICE" :locale="locale" />
         <ComponentStatusPage v-else-if="entry.id === ROUTES.COMPONENT_STATUS" />
         <ToolboxPage v-else-if="entry.id === ROUTES.TOOLBOX" :tools="toolsMenuItems" />
         <LatencyClockPage v-else-if="entry.id === ROUTES.LATENCY_CLOCK" />
@@ -149,6 +150,8 @@ import UsbPage from './m3e/UsbPage.vue'
 import AboutPage from './m3e/AboutPage.vue'
 import DeveloperPage from './m3e/DeveloperPage.vue'
 import ComponentStatusPage from './m3e/ComponentStatusPage.vue'
+import SunshineServicePage from './m3e/SunshineServicePage.vue'
+import { serviceTexts } from 'foundation-ui/service'
 import { useComponentStatus } from '../composables/useComponentStatus.js'
 import ToolboxPage from './m3e/ToolboxPage.vue'
 import LatencyClockPage from './m3e/LatencyClockPage.vue'
@@ -288,7 +291,7 @@ window.addEventListener('panel-force-host-state', forceHostState)
 window.addEventListener('panel-force-proxy-state', forceProxyState)
 onBeforeUnmount(() => { window.removeEventListener('panel-force-host-state', forceHostState); window.removeEventListener('panel-force-proxy-state', forceProxyState) })
 // the pages of the panel itself, which work without the host: 面板设置, 个性化, 帮助与关于, 公告 (from the announcement feed), the diagnostics, 米塔 AI, the guide
-const NEEDS_NO_HOST = new Set([ROUTES.DEVELOPER, ROUTES.PANEL_SETTINGS, ROUTES.CFG_APPEARANCE, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.ANNOUNCEMENTS, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
+const NEEDS_NO_HOST = new Set([ROUTES.SUNSHINE_SERVICE, ROUTES.DEVELOPER, ROUTES.PANEL_SETTINGS, ROUTES.CFG_APPEARANCE, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.ANNOUNCEMENTS, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
 // The host cannot be used for one of three causes, and the content area is then ONE status page (MScene status): the host is down, it runs and does not answer, or the panel's own proxy does not answer the window.
 // The rail and the caption bar stay: the pages of the panel itself (NEEDS_NO_HOST) still work and open as always. What needs the host does not look live: the pages give way to the status page and are inert, the
 // frame stays mounted but hidden, so an unsaved edit is there when the connection is back, and 连接设备 (it pairs through the host) is disabled.
@@ -339,7 +342,7 @@ const railLabel = (id) => t.value.m3e.nav[id]
 // Developer mode (seven taps on the version in 关于): the row of 开发者选项 in 系统, and the overlays the page chose, applied at start
 const developerMode = useDeveloperMode()
 watch(developerMode.enabled, (on) => { if (on) developerOverlays(); else if (!on) developerOverlays().set({ ...DEFAULT_FLAGS }) }, { immediate: true })
-const runtimeView = computed(() => ({ ...runtime, developer: developerMode.enabled.value, developerTitle: developerTexts(locale.value).title, lines: settingsList.lines.value, statusTitle: statusTexts(locale.value).title, diagTitle: diagnosticsTexts(locale.value).title }))
+const runtimeView = computed(() => ({ ...runtime, developer: developerMode.enabled.value, developerTitle: developerTexts(locale.value).title, lines: settingsList.lines.value, statusTitle: statusTexts(locale.value).title, serviceTitle: serviceTexts(locale.value).title, diagTitle: diagnosticsTexts(locale.value).title }))
 const listItems = (id) => pageItems(t.value, id, runtimeView.value)
 // The stream settings are the shared model (categories in groups with a live line, search of every setting, recently used)
 const hostConfig = ref(null)

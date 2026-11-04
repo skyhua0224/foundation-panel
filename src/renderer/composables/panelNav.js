@@ -17,7 +17,7 @@ export const ROW_OF_ROUTE = {
   [ROUTES.VDD_SETTINGS]: 'vdd', [ROUTES.HDR_ENHANCED]: 'quality', [ROUTES.COMPONENT_STATUS]: 'components', [ROUTES.DIAGNOSTICS]: 'diagnostics', [ROUTES.TOOLBOX]: 'toolbox',
   [ROUTES.LATENCY_CLOCK]: 'latency-clock', [ROUTES.TEST_TOOLS]: 'test-tools', [ROUTES.STREAM_TIMER]: 'stream-timer',
   [ROUTES.PANEL_SETTINGS]: 'panel', [ROUTES.HELP]: 'help', [ROUTES.AI_ASSISTANT]: 'assistant',
-  [ROUTES.LIVE_SESSION]: 'session', [ROUTES.RTSS]: 'rtss',
+  [ROUTES.LIVE_SESSION]: 'session', [ROUTES.RTSS]: 'rtss', [ROUTES.SUNSHINE_SERVICE]: 'service',
 }
 
 export function pageItems(t, rail, runtime = {}) {
@@ -51,6 +51,7 @@ export function pageItems(t, rail, runtime = {}) {
       { id: ROUTES.HDR_ENHANCED, icon: 'wand_stars', tone: 'tertiary', label: c.display.quality, text: lines.quality },
     ],
     system: [
+      { id: ROUTES.SUNSHINE_SERVICE, icon: 'dns', tone: 'primary', label: runtime.serviceTitle || 'Sunshine', text: lines.service },
       { id: ROUTES.COMPONENT_STATUS, icon: 'monitor_heart', tone: 'success', label: runtime.statusTitle || 'Components', text: lines.components },
       { id: ROUTES.DIAGNOSTICS, icon: 'stethoscope', tone: 'warn', label: runtime.diagTitle || c.system.diagnostics, text: lines.diagnostics },
       { id: ROUTES.TOOLBOX, icon: 'build', tone: 'secondary', label: t.sidebar.toolbox, text: lines.toolbox },

@@ -187,6 +187,17 @@ export const sunshine = {
   stopAllSessions: () => invoke('stop_all_sessions'),
 }
 
+// ─── Sunshine 服务（SCM）────────────────────────────────
+
+// The SCM, process and API layers of SunshineService and the changes that need administrator approval (see
+// src-tauri/src/sunshine_service). Manual and Disabled need acknowledgeUnreachableAfterReboot; stop and restart during a
+// live stream need acknowledgeLiveStream: the back end refuses without them.
+export const sunshineService = {
+  status: () => invoke('get_sunshine_service_status'),
+  setStartType: (startType, acknowledgeUnreachableAfterReboot = false) => invoke('set_sunshine_service_start_type', { startType, acknowledgeUnreachableAfterReboot }),
+  control: (action, acknowledgeLiveStream = false) => invoke('control_sunshine_service', { action, acknowledgeLiveStream }),
+}
+
 // ─── 系统工具 ────────────────────────────────────────────
 
 export const tools = {
