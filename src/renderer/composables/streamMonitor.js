@@ -4,11 +4,20 @@
 
 const displayOf = (text) => String(text || '').match(/DISPLAY\d+/i)?.[0].toUpperCase() || ''
 
-/** The Windows display (DISPLAYn) Sunshine captures, or '' (auto, or a device it does not describe). */
+const squash = (text) => String(text || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+const friendlyOf = (data) => String(data || '').match(/FRIENDLY NAME:[ \t]*([^\n]*)/i)?.[1] || ''
+
+/**
+ * The Windows display (DISPLAYn) Sunshine captures, or '' (auto, or a device it does not describe). output_name is a device id, or the name of a display the host made itself
+ * (the virtual display writes 「ZakoHDR」 for the device whose friendly name is 「Zako HDR」): a name that equals no id is matched with the friendly names, ignoring case and spaces.
+ */
 export function capturedDisplay(outputName, displayDevices = []) {
   if (!outputName) return ''
-  const dev = (Array.isArray(displayDevices) ? displayDevices : []).find((d) => (typeof d === 'string' ? d : d?.device_id || d?.id) === outputName)
-  return displayOf(typeof dev === 'string' ? dev : dev?.data || dev?.name || '') || displayOf(outputName)
+  const list = Array.isArray(displayDevices) ? displayDevices : []
+  const idOf = (d) => (typeof d === 'string' ? d : d?.device_id || d?.id)
+  const dataOf = (d) => (typeof d === 'string' ? d : d?.data || d?.name || '')
+  const dev = list.find((d) => idOf(d) === outputName) || list.find((d) => squash(friendlyOf(dataOf(d))) === squash(outputName))
+  return displayOf(dataOf(dev)) || displayOf(outputName)
 }
 
 /** { monitor, found }: the monitor of the captured display; else the primary one, found false when Sunshine named a display that is not there. */
