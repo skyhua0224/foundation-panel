@@ -14,7 +14,7 @@ const messages = {
     "scale": "NR 处理比例",
     "intensity": "增强强度",
     "advanced": "高级设置",
-    "style": "Style",
+    "style": "风格",
     "skinStructure": "肤质结构强度",
     "autoMask": "自动遮罩",
     "dvWaiting": "当前未输出 DV 元数据",
