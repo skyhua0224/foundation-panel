@@ -23,6 +23,12 @@ test('the rows of the two rails: the places of the display and audio tabs, none 
   assert.deepEqual(rowsOf('input').map((r) => r.route), ['GAMEPAD', 'USB'])
   assert.match(router, /\[ROUTES\.MICROPHONE\]: \{ rail: 'audio' \}/)
 })
+test('a rail opens on the first row of its list (the first page of the rail in PAGES)', () => {
+  for (const [rail, rows] of [['display', rowsOf('display')], ['audio', rowsOf('audio')]]) {
+    const inPages = [...router.matchAll(/\[ROUTES\.(\w+)\]: \{ rail: '(\w+)'/g)].filter((m) => m[2] === rail).map((m) => m[1])
+    assert.equal(inPages[0], rows[0].route, rail)
+  }
+})
 test('every row of the two rails has an icon of its own, and the two rails differ', () => {
   const icons = [...rowsOf('display'), ...rowsOf('audio')].map((r) => r.icon)
   assert.equal(new Set(icons).size, icons.length)

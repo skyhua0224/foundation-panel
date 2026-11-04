@@ -58,8 +58,8 @@ export const PAGES = {
   [ROUTES.CFG_APPEARANCE]: { rail: 'appearance', list: false },
   [ROUTES.WEB_PASSWORD]: { rail: 'config' },
   [ROUTES.GAMEPAD]: { rail: 'input' },
+  [ROUTES.WEB_AUDIO_SOUND]: { rail: 'audio' }, // the first page of a rail is the one the rail opens on
   [ROUTES.MICROPHONE]: { rail: 'audio' },
-  [ROUTES.WEB_AUDIO_SOUND]: { rail: 'audio' },
   [ROUTES.USB]: { rail: 'input' },
   [ROUTES.WEB_DISPLAY_OUTPUT]: { rail: 'display' },
   [ROUTES.WEB_DISPLAY_MODES]: { rail: 'display' },
