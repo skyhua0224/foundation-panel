@@ -24,3 +24,10 @@ test('a host that runs and does not answer opens 「Sunshine 没有响应」 and
   assert.match(shell, /reportHostStop, reportHostHung, dismissHostHung,/, 'both come from the shared package')
   assert.match(shell, /onLost: \(\{ at \}\) => reportHostStop\(\{ at \}\)/, 'a stop is still opened only on the facts')
 })
+
+test('the facts carry the process id of the service wrapper, so that a restart of the service is told from a crash', () => {
+  const rust = fs.readFileSync(new URL('../../../src-tauri/src/host_facts.rs', import.meta.url), 'utf8')
+  assert.match(rust, /pub service_pid: u32/)
+  assert.match(rust, /status\.dwProcessId/)
+  assert.match(rust, /let \(service, service_pid\) = service_state\(\)/)
+})
