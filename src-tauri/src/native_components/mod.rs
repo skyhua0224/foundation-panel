@@ -116,15 +116,28 @@ fn require_hdr_component(id: &str) -> Result<(), String> {
     }
 }
 
+/// A DLSS NR status from a component command goes to the NR shortcuts (registered only while it is installed and usable); a failed call changes nothing.
+fn dlssnr_noted(
+    app: &tauri::AppHandle,
+    result: Result<providers::EnhancementComponentStatus, String>,
+    cause: &str,
+) -> Result<providers::EnhancementComponentStatus, String> {
+    if let Ok(status) = &result {
+        crate::nr_overlay::note_component_status(app, Some(status), cause);
+    }
+    result
+}
+
 #[tauri::command]
 pub async fn native_component_recover(
+    app: tauri::AppHandle,
     component_id: String,
 ) -> Result<providers::EnhancementComponentStatus, String> {
     require_hdr_component(&component_id)?;
     // Providers serialize recovery just like import/remove. Taking the same
     // non-reentrant lock here would make every recovery reject itself as busy.
     if component_id == NVIDIA_DLSSNR_ID {
-        providers::nvidia_dlssnr::component_recover().await
+        dlssnr_noted(&app, providers::nvidia_dlssnr::component_recover().await, "recover")
     } else {
         providers::nvidia_rtx_hdr::component_recover().await
     }
@@ -132,11 +145,12 @@ pub async fn native_component_recover(
 
 #[tauri::command]
 pub async fn native_component_get_status(
+    app: tauri::AppHandle,
     component_id: String,
 ) -> Result<providers::EnhancementComponentStatus, String> {
     require_hdr_component(&component_id)?;
     if component_id == NVIDIA_DLSSNR_ID {
-        providers::nvidia_dlssnr::component_get_status().await
+        dlssnr_noted(&app, providers::nvidia_dlssnr::component_get_status().await, "status")
     } else {
         providers::nvidia_rtx_hdr::component_get_status().await
     }
@@ -144,6 +158,7 @@ pub async fn native_component_get_status(
 
 #[tauri::command]
 pub async fn native_component_import(
+    app: tauri::AppHandle,
     component_id: String,
     sources: std::collections::BTreeMap<String, String>,
 ) -> Result<providers::EnhancementComponentStatus, String> {
@@ -159,7 +174,7 @@ pub async fn native_component_import(
         })
         .ok_or("COMPONENT-FILES: missing runtime file")?;
     if component_id == NVIDIA_DLSSNR_ID {
-        providers::nvidia_dlssnr::component_install(runtime.clone()).await
+        dlssnr_noted(&app, providers::nvidia_dlssnr::component_install(runtime.clone()).await, "install")
     } else {
         providers::nvidia_rtx_hdr::component_install(runtime.clone()).await
     }
@@ -167,11 +182,12 @@ pub async fn native_component_import(
 
 #[tauri::command]
 pub async fn native_component_remove(
+    app: tauri::AppHandle,
     component_id: String,
 ) -> Result<providers::EnhancementComponentStatus, String> {
     require_hdr_component(&component_id)?;
     if component_id == NVIDIA_DLSSNR_ID {
-        providers::nvidia_dlssnr::component_uninstall().await
+        dlssnr_noted(&app, providers::nvidia_dlssnr::component_uninstall().await, "uninstall")
     } else {
         providers::nvidia_rtx_hdr::component_uninstall().await
     }
@@ -179,12 +195,13 @@ pub async fn native_component_remove(
 
 #[tauri::command]
 pub async fn hdr_enhanced_select_backend(
+    app: tauri::AppHandle,
     component_id: String,
     enabled: bool,
 ) -> Result<providers::EnhancementComponentStatus, String> {
     require_hdr_component(&component_id)?;
     if component_id == NVIDIA_DLSSNR_ID {
-        providers::nvidia_dlssnr::component_set_enabled(enabled).await
+        dlssnr_noted(&app, providers::nvidia_dlssnr::component_set_enabled(enabled).await, "select")
     } else {
         providers::nvidia_rtx_hdr::component_set_enabled(enabled).await
     }
