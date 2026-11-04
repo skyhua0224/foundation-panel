@@ -221,6 +221,9 @@ const sponsorSections = computed(() => [
 ])
 const actions_openExternal = (url) => openExternalUrl(url)
 const nav = router.nav
+// the back stack mirrors into the window's history (as in the Web UI): the back arrow of a pushed page, Esc, the mouse's back button and the browser's agree; without it the arrow only went back in the history and the page stayed
+onMounted(() => nav.attach())
+onBeforeUnmount(() => nav.detach())
 const isWebPage = computed(() => !!webPathOf(router.currentRoute.value))
 // The frame shows the page of the route. Callers that open a Web page tell the frame themselves; a route that is set any other way (a link, a deep link, a caller that only
 // switches the route) comes here: when the frame is not on the page of the route it is told, so a route never shows another page's content.
