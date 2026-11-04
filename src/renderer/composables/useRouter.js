@@ -52,7 +52,7 @@ export const ROUTES = {
 /** rail: category of the page (rail item); list: false = the page takes the whole width (no list pane) */
 export const PAGES = {
   [ROUTES.HOME]: { rail: 'overview', list: false },
-  [ROUTES.WELCOME]: { rail: 'overview', list: false },
+  [ROUTES.WELCOME]: { rail: 'overview', list: false, push: true },
   [ROUTES.WEB_STREAM]: { rail: 'overview', list: false },
   [ROUTES.WEB_CLIENTS]: { rail: 'stream' },
   [ROUTES.WEB_APPS]: { rail: 'stream' },

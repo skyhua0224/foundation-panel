@@ -27,7 +27,7 @@
       <template #detail="{ entry }">
         <MHostOffline v-if="offlineShown && !isWebPage" :state="hostConn.state" :locale="locale" :port="hostPort" can-restart can-user-mode can-logs @retry="hostConn.retry" @restart="hostConn.restart('service')" @user-mode="hostConn.restart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" />
         <PanelHome v-else-if="entry.id === ROUTES.HOME" :runtime="runtime" :update-available="!!updateInfo" @open="openDestination" @webui-navigate="openWebUi" />
-        <Welcome v-else-if="entry.id === ROUTES.WELCOME" @close="goHome" @webui-navigate="openWebUi" />
+        <Welcome v-else-if="entry.id === ROUTES.WELCOME" @close="closeWelcome" @webui-navigate="openWebUi" />
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
@@ -190,6 +190,8 @@ const openWebUi = (path) => {
   router.navigate(route)
 }
 const goHome = () => openWebUi('/')
+// 新手引导 opens over the page it was opened from (帮助与关于): closing it, with its button or Esc, goes back there; started alone (first run) it opens the overview
+const closeWelcome = () => (router.nav.canPop.value ? router.goBack() : goHome())
 const handleCheckForUpdates = async (channel = null) => {
   const result = await checkForUpdates(channel)
   recordUpdateCheck()
