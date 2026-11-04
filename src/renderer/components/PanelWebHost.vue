@@ -66,7 +66,8 @@ onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); w
 .panel-web__frame { position: relative; flex: 1; min-height: 0; }
 .panel-web__frame .iframe-container, .panel-web__frame .sunshine-iframe { height: 100%; width: 100%; }
 .panel-web__frame iframe { transition: opacity 140ms linear; }
-.panel-web.is-covered .panel-web__frame iframe { opacity: 0; transition: none; }
+/* not 0: a frame at opacity 0 is not painted for the paint timing, so its page paints only once shown (the 50 ms of empty frames) and never tells that it has painted; at 1 % it paints under the cover and nobody sees it */
+.panel-web.is-covered .panel-web__frame iframe { opacity: 0.01; transition: none; }
 .panel-web__cover { position: absolute; inset: 0; z-index: 1; overflow: hidden; padding: 76px 16px 0; box-sizing: border-box; pointer-events: none; opacity: 0; transition: opacity 120ms linear; }
 .panel-web__cover > .m-pageload { width: min(100%, 840px); margin-inline: auto; }
 .panel-web.is-covered .panel-web__cover { opacity: 1; }
