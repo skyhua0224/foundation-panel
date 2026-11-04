@@ -188,7 +188,9 @@ const monitoring = ref(false), available = ref([])
 const snapshot = reactive({ active: false, osd_text: '' })
 const groups = computed(() => metricGroups(available.value, String(locale.value).startsWith('zh')))
 let poll = null
-watch(config, (v) => { saveMonitoringConfig(JSON.parse(JSON.stringify(v))); if (monitoring.value) restartSoon() }, { deep: true })
+// a style change restarts a running monitor with it; the config read back from the host (loadMonitoring) does not
+let adopting = false
+watch(config, (v) => { saveMonitoringConfig(JSON.parse(JSON.stringify(v))); if (monitoring.value && !adopting) restartSoon() }, { deep: true })
 let restartTimer = null
 const restartSoon = () => { clearTimeout(restartTimer); restartTimer = setTimeout(() => startMonitoring(true), 400) }
 function setMetrics(list) { config.metrics = list }
@@ -196,7 +198,7 @@ async function loadMonitoring() {
   try { available.value = await invoke('rtss_get_available_metrics') } catch { /* no metrics offered */ }
   try {
     const snap = await invoke('rtss_get_monitoring_status')
-    if (snap?.active) { monitoring.value = true; Object.assign(snapshot, snap); if (snap.config) Object.assign(config, snap.config); startPoll() }
+    if (snap?.active) { if (snap.config) { adopting = true; Object.assign(config, snap.config); await nextTick(); adopting = false } monitoring.value = true; Object.assign(snapshot, snap); startPoll() }
   } catch { /* not running */ }
 }
 async function startMonitoring(quiet = false) {
