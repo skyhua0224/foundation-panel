@@ -50,6 +50,7 @@
         <TestToolsPage v-else-if="entry.id === ROUTES.TEST_TOOLS" />
         <LiveSessionPage v-else-if="entry.id === ROUTES.LIVE_SESSION" @open-quality="router.navigate(ROUTES.HDR_ENHANCED)" />
         <RtssPage v-else-if="entry.id === ROUTES.RTSS" />
+        <NetworkOverviewPage v-else-if="entry.id === ROUTES.NETWORK_OVERVIEW" @open-network="openConfig({ tab: 'network' })" />
         <DiagnosticsPage
           v-else-if="entry.id === ROUTES.DIAGNOSTICS || entry.id === ROUTES.WEB_TROUBLESHOOTING"
           @go="goDiagnosticsPlace"
@@ -162,6 +163,7 @@ import StreamTimerPage from './m3e/StreamTimerPage.vue'
 import TestToolsPage from './m3e/TestToolsPage.vue'
 import LiveSessionPage from './m3e/LiveSessionPage.vue'
 import RtssPage from './m3e/RtssPage.vue'
+import NetworkOverviewPage from './m3e/NetworkOverviewPage.vue'
 import DiagnosticsPage from './m3e/DiagnosticsPage.vue'
 import DoctorPage from './m3e/DoctorPage.vue'
 import { MITA_PENDING_PROMPT } from '../composables/useAiAssistant.js'

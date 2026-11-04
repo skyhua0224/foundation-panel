@@ -34,3 +34,18 @@ test("the bottom bar of a narrow window has five destinations with full labels a
   for (const rail of ["config", "input", "display", "system"]) assert.equal(map[rail], "settings-hub", rail)
   assert.equal(map.settings, "more"); assert.equal(map.help, "more")
 })
+
+test('网络概览 is a page of the 系统 list, two steps from the rail, and opens 串流设置 › 网络 for a fix', () => {
+  assert.match(router, /NETWORK_OVERVIEW: 'network-overview'/)
+  assert.match(router, /\[ROUTES\.NETWORK_OVERVIEW\]: \{ rail: 'system' \}/, 'rail 系统, with the list pane: rail, then the row')
+  const system = nav.slice(nav.indexOf('system: ['), nav.indexOf('],', nav.indexOf('system: [')))
+  assert.match(system, /id: ROUTES\.NETWORK_OVERVIEW, icon: 'lan', tone: 'primary', label: c\.system\.network, text: lines\.network/)
+  assert.match(nav, /\[ROUTES\.NETWORK_OVERVIEW\]: 'network'/, 'the row line comes from the shared rowLines')
+  assert.equal(zh.m3e.system.network, '网络概览')
+  assert.equal(en.m3e.system.network, 'Network overview')
+  const menu = fs.readFileSync(new URL('../components/SidebarMenu.vue', import.meta.url), 'utf8')
+  assert.match(menu, /<NetworkOverviewPage v-else-if="entry\.id === ROUTES\.NETWORK_OVERVIEW" @open-network="openConfig\(\{ tab: 'network' \}\)" \/>/)
+  const page = fs.readFileSync(new URL('../components/m3e/NetworkOverviewPage.vue', import.meta.url), 'utf8')
+  assert.match(page, /\/api\/network\/overview\$\{refresh \? '\?refresh=1' : ''\}/)
+  assert.match(page, /response\.status === 404\) \{ status\.value = 'unavailable'/, 'an older host says the page is not available')
+})

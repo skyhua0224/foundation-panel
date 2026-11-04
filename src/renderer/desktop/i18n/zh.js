@@ -1205,7 +1205,7 @@ export const zh = {
     input: { summary: '{count} / {total} 项已就绪', title: '输入与外设', lead: '客户端带来的设备：手柄、键盘、鼠标与触控、USB 设备。', gamepad: '手柄', keyboard: '键盘', mouse: '鼠标与触控', microphone: '麦克风', usb: 'USB 转发', usbNote: 'USB/IP 传输与已挂载设备', gamepadNote: '手柄类型与 DualSense 调校', micNote: '把客户端麦克风传到这台主机' },
     audio: { title: '音频', lead: '串流的声音输出与客户端麦克风。', sound: '音频输出' },
     display: { title: '显示与视频', lead: '串流的显示器、分辨率与刷新率、HDR、虚拟显示器与画质。', output: '显示输出', modes: '分辨率、帧率与码率', encoders: '编码器', video: '捕获与视频', hdr: 'HDR', vdd: '虚拟显示器', vddNote: '按客户端提供稳定的虚拟显示器，并校准 HDR', quality: '画质增强', qualityNote: 'RTX HDR 与 DLSS NR' },
-    system: { title: '系统', lead: '驱动组件、诊断与助手。', troubleshooting: '诊断与日志', components: '组件', componentsNote: '虚拟手柄总线、USB/IP 传输等驱动', diagnostics: '诊断工具', diagnosticsNote: '手柄测试、手写笔检测、串流计时器、延迟测试', assistant: '米塔 AI', assistantNote: '帮你排查问题' },
+    system: { title: '系统', lead: '驱动组件、诊断与助手。', network: '网络概览', troubleshooting: '诊断与日志', components: '组件', componentsNote: '虚拟手柄总线、USB/IP 传输等驱动', diagnostics: '诊断工具', diagnosticsNote: '手柄测试、手写笔检测、串流计时器、延迟测试', assistant: '米塔 AI', assistantNote: '帮你排查问题' },
   },
   deviceHub: {
     eyebrow: 'MANAGE / DEVICE HUB',
