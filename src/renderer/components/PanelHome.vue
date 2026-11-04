@@ -154,7 +154,7 @@ const smartSignals = computed(() => ({
   problems: 0, problemComponents: compRows().filter((r) => r.state === 'error' || r.state === 'warn').map((r) => r.id),
   recentErrors: (state.errorLog?.rows || state.errorLog || []).length || 0, isNew: isNew.value,
   wifiHost: nics.defaultNic.value?.type === 'wifi', linkSlowMbps: nics.defaultNic.value?.link_speed_mbps && nics.defaultNic.value.link_speed_mbps < 1000 ? nics.defaultNic.value.link_speed_mbps : 0,
-  reachBad: reachProblem.value,
+  reachBad: reachProblem.value, updateAvailable: props.updateAvailable,
 }))
 const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value, star: star.visible.value, starNames: (state.clients || []).map((c) => c.name), clientList: (state.clients || []).map((c) => ({ name: c.name, uuid: c.uuid, family: c.family, official: c.official, os: c.os, version: c.version, last_seen: c.last_seen })), sessionClient: session.value ? { uuid: session.value.uuid || session.value.client_uuid || '', name: session.value.client_name || '' } : null, signals: smartSignals.value }))
 
