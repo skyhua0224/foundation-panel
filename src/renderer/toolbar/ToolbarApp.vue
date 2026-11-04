@@ -17,6 +17,7 @@
           >
             <div class="bubble-icon" v-html="item.icon"></div>
           </div>
+          <span class="bubble-caption" :class="{ danger: item.danger }">{{ captionOf(item.id) }}</span>
         </div>
       </div>
     </transition>
@@ -777,6 +778,14 @@ const menuItems = computed(() => [
     danger: true,
   },
 ])
+
+// what each bubble does, in words under it: a right click (or a long press) opens the menu, and 隐藏桌宠 and 桌宠设置… are there to read, not to guess from an icon
+const captionOf = (id) => t.value.toolbar.captions?.[id] || ''
+
+// a long press on the pet opens the menu, as a right click does with a mouse
+let longPressTimer = null
+let longPressFired = false
+const clearLongPress = () => { if (longPressTimer !== null) { clearTimeout(longPressTimer); longPressTimer = null } }
 
 const toggleMenu = () => {
   menuVisible.value = !menuVisible.value
@@ -1584,6 +1593,11 @@ const onDragStart = (e) => {
     dragPointerTarget.setPointerCapture(dragPointerId)
   } catch {}
 
+  longPressFired = false
+  clearLongPress()
+  if (e.pointerType === 'touch' && !menuVisible.value) {
+    longPressTimer = setTimeout(() => { longPressTimer = null; if (!hasMoved && dragPointerId === pointerId && !menuVisible.value) { longPressFired = true; toggleMenu() } }, 550)
+  }
   document.addEventListener('pointermove', onDragMove, { passive: false })
   document.addEventListener('pointerup', onDragEnd)
   document.addEventListener('pointercancel', onDragEnd)
@@ -1680,6 +1694,7 @@ const onDragMove = (e) => {
     const dy = e.screenY - dragStartScreenY
     if (!hasMoved && Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return
     hasMoved = true
+    clearLongPress()
     e.preventDefault()
     const generation = dragGeneration
     const pointerId = dragPointerId
@@ -1713,6 +1728,7 @@ const onDragMove = (e) => {
 }
 
 const onDragEnd = async (e) => {
+  clearLongPress()
   if (
     dragPointerId === null ||
     e.pointerId !== dragPointerId ||
@@ -1787,6 +1803,7 @@ const onDragEnd = async (e) => {
 }
 
 const onIconClick = () => {
+  if (longPressFired) { longPressFired = false; return }
   if (!hasMoved) toggleMenu()
 }
 
@@ -2126,6 +2143,23 @@ onUnmounted(() => {
   pointer-events: all;
   will-change: transform, margin-top;
   .gpu-accelerate();
+}
+
+.bubble-caption {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: 2px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: none;
+  font: 600 11px/14px system-ui, 'Microsoft YaHei UI', sans-serif;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(60, 20, 90, 0.85), 0 0 2px rgba(60, 20, 90, 0.9);
+
+  &.danger {
+    color: #ffe3e3;
+  }
 }
 
 .bubble-item {

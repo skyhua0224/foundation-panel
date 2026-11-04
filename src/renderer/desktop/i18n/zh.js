@@ -791,8 +791,9 @@ export const zh = {
     hostPerformance: '主机性能',
     shortcutGuide: '快捷键手册',
     rtssControl: 'RTSS 控制',
-    petSettings: '桌宠设置',
-    close: '关闭',
+    petSettings: '桌宠设置…',
+    close: '隐藏桌宠',
+    captions: { main: '控制面板', vdd: '虚拟显示器', dpi: '调整 DPI', bitrate: '码率', shortcuts: '快捷键', 'pet-settings': '桌宠设置', close: '隐藏桌宠' },
   },
 
   // === 日志控制台 ===

@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import test from 'node:test'
+import { zh } from '../desktop/i18n/zh.js'
+import { en } from '../desktop/i18n/en.js'
 
 // The pet sheet of 面板设置 has what the old pet window had besides the desktop observation: five controls and three buttons.
 const sheet = fs.readFileSync(new URL('../components/m3e/PanelOptions.vue', import.meta.url), 'utf8')
@@ -34,4 +36,19 @@ test('the desktop observation asks for consent and needs a configured assistant'
   assert.match(sheet, /const togglePet = \(on\) => \{ if \(!on\) stopObserving\(\); else consent\.value = true \}/)
   assert.match(sheet, /:disabled="!speech\.masterEnabled\.value \|\| !speech\.aiReady\.value"/)
   assert.match(speech, /\/api\/ai\/config/)
+})
+
+// the pet's own menu: a right click or a long press opens it, and the entries to hide the pet and to open its settings are words, not guesses
+const pet = fs.readFileSync(new URL('../toolbar/ToolbarApp.vue', import.meta.url), 'utf8')
+test('the pet menu opens on a right click and on a long press, and says what its bubbles do', () => {
+  assert.match(pet, /@contextmenu\.prevent="toggleMenu"/)
+  assert.match(pet, /longPressTimer = setTimeout\(/)
+  assert.match(pet, /<span class="bubble-caption"/)
+  for (const t of [zh, en]) {
+    for (const id of ['main', 'vdd', 'dpi', 'bitrate', 'shortcuts', 'pet-settings', 'close']) assert.ok(t.toolbar.captions[id], id)
+  }
+  assert.equal(zh.toolbar.close, '隐藏桌宠')
+  assert.equal(zh.toolbar.petSettings, '桌宠设置…')
+  assert.equal(en.toolbar.close, 'Hide pet')
+  assert.equal(en.toolbar.petSettings, 'Pet settings…')
 })

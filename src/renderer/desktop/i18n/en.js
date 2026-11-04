@@ -791,8 +791,9 @@ Output only one short sentence, no explanation. Reply in English.`,
     hostPerformance: 'Host Performance',
     shortcutGuide: 'Shortcuts Guide',
     rtssControl: 'RTSS Control',
-    petSettings: 'Pet Settings',
-    close: 'Close',
+    petSettings: 'Pet settings…',
+    close: 'Hide pet',
+    captions: { main: 'Panel', vdd: 'Display', dpi: 'DPI', bitrate: 'Bitrate', shortcuts: 'Shortcuts', 'pet-settings': 'Pet settings', close: 'Hide pet' },
   },
 
   // === Log Console ===
