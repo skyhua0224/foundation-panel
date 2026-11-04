@@ -1,6 +1,6 @@
 import { computed } from 'vue'
 import { createNav } from 'foundation-ui/vue'
-import { settingsHash } from 'foundation-ui/settings/index.js'
+import { settingsHash, DEFAULT_PLACE } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
 /** Destinations of the control panel. A page is a detail entry of one back stack (see foundation-ui createNav). */
@@ -20,6 +20,7 @@ export const ROUTES = {
   ANNOUNCEMENTS: 'announcements', // 公告: every announcement, opened from the bell of the caption bar
   CAT_STREAM: 'cat-stream',
   CAT_INPUT: 'cat-input',
+  CAT_AUDIO: 'cat-audio',
   CAT_DISPLAY: 'cat-display',
   CAT_SYSTEM: 'cat-system',
   GAMEPAD: 'gamepad',
@@ -36,6 +37,12 @@ export const ROUTES = {
   CFG_APPEARANCE: 'cfg-appearance', // 个性化: a destination of its own, the palette button in the foot of the rail
   WEB_DOWNLOADS: 'web-downloads',
   WEB_PASSWORD: 'web-password',
+  // Places of 显示与视频 and 音频 that are pages of the Web UI, shown in the frame (/config#tab=display&sub=output)
+  WEB_DISPLAY_OUTPUT: 'web-display-output',
+  WEB_DISPLAY_MODES: 'web-display-modes',
+  WEB_DISPLAY_HDR: 'web-display-hdr',
+  WEB_DISPLAY_VIDEO: 'web-display-video',
+  WEB_AUDIO_SOUND: 'web-audio-sound',
   WEB_TROUBLESHOOTING: 'web-troubleshooting',
 }
 
@@ -51,9 +58,14 @@ export const PAGES = {
   [ROUTES.CFG_APPEARANCE]: { rail: 'appearance', list: false },
   [ROUTES.WEB_PASSWORD]: { rail: 'config' },
   [ROUTES.GAMEPAD]: { rail: 'input' },
-  [ROUTES.MICROPHONE]: { rail: 'input' },
+  [ROUTES.MICROPHONE]: { rail: 'audio' },
+  [ROUTES.WEB_AUDIO_SOUND]: { rail: 'audio' },
   [ROUTES.USB]: { rail: 'input' },
+  [ROUTES.WEB_DISPLAY_OUTPUT]: { rail: 'display' },
+  [ROUTES.WEB_DISPLAY_MODES]: { rail: 'display' },
+  [ROUTES.WEB_DISPLAY_HDR]: { rail: 'display' },
   [ROUTES.VDD_SETTINGS]: { rail: 'display' },
+  [ROUTES.WEB_DISPLAY_VIDEO]: { rail: 'display' },
   [ROUTES.HDR_ENHANCED]: { rail: 'display' },
   [ROUTES.COMPONENT_STATUS]: { rail: 'system' },
   [ROUTES.COMPONENTS]: { rail: 'system' },
@@ -67,11 +79,18 @@ export const PAGES = {
   [ROUTES.ABOUT]: { rail: 'help', list: false, push: true },
   [ROUTES.ANNOUNCEMENTS]: { rail: 'overview', list: false, push: true },
 }
-export const RAILS = ['overview', 'stream', 'config', 'input', 'display', 'system', 'assistant', 'settings', 'help']
+export const RAILS = ['overview', 'stream', 'config', 'input', 'audio', 'display', 'system', 'assistant', 'settings', 'help']
 
 // the old component page is part of the component status page now
 const ALIAS = { [ROUTES.CONTROLLERS]: ROUTES.GAMEPAD, [ROUTES.COMPONENTS]: ROUTES.COMPONENT_STATUS }
-const CATEGORY = { [ROUTES.CAT_CONFIG]: 'config', [ROUTES.CAT_STREAM]: 'stream', [ROUTES.CAT_INPUT]: 'input', [ROUTES.CAT_DISPLAY]: 'display', [ROUTES.CAT_SYSTEM]: 'system' }
+const CATEGORY = { [ROUTES.CAT_CONFIG]: 'config', [ROUTES.CAT_STREAM]: 'stream', [ROUTES.CAT_INPUT]: 'input', [ROUTES.CAT_AUDIO]: 'audio', [ROUTES.CAT_DISPLAY]: 'display', [ROUTES.CAT_SYSTEM]: 'system' }
+// The panel destination of a place of the display and audio tabs (the same places as foundation-ui's DISPLAY_PLACES and AUDIO_PLACES): the virtual display and the microphone are pages of the panel itself
+const PLACE_ROUTE = {
+  'display:output': ROUTES.WEB_DISPLAY_OUTPUT, 'display:modes': ROUTES.WEB_DISPLAY_MODES, 'display:hdr': ROUTES.WEB_DISPLAY_HDR, 'display:virtual': ROUTES.VDD_SETTINGS, 'display:video': ROUTES.WEB_DISPLAY_VIDEO,
+  'audio:sound': ROUTES.WEB_AUDIO_SOUND, 'audio:microphone': ROUTES.MICROPHONE,
+}
+export const routeOfPlace = (tab, sub) => PLACE_ROUTE[`${tab}:${sub || DEFAULT_PLACE[tab]}`] || null
+const PLACE_PATH = /^\/config(?:\.html)?#tab=(display|audio)(?:&sub=([\w-]+))?/
 const WEB_PATHS = [
   [/^\/(?:pin|clients)(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_CLIENTS],
   [/^\/apps(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_APPS],
@@ -84,6 +103,8 @@ const WEB_PATHS = [
 /** The panel destination that shows a Web UI path; the Web home is the panel's own overview. */
 export const routeForWebPath = (path) => {
   const p = String(path || '/')
+  const place = PLACE_PATH.exec(p)
+  if (place && routeOfPlace(place[1], place[2])) return routeOfPlace(place[1], place[2])
   for (const [re, route] of WEB_PATHS) if (re.test(p)) return route
   return ROUTES.HOME
 }
@@ -91,6 +112,9 @@ export const routeForWebPath = (path) => {
 export const webPathOf = (route) => ({
   [ROUTES.WEB_CLIENTS]: '/pin', [ROUTES.WEB_APPS]: '/apps', [ROUTES.WEB_CONFIG]: '/config', [ROUTES.WEB_DOWNLOADS]: '/downloads',
   [ROUTES.WEB_PASSWORD]: '/password', [ROUTES.WEB_TROUBLESHOOTING]: '/troubleshooting',
+  [ROUTES.WEB_DISPLAY_OUTPUT]: `/config${settingsHash({ tab: 'display', sub: 'output' })}`, [ROUTES.WEB_DISPLAY_MODES]: `/config${settingsHash({ tab: 'display', sub: 'modes' })}`,
+  [ROUTES.WEB_DISPLAY_HDR]: `/config${settingsHash({ tab: 'display', sub: 'hdr' })}`, [ROUTES.WEB_DISPLAY_VIDEO]: `/config${settingsHash({ tab: 'display', sub: 'video' })}`,
+  [ROUTES.WEB_AUDIO_SOUND]: `/config${settingsHash({ tab: 'audio', sub: 'sound' })}`,
   // the gamepad is a page of 输入 in the Web UI: the rail destination shows that page in the frame
   [ROUTES.GAMEPAD]: `/config${settingsHash({ tab: 'input', focus: 'ds5-block' })}`,
 }[route] || null)

@@ -434,7 +434,7 @@ const activeSection = computed({
   get: () => vddSub.value || 'overview',
   set: (value) => { if (value === 'overview') { if (vddSub.value) backVdd() } else openVddSub(value) },
 })
-const pageTitle = computed(() => ({ display: t.value.vddSettings.tabDisplay, quality: vp.value.qualityTitle, calibration: t.value.vddSettings.calibrationTitle, driver: vp.value.driverTitle }[activeSection.value] || t.value.vddSettings.title))
+const pageTitle = computed(() => ({ display: t.value.vddSettings.tabDisplay, quality: vp.value.qualityTitle, calibration: t.value.vddSettings.calibrationTitle, driver: vp.value.driverTitle }[activeSection.value] || t.value.m3e.display.vdd))
 const edidInput = ref(null)
 const onEdidPicked = (event) => {
   const file = event.target.files?.[0]

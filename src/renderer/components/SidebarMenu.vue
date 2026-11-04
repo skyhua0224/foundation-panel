@@ -138,7 +138,7 @@ import { useWindowControls } from '../composables/useWindowControls.js'
 import { useTools } from '../composables/useTools.js'
 import { useTouchWindowDrag } from '../composables/useTouchWindowDrag.js'
 import { createUtilityTools } from '../composables/toolsRegistry.js'
-import { ROUTES, PAGES, routeForWebPath, webPathOf } from '../composables/useRouter.js'
+import { ROUTES, PAGES, routeForWebPath, routeOfPlace, webPathOf } from '../composables/useRouter.js'
 import { createGuideData } from '../composables/guideData.js'
 import PanelPending from './PanelPending.vue'
 import { recordUpdateCheck } from '../composables/useUpdateCheckTime.js'
@@ -288,6 +288,8 @@ const currentRow = computed(() => {
   if (route === ROUTES.WEB_PASSWORD) return 'password'
   return route
 })
+// the settings of the display and audio rails are not under 串流设置: their path starts with the rail's own name (the category of the entry)
+const settingsPlace = (e) => (e.params?.tab === 'display' || e.params?.tab === 'audio' ? '' : railLabel('config'))
 const searchItems = computed(() => [
   ...Object.keys(PAGES)
     .filter((id) => PAGES[id].list !== false)
@@ -354,13 +356,13 @@ const actionHandlers = {
   addApp: () => openRoute(ROUTES.WEB_APPS),
 }
 const searchDocs = computed(() => [
-  ...settingDocs(searchItems.value, { prefix: railLabel('config'), locale: locale.value }),
+  ...settingDocs(searchItems.value, { prefix: settingsPlace, locale: locale.value }),
   ...actionDocs(locale.value, actionHandlers, searchT.value.types.action),
   ...clientDocs(hostClients.value, { place: `${railLabel('stream')}` }),
   ...appDocs(hostApps.value, { place: `${railLabel('stream')}` }),
   ...tileDocs(locale.value),
 ])
-const recentSettingDocs = computed(() => settingDocs(settingsList.recentView.value.items.map((r) => r.entry), { prefix: railLabel('config'), locale: locale.value }))
+const recentSettingDocs = computed(() => settingDocs(settingsList.recentView.value.items.map((r) => r.entry), { prefix: settingsPlace, locale: locale.value }))
 const onUnifiedChoose = (doc) => {
   if (doc.type === 'setting' || doc.type === 'page') onSearch(doc.entry)
   else if (doc.type === 'client') { emit('webui-navigate', `/pin${filterHash(doc.client?.name || doc.title)}`); router.navigate(ROUTES.WEB_CLIENTS) }
@@ -373,10 +375,18 @@ const goDiagnosticsPlace = (place) => {
   if (place === 'drivers') router.navigate(ROUTES.COMPONENTS)
   else if (place === 'encoder') openConfig({ tab: 'encoders' })
   else if (place === 'network') openConfig({ tab: 'network' })
-  else if (place === 'audio' || place === 'display') openConfig({ tab: 'av' })
+  else if (place === 'audio') openConfig({ tab: 'audio', sub: 'sound' })
+  else if (place === 'display') openConfig({ tab: 'display', sub: 'output' })
 }
 // A place of the stream settings: the list pane opens the Web page in the frame at that tab, section and row
 const openConfig = (params = { tab: 'general' }) => {
+  // the display and audio places are destinations of their own rails (the virtual display and the microphone are pages of the panel)
+  const place = routeOfPlace(params.tab, params.sub)
+  if (place) {
+    if (webPathOf(place)) emit('webui-navigate', `/config${settingsHash(params.sub ? params : { ...params, sub: undefined })}`)
+    router.navigate(place, params)
+    return
+  }
   emit('webui-navigate', `/config${settingsHash(params)}`)
   router.navigate(ROUTES.WEB_CONFIG, params)
 }
@@ -407,7 +417,10 @@ const onRail = (item) => {
   if (item.id === 'config') { loadHostData(); openConfig({ tab: 'general' }); router.navigate(ROUTES.CAT_CONFIG); return }
   // the stream rail opens on its first page: the frame has to show it
   if (item.id === 'stream') { emit('webui-navigate', webPathOf(ROUTES.WEB_CLIENTS)); router.navigate(ROUTES.CAT_STREAM); return }
-  router.navigate({ overview: ROUTES.HOME, settings: ROUTES.PANEL_SETTINGS, help: ROUTES.HELP, stream: ROUTES.CAT_STREAM, input: ROUTES.CAT_INPUT, display: ROUTES.CAT_DISPLAY, system: ROUTES.CAT_SYSTEM, assistant: ROUTES.AI_ASSISTANT }[item.id])
+  router.navigate({ overview: ROUTES.HOME, settings: ROUTES.PANEL_SETTINGS, help: ROUTES.HELP, stream: ROUTES.CAT_STREAM, input: ROUTES.CAT_INPUT, audio: ROUTES.CAT_AUDIO, display: ROUTES.CAT_DISPLAY, system: ROUTES.CAT_SYSTEM, assistant: ROUTES.AI_ASSISTANT }[item.id])
+  const first = nav.list.value && nav.defaultDetailOf(nav.list.value)
+  const path = first && webPathOf(first.id)
+  if (path) emit('webui-navigate', path)
 }
 const onSearch = (item) => {
   settingsList.remember(item.keyName)
@@ -425,9 +438,6 @@ const pushDs5Status = () => {
   for (const frame of document.querySelectorAll('iframe')) frame.contentWindow?.postMessage(message, '*')
 }
 watch(() => ds5.status.value?.state, pushDs5Status)
-  const first = nav.list.value && nav.defaultDetailOf(nav.list.value)
-  const path = first && webPathOf(first.id)
-  if (path) emit('webui-navigate', path)
 const onFrameMessage = (event) => {
   const data = event.data
   if (![...document.querySelectorAll('iframe')].some((frame) => frame.contentWindow === event.source)) return

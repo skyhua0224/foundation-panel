@@ -1116,7 +1116,7 @@ export const zh = {
     open: '管理画质增强',
   },
   m3e: {
-    nav: { overview: '概览', stream: '串流', config: '串流设置', input: '输入与外设', display: '显示', system: '系统', assistant: '米塔 AI', settings: '面板设置', help: '帮助与关于', main: '主导航', barSettings: '设置', barMore: '更多', moreTitle: '更多选项', expand: '展开导航', collapse: '收起导航' },
+    nav: { overview: '概览', stream: '串流', config: '串流设置', input: '输入与外设', audio: '音频', display: '显示与视频', system: '系统', assistant: '米塔 AI', settings: '面板设置', help: '帮助与关于', main: '主导航', barSettings: '设置', barMore: '更多', moreTitle: '更多选项', expand: '展开导航', collapse: '收起导航' },
     search: '搜索', noResults: '没有结果', clear: '清除', resize: '调整列表宽度', shortcuts: '键盘快捷键', shortcutHelp: '显示快捷键', section: '切换栏目',
     micFlow: { client: '客户端麦克风', host: '主机', device: '虚拟设备', apps: '应用', buffer: '缓冲' },
     home: { pad: { auto: '自动', x360: 'Xbox 360', ds4: 'DualShock 4', ds5: 'DualSense' }, gamepadType: '手柄类型', vddKeep: '保持虚拟显示器', vddKeepSub: '串流结束后保留', download: '下载客户端', star: '在 GitHub 点 Star', qq: 'QQ 交流群', edit: '编辑磁贴', done: '完成', add: '添加磁贴', reset: '恢复默认', remove: '移除', resize: '更改大小', earlier: '前移', later: '后移', addTitle: '添加磁贴', nothing: '所有磁贴都已在页面上',
@@ -1134,7 +1134,8 @@ export const zh = {
       settings: ['串流设置', '编码、网络、音频等主机配置'], downloads: ['下载客户端', '获取各平台的客户端'],
     },
     input: { summary: '{count} / {total} 项已就绪', title: '输入与外设', lead: '客户端带来的设备：手柄、麦克风与 USB 设备。', gamepad: '手柄', microphone: '麦克风', usb: 'USB 设备', usbNote: 'USB/IP 传输与已挂载设备', gamepadNote: '手柄类型与 DualSense 调校', micNote: '把客户端麦克风传到这台主机' },
-    display: { title: '显示', lead: '虚拟显示器与画质。', vdd: '虚拟显示器', vddNote: '按客户端提供稳定的虚拟显示器，并校准 HDR', quality: '画质增强', qualityNote: 'RTX HDR 与 DLSS NR' },
+    audio: { title: '音频', lead: '串流的声音输出与客户端麦克风。', sound: '音频输出' },
+    display: { title: '显示与视频', lead: '串流的显示器、分辨率与刷新率、HDR、虚拟显示器与画质。', output: '显示输出', modes: '分辨率与刷新', hdr: 'HDR', video: '视频', vdd: '虚拟显示器', vddNote: '按客户端提供稳定的虚拟显示器，并校准 HDR', quality: '画质增强', qualityNote: 'RTX HDR 与 DLSS NR' },
     system: { title: '系统', lead: '驱动组件、诊断与助手。', components: '组件', componentsNote: '虚拟手柄总线、USB/IP 传输等驱动', diagnostics: '诊断工具', diagnosticsNote: '手柄测试、手写笔检测、串流计时器、延迟测试', assistant: '米塔 AI', assistantNote: '帮你排查问题' },
   },
   deviceHub: {

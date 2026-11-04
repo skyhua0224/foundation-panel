@@ -6,13 +6,14 @@ import { ROUTES, RAILS } from './useRouter.js'
  */
 export function railItems(t) {
   const n = t.m3e.nav
-  const icons = { overview: 'home', stream: 'cast_connected', config: 'tune', input: 'sports_esports', display: 'desktop_windows', system: 'build', assistant: 'smart_toy', settings: 'settings', help: 'help' }
+  const icons = { overview: 'home', stream: 'cast_connected', config: 'tune', input: 'sports_esports', audio: 'volume_up', display: 'desktop_windows', system: 'build', assistant: 'smart_toy', settings: 'settings', help: 'help' }
   return RAILS.map((id) => ({ id, icon: icons[id], label: n[id] }))
 }
 
 /** The row id of foundation-ui's rowLines for a page of the list panes (the second line and the search words of the page). */
 export const ROW_OF_ROUTE = {
   [ROUTES.WEB_CLIENTS]: 'clients', [ROUTES.WEB_APPS]: 'apps', [ROUTES.WEB_DOWNLOADS]: 'downloads', [ROUTES.GAMEPAD]: 'gamepad', [ROUTES.MICROPHONE]: 'microphone', [ROUTES.USB]: 'usb',
+  [ROUTES.WEB_DISPLAY_OUTPUT]: 'display-output', [ROUTES.WEB_DISPLAY_MODES]: 'display-modes', [ROUTES.WEB_DISPLAY_HDR]: 'display-hdr', [ROUTES.WEB_DISPLAY_VIDEO]: 'display-video', [ROUTES.WEB_AUDIO_SOUND]: 'audio-output',
   [ROUTES.VDD_SETTINGS]: 'vdd', [ROUTES.HDR_ENHANCED]: 'quality', [ROUTES.COMPONENT_STATUS]: 'components', [ROUTES.DIAGNOSTICS]: 'diagnostics', [ROUTES.TOOLBOX]: 'toolbox',
   [ROUTES.PANEL_SETTINGS]: 'panel', [ROUTES.HELP]: 'help', [ROUTES.AI_ASSISTANT]: 'assistant',
 }
@@ -28,11 +29,18 @@ export function pageItems(t, rail, runtime = {}) {
     ],
     input: [
       { id: ROUTES.GAMEPAD, icon: 'sports_esports', tone: 'primary', label: c.input.gamepad, text: lines.gamepad },
-      { id: ROUTES.MICROPHONE, icon: 'mic', tone: 'tertiary', label: c.input.microphone, text: lines.microphone },
       { id: ROUTES.USB, icon: 'usb', tone: 'success', label: c.input.usb, text: lines.usb },
     ],
+    audio: [
+      { id: ROUTES.WEB_AUDIO_SOUND, icon: 'speaker', tone: 'primary', label: c.audio.sound, text: lines['audio-output'] },
+      { id: ROUTES.MICROPHONE, icon: 'mic', tone: 'tertiary', label: c.input.microphone, text: lines.microphone },
+    ],
     display: [
-      { id: ROUTES.VDD_SETTINGS, icon: 'desktop_windows', tone: 'primary', label: c.display.vdd, text: lines.vdd },
+      { id: ROUTES.WEB_DISPLAY_OUTPUT, icon: 'monitor', tone: 'primary', label: c.display.output, text: lines['display-output'] },
+      { id: ROUTES.WEB_DISPLAY_MODES, icon: 'aspect_ratio', tone: 'secondary', label: c.display.modes, text: lines['display-modes'] },
+      { id: ROUTES.WEB_DISPLAY_HDR, icon: 'hdr_on', tone: 'warn', label: c.display.hdr, text: lines['display-hdr'] },
+      { id: ROUTES.VDD_SETTINGS, icon: 'desktop_windows', tone: 'success', label: c.display.vdd, text: lines.vdd },
+      { id: ROUTES.WEB_DISPLAY_VIDEO, icon: 'videocam', tone: 'primary', label: c.display.video, text: lines['display-video'] },
       { id: ROUTES.HDR_ENHANCED, icon: 'wand_stars', tone: 'tertiary', label: c.display.quality, text: lines.quality },
     ],
     system: [
@@ -46,7 +54,7 @@ export function pageItems(t, rail, runtime = {}) {
 
 // The bottom bar of a narrow window (the Material navigation bar takes three to five destinations; nine crammed their labels): the overview, the stream,
 // ONE entry for the four settings categories (it opens a list of them), 米塔 AI, and 更多 (panel settings, help and about, search, sponsor).
-export const BAR_GROUP_OF = { overview: 'overview', stream: 'stream', config: 'settings-hub', input: 'settings-hub', display: 'settings-hub', system: 'settings-hub', assistant: 'assistant', settings: 'more', help: 'more', appearance: 'more' }
+export const BAR_GROUP_OF = { overview: 'overview', stream: 'stream', config: 'settings-hub', input: 'settings-hub', audio: 'settings-hub', display: 'settings-hub', system: 'settings-hub', assistant: 'assistant', settings: 'more', help: 'more', appearance: 'more' }
 export function barItems(t) {
   const n = t.m3e.nav
   return [
