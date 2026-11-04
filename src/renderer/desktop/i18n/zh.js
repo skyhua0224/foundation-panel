@@ -1125,10 +1125,10 @@ export const zh = {
       status: { idle: '没有串流', waiting: '等待数据', good: '良好', warning: '偏高', slow: '过慢', error: '读不到主机' },
       window: '延迟窗口', last: '最近', min: '最小', avg: '平均', max: '最大', frameBudget: '帧预算', sampleAge: '最近样本距今', totalFrames: '总帧数', totalSamples: '总样本数',
       pipeline: '编码管线', segments: { capture_to_convert: '捕获等待', convert: '转换', encode_queue: '编码排队', encode: '编码', packet_to_broadcast: '发送排队', total: '合计' },
-      session: '会话', encoderCapture: '编码器 / 捕获', uptime: '时长',
+      nrOpen: '打开画质增强', session: '会话', encoderCapture: '编码器 / 捕获', uptime: '时长',
       stopAll: '断开所有会话', stopTitle: '断开所有会话？', stopText: '会结束全部串流，包括其他客户端的。', stop: '断开', stopped: '已请求断开全部会话', stopFailed: '断开失败：{error}',
     },
-    dpi: { title: '桌面缩放', scale: 'DPI 缩放', presets: '常用缩放', loading: '读取中', apply: '应用', applying: '应用中…', applied: 'DPI 已设为 {value}%', partial: 'Windows 现在是 {value}%，部分应用要重新打开才会变', failed: '设置失败：{error}' },
+    dpi: { title: '桌面缩放', readFailed: '读不到当前 DPI：{error}',  scale: 'DPI 缩放', presets: '常用缩放', loading: '读取中', apply: '应用', applying: '应用中…', applied: 'DPI 已设为 {value}%', partial: 'Windows 现在是 {value}%，部分应用要重新打开才会变', failed: '设置失败：{error}' },
     rtss: {
       title: 'RTSS 叠加', refresh: '刷新', ok: '确定', cancel: '取消', running: '运行中', notRunning: 'RTSS 没有运行：先启动 RivaTuner Statistics Server，再点刷新',
       cliMissing: '帧率限制和 OSD 设置需要 rtss-cli.exe', download: '自动下载', downloading: '下载中…', downloaded: 'rtss-cli.exe 已下载',

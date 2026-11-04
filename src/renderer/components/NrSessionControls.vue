@@ -163,3 +163,16 @@ async function run(build) {
   }
 }
 </script>
+
+<style>
+/* the live controls on 画质增强 › 当前会话 and on 当前串流: every row is a label with its value beside it, a gap between them */
+.live-controls { display: grid; gap: 4px; padding: 4px 0 8px; }
+.live-controls .live-control-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
+.live-controls .live-control-row strong { font: var(--m-title-small); color: var(--md-sys-color-on-surface); }
+.live-controls .live-control-row p { margin: 4px 0 0; font: var(--m-body-medium); color: var(--md-sys-color-on-surface-variant); }
+.live-controls .live-scale { display: grid; gap: 4px; }
+.live-controls .live-scale > span { display: flex; align-items: baseline; gap: 8px; font: var(--m-title-small); color: var(--md-sys-color-on-surface); }
+.live-controls .live-scale > span > strong { font: var(--m-label-large); font-variant-numeric: tabular-nums; color: var(--md-sys-color-primary); }
+.live-controls .quality-note, .live-controls .quality-warning { margin: 0 0 8px; font: var(--m-body-small); color: var(--md-sys-color-on-surface-variant); }
+.live-controls .quality-warning { color: var(--md-sys-color-error); }
+</style>

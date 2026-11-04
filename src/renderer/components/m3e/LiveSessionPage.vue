@@ -21,6 +21,20 @@
         </MSection>
       </template>
 
+      <!-- 画质增强: the NR live controls of the stream (NrSessionControls, as on 画质增强 › 当前会话); without a stream its state and one action -->
+      <MSection :title="t.m3e.display.quality">
+        <MBanner v-if="nrError" tone="error" icon="error">{{ enhancementError(nrText, nrError) }}</MBanner>
+        <MGroup v-if="nr.list.length > 1">
+          <MChoiceItem icon="cast_connected" :title="nrText.choose" :model-value="nr.selected ?? ''" :options="nr.list.map((p) => ({ value: p.id, label: `${nrText.stream} #${p.id} · ${nrOutputLabel(p)}` }))" :cancel-label="l.cancel" @update:model-value="(v) => selectNr(Number(v))" />
+        </MGroup>
+        <NrSessionControls v-if="nrPipeline" :pipeline="nrPipeline" :online="nr.online" @changed="pollNr" @error="nrError = $event" />
+        <MGroup v-else>
+          <MItem icon="wand_stars" title="DLSS NR" :value="nrOverlayText.states[nrOverlayState(null, nr.online)]">
+            <template #trail><MButton variant="text" size="sm" @click="nr.online ? emit('open-quality') : pollNr()">{{ nr.online ? l.nrOpen : l.refresh }}</MButton></template>
+          </MItem>
+        </MGroup>
+      </MSection>
+
       <!-- 主机性能 -->
       <MSection :title="l.host">
         <MBanner v-if="perfError" tone="warn" icon="warning">{{ l.perfFailed.replace('{error}', perfError) }}</MBanner>
@@ -67,15 +81,21 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { MPage, MGroup, MSection, MItem, MSliderItem, MChoiceItem, MValueItem, MChipSet, MStat, MSparkline, MBanner, MButton, MIconButton, MFooter, MEmpty, MDialog, MPageLoading, useNotify } from 'foundation-ui/vue'
+import { invoke } from '@tauri-apps/api/core'
 import { sunshine } from '../../tauri-adapter.js'
+import NrSessionControls from '../NrSessionControls.vue'
+import { enhancementControlsText, enhancementError } from '../../composables/enhancementControls.js'
+import { nrOverlayText as overlayTexts } from '../../composables/nrOverlayMessages.js'
+import { nrOutputLabel, nrOverlayState, nrPipelines } from '../../composables/nrOverlayState.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 import { BITRATE, BITRATE_PRESETS, DEFAULT_BITRATE, formatBitrate, validBitrate, liveSessions, perfSessionOf, budgetUsage, perfStatus, pipelineSegments, formatMs, formatNumber, formatPercent, formatInteger, formatUptime } from '../../composables/liveSession.js'
 
 // 当前串流: the old 码率调整 tool (a live session's bitrate: change_bitrate) and the old 主机性能 window (/api/perf/current) on one page of 串流.
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const l = computed(() => t.value.m3e.live)
+const emit = defineEmits(['open-quality'])
 const say = (text) => useNotify().snack(text)
 
 const sessions = ref([]), loaded = ref(false), refreshing = ref(false), loadError = ref('')
@@ -134,6 +154,25 @@ async function loadPerf() {
   } catch (e) { perfError.value = e?.message || String(e) }
 }
 
+// 画质增强 (DLSS NR) of the live stream: nr_live_status as 画质增强 polls it; a choice of stream is the overlay's target (nr_overlay_select_session), the same as there
+const nrText = computed(() => enhancementControlsText(locale.value)), nrOverlayText = computed(() => overlayTexts(locale.value))
+const nr = reactive({ list: [], selected: null, online: true })
+const nrError = ref('')
+const nrPipeline = computed(() => nr.list.find((p) => p.id === nr.selected) || null)
+async function selectNr(id) {
+  try { await invoke('nr_overlay_select_session', { id }); nr.selected = id; nrError.value = '' } catch (e) { nrError.value = String(e) }
+}
+let targetRead = false
+async function pollNr() {
+  try {
+    if (!targetRead) { targetRead = true; try { const s = await invoke('nr_overlay_settings'); if (s?.target != null) nr.selected = s.target } catch { /* no saved target */ } }
+    nr.list = nrPipelines((await invoke('nr_live_status'))?.pipelines)
+    nr.online = true
+    if (nr.selected !== null && !nr.list.some((p) => p.id === nr.selected)) nr.selected = null
+    if (nr.selected === null && nr.list.length === 1) await selectNr(nr.list[0].id)
+  } catch { nr.online = false; nr.list = [] }
+}
+
 const confirmStop = ref(false), stopping = ref(false)
 async function stopAll() {
   confirmStop.value = false
@@ -146,7 +185,7 @@ async function refresh(manual = false) {
   if (inFlight) return
   inFlight = true
   if (manual) refreshing.value = true
-  try { await Promise.all([loadSessions(), loadPerf()]) } finally { inFlight = false; refreshing.value = false; loaded.value = true }
+  try { await Promise.all([loadSessions(), loadPerf(), pollNr()]) } finally { inFlight = false; refreshing.value = false; loaded.value = true }
 }
 let timer = null
 onMounted(() => { refresh(); timer = setInterval(refresh, 2000) })
