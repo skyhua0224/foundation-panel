@@ -5,7 +5,7 @@ import vm from 'node:vm'
 
 const source = readFileSync(new URL('./lifecycle.js', import.meta.url), 'utf8')
 
-function page(generation) {
+function page(generation, framed = false) {
   const calls = [], timers = [], events = [], styles = []
   const head = {
     appendChild(style) { styles.push(style); style.parentNode = this },
@@ -13,7 +13,8 @@ function page(generation) {
   }
   const document = { head, documentElement: head,
     createElement: () => ({ parentNode: null }), dispatchEvent: event => events.push(event.type) }
-  const window = { __TAURI_INTERNALS__: { invoke: (name, args) => calls.push({ name, args }) } }
+  const window = { __TAURI_INTERNALS__: { invoke: (name, args) => { calls.push({ name, args }); return Promise.reject(new Error('not allowed by ACL')) } } }
+  window.top = framed ? {} : window
   vm.runInNewContext(source.replaceAll('__LIFECYCLE_GENERATION__', String(generation)), {
     window, document, Event: class { constructor(type) { this.type = type } },
     console: { log() {} }, setInterval: (callback, delay) => timers.push({ callback, delay }),
@@ -46,4 +47,18 @@ test('visibility notifications pause and resume page content only on transitions
   assert.equal(view.document.hidden, false)
   assert.equal(view.styles.length, 0)
   assert.deepEqual(view.events, ['visibilitychange', 'visibilitychange'])
+})
+
+test('a frame of another origin does not beat, and a rejected beat is not an unhandled rejection', async () => {
+  const frame = page(3, true)
+  frame.timers[0].callback()
+  assert.equal(frame.calls.length, 0, 'the Web UI frame never calls the command')
+  const top = page(3)
+  const rejections = []
+  process.on('unhandledRejection', (e) => rejections.push(e))
+  top.timers[0].callback()
+  await new Promise((r) => setTimeout(r, 20))
+  process.removeAllListeners('unhandledRejection')
+  assert.ok(top.calls.length >= 2, 'the window itself still beats')
+  assert.equal(rejections.length, 0)
 })

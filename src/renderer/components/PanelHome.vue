@@ -7,7 +7,8 @@ import { usePanelHome } from '../composables/usePanelHome.js'
 import { useHostReach } from '../composables/useHostReach.js'
 import { useGamepadType } from '../composables/useGamepadType.js'
 import { SPONSORS } from '../config/sponsors.js'
-import { openExternalUrl, vdd as vddApi, virtualMicrophone } from '../tauri-adapter.js'
+import { openExternalUrl, sunshine, vdd as vddApi, virtualMicrophone } from '../tauri-adapter.js'
+import { hostBase, hostFetch } from '../composables/hostBase.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
 const props = defineProps({
@@ -105,15 +106,17 @@ const sampleAll = () => {
 let sampler = 0
 onMounted(() => { sampleAll(); sampler = setInterval(sampleAll, SAMPLE_SEC * 1000) })
 onBeforeUnmount(() => clearInterval(sampler))
+// the address of the host API: a request waits for it (hostBase.js) instead of going to the panel's own origin with an empty prefix
+const base = () => hostBase(() => proxyUrl.value, () => sunshine.getProxyUrl())
 // the shared virtual display control: the same store the settings use, here over the host API through the proxy and the tray commands
 const vddAdapter = createHttpVddAdapter({
-  fetchJson: async (path, init) => (await fetch(`${proxyUrl.value}${path}`, init)).json(),
+  fetchJson: async (path, init) => (await hostFetch(base, path, init)).json(),
   setProtected: async (key, on) => { const r = key === 'vdd_keep_enabled' ? await vddApi.setKeepEnabled(on) : await vddApi.setHeadlessCreateEnabled(on); if (r && r.success === false) throw new Error(r.error || 'failed') },
   status: async () => vddStatusOf(state.vdd),
 })
 const vddStore = createVddStore(vddAdapter, { autosave: true })
 onMounted(async () => { try { await vddAdapter.load() } catch { /* the card then shows the defaults */ } vddStore.refresh() })
-const sysJson = async (path) => { const r = await fetch(`${proxyUrl.value}${path}`); if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}`), { status: r.status }); return r.json() }
+const sysJson = async (path) => { const r = await hostFetch(base, path); if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}`), { status: r.status }); return r.json() }
 const nics = useSystemInfo({ fetchJson: sysJson })
 const hostReach = useHostReach()
 const reachProblem = computed(() => reachProblemOf(hostReach.view.report))
@@ -188,8 +191,8 @@ function onAction(a) {
 }
 // a control card saves its setting the way the settings do: read the configuration, change the key, write it back
 const hostApi = {
-  getJson: async (path) => (await fetch(`${proxyUrl.value}${path}`)).json(),
-  postJson: async (path, body) => (await fetch(`${proxyUrl.value}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json(),
+  getJson: async (path) => (await hostFetch(base, path)).json(),
+  postJson: async (path, body) => (await hostFetch(base, path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json(),
 }
 // the QR code of the pairing card: a pairing window is open on the host only while the card shows it (the card asks and gives it back)
 const pairQr = createPairQr({

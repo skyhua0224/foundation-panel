@@ -43,6 +43,7 @@ import SidebarMenu from './SidebarMenu.vue'
 import { isWebuiNavigationPath } from '../composables/webuiNavigation.js'
 import { BLANK, routeChanged, webuiNavigated } from '../composables/frameRoute.js'
 import { webPathOf, routeForWebPath } from '../composables/useRouter.js'
+import { createReportLimiter, normalizeFrameReport } from '../composables/frameReport.js'
 import { parseSettingsHash } from 'foundation-ui/settings/index.js'
 
 invoke('main_panel_loading').catch(() => {})
@@ -243,6 +244,7 @@ const handleTauriFileDrop = async (paths) => {
 }
 
 // Message handling
+const frameLimiter = createReportLimiter({ perMinute: 30 })
 const createMessageHandler = () => {
   const getSunshineOrigin = () => {
     try {
@@ -289,6 +291,12 @@ const createMessageHandler = () => {
       beginLoading()
     },
     'webui-ready': finishLoading,
+    // errors, long frames and slow calls inside the page, written to the panel's log (frameReport.js); only the frame that is shown may say them
+    'panel-frame-report': (data, event) => {
+      if (!isTrustedSunshineEvent(event) || !frameLimiter.allow()) return
+      const line = normalizeFrameReport(data)
+      if (line) invoke('frontend_slow', line).catch(() => {})
+    },
     'restore-background': (data) => loadAndSetBackground(data.path),
     'show-message': (data) => {
       // 处理来自 Web UI 的消息显示请求
