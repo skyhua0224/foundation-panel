@@ -54,6 +54,7 @@ import { dlssNrText } from '../composables/dlssNrMessages.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { useRtxHdrI18n } from '../composables/rtxHdrI18n.js'
 import { useEnhancementManager } from '../composables/useEnhancementManager.js'
+import { noteDlssNrStatus } from '../composables/useDlssNrReady.js'
 
 const props = defineProps({ kind: { type: String, default: 'hdr' } })
 const { locale } = useI18n()
@@ -84,7 +85,9 @@ const {
 } = useEnhancementManager({
   api: props.kind === 'nr' ? dlssNr : rtxHdr,
   messages: text,
-  runtimeName: props.kind === 'nr' ? 'nvngx_dlssnr.dll' : 'nvngx_truehdr.dll'
+  runtimeName: props.kind === 'nr' ? 'nvngx_dlssnr.dll' : 'nvngx_truehdr.dll',
+  // the DLSS NR live controls elsewhere follow what this page reads (install, repair, uninstall)
+  onStatus: props.kind === 'nr' ? noteDlssNrStatus : undefined
 })
 const maintenanceMessage = computed(() => {
   if (status.value.state === 'pending_removal') return text.value.pendingRemovalNotice

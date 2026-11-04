@@ -53,8 +53,8 @@
         </MGroup>
         <MNotice v-if="selectedId && !pipeline" tone="warn">{{ text.expired }}</MNotice>
         <MBanner v-if="pipeline?.dv_profile && pipeline.dv_state !== 'active'" tone="info" icon="info">{{ pipeline.dv_state === 'waiting' ? overlayText.dvWaiting : overlayText.dvFallback }}</MBanner>
-        <NrSessionControls v-if="pipeline" :pipeline="pipeline" :online="online" @changed="pollOnce" @error="error = $event" />
-        <MButton v-if="pipeline" icon="monitor" :disabled="saving" @click="setVisibility(true)">{{ text.open }}</MButton>
+        <NrSessionControls v-if="pipeline && nrReady" :pipeline="pipeline" :online="online" @changed="pollOnce" @error="error = $event" />
+        <MButton v-if="pipeline && nrReady" icon="monitor" :disabled="saving" @click="setVisibility(true)">{{ text.open }}</MButton>
       </template>
       <MFooter>{{ text.sessionHint }}</MFooter>
     </template>
@@ -88,6 +88,7 @@ import { listen } from '@tauri-apps/api/event'
 import { MIcon, MPage, MGroup, MSection, MItem, MSwitchItem, MSliderItem, MChoiceItem, MBanner, MNotice, MEmpty, MFooter, MButton, MIconButton, useSubpage } from 'foundation-ui/vue'
 import { displayGamepadShortcut, FIXED_GAMEPAD_SHORTCUTS } from '../composables/controllerButtons.js'
 import NrSessionControls from './NrSessionControls.vue'
+import { noteDlssNrStatus, dlssNrShown } from '../composables/useDlssNrReady.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import {
   DEFAULT_NR_SHORTCUT,
@@ -114,11 +115,13 @@ const t = useI18n().t
 const keysOf = (label) => String(label || '').split(' + ').map((k) => k.trim()).filter(Boolean)
 const emit = defineEmits(['manage-components'])
 const { current, open, back } = useSubpage('quality')
+// the live NR controls (and the overlay that carries them) only for an installed and usable DLSS NR; readComponents reads the status and hands it in, the install flow stays on this page
+const nrReady = dlssNrShown
 // the two runtimes are installed on the component status page (not here): this page only reads whether they are there
 const installed = ref({ nr: null, hdr: null })
 async function readComponents() {
   for (const [key, api] of [['nr', dlssNr], ['hdr', rtxHdr]]) {
-    try { const result = await api.getStatus(); installed.value[key] = result?.success ? !!result.data?.installed : null } catch { installed.value[key] = null }
+    try { const result = await api.getStatus(); installed.value[key] = result?.success ? !!result.data?.installed : null; if (key === 'nr' && result?.success) noteDlssNrStatus(result.data) } catch { installed.value[key] = null }
   }
 }
 const missing = computed(() => [['nr', 'DLSS NR'], ['hdr', 'RTX HDR']].filter(([key]) => installed.value[key] === false).map(([, name]) => name))

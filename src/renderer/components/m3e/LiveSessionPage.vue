@@ -22,7 +22,7 @@
       </template>
 
       <!-- 画质增强: the NR live controls of the stream (NrSessionControls, as on 画质增强 › 当前会话); without a stream its state and one action -->
-      <MSection :title="t.m3e.display.quality">
+      <MSection v-if="nrReady" :title="t.m3e.display.quality">
         <MBanner v-if="nrError" tone="error" icon="error">{{ enhancementError(nrText, nrError) }}</MBanner>
         <MGroup v-if="nr.list.length > 1">
           <MChoiceItem icon="cast_connected" :title="nrText.choose" :model-value="nr.selected ?? ''" :options="nr.list.map((p) => ({ value: p.id, label: `${nrText.stream} #${p.id} · ${nrOutputLabel(p)}` }))" :cancel-label="l.cancel" @update:model-value="(v) => selectNr(Number(v))" />
@@ -86,6 +86,7 @@ import { MPage, MGroup, MSection, MItem, MSliderItem, MChoiceItem, MValueItem, M
 import { invoke } from '@tauri-apps/api/core'
 import { sunshine } from '../../tauri-adapter.js'
 import NrSessionControls from '../NrSessionControls.vue'
+import { useDlssNrReady } from '../../composables/useDlssNrReady.js'
 import { enhancementControlsText, enhancementError } from '../../composables/enhancementControls.js'
 import { nrOverlayText as overlayTexts } from '../../composables/nrOverlayMessages.js'
 import { nrOutputLabel, nrOverlayState, nrPipelines } from '../../composables/nrOverlayState.js'
@@ -156,6 +157,8 @@ async function loadPerf() {
 
 // 画质增强 (DLSS NR) of the live stream: nr_live_status as 画质增强 polls it; a choice of stream is the overlay's target (nr_overlay_select_session), the same as there
 const nrText = computed(() => enhancementControlsText(locale.value)), nrOverlayText = computed(() => overlayTexts(locale.value))
+// only for an installed and usable DLSS NR: otherwise nothing of it on this page (the install is on 画质增强)
+const nrReady = useDlssNrReady()
 const nr = reactive({ list: [], selected: null, online: true })
 const nrError = ref('')
 const nrPipeline = computed(() => nr.list.find((p) => p.id === nr.selected) || null)
@@ -164,6 +167,7 @@ async function selectNr(id) {
 }
 let targetRead = false
 async function pollNr() {
+  if (!nrReady.value) return
   try {
     if (!targetRead) { targetRead = true; try { const s = await invoke('nr_overlay_settings'); if (s?.target != null) nr.selected = s.target } catch { /* no saved target */ } }
     nr.list = nrPipelines((await invoke('nr_live_status'))?.pipelines)

@@ -15,12 +15,13 @@ const emptyStatus = () => ({
   runtime_present: false,
 })
 
-export function useEnhancementManager({ api, messages: text, runtimeName }) {
+export function useEnhancementManager({ api, messages: text, runtimeName, onStatus }) {
   const status = ref(emptyStatus())
   const statusKnown = ref(false)
   const applyStatus = (data) => {
     status.value = { ...emptyStatus(), ...data }
     statusKnown.value = true
+    onStatus?.(status.value)
   }
   const refreshing = ref(false)
   const operation = ref('')
