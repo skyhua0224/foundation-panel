@@ -217,6 +217,12 @@ const sponsorSections = computed(() => [
 const actions_openExternal = (url) => openExternalUrl(url)
 const nav = router.nav
 const isWebPage = computed(() => !!webPathOf(router.currentRoute.value))
+// The frame shows the page of the route. Callers that open a Web page tell the frame themselves; a route that is set any other way (a link, a deep link, a caller that only
+// switches the route) comes here: when the frame is not on the page of the route it is told, so a route never shows another page's content.
+watch(() => router.currentRoute.value, (route) => {
+  const path = webPathOf(route)
+  if (path && props.webuiPath !== path && routeForWebPath(props.webuiPath) !== route) emit('webui-navigate', path)
+}, { flush: 'post', immediate: true })
 // The host (Sunshine) does not answer: the content area shows the offline state (Vivi, the actions, the countdown); the rail stays usable and the pages that
 // do not need the host (the panel's settings, 米塔 AI, help, about, the diagnostics) stay as they are. When the host is back the frame loads again.
 const probeHost = async () => {
