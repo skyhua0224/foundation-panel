@@ -76,6 +76,9 @@ struct Face {
 }
 
 static REGISTERED: AtomicBool = AtomicBool::new(false);
+/// How many times the cover windows were asked to paint and to print (the check reads them)
+static PAINTS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+static PRINTS: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
 fn class_name() -> PCWSTR {
     w!("SunshinePanelDpiCover")
@@ -132,12 +135,14 @@ unsafe extern "system" fn cover_proc(hwnd: HWND, message: u32, wparam: WPARAM, l
         WM_PAINT => {
             let mut paint = PAINTSTRUCT::default();
             let hdc = unsafe { BeginPaint(hwnd, &mut paint) };
+            PAINTS.fetch_add(1, Ordering::Relaxed);
             draw(hwnd, hdc);
             let _ = unsafe { EndPaint(hwnd, &paint) };
             LRESULT(0)
         }
         // PrintWindow of the cover's own window (the check of its content) asks the window to draw itself into a device context of ours
         WM_PRINTCLIENT => {
+            PRINTS.fetch_add(1, Ordering::Relaxed);
             draw(hwnd, windows::Win32::Graphics::Gdi::HDC(wparam.0 as *mut _));
             LRESULT(0)
         }
@@ -278,6 +283,14 @@ pub(super) fn verify(cover: HWND, color: (u8, u8, u8), frame: Option<&Frame>) ->
         let _ = DeleteObject(HGDIOBJ(dib.0));
         let _ = DeleteDC(memory);
         ReleaseDC(None, screen);
+        let mut direct = false;
+        if !pixels.chunks_exact(4).any(|pixel| pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0) {
+            // the window did not print: its drawing routine is run into the memory bitmap, which checks the face (colour, frame, stretch) if not the window's messages
+            std::ptr::write_bytes(bits.cast::<u8>(), 0, width * height * 4);
+            draw(cover, memory);
+            pixels = std::slice::from_raw_parts(bits.cast::<u8>(), width * height * 4).to_vec();
+            direct = true;
+        }
         let shown = grid_means(&pixels, width, height, 16, 10);
         let expected = match frame {
             Some(frame) => grid_means(&frame.bgra, frame.width as usize, frame.height as usize, 16, 10),
@@ -288,7 +301,7 @@ pub(super) fn verify(cover: HWND, color: (u8, u8, u8), frame: Option<&Frame>) ->
             Some(frame) => ("frame", format!("stretch x{:.2} y{:.2} of {}x{}", width as f64 / f64::from(frame.width), height as f64 / f64::from(frame.height), frame.width, frame.height)),
             None => ("colour", format!("expected #{:02x}{:02x}{:02x}", color.0, color.1, color.2)),
         };
-        format!("PrintWindow(flags {used}) {} {}x{} shows {kind}: mean #{:02x}{:02x}{:02x}, grid difference {diff:.1}/255, {stretch}", if printed { "ok" } else { "failed" }, width, height, mean[0], mean[1], mean[2])
+        format!("{}PrintWindow(flags {used}) {} (paints {}, prints {}) {}x{} shows {kind}: mean #{:02x}{:02x}{:02x}, grid difference {diff:.1}/255, {stretch}", if direct { "DIRECT DRAW, the window printed nothing: " } else { "" }, if printed { "ok" } else { "failed" }, PAINTS.load(Ordering::Relaxed), PRINTS.load(Ordering::Relaxed), width, height, mean[0], mean[1], mean[2])
     }
 }
 
