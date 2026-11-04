@@ -113,7 +113,7 @@ import { computed, defineAsyncComponent, getCurrentInstance, ref, toRef, watch, 
 import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
-import { MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
+import { MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelWebHost from './PanelWebHost.vue'
@@ -316,6 +316,8 @@ const searchItems = computed(() => [
     }),
   // 米塔 AI is a destination of the rail (no list pane): a result of its own, and one for the settings behind the gear of its chat
   { id: ROUTES.AI_ASSISTANT, title: t.value.m3e.nav.assistant, path: t.value.m3e.nav.main, icon: 'smart_toy', route: ROUTES.AI_ASSISTANT, keywords: rowKeywords('assistant') },
+  // 新手引导 is the page of the first run: found by its name and by what people type for it (it is a row of 帮助与关于 too)
+  { id: ROUTES.WELCOME, title: guideTexts(locale.value).guide, path: railLabel('help'), icon: 'rocket_launch', route: ROUTES.WELCOME, keywords: 'guide welcome wizard first run setup 向导 引导 首次 新手' },
   ...settingsList.searchItems.value,
 ])
 // ---- the unified search: one entry in the caption bar (an icon and a full-screen view on a narrow window) over everything a person can look for ----
