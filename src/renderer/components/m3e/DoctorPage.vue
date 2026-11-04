@@ -49,15 +49,19 @@ const local = {
 }
 const sources = [local, doctorHostSource(request)]
 
-// The repairs this panel can run. service:start_type waits for the service work's hardened helper (the old path writes a temp script).
+// The repairs this panel can run. With 系统 › Sunshine 服务 (panel feat/service-page) the service is started and its start type set
+// through its hardened elevated helper; without it the start goes through the old restart command and the start type is not offered
+// (the old writer puts a script in %TEMP% before elevating: audit danger table).
+const serviceHelper = ref(false)
 const REPAIRS = {
-  'service:start': () => invoke('restart_sunshine_service'),
+  'service:start': () => (serviceHelper.value ? invoke('control_sunshine_service', { action: 'start', acknowledgeLiveStream: false }) : invoke('restart_sunshine_service')),
+  'service:start_type': () => invoke('set_sunshine_service_start_type', { startType: 'auto', acknowledgeUnreachableAfterReboot: false }),
   'driver:vdd': () => invoke('install_vdd_driver'),
   'driver:vigem': () => invoke('install_vigem_driver', { force: true }),
   'driver:vmouse': () => invoke('install_vmouse_driver'),
   'driver:usbip': () => invoke('usbip_install_transport'),
 }
-const canRepair = (action) => !!REPAIRS[action.target]
+const canRepair = (action) => !!REPAIRS[action.target] && (action.target !== 'service:start_type' || serviceHelper.value)
 const repair = async (action) => {
   const run = REPAIRS[action.target]
   if (!run) throw new Error(action.target)
@@ -68,6 +72,8 @@ const repair = async (action) => {
 const streaming = ref(false)
 onMounted(async () => {
   diag.loadFacts()
+  // the service page's commands exist only once feat/service-page is merged
+  invoke('get_sunshine_service_status').then(() => { serviceHelper.value = true }, () => {})
   try { streaming.value = ((await request('/api/runtime/sessions')).json?.sessions || []).length > 0 } catch { /* Sunshine is down: no stream */ }
 })
 const diag = useDiagnostics()
