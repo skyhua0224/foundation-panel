@@ -38,6 +38,8 @@
         <UsbPage v-else-if="entry.id === ROUTES.USB" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <ComponentStatusPage v-else-if="entry.id === ROUTES.COMPONENT_STATUS" />
         <ToolboxPage v-else-if="entry.id === ROUTES.TOOLBOX" :tools="toolsMenuItems" />
+        <LiveSessionPage v-else-if="entry.id === ROUTES.LIVE_SESSION" />
+        <RtssPage v-else-if="entry.id === ROUTES.RTSS" />
         <DiagnosticsPage
           v-else-if="entry.id === ROUTES.DIAGNOSTICS"
           @go="goDiagnosticsPlace"
@@ -130,6 +132,8 @@ import AboutPage from './m3e/AboutPage.vue'
 import ComponentStatusPage from './m3e/ComponentStatusPage.vue'
 import { useComponentStatus } from '../composables/useComponentStatus.js'
 import ToolboxPage from './m3e/ToolboxPage.vue'
+import LiveSessionPage from './m3e/LiveSessionPage.vue'
+import RtssPage from './m3e/RtssPage.vue'
 import DiagnosticsPage from './m3e/DiagnosticsPage.vue'
 import { useDeviceRuntime } from '../composables/useDeviceRuntime.js'
 import { useGuideAutoOpen } from '../composables/useGuideAutoOpen.js'

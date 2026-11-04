@@ -16,6 +16,7 @@ export const ROW_OF_ROUTE = {
   [ROUTES.WEB_DISPLAY_OUTPUT]: 'display-output', [ROUTES.WEB_DISPLAY_MODES]: 'display-modes', [ROUTES.WEB_DISPLAY_HDR]: 'display-hdr', [ROUTES.WEB_DISPLAY_VIDEO]: 'display-video', [ROUTES.WEB_AUDIO_SOUND]: 'audio-output',
   [ROUTES.VDD_SETTINGS]: 'vdd', [ROUTES.HDR_ENHANCED]: 'quality', [ROUTES.COMPONENT_STATUS]: 'components', [ROUTES.DIAGNOSTICS]: 'diagnostics', [ROUTES.TOOLBOX]: 'toolbox',
   [ROUTES.WEB_TROUBLESHOOTING]: 'troubleshooting', [ROUTES.PANEL_SETTINGS]: 'panel', [ROUTES.HELP]: 'help', [ROUTES.AI_ASSISTANT]: 'assistant',
+  [ROUTES.LIVE_SESSION]: 'session', [ROUTES.RTSS]: 'rtss',
 }
 
 export function pageItems(t, rail, runtime = {}) {
@@ -26,6 +27,7 @@ export function pageItems(t, rail, runtime = {}) {
       { id: ROUTES.WEB_CLIENTS, icon: 'devices', tone: 'tertiary', label: c.stream.clients[0], text: lines.clients },
       { id: ROUTES.WEB_APPS, icon: 'apps', tone: 'secondary', label: c.stream.apps[0], text: lines.apps },
       { id: ROUTES.WEB_DOWNLOADS, icon: 'download', tone: 'success', label: c.stream.downloads[0], text: lines.downloads },
+      { id: ROUTES.LIVE_SESSION, icon: 'cast', tone: 'warn', label: c.live.title, text: lines.session },
     ],
     input: [
       { id: ROUTES.GAMEPAD, icon: 'sports_esports', tone: 'primary', label: c.input.gamepad, text: lines.gamepad },
@@ -48,6 +50,7 @@ export function pageItems(t, rail, runtime = {}) {
       { id: ROUTES.DIAGNOSTICS, icon: 'stethoscope', tone: 'warn', label: runtime.diagTitle || c.system.diagnostics, text: lines.diagnostics },
       { id: ROUTES.TOOLBOX, icon: 'build', tone: 'secondary', label: t.sidebar.toolbox, text: lines.toolbox },
       { id: ROUTES.WEB_TROUBLESHOOTING, icon: 'troubleshoot', tone: 'primary', label: c.system.troubleshooting, text: lines.troubleshooting },
+      { id: ROUTES.RTSS, icon: 'speed', tone: 'tertiary', label: c.rtss.title, text: lines.rtss },
     ],
   }
   return pages[rail] || []

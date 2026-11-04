@@ -60,6 +60,7 @@
             <MSwitchItem v-model="headlessModel" icon="desktop_access_disabled" :title="vp.headless" :text="hostVdd.store.canSaveProtected ? '' : vt.trayOnly" :disabled="!hostVdd.store.canSaveProtected || hostVdd.store.busy.vdd_headless_create" />
           </MGroup>
         </MSection>
+        <DpiScaleSection />
         <MGroup>
           <MItem action icon="monitor" :title="t.vddSettings.tabDisplay" :text="displaySummary" @click="activeSection = 'display'" />
           <MItem action icon="hdr_on" :title="vp.qualityTitle" :text="qualitySummary" @click="activeSection = 'quality'" />
@@ -247,6 +248,7 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
 import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards, MDialog, MPrepArt, MValueItem, MSeg, MChip, MTile, MIcon, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, MPageLoading, useSubpage, vddPageTexts, vddTexts, VDD_PREP, VDD_RULES, vddOn } from 'foundation-ui/vue'
 import { useHostVdd } from '../composables/useHostVdd.js'
+import DpiScaleSection from './m3e/DpiScaleSection.vue'
 import { useEditableOptionField } from '../composables/useEditableOptionField.js'
 import { useVddEdid } from '../composables/useVddEdid.js'
 import { useVddStatusLabel } from '../composables/useVddStatusLabel.js'

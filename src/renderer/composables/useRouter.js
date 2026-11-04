@@ -44,6 +44,8 @@ export const ROUTES = {
   WEB_DISPLAY_VIDEO: 'web-display-video',
   WEB_AUDIO_SOUND: 'web-audio-sound',
   WEB_TROUBLESHOOTING: 'web-troubleshooting',
+  LIVE_SESSION: 'live-session', // 当前串流: the bitrate of a live session and the host performance (the old 码率调整 and 主机性能 tools)
+  RTSS: 'rtss', // RTSS 叠加: frame-rate limit, OSD, stream monitoring and HWiNFO (the old RTSS tool)
 }
 
 /** rail: category of the page (rail item); list: false = the page takes the whole width (no list pane) */
@@ -54,6 +56,7 @@ export const PAGES = {
   [ROUTES.WEB_CLIENTS]: { rail: 'stream' },
   [ROUTES.WEB_APPS]: { rail: 'stream' },
   [ROUTES.WEB_DOWNLOADS]: { rail: 'stream' },
+  [ROUTES.LIVE_SESSION]: { rail: 'stream' },
   [ROUTES.WEB_CONFIG]: { rail: 'config' },
   [ROUTES.CFG_APPEARANCE]: { rail: 'appearance', list: false },
   [ROUTES.WEB_PASSWORD]: { rail: 'config' },
@@ -73,6 +76,7 @@ export const PAGES = {
   [ROUTES.DIAGNOSTICS]: { rail: 'system' },
   [ROUTES.AI_ASSISTANT]: { rail: 'assistant', list: false }, // 米塔 AI: the chat takes the whole width, its settings are behind the gear of the chat header
   [ROUTES.WEB_TROUBLESHOOTING]: { rail: 'system' },
+  [ROUTES.RTSS]: { rail: 'system' },
   [ROUTES.PANEL_SETTINGS]: { rail: 'settings', list: false },
   [ROUTES.SETTINGS_HUB]: { rail: 'config', list: false },
   [ROUTES.HELP]: { rail: 'help', list: false },
