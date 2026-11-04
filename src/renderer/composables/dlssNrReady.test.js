@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { createDlssNrReady, dlssNrUsable } from './dlssNrReady.js'
+import { readFileSync } from 'node:fs'
+import { createDlssNrReady, dlssNrUsable, qualityParts } from './dlssNrReady.js'
 
 const usable = { installed: true, host_supported: true, adapter_present: true }
 
@@ -49,4 +50,27 @@ test('the status is read once and shared; an answer handed in from 画质增强 
   // a failed read later does not hide what is known
   s.note(null)
   assert.equal(a.value, true)
+})
+
+test('画质增强 before DLSS NR is ready: the component state, the install flow and the output format; the overlay, its keys and the NR parts only once ready', () => {
+  for (const unknownOrMissing of [null, false]) {
+    const p = qualityParts(unknownOrMissing)
+    assert.deepEqual([p.components, p.install, p.session, p.output], [true, true, true, true])
+    assert.deepEqual([p.overlay, p.keys, p.nrState, p.liveControls], [false, false, false, false])
+  }
+  const ready = qualityParts(true)
+  assert.deepEqual([ready.overlay, ready.keys, ready.nrState, ready.liveControls], [true, true, true, true])
+})
+
+test('the page puts the overlay switch, the shortcut keys and the live NR parts under those parts', () => {
+  const page = readFileSync(new URL('../components/HdrEnhancedManager.vue', import.meta.url), 'utf8')
+  const tag = (re) => { const m = re.exec(page); assert.ok(m, String(re)); return m[0] }
+  assert.match(tag(/<MGroup[^>]*>\s*<MSwitchItem :model-value="visible"/), /v-if="parts\.overlay"/)
+  assert.match(tag(/<MSection[^>]*:title="text\.keys"[^>]*>/), /v-if="parts\.keys"/)
+  assert.match(tag(/<div v-else-if="current === 'keys'[^>]*>/), /parts\.keys/)
+  assert.match(tag(/<MItem[^>]*:title="text\.enhancement"[^>]*>/), /v-if="parts\.nrState"/)
+  assert.match(tag(/<NrSessionControls[^>]*>/), /parts\.liveControls/)
+  assert.match(tag(/<MButton[^>]*@click="setVisibility\(true\)"[^>]*>/), /parts\.liveControls/)
+  const live = readFileSync(new URL('../components/m3e/LiveSessionPage.vue', import.meta.url), 'utf8')
+  assert.match(live, /<MSection v-if="nrReady" :title="t\.m3e\.display\.quality">/)
 })

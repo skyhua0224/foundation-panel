@@ -8,6 +8,16 @@ import { computed, ref } from 'vue'
 /** Whether a component status makes the live controls usable. */
 export const dlssNrUsable = (status) => !!(status && status.installed && status.host_supported && status.adapter_present)
 
+/**
+ * What 画质增强 shows. Before DLSS NR is ready: the component state, the install flow, and the stream's output format (SDR / HDR / Dolby Vision on
+ * 当前会话, the one thing of the NR overlay that is not NR). Only once it is ready: the overlay switch and its opacity, the overlay and NR shortcut keys
+ * (shortcut 1 toggles NR, shortcut 2 shows the NR overlay window), the NR state of the stream, the live controls and the button that opens the overlay.
+ */
+export const qualityParts = (ready) => {
+  const nr = ready === true
+  return { components: true, install: true, session: true, output: true, overlay: nr, keys: nr, nrState: nr, liveControls: nr }
+}
+
 /** The shared answer: `state` is true / false, or null while unknown; `use()` reads once if nothing is known and gives `shown`. */
 export function createDlssNrReady(getStatus) {
   const state = ref(null)

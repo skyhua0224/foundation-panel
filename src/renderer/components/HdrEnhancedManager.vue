@@ -19,12 +19,12 @@
 
       <MBanner v-if="missing.length" tone="info" icon="extension">{{ text.componentsMissing }}<template #actions><MButton variant="text" size="sm" @click="emit('manage-components')">{{ text.openComponents }}</MButton></template></MBanner>
 
-      <MGroup>
+      <MGroup v-if="parts.overlay">
         <MSwitchItem :model-value="visible" icon="picture_in_picture" :title="text.show" :text="text.showHint" :disabled="saving || !loaded" @update:model-value="setVisibility" />
         <MSliderItem v-model="draftOpacity" icon="opacity" :title="text.opacity" :min="35" :max="95" :step="1" :decimals="0" unit="%" size="m" icon-start="brightness_medium" icon-end="brightness_6" :disabled="saving || !loaded" @commit="save({ opacity: draftOpacity })" />
       </MGroup>
 
-      <MSection :title="text.keys">
+      <MSection v-if="parts.keys" :title="text.keys">
         <MGroup>
           <MItem action icon="visibility" :title="text.visibilityKey" @click="open('keys')">
             <template #trail><span class="m-qkeys"><kbd v-for="k in keysOf(displayShortcut(settings.overlayShortcut))" :key="k">{{ k }}</kbd><kbd v-if="!settings.overlayShortcut" class="is-unset">{{ text.unset }}</kbd><kbd v-if="settings.overlayGamepad" class="is-pad"><MIcon name="sports_esports" />{{ displayGamepadShortcut(settings.overlayGamepad) }}</kbd></span></template>
@@ -35,7 +35,7 @@
         </MGroup>
         <MFooter>{{ text.keyHint }}</MFooter>
       </MSection>
-      <MFooter>{{ saved ? text.saved : text.local }}</MFooter>
+      <MFooter v-if="parts.overlay">{{ saved ? text.saved : text.local }}</MFooter>
     </template>
 
     <!-- Current session -->
@@ -47,20 +47,20 @@
           <MChoiceItem v-if="pipelines.length > 1 || !pipeline" icon="cast_connected" :title="text.choose" :model-value="selectedId ?? ''" :options="pipelines.map((p) => ({ value: p.id, label: `${text.stream} #${p.id} · ${nrOutputLabel(p)}` }))" :disabled="saving" :cancel-label="text.cancel" @update:model-value="(v) => selectSession(Number(v))" />
           <MItem v-else icon="cast_connected" :title="`${text.stream} #${pipeline.id}`" :value="text.connected" />
           <template v-if="pipeline">
-            <MItem icon="wand_stars" :title="text.enhancement" :value="overlayText.states[nrOverlayState(pipeline, online)]" />
+            <MItem v-if="parts.nrState" icon="wand_stars" :title="text.enhancement" :value="overlayText.states[nrOverlayState(pipeline, online)]" />
             <MItem icon="monitor" :title="text.output" :value="nrOutputLabel(pipeline)" />
           </template>
         </MGroup>
         <MNotice v-if="selectedId && !pipeline" tone="warn">{{ text.expired }}</MNotice>
         <MBanner v-if="pipeline?.dv_profile && pipeline.dv_state !== 'active'" tone="info" icon="info">{{ pipeline.dv_state === 'waiting' ? overlayText.dvWaiting : overlayText.dvFallback }}</MBanner>
-        <NrSessionControls v-if="pipeline && nrReady" :pipeline="pipeline" :online="online" @changed="pollOnce" @error="error = $event" />
-        <MButton v-if="pipeline && nrReady" icon="monitor" :disabled="saving" @click="setVisibility(true)">{{ text.open }}</MButton>
+        <NrSessionControls v-if="pipeline && parts.liveControls" :pipeline="pipeline" :online="online" @changed="pollOnce" @error="error = $event" />
+        <MButton v-if="pipeline && parts.liveControls" icon="monitor" :disabled="saving" @click="setVisibility(true)">{{ text.open }}</MButton>
       </template>
-      <MFooter>{{ text.sessionHint }}</MFooter>
+      <MFooter v-if="parts.liveControls">{{ text.sessionHint }}</MFooter>
     </template>
 
     <!-- Shortcuts: press a key while a row records -->
-    <div v-else-if="current === 'keys'" class="m-quality-keys" @keydown="captureKey">
+    <div v-else-if="current === 'keys' && parts.keys" class="m-quality-keys" @keydown="captureKey">
       <MBanner v-if="recording" tone="info" icon="keyboard">{{ text.recordHint }}<template #actions><MButton variant="text" size="sm" @click="cancelRecording">{{ text.cancel }}</MButton></template></MBanner>
       <MSection v-for="group in shortcutGroups" :key="group.label" :title="group.label">
         <MGroup>
@@ -89,6 +89,7 @@ import { MIcon, MPage, MGroup, MSection, MItem, MSwitchItem, MSliderItem, MChoic
 import { displayGamepadShortcut, FIXED_GAMEPAD_SHORTCUTS } from '../composables/controllerButtons.js'
 import NrSessionControls from './NrSessionControls.vue'
 import { noteDlssNrStatus, dlssNrShown } from '../composables/useDlssNrReady.js'
+import { qualityParts } from '../composables/dlssNrReady.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import {
   DEFAULT_NR_SHORTCUT,
@@ -117,6 +118,7 @@ const emit = defineEmits(['manage-components'])
 const { current, open, back } = useSubpage('quality')
 // the live NR controls (and the overlay that carries them) only for an installed and usable DLSS NR; readComponents reads the status and hands it in, the install flow stays on this page
 const nrReady = dlssNrShown
+const parts = computed(() => qualityParts(nrReady.value))
 // the two runtimes are installed on the component status page (not here): this page only reads whether they are there
 const installed = ref({ nr: null, hdr: null })
 async function readComponents() {
