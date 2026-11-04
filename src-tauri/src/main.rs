@@ -11,6 +11,7 @@ mod controller_hub;
 mod controller_input;
 mod controllermeta;
 mod desktop_settings;
+mod dev_tools;
 mod device_config;
 mod dualsense;
 #[cfg(target_os = "windows")]
@@ -355,6 +356,15 @@ fn main() {
             windows::panel_activity,
             windows::panel_first_paint,
             windows::test_synthetic_dpi,
+            dev_tools::dev_get_state,
+            dev_tools::dev_set_cover_mode,
+            dev_tools::dev_set_cold_cloak,
+            dev_tools::dev_simulate_dpi,
+            dev_tools::dev_open_devtools,
+            dev_tools::dev_clear_webview_cache,
+            dev_tools::dev_reset_desktop_settings,
+            dev_tools::dev_environment,
+            windows::resize_about_window,
             windows::resize_tool_window,
             hdr_enhanced::nr_live_status,
             hdr_enhanced::nr_live_set_enabled,

@@ -20,6 +20,7 @@ export const ROUTES = {
   SETTINGS_HUB: 'settings-hub', // the bottom bar's one entry for 主机设置, 输入与外设, 显示 and 系统: a list of those four
   HELP: 'help',
   ABOUT: 'about',
+  DEVELOPER: 'developer', // 开发者选项: a pushed page, reachable once developer mode is on
   ANNOUNCEMENTS: 'announcements', // 公告: every announcement, opened from the bell of the caption bar
   CAT_STREAM: 'cat-stream',
   CAT_INPUT: 'cat-input',
@@ -94,6 +95,7 @@ export const PAGES = {
   [ROUTES.SETTINGS_HUB]: { rail: 'config', list: false },
   [ROUTES.HELP]: { rail: 'help', list: false },
   [ROUTES.ABOUT]: { rail: 'help', list: false, push: true },
+  [ROUTES.DEVELOPER]: { rail: 'system', list: false, push: true },
   [ROUTES.ANNOUNCEMENTS]: { rail: 'overview', list: false, push: true },
 }
 export const RAILS = ['overview', 'stream', 'config', 'input', 'audio', 'display', 'system', 'assistant', 'settings', 'help']

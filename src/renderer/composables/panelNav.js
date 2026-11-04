@@ -23,6 +23,7 @@ export const ROW_OF_ROUTE = {
 export function pageItems(t, rail, runtime = {}) {
   const c = t.m3e
   const lines = runtime.lines || {}
+  const developer = runtime.developer ? [{ id: ROUTES.DEVELOPER, icon: 'code', tone: 'tertiary', label: runtime.developerTitle || 'Developer options', text: runtime.developerLine || '' }] : []
   const pages = {
     stream: [
       { id: ROUTES.WEB_CLIENTS, icon: 'devices', tone: 'tertiary', label: c.stream.clients[0], text: lines.clients },
@@ -58,6 +59,7 @@ export function pageItems(t, rail, runtime = {}) {
       { id: ROUTES.TEST_TOOLS, icon: 'science', tone: 'secondary', label: t.sidebar.testTools, text: lines['test-tools'] },
       { id: ROUTES.STREAM_TIMER, icon: 'timer', tone: 'tertiary', label: t.sidebar.streamTimer, text: lines['stream-timer'] },
       { id: ROUTES.RTSS, icon: 'speed', tone: 'tertiary', label: c.rtss.title, text: lines.rtss },
+      ...developer,
     ],
   }
   return pages[rail] || []

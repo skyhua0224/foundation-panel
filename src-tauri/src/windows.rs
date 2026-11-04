@@ -203,6 +203,9 @@ pub(crate) fn test_offscreen() -> bool {
 const COLD_CLOAK_DEFAULT: bool = false;
 
 fn cold_cloak_wanted() -> bool {
+    if let Some(chosen) = crate::dev_tools::cold_cloak_override() {
+        return chosen;
+    }
     match std::env::var("SUNSHINE_GUI_COLD_CLOAK").ok().as_deref() {
         Some("on") => true,
         Some("off") => false,
@@ -262,13 +265,19 @@ pub fn panel_activity() {
 #[tauri::command]
 pub fn test_synthetic_dpi(window: tauri::WebviewWindow, dpi: u32) -> Result<(), String> {
     #[cfg(target_os = "windows")]
+    if !test_offscreen() {
+        return Err("only a measurement instance takes a synthetic scale change".to_string());
+    }
+    send_synthetic_dpi(&window, dpi)
+}
+
+/// The message itself: used by the measurement instances above and by the developer page (dev_tools), which asks the person first.
+pub(crate) fn send_synthetic_dpi(window: &tauri::WebviewWindow, dpi: u32) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
     {
         use windows::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
         use windows::Win32::UI::HiDpi::GetDpiForWindow;
         use windows::Win32::UI::WindowsAndMessaging::{GetWindowRect, SendMessageW, WM_DPICHANGED};
-        if !test_offscreen() {
-            return Err("only a measurement instance takes a synthetic scale change".to_string());
-        }
         let hwnd = HWND(window.hwnd().map_err(|e| e.to_string())?.0);
         // the system's DPI of the window never changes here: the scale the last synthetic message set is the one this one changes from
         static CURRENT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);

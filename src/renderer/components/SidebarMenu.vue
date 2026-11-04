@@ -57,7 +57,8 @@
           @open-remote="remoteOpen = true"
         />
         <MAnnouncementPage v-else-if="entry.id === ROUTES.ANNOUNCEMENTS" :items="announcements.list.value" :locale="locale" :acked-at="ackedAt" :open-id="entry.params?.id || ''" :on-refresh="() => announcements.refresh(true)" @dismiss="announcements.dismiss" @read="announcements.read" @open-url="actions_openExternal" @back="back" />
-        <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" :on-refresh="() => announcements.refresh(true)" :consent="telemetry.consent.value" @consent="telemetry.answer" :include-prerelease="includePrerelease" @channel-change="setIncludePrerelease" @open-update="showUpdateDialog = true" @open="actions_openExternal" />
+        <DeveloperPage v-else-if="entry.id === ROUTES.DEVELOPER" :locale="locale" :version="currentVersion" :consent="telemetry.consent.value" :error-context="errorContext" :simulate-host="simulateHost" @disabled="back" />
+        <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" :on-refresh="() => announcements.refresh(true)" :consent="telemetry.consent.value" @consent="telemetry.answer" :include-prerelease="includePrerelease" @channel-change="setIncludePrerelease" @open-update="showUpdateDialog = true" @open="actions_openExternal" @open-developer="router.navigate(ROUTES.DEVELOPER)" />
         <ControlPanelPage
           v-else-if="entry.id === ROUTES.PANEL_SETTINGS || entry.id === ROUTES.HELP"
           :page="entry.id"
@@ -128,7 +129,8 @@ import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
 import { openBigScreenWithNotice } from '../composables/openBigScreen.js'
-import { MButton, homeTexts, MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey } from 'foundation-ui/vue'
+import { MButton, homeTexts, MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode } from 'foundation-ui/vue'
+import { developerOverlays, developerTexts, DEFAULT_FLAGS } from 'foundation-ui/developer'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelBusyLayer from './PanelBusyLayer.vue'
@@ -145,6 +147,7 @@ import MicrophonePage from './m3e/MicrophonePage.vue'
 import AppearancePage from './m3e/AppearancePage.vue'
 import UsbPage from './m3e/UsbPage.vue'
 import AboutPage from './m3e/AboutPage.vue'
+import DeveloperPage from './m3e/DeveloperPage.vue'
 import ComponentStatusPage from './m3e/ComponentStatusPage.vue'
 import { useComponentStatus } from '../composables/useComponentStatus.js'
 import ToolboxPage from './m3e/ToolboxPage.vue'
@@ -275,6 +278,9 @@ const hostConn = useHostConnection({
   onHung: ({ at, seconds }) => reportHostHung({ at, seconds }),
   onHungEnd: () => dismissHostHung(),
 })
+// The developer page shows the surfaces of a host that is away without the host going anywhere: 'offline' is the offline page, 'stopped' the 「意外停止」 error surface. It ends by itself after a minute.
+const hostSimulated = ref('')
+let hostSimulatedTimer = 0
 // tools/realshot and the QA harness show the failure states with events of the page itself (a real fault is not repeatable on a guarded instance, where the panel would show its window): the verdict and the numbers the card shows; the next real probe of a host that answers puts it back
 const forceHostState = (event) => { const d = event.detail || {}; Object.assign(hostConn.state, { verdict: d.verdict || 'down', status: 'offline', fails: d.fails ?? 3, round: 1, nextIn: d.nextIn ?? 12, probing: false }) }
 const forceProxyState = (event) => { proxyBlock.attempts = Number(event.detail?.attempts) || 4; proxyBlock.blocked = event.detail?.on !== false }
@@ -282,16 +288,23 @@ window.addEventListener('panel-force-host-state', forceHostState)
 window.addEventListener('panel-force-proxy-state', forceProxyState)
 onBeforeUnmount(() => { window.removeEventListener('panel-force-host-state', forceHostState); window.removeEventListener('panel-force-proxy-state', forceProxyState) })
 // the pages of the panel itself, which work without the host: 面板设置, 个性化, 帮助与关于, 公告 (from the announcement feed), the diagnostics, 米塔 AI, the guide
-const NEEDS_NO_HOST = new Set([ROUTES.PANEL_SETTINGS, ROUTES.CFG_APPEARANCE, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.ANNOUNCEMENTS, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
+const NEEDS_NO_HOST = new Set([ROUTES.DEVELOPER, ROUTES.PANEL_SETTINGS, ROUTES.CFG_APPEARANCE, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.ANNOUNCEMENTS, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
 // The host cannot be used for one of three causes, and the content area is then ONE status page (MScene status): the host is down, it runs and does not answer, or the panel's own proxy does not answer the window.
 // The rail and the caption bar stay: the pages of the panel itself (NEEDS_NO_HOST) still work and open as always. What needs the host does not look live: the pages give way to the status page and are inert, the
 // frame stays mounted but hidden, so an unsaved edit is there when the connection is back, and 连接设备 (it pairs through the host) is disabled.
-const hostUnusable = computed(() => proxyBlock.blocked || hostConn.state.status !== 'online')
-const offlineCause = computed(() => (proxyBlock.blocked ? 'proxy' : hostConn.state.verdict === 'unresponsive' ? 'unresponsive' : 'down'))
-const offlineState = computed(() => (proxyBlock.blocked ? { status: 'offline', verdict: 'proxy', fails: proxyBlock.attempts, round: 1, nextIn: 0, probing: proxyBlock.checking, mode: '', error: '' } : hostConn.state))
+const hostUnusable = computed(() => hostSimulated.value === 'offline' || proxyBlock.blocked || hostConn.state.status !== 'online')
+const offlineCause = computed(() => (hostSimulated.value === 'offline' ? 'down' : proxyBlock.blocked ? 'proxy' : hostConn.state.verdict === 'unresponsive' ? 'unresponsive' : 'down'))
+const offlineState = computed(() => (hostSimulated.value === 'offline' ? { ...hostConn.state, status: 'offline', verdict: 'down', fails: 3, round: 1, nextIn: 5, probing: false, error: '' } : proxyBlock.blocked ? { status: 'offline', verdict: 'proxy', fails: proxyBlock.attempts, round: 1, nextIn: 0, probing: proxyBlock.checking, mode: '', error: '' } : hostConn.state))
 const retryOffline = () => (proxyBlock.blocked ? proxyBlock.retryNow() : hostConn.retry())
 const offlineShown = computed(() => hostUnusable.value && !NEEDS_NO_HOST.has(router.currentRoute.value))
 watch(hostUnusable, (on) => { if (on) connect.open.value = false })
+function simulateHost(kind) {
+  clearTimeout(hostSimulatedTimer)
+  hostSimulated.value = kind === 'offline' ? 'offline' : ''
+  if (kind === 'stopped') reportHostStop({ at: Date.now() })
+  else if (!kind) useErrors().dismissError()
+  if (kind) hostSimulatedTimer = setTimeout(() => simulateHost(''), 60000)
+}
 const back = () => nav.pop()
 // the way out of the error surface: the previous page, or the overview when there is none
 // The choice about usage counts and error information: the host keeps it, the Web UI and this window agree; asked once when nothing else is on screen, changed later in 关于
@@ -323,7 +336,10 @@ const updateWaiting = computed(() => !!updateInfo.value && !updateInfo.value.is_
 const rail = computed(() => railItems(t.value).map((item) => (item.id === 'overview' && announcementsUnread.value ? { ...item, badge: announcementsUnread.value } : item.id === 'help' && updateWaiting.value ? { ...item, badge: 'dot' } : item.id === 'assistant' && mitaState.unread ? { ...item, badge: 'dot' } : item)))
 // the one-time thank-you line after the guided first run
 const railLabel = (id) => t.value.m3e.nav[id]
-const runtimeView = computed(() => ({ ...runtime, lines: settingsList.lines.value, statusTitle: statusTexts(locale.value).title, diagTitle: diagnosticsTexts(locale.value).title }))
+// Developer mode (seven taps on the version in 关于): the row of 开发者选项 in 系统, and the overlays the page chose, applied at start
+const developerMode = useDeveloperMode()
+watch(developerMode.enabled, (on) => { if (on) developerOverlays(); else if (!on) developerOverlays().set({ ...DEFAULT_FLAGS }) }, { immediate: true })
+const runtimeView = computed(() => ({ ...runtime, developer: developerMode.enabled.value, developerTitle: developerTexts(locale.value).title, lines: settingsList.lines.value, statusTitle: statusTexts(locale.value).title, diagTitle: diagnosticsTexts(locale.value).title }))
 const listItems = (id) => pageItems(t.value, id, runtimeView.value)
 // The stream settings are the shared model (categories in groups with a live line, search of every setting, recently used)
 const hostConfig = ref(null)
