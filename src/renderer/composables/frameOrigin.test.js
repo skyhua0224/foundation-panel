@@ -27,3 +27,12 @@ test('the pending bridge of the panel uses it for both its messages', () => {
   assert.match(src, /postToFrame\(frame\(\), \{ type: 'foundation-pending', op: 'hello' \}\)/)
   assert.ok(!/postMessage\(message, originOf/.test(src))
 })
+
+// the frame component sends to an http(s) origin only: the place message and the replies (a custom scheme or about:blank has the origin 'null')
+test('SunshineFrame sends only to an http(s) origin', async () => {
+  const fs = await import('node:fs')
+  const src = fs.readFileSync(new URL('../components/SunshineFrame.vue', import.meta.url), 'utf8')
+  assert.match(src, /if \(!\/\^https\?:\\\/\\\/\/\.test\(origin\)\) return false/)
+  assert.match(src, /return \/\^https\?:\$\/\.test\(url\.protocol\) \? url\.origin : ''/)
+  assert.ok(!/\$\{url\.protocol\}\/\/\$\{url\.host\}/.test(src), 'no origin is built by hand')
+})

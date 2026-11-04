@@ -183,7 +183,10 @@ const settingsPlaceMessage = (path) => {
   const place = parseSettingsHash(path.slice(at))
   const frame = sunshineIframe.value?.contentWindow
   if (!place || !frame) return false
-  frame.postMessage({ type: 'foundation-settings-go', ...place }, new URL(sunshineUrl.value, window.location.href).origin)
+  // a frame that is not on an http(s) address has the origin 'null', and postMessage(message, 'null') throws: nothing is sent to it
+  const origin = new URL(sunshineUrl.value, window.location.href).origin
+  if (!/^https?:\/\//.test(origin)) return false
+  frame.postMessage({ type: 'foundation-settings-go', ...place }, origin)
   currentPath.value = path
   return true
 }
@@ -250,7 +253,8 @@ const createMessageHandler = () => {
   const getSunshineOrigin = () => {
     try {
       const url = new URL(sunshineUrl.value || sunshineIframe.value?.src || '', window.location.href)
-      return url.origin === 'null' ? `${url.protocol}//${url.host}` : url.origin
+      // only an http(s) address has an origin a message can be sent to (about:blank, a custom scheme: 'null')
+      return /^https?:$/.test(url.protocol) ? url.origin : ''
     } catch {
       return ''
     }
