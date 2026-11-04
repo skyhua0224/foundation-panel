@@ -236,9 +236,9 @@ const resetAll = async () => {
       </MItem>
     </MGroup>
   </MSheet>
-  <MDialog v-model="consent" :title="st.pet" icon="visibility" tone="info">
-    <p>{{ t.petTool.visionPrivacyConfirm }}</p>
-    <template #actions><MButton variant="text" @click="consent = false">{{ fs.close }}</MButton><MButton @click="acceptPet">{{ st.deskObserve }}</MButton></template>
+  <MDialog v-model="consent" :title="t.petTool.visionPrivacyConfirm.title" icon="visibility" tone="info">
+    <p>{{ t.petTool.visionPrivacyConfirm.message }}</p>
+    <template #actions><MButton variant="text" @click="consent = false">{{ t.petTool.visionPrivacyConfirm.cancel }}</MButton><MButton @click="acceptPet">{{ t.petTool.visionPrivacyConfirm.accept }}</MButton></template>
   </MDialog>
 
   <MSheet :model-value="sheet === 'expert'" :title="st.advanced" side="end" :close-label="fs.close" @update:model-value="closeSheet">
