@@ -426,7 +426,7 @@ const onRail = (item) => {
   if (item.id === 'more') { moreOpen.value = true; return }
   if (item.id === 'config') { loadHostData(); openConfig({ tab: 'general' }); router.navigate(ROUTES.CAT_CONFIG); return }
   // the stream rail opens on its first page: the frame has to show it
-  if (item.id === 'stream') { emit('webui-navigate', webPathOf(ROUTES.WEB_CLIENTS)); router.navigate(ROUTES.CAT_STREAM); return }
+  if (item.id === 'stream') { router.navigate(ROUTES.CAT_STREAM); emit('webui-navigate', webPathOf(ROUTES.WEB_CLIENTS)); return }
   router.navigate({ overview: ROUTES.HOME, settings: ROUTES.PANEL_SETTINGS, help: ROUTES.HELP, stream: ROUTES.CAT_STREAM, input: ROUTES.CAT_INPUT, audio: ROUTES.CAT_AUDIO, display: ROUTES.CAT_DISPLAY, system: ROUTES.CAT_SYSTEM, assistant: ROUTES.AI_ASSISTANT }[item.id])
   const first = nav.list.value && nav.defaultDetailOf(nav.list.value)
   const path = first && webPathOf(first.id)

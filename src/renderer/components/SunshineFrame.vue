@@ -41,6 +41,8 @@ import { isNativeControlPanelMessage, isTrustedNativeControlPanelMessage } from 
 import { useI18n } from '../desktop/i18n/index.js'
 import SidebarMenu from './SidebarMenu.vue'
 import { isWebuiNavigationPath } from '../composables/webuiNavigation.js'
+import { BLANK, routeChanged, webuiNavigated } from '../composables/frameRoute.js'
+import { webPathOf, routeForWebPath } from '../composables/useRouter.js'
 import { parseSettingsHash } from 'foundation-ui/settings/index.js'
 
 invoke('main_panel_loading').catch(() => {})
@@ -183,40 +185,36 @@ const settingsPlaceMessage = (path) => {
   currentPath.value = path
   return true
 }
+// the address of a page of the frame; none until the proxy is known and verified
+const frameUrlOf = (path) => (proxyBase && localProxyVerified && path ? proxyBase + path : '')
 const handleWebuiNavigate = (path) => {
   if (!isWebuiNavigationPath(path)) return
   if (settingsPlaceMessage(path)) return
   requestedWebuiPath = path
-  savedIframeUrl = ''
   windowSuspendedUrl = ''
-  if (path === currentPath.value && sunshineUrl.value && sunshineUrl.value !== 'about:blank') return
-  currentPath.value = path
+  const next = webuiNavigated(path, { currentPath: currentPath.value, url: sunshineUrl.value, saved: savedIframeUrl }, { urlOf: frameUrlOf })
+  savedIframeUrl = next.saved
+  currentPath.value = next.currentPath
+  if (next.url === null && sunshineUrl.value && sunshineUrl.value !== BLANK) return
   beginLoading()
-  if (proxyBase && localProxyVerified) sunshineUrl.value = proxyBase + path
+  if (next.url) sunshineUrl.value = next.url
 }
 
+// the overview and the pages of the panel itself: the frame sleeps behind them and wakes with the overview; a Web page is never shown over a sleeping frame (frameRoute.js)
 const handleRouteChange = ({ from, to }) => {
-  if (from === 'home' && to !== 'home') {
-    // Leaving the streaming pages suspends the iframe and its timers.
-    savedIframeUrl = proxyBase ? proxyBase + currentPath.value : sunshineUrl.value
-    sunshineUrl.value = 'about:blank'
-    beginLoading()
-    if (pollTimer) {
-      clearInterval(pollTimer)
-      pollTimer = null
-    }
-    console.log('[SunshineFrame] iframe 休眠: 已导航到 about:blank')
-  } else if (from !== 'home' && to === 'home') {
-    // Resume the last page unless an explicit sidebar destination was requested.
-    if (savedIframeUrl && savedIframeUrl !== 'about:blank') {
-      sunshineUrl.value = savedIframeUrl
-      savedIframeUrl = ''
-      console.log('[SunshineFrame] iframe 唤醒: 恢复 URL')
-    }
-    // 重启窗口状态轮询
-    if (!pollTimer && checkWindowStateFn) {
-      pollTimer = setInterval(checkWindowStateFn, POLL_INTERVAL)
-    }
+  const decision = routeChanged({ from, to }, { currentPath: currentPath.value, url: sunshineUrl.value, saved: savedIframeUrl }, { urlOf: frameUrlOf, webPathOf, routeForWebPath })
+  if (decision) {
+    if (decision.kind !== 'resume') beginLoading()
+    sunshineUrl.value = decision.url
+    savedIframeUrl = decision.saved
+    if (decision.currentPath) currentPath.value = decision.currentPath
+    console.log(`[SunshineFrame] route ${from} -> ${to}: iframe ${decision.kind}`)
+  }
+  if (decision?.kind === 'suspend' && pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  } else if (from !== 'home' && to === 'home' && !pollTimer && checkWindowStateFn) {
+    pollTimer = setInterval(checkWindowStateFn, POLL_INTERVAL)
   }
 }
 
