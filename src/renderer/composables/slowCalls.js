@@ -32,8 +32,8 @@ const pathOf = (input) => {
   try { return new URL(raw, 'http://x').pathname } catch { return raw.slice(0, 80) }
 }
 
-/** Starts the reports in a page; `report` writes one line. Returns a stop function. */
-export function startSlowCallLog(report, win = window) {
+/** Starts the reports in a page; `report` writes one line, `extraPending` lists the commands that have not returned. Returns a stop function. */
+export function startSlowCallLog(report, win = window, extraPending = null) {
   const stops = []
   const watch = []
   if (typeof win.fetch === 'function') {
@@ -41,16 +41,8 @@ export function startSlowCallLog(report, win = window) {
     win.fetch = wrapped
     watch.push(pending)
   }
-  const internals = win.__TAURI_INTERNALS__
-  if (internals && typeof internals.invoke === 'function') {
-    const original = internals.invoke.bind(internals)
-    const { wrapped, pending } = trackCalls(original, { report, kind: 'invoke', nameOf: (args) => String(args[0]) })
-    // the Tauri runtime keeps invoke read-only: assigning throws, so invoke calls go untimed there and the frame and timer reports below still start
-    try {
-      internals.invoke = wrapped
-      watch.push(pending)
-    } catch { /* read-only */ }
-  }
+  // the commands of the renderer are timed by the import they go through (tauri-core-timed.js); their pending list is passed in
+  if (typeof extraPending === 'function') watch.push(extraPending)
   // a frame that was blocked: its scripts say by what
   try {
     const observer = new win.PerformanceObserver((list) => {

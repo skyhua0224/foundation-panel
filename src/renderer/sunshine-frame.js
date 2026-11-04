@@ -6,6 +6,7 @@ import { startWebPrewarm, createHiddenFrameLoader } from './composables/webPrewa
 import { startSlowCallLog } from './composables/slowCalls.js'
 import { followDpiCover } from './composables/dpiSettle.js'
 import { listen } from '@tauri-apps/api/event'
+import { configureInvokeTiming, invokePending } from './tauri-core-timed.js'
 import 'element-plus/theme-chalk/el-loading.css'
 import 'element-plus/theme-chalk/el-message.css'
 import 'element-plus/theme-chalk/el-overlay.css'
@@ -39,7 +40,9 @@ queueMicrotask(() => {
   followDpiCover({ listen, invoke })  // the native cover after a change of scale fades out when the layout matches the window
   prewarmWebPages()
   // the calls, frames and timers that take long are in the panel's log, with what was waiting when a timer came late
-  startSlowCallLog((kind, name, ms, detail) => { if (name !== 'frontend_slow') invoke('frontend_slow', { kind, name, ms, detail }).catch(() => {}) })
+  const report = (kind, name, ms, detail) => { if (name !== 'frontend_slow') invoke('frontend_slow', { kind, name, ms, detail }).catch(() => {}) }
+  configureInvokeTiming({ report })
+  startSlowCallLog(report, window, invokePending)
 })
 
 // The page is being used: the native side takes no snapshot of it then (at most one report in 250 ms)

@@ -66,6 +66,8 @@ export default defineConfig(() => ({
     // foundation-ui is the shared Material 3 Expressive package (sibling checkout); Vue must stay a single copy.
     dedupe: ['vue'],
     alias: [
+      // every call to the host goes through this import: the timed one (src/renderer/tauri-core-timed.js) gives the package back with a timed invoke
+      { find: /^@tauri-apps\/api\/core$/, replacement: join(rendererSrcPath, 'tauri-core-timed.js') },
       { find: '@', replacement: rendererSrcPath },
       { find: /^foundation-ui\/vue$/, replacement: join(foundationUi, 'src/vue/index.js') },
       { find: /^foundation-ui\/all\.css$/, replacement: join(foundationUi, 'src/css/all.css') },

@@ -31,16 +31,28 @@ test('a call that throws is reported and rethrown', () => {
   assert.equal(lines.length, 1)
 })
 
-test('a read-only invoke (the Tauri runtime) does not stop the start: the late-timer report still runs', () => {
+test('the Tauri runtime is not touched, and the commands that have not returned are part of the late-timer report', () => {
   const internals = {}
-  Object.defineProperty(internals, 'invoke', { value: () => Promise.resolve(), writable: false, enumerable: true })
-  let intervals = 0
+  const invoke = () => Promise.resolve()
+  Object.defineProperty(internals, 'invoke', { value: invoke, writable: false, enumerable: true })
+  let tick = null
+  const lines = []
   const win = {
     __TAURI_INTERNALS__: internals,
-    setInterval: () => { intervals += 1; return 1 },
+    setInterval: (fn) => { tick = fn; return 1 },
     clearInterval: () => {},
   }
-  const stop = startSlowCallLog(() => {}, win)
-  assert.equal(intervals, 1)
-  stop()
+  let now = 0
+  const realNow = performance.now.bind(performance)
+  performance.now = () => now
+  try {
+    const stop = startSlowCallLog((...line) => lines.push(line), win, () => [{ name: 'get_vdd_status', ms: 4000 }])
+    assert.equal(internals.invoke, invoke)
+    now = 5000
+    tick()
+    assert.equal(lines.length, 1)
+    assert.equal(lines[0][0], 'timer')
+    assert.match(lines[0][3], /get_vdd_status 4000ms/)
+    stop()
+  } finally { performance.now = realNow }
 })
