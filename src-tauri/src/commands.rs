@@ -6,7 +6,7 @@ use std::sync::{
     OnceLock,
     atomic::{AtomicBool, Ordering},
 };
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 use url::Url;
 
 /// Shared CDN HTTP client with connection pooling.
@@ -117,7 +117,7 @@ pub async fn open_tool_window(app: AppHandle, tool_name: String) -> Result<(), S
         "vdd" => {
             if let Some(window) = app.get_webview_window("main") {
                 windows::show_and_activate_window(&window);
-                let _ = window.emit("open-vdd-settings", ());
+                crate::panel_page::open_page(&window, "vdd");
             }
         }
         "about" => {

@@ -5,7 +5,7 @@ use log::{debug, error, warn};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tauri::{AppHandle, Emitter, Manager, Runtime};
+use tauri::{AppHandle, Manager, Runtime};
 
 /// The toolbar is compact while idle and expands only for the radial menu.
 /// Keeping the idle window at the 80x80 pet size lets touch input reach the pet
@@ -453,10 +453,11 @@ pub fn handle_toolbar_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str)
         }
     }
 
-    // the old tool windows of these items are pages of the main window now (renderer composables/panelParts.js)
+    // the old tool windows of these items are pages of the main window now (renderer composables/panelParts.js); the request waits until
+    // the renderer takes it, so a main window that is only being created still opens the page (panel_page.rs)
     fn open_panel_page<R: Runtime>(app: &AppHandle<R>, page: &str) {
         if let Some(window) = ensure_main_window(app) {
-            let _ = window.emit("open-panel-page", serde_json::json!({ "page": page }));
+            crate::panel_page::open_page(&window, page);
         }
     }
 
@@ -464,11 +465,7 @@ pub fn handle_toolbar_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str)
         "main" | "toolbar_main" => {
             ensure_main_window(app);
         }
-        "vdd" | "toolbar_vdd" => {
-            if let Some(window) = ensure_main_window(app) {
-                let _ = window.emit("open-vdd-settings", ());
-            }
-        }
+        "vdd" | "toolbar_vdd" => open_panel_page(app, "vdd"),
         "dpi" | "toolbar_dpi" => open_panel_page(app, "desktop-scale"),
         "bitrate" | "toolbar_bitrate" => open_panel_page(app, "live-session"),
         "performance" | "toolbar_performance" => {

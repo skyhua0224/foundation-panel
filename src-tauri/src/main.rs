@@ -35,6 +35,7 @@ mod perf;
 mod hdr_enhanced;
 mod native_components;
 mod nr_overlay;
+mod panel_page;
 #[cfg(target_os = "windows")]
 mod shell_context_menu;
 mod stall_watch;
@@ -382,6 +383,7 @@ fn main() {
             tray::get_tray_locale,
             tray::main_panel_loading,
             tray::main_panel_ready,
+            panel_page::take_pending_panel_page,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

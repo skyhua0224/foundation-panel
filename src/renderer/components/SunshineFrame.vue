@@ -35,6 +35,7 @@ import { ref, onMounted, onUnmounted } from 'vue'
 import { followRoot } from '../composables/frameRoot.js'
 import { ElMessage } from '../composables/notifyMessage.js'
 import { invoke } from '@tauri-apps/api/core'
+import { deliverPendingPanelPage } from '../composables/panelParts.js'
 import { sunshine } from '@/tauri-adapter.js'
 import { checkLocalProxyHealth } from '../utils/proxyHealth.js'
 import { isNativeControlPanelMessage, isTrustedNativeControlPanelMessage } from '../composables/nativeBridge.js'
@@ -541,15 +542,17 @@ onMounted(async () => {
       sidebarMenuRef.value?.openVddSettings?.()
     })
 
-    await currentWindow.listen('open-panel-page', (event) => {
-      sidebarMenuRef.value?.openPanelPage?.(event.payload?.page)
-    })
+    // a page the toolbar or the tray asked for (panel_page.rs): taken on the ping, and once here after the listeners, so a window that
+    // was only being created still opens it, exactly once
+    const takePanelPage = () => deliverPendingPanelPage(invoke, (page) => sidebarMenuRef.value?.openPanelPage?.(page))
+    await currentWindow.listen('panel-page-pending', takePanelPage)
 
     await currentWindow.listen('open-web-stream', () => {
       sidebarMenuRef.value?.openWebStream?.()
     })
 
     await currentWindow.listen('open-welcome', openWelcome)
+    await takePanelPage()
     await invoke('main_panel_ready')
   } catch (error) {
     console.error('初始化失败:', error)

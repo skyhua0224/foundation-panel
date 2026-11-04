@@ -1,14 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { nextTick, effectScope } from 'vue'
-import { PANEL_PAGES, requestPanelPage, usePanelPart, panelPartWanted } from './panelParts.js'
+import { PANEL_PAGES, requestPanelPage, usePanelPart, panelPartWanted, deliverPendingPanelPage } from './panelParts.js'
 import { readFileSync } from 'node:fs'
 // ROUTES of useRouter.js, read from its source (it imports the UI framework)
 const ROUTES = Object.fromEntries([...readFileSync(new URL('./useRouter.js', import.meta.url), 'utf8').matchAll(/^  ([A-Z_]+): '([\w-]+)',/gm)].map((m) => [m[1], m[2]]))
 
 test('the toolbar menu opens the new pages: DPI, bitrate, the shortcuts guide and the pet', () => {
   assert.deepEqual(Object.fromEntries(Object.entries(PANEL_PAGES).map(([k, v]) => [k, v.route])), {
-    'desktop-scale': ROUTES.VDD_SETTINGS, 'live-session': ROUTES.LIVE_SESSION, shortcuts: ROUTES.HELP, pet: ROUTES.PANEL_SETTINGS,
+    vdd: ROUTES.VDD_SETTINGS, 'desktop-scale': ROUTES.VDD_SETTINGS, 'live-session': ROUTES.LIVE_SESSION, shortcuts: ROUTES.HELP, pet: ROUTES.PANEL_SETTINGS,
   })
   assert.equal(requestPanelPage('nothing'), null)
 })
@@ -33,4 +33,20 @@ test('a page takes its part once, only when it accepts it', async () => {
   effectScope().run(() => usePanelPart('shortcuts', () => (helpShown ? taken.push('shortcuts') : false)))
   await nextTick(); await nextTick()
   assert.deepEqual(taken, ['pet', 'shortcuts']); assert.equal(panelPartWanted.value, '')
+})
+
+test('a page left by the toolbar opens once, whether the ping or the mount takes it first', async () => {
+  // the host's slot (panel_page.rs): taking empties it
+  let slot = 'desktop-scale'
+  const invoke = async (cmd) => { assert.equal(cmd, 'take_pending_panel_page'); await Promise.resolve(); const page = slot; slot = null; return page }
+  const opened = []
+  const results = await Promise.all([deliverPendingPanelPage(invoke, (p) => opened.push(p)), deliverPendingPanelPage(invoke, (p) => opened.push(p))])
+  assert.deepEqual(opened, ['desktop-scale'])
+  assert.deepEqual(results.sort(), ['desktop-scale', null].sort())
+  // nothing waiting, an unknown name, a host that cannot answer: nothing opens
+  assert.equal(await deliverPendingPanelPage(invoke, (p) => opened.push(p)), null)
+  slot = 'no-such-page'
+  assert.equal(await deliverPendingPanelPage(invoke, (p) => opened.push(p)), null)
+  assert.equal(await deliverPendingPanelPage(async () => { throw new Error('ipc') }, (p) => opened.push(p)), null)
+  assert.deepEqual(opened, ['desktop-scale'])
 })
