@@ -65,8 +65,8 @@ export const PAGES = {
   [ROUTES.WEB_AUDIO_SOUND]: { rail: 'audio' }, // the first page of a rail is the one the rail opens on
   [ROUTES.MICROPHONE]: { rail: 'audio' },
   [ROUTES.USB]: { rail: 'input' },
+  [ROUTES.WEB_DISPLAY_MODES]: { rail: 'display' }, // the page the rail opens on: resolution, frame rates and bitrate (the most common change)
   [ROUTES.WEB_DISPLAY_OUTPUT]: { rail: 'display' },
-  [ROUTES.WEB_DISPLAY_MODES]: { rail: 'display' },
   [ROUTES.WEB_DISPLAY_HDR]: { rail: 'display' },
   [ROUTES.VDD_SETTINGS]: { rail: 'display' },
   [ROUTES.WEB_DISPLAY_VIDEO]: { rail: 'display' },

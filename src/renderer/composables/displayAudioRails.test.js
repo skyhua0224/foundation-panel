@@ -18,7 +18,7 @@ test('音频 and 显示与视频 are two rails of their own, between 输入与�
   assert.match(nav, /audio: 'volume_up'/)
 })
 test('the rows of the two rails: the places of the display and audio tabs, none alone in its list', () => {
-  assert.deepEqual(rowsOf('display').map((r) => r.route), ['WEB_DISPLAY_OUTPUT', 'WEB_DISPLAY_MODES', 'WEB_DISPLAY_HDR', 'VDD_SETTINGS', 'WEB_DISPLAY_VIDEO', 'HDR_ENHANCED'])
+  assert.deepEqual(rowsOf('display').map((r) => r.route), ['WEB_DISPLAY_MODES', 'WEB_DISPLAY_OUTPUT', 'WEB_DISPLAY_HDR', 'VDD_SETTINGS', 'WEB_DISPLAY_VIDEO', 'HDR_ENHANCED'])
   assert.deepEqual(rowsOf('audio').map((r) => r.route), ['WEB_AUDIO_SOUND', 'MICROPHONE'])
   assert.deepEqual(rowsOf('input').map((r) => r.route), ['GAMEPAD', 'USB'])
   assert.match(router, /\[ROUTES\.MICROPHONE\]: \{ rail: 'audio' \}/)

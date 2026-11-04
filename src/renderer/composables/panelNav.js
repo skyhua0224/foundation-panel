@@ -38,8 +38,8 @@ export function pageItems(t, rail, runtime = {}) {
       { id: ROUTES.MICROPHONE, icon: 'mic', tone: 'tertiary', label: c.input.microphone, text: lines.microphone },
     ],
     display: [
-      { id: ROUTES.WEB_DISPLAY_OUTPUT, icon: 'monitor', tone: 'primary', label: c.display.output, text: lines['display-output'] },
       { id: ROUTES.WEB_DISPLAY_MODES, icon: 'aspect_ratio', tone: 'secondary', label: c.display.modes, text: lines['display-modes'] },
+      { id: ROUTES.WEB_DISPLAY_OUTPUT, icon: 'monitor', tone: 'primary', label: c.display.output, text: lines['display-output'] },
       { id: ROUTES.WEB_DISPLAY_HDR, icon: 'hdr_on', tone: 'warn', label: c.display.hdr, text: lines['display-hdr'] },
       { id: ROUTES.VDD_SETTINGS, icon: 'desktop_windows', tone: 'success', label: c.display.vdd, text: lines.vdd },
       { id: ROUTES.WEB_DISPLAY_VIDEO, icon: 'videocam', tone: 'primary', label: c.display.video, text: lines['display-video'] },
