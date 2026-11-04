@@ -242,11 +242,10 @@ pub(super) fn compare_grids(shown: &[[f64; 3]], expected: &[[f64; 3]]) -> (f64, 
     (diff, [mean(0), mean(1), mean(2)])
 }
 
-/// What the cover shows, read back from the cover's own window with PrintWindow into memory (never from the screen): its size, its mean colour, and how far
+/// What the cover shows, drawn by its own routine into a memory bitmap (never read from the screen): its size, its mean colour, and how far
 /// its 16 x 10 grid of colours is from the grid of the frame it should show stretched over its client area (or from its flat colour). One line for the log.
 pub(super) fn verify(cover: HWND, color: (u8, u8, u8), frame: Option<&Frame>) -> String {
     use windows::Win32::Graphics::Gdi::{BITMAPINFO, BITMAPINFOHEADER, BI_RGB, CreateDIBSection, DIB_RGB_COLORS, GetDC, ReleaseDC};
-    use windows::Win32::Storage::Xps::{PRINT_WINDOW_FLAGS, PrintWindow};
     let mut client = RECT::default();
     if unsafe { GetClientRect(cover, &mut client) }.is_err() || client.right <= 0 || client.bottom <= 0 {
         return "no client area".to_string();
@@ -266,31 +265,11 @@ pub(super) fn verify(cover: HWND, color: (u8, u8, u8), frame: Option<&Frame>) ->
             return "no memory bitmap".to_string();
         };
         let previous = SelectObject(memory, HGDIOBJ(dib.0));
-        // a layered window is printed from what DWM holds for it (PW_RENDERFULLCONTENT, 2); where that gives nothing, the window is asked to draw itself (WM_PRINT)
-        let mut printed = false;
-        let mut pixels = Vec::new();
-        let mut used = 0;
-        for flags in [2u32, 1, 0] {
-            std::ptr::write_bytes(bits.cast::<u8>(), 0, width * height * 4);
-            printed = PrintWindow(cover, memory, PRINT_WINDOW_FLAGS(flags)).as_bool();
-            pixels = std::slice::from_raw_parts(bits.cast::<u8>(), width * height * 4).to_vec();
-            used = flags;
-            if pixels.chunks_exact(4).any(|pixel| pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0) {
-                break;
-            }
-        }
-        SelectObject(memory, previous);
-        let _ = DeleteObject(HGDIOBJ(dib.0));
-        let _ = DeleteDC(memory);
-        ReleaseDC(None, screen);
-        let mut direct = false;
-        if !pixels.chunks_exact(4).any(|pixel| pixel[0] != 0 || pixel[1] != 0 || pixel[2] != 0) {
-            // the window did not print: its drawing routine is run into the memory bitmap, which checks the face (colour, frame, stretch) if not the window's messages
-            std::ptr::write_bytes(bits.cast::<u8>(), 0, width * height * 4);
-            draw(cover, memory);
-            pixels = std::slice::from_raw_parts(bits.cast::<u8>(), width * height * 4).to_vec();
-            direct = true;
-        }
+        // The cover's own drawing routine is run into the memory bitmap (the routine WM_PAINT and WM_PRINTCLIENT use): what the window is handed, checked without the screen.
+        // PrintWindow of the window itself is not used: it sends messages to the owner while the caller holds the panel's locks, and that deadlocked the window thread.
+        std::ptr::write_bytes(bits.cast::<u8>(), 0, width * height * 4);
+        draw(cover, memory);
+        let pixels = std::slice::from_raw_parts(bits.cast::<u8>(), width * height * 4).to_vec();
         let shown = grid_means(&pixels, width, height, 16, 10);
         let expected = match frame {
             Some(frame) => grid_means(&frame.bgra, frame.width as usize, frame.height as usize, 16, 10),
@@ -301,7 +280,7 @@ pub(super) fn verify(cover: HWND, color: (u8, u8, u8), frame: Option<&Frame>) ->
             Some(frame) => ("frame", format!("stretch x{:.2} y{:.2} of {}x{}", width as f64 / f64::from(frame.width), height as f64 / f64::from(frame.height), frame.width, frame.height)),
             None => ("colour", format!("expected #{:02x}{:02x}{:02x}", color.0, color.1, color.2)),
         };
-        format!("{}PrintWindow(flags {used}) {} (paints {}, prints {}) {}x{} shows {kind}: mean #{:02x}{:02x}{:02x}, grid difference {diff:.1}/255, {stretch}", if direct { "DIRECT DRAW, the window printed nothing: " } else { "" }, if printed { "ok" } else { "failed" }, PAINTS.load(Ordering::Relaxed), PRINTS.load(Ordering::Relaxed), width, height, mean[0], mean[1], mean[2])
+        format!("{}face drawn into memory (paints {}, prints {}) {}x{} shows {kind}: mean #{:02x}{:02x}{:02x}, grid difference {diff:.1}/255, {stretch}", "", PAINTS.load(Ordering::Relaxed), PRINTS.load(Ordering::Relaxed), width, height, mean[0], mean[1], mean[2])
     }
 }
 
