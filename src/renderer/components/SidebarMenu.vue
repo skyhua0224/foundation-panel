@@ -114,6 +114,7 @@ import { computed, defineAsyncComponent, getCurrentInstance, ref, toRef, watch, 
 import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
+import { qrSvgDataUrl } from '../composables/qrSvg.js'
 import { MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, MThanksLine, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, useThanks } from 'foundation-ui/vue'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
@@ -342,7 +343,7 @@ watch(connectNotice, (message) => { if (message) { useNotify().snack(message); c
 const hostApiOf = async (path, init) => { const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, ''); return (await fetch(`${base}${path}`, init)).json() }
 const connect = useConnectDialog({
   hostApi: { getJson: (path) => hostApiOf(path), postJson: (path, body) => hostApiOf(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }) },
-  render: (url) => QRCode.toDataURL(url, { width: 280, margin: 2, color: { dark: '#000000', light: '#ffffff' } }),
+  render: (url) => qrSvgDataUrl(QRCode.create(url, { errorCorrectionLevel: 'M' }).modules),
   matrix: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules,
   say: (kind) => { connectNotice.value = kind === 'sent' ? connectT.value.pinSent : connectT.value.pinFailed },
   defaultName: locale.value.startsWith('zh') ? '新客户端' : 'New client',

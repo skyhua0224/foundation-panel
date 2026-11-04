@@ -46,3 +46,12 @@ test('the offline tips get the real port of the Web UI from the URL the panel ta
   assert.equal((src.match(/:port=\"hostPort\"/g) || []).length, 2)
   assert.match(src, /new URL\(String\(await sunshine\.getUrl\(\)\)\)\.port/)
 })
+
+test('the pairing code of the connect dialog is an SVG, not a PNG made by a canvas (38-47 ms in one task at the dialog\'s opening)', async () => {
+  const fs = await import('node:fs')
+  for (const f of ['SidebarMenu.vue', 'PanelHome.vue']) {
+    const src = fs.readFileSync(new URL(`./${f}`, import.meta.url), 'utf8')
+    assert.ok(!src.includes('QRCode.toDataURL'), f)
+    assert.match(src, /render: \(url\) => qrSvgDataUrl\(QRCode\.create\(url, \{ errorCorrectionLevel: 'M' \}\)\.modules\)/, f)
+  }
+})

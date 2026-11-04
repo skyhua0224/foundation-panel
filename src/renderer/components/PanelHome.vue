@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { firstImage, micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
 import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, useSystemInfo, reachProblemOf, registeredComponentStatus, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
+import { qrSvgDataUrl } from '../composables/qrSvg.js'
 import { usePanelHome } from '../composables/usePanelHome.js'
 import { useHostReach } from '../composables/useHostReach.js'
 import { useGamepadType } from '../composables/useGamepadType.js'
@@ -199,7 +200,7 @@ const pairQr = createPairQr({
   start: async () => { const d = await hostApi.postJson('/api/qr-pair', {}); if (String(d.status) !== 'true') throw new Error(d.error || 'qr'); return d },
   poll: () => hostApi.getJson('/api/qr-pair'),
   cancel: () => hostApi.postJson('/api/qr-pair/cancel', {}),
-  render: (url) => QRCode.toDataURL(url, { width: 280, margin: 2, color: { dark: '#000000', light: '#ffffff' } }),
+  render: (url) => qrSvgDataUrl(QRCode.create(url, { errorCorrectionLevel: 'M' }).modules),
 })
 onBeforeUnmount(() => pairQr.stop())
 // the connect journey card: on by default while no client is paired (choose the device, install, pair, done)
