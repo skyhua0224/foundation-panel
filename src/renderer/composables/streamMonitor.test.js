@@ -24,6 +24,15 @@ test('the stream monitor is that display (DISPLAY1 is not DISPLAY12); auto is th
   assert.deepEqual(pickStreamMonitor({ outputName: '', monitors: [] }), { monitor: null, found: false })
 })
 
+test('a name the host wrote itself (ZakoHDR) is the device whose friendly name is Zako HDR', () => {
+  const zako = [{ device_id: '{9d2d}', data: 'DISPLAY NAME: \\\\.\\DISPLAY15\nFRIENDLY NAME: Zako HDR\nDEVICE STATE: PRIMARY\nHDR STATE: ENABLED' }]
+  assert.equal(capturedDisplay('ZakoHDR', zako), 'DISPLAY15')
+  assert.equal(capturedDisplay('zako hdr', zako), 'DISPLAY15')
+  assert.equal(capturedDisplay('Other', zako), '')
+  const m = [mon('\\\\.\\DISPLAY15', 0, 2)]
+  assert.deepEqual(pickStreamMonitor({ outputName: 'ZakoHDR', displayDevices: zako, monitors: m, primary: m[0] }), { monitor: m[0], found: true })
+})
+
 test('the window is centred on the monitor in logical pixels', () => {
   assert.deepEqual(centredOn(monitors[0], 960, 600), { x: 800, y: 420, width: 960, height: 600 })
   assert.deepEqual(centredOn(monitors[1], 960, 600), { x: 3840 + 800, y: 420, width: 960, height: 600 })
