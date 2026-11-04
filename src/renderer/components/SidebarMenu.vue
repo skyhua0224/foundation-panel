@@ -93,7 +93,7 @@
     <MContextProvider :locale="locale" :callbacks="ctxCallbacks" :capabilities="{ product: 'panel' }" />
     <!-- every uncaught error is drawn in our own surface: the way back, the restart of Sunshine, then copy, download and the report to the developers -->
     <MTelemetryConsent v-model="consentOpen" :locale="locale" @answer="telemetry.answer" />
-    <MErrorHost :locale="locale" :can-go-back="nav.canPop.value" :host-online="hostConn.state.status === 'online'" :restart="() => hostConn.restart('service')" :open-url="actions_openExternal" @back="errorBack" />
+    <MErrorHost :locale="locale" :can-go-back="nav.canPop.value" :host-online="hostConn.state.status === 'online'" :restart="() => hostConn.restart('service')" :doctor="openDoctor" :open-url="actions_openExternal" @back="errorBack" />
     <!-- 更多 of the bottom bar: what the bar has no room for -->
     <MSheet v-model="moreOpen" :title="t.m3e.nav.moreTitle" side="end" :close-label="t.m3e.home.done">
       <MGroup>
