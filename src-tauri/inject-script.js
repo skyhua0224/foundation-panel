@@ -271,8 +271,62 @@
     })
   }
 
+  // What happens inside the page is reported to the panel, which writes it to its log (`[renderer] frame-<kind> <page> <ms> ms ...`): a page that is blank or slow in the panel's
+  // frame leaves an error with its place, a long frame with its script, a slow call with its path. At most 20 reports a minute; the long poll of the pairing list is not slow.
+  const initReports = () => {
+    if (window.parent === window) return
+    let windowStart = 0
+    let sent = 0
+    const report = (kind, name, ms, detail) => {
+      const now = Date.now()
+      if (!windowStart || now - windowStart >= 60000) { windowStart = now; sent = 0 }
+      if (++sent > 20) return
+      postToParent('panel-frame-report', { kind, name: String(name || '').slice(0, 160), ms: Math.round(ms || 0), detail: String(detail || '').slice(0, 300), page: location.pathname })
+    }
+    const frames = (stack) => String(stack || '').split('\n').slice(1, 4).join(' | ')
+    window.addEventListener('error', (e) => {
+      if (/ResizeObserver loop/.test(e.message || '')) return
+      report('error', e.message || 'error', 0, `${String(e.filename || '').split('/').pop()}:${e.lineno || 0}:${e.colno || 0} ${frames(e.error && e.error.stack)}`)
+    })
+    window.addEventListener('unhandledrejection', (e) => {
+      const r = e.reason
+      report('error', `unhandledrejection: ${(r && r.message) || r}`, 0, frames(r && r.stack))
+    })
+    try {
+      new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          if (entry.duration < 300) continue
+          const scripts = (entry.scripts || []).filter((x) => x.duration >= 20).map((x) => `${x.invokerType}:${String(x.invoker || '').slice(0, 40)}:${x.duration | 0}ms@${String(x.sourceURL || '').split('/').pop()}:${x.sourceCharPosition}`).slice(0, 3).join(' ; ')
+          report('frame', entry.entryType === 'longtask' ? 'long-task' : 'long-animation-frame', entry.duration, `blocking ${entry.blockingDuration | 0} ms ${scripts}`)
+        }
+      }).observe({ type: 'long-animation-frame', buffered: false })
+    } catch {
+      try {
+        new PerformanceObserver((list) => { for (const entry of list.getEntries()) if (entry.duration >= 300) report('frame', 'long-task', entry.duration, '') }).observe({ type: 'longtask' })
+      } catch { /* an engine without either entry type */ }
+    }
+    const nativeFetch = window.fetch
+    if (typeof nativeFetch === 'function') {
+      window.fetch = function (...args) {
+        const started = performance.now()
+        const target = typeof args[0] === 'string' ? args[0] : args[0] && args[0].url
+        const result = nativeFetch.apply(this, args)
+        const done = () => {
+          const ms = performance.now() - started
+          if (ms < 1500 || /\/api\/pairing\/pending/.test(String(target)) || /[?&]wait=\d+/.test(String(target))) return
+          let path = String(target)
+          try { path = new URL(path, location.href).pathname } catch { /* keep the text */ }
+          report('fetch', path, ms, '')
+        }
+        if (result && typeof result.then === 'function') result.then(done, done)
+        return result
+      }
+    }
+  }
+
   // 初始化
   const init = () => {
+    initReports()
     disableContextMenu()
     initNavigation()
     postToParent('request-theme')
@@ -281,7 +335,7 @@
       new PerformanceObserver((list, observer) => {
         if (list.getEntries().some((entry) => entry.name === 'first-contentful-paint')) {
           observer.disconnect()
-          postToParent('panel-painted')
+          postToParent('panel-painted', { fcp: Math.round(performance.now()) })
         }
       }).observe({ type: 'paint', buffered: true })
     } catch {

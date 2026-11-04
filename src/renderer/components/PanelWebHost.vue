@@ -1,6 +1,8 @@
 <script setup>
 import { inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { MPageLoading } from 'foundation-ui/vue'
+import { invoke } from '@tauri-apps/api/core'
+import { revealReport } from '../composables/frameReport.js'
 
 // The embedded Web UI frame lives here for the whole session (so it never reloads when the window is resized). Where the
 // list is hidden behind the page (single pane) a small bar carries the way back.
@@ -20,17 +22,28 @@ let waitLoad = false
 let settle = 0
 let ceiling = 0
 let observer = null
-const uncover = () => { clearTimeout(settle); clearTimeout(ceiling); waitLoad = false; covered.value = false }
-const cover = () => { covered.value = true; clearTimeout(ceiling); ceiling = setTimeout(uncover, 6000) }
+// How long the frame stayed covered and what showed it is written to the panel's log when it was slow (>= 600 ms) or had to be forced by the ceiling: a blank right pane then has a time.
+let coveredAt = 0
+const uncover = (by = '', fcp = 0) => {
+  clearTimeout(settle); clearTimeout(ceiling); waitLoad = false
+  if (covered.value && coveredAt) {
+    const line = revealReport({ page: props.page || 'frame', ms: performance.now() - coveredAt, by, fcp })
+    if (line) invoke('frontend_slow', line).catch(() => {})
+  }
+  coveredAt = 0
+  covered.value = false
+}
+const cover = () => { if (!covered.value || !coveredAt) coveredAt = performance.now(); covered.value = true; clearTimeout(ceiling); ceiling = setTimeout(() => uncover('ceiling'), 6000) }
 // The frame is shown when its page says that it has painted its first frame (`panel-painted`, sent by the script the proxy puts into every page): the load event comes
 // 50 to 100 ms before that, and a frame shown at load showed 4 to 6 frames with nothing in them. Where no such message comes (a page the proxy does not change) the load
 // event shows the frame after a longer settle.
-const onLoad = () => { if (!waitLoad && !covered.value) return; clearTimeout(settle); settle = setTimeout(uncover, 450) }
+const onLoad = () => { if (!waitLoad && !covered.value) return; clearTimeout(settle); settle = setTimeout(() => uncover('load'), 450) }
 const onMessage = (event) => {
   if (event.data?.type !== 'panel-painted' || !covered.value) return
   if (event.source !== host.value?.querySelector('iframe')?.contentWindow) return
   clearTimeout(settle)
-  requestAnimationFrame(uncover)
+  const fcp = event.data?.fcp
+  requestAnimationFrame(() => uncover('painted', fcp))
 }
 onMounted(() => {
   host.value.addEventListener('load', onLoad, true)
@@ -43,7 +56,7 @@ watch(() => props.page, (page) => {
   if (!page) return
   cover()
   clearTimeout(settle)
-  settle = setTimeout(() => { if (!waitLoad) uncover() }, 320)
+  settle = setTimeout(() => { if (!waitLoad) uncover('settle') }, 320)
 })
 onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); window.removeEventListener('message', onMessage); observer?.disconnect(); clearTimeout(settle); clearTimeout(ceiling) })
 </script>

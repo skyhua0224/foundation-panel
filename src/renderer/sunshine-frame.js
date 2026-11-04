@@ -3,7 +3,7 @@ import SunshineFrame from './components/SunshineFrame.vue'
 import { invoke } from '@tauri-apps/api/core'
 import { followPanelSurface } from './composables/panelSurface.js'
 import { startWebPrewarm, createHiddenFrameLoader } from './composables/webPrewarm.js'
-import { startSlowCallLog } from './composables/slowCalls.js'
+import { startSlowCallLog, installFaultLog } from './composables/slowCalls.js'
 import { followDpiCover } from './composables/dpiSettle.js'
 import { listen } from '@tauri-apps/api/event'
 import { configureInvokeTiming, invokePending } from './tauri-core-timed.js'
@@ -43,6 +43,7 @@ queueMicrotask(() => {
   const report = (kind, name, ms, detail) => { if (name !== 'frontend_slow') invoke('frontend_slow', { kind, name, ms, detail }).catch(() => {}) }
   configureInvokeTiming({ report })
   startSlowCallLog(report, window, invokePending)
+  installFaultLog(report, window)
 })
 
 // The page is being used: the native side takes no snapshot of it then (at most one report in 250 ms)
