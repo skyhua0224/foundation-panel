@@ -48,8 +48,12 @@ const onMessage = (event) => {
 onMounted(() => {
   host.value.addEventListener('load', onLoad, true)
   window.addEventListener('message', onMessage)
-  observer = new MutationObserver(() => { waitLoad = true; cover(); clearTimeout(settle) })
-  observer.observe(host.value, { subtree: true, attributes: true, attributeFilter: ['src'] })
+  // a frame whose address changes is a new element (SunshineFrame: a frame that navigates adds a history entry), so a frame that comes in counts like a changed `src`
+  observer = new MutationObserver((records) => {
+    if (!records.some((r) => r.type === 'attributes' || [...r.addedNodes].some((n) => n.tagName === 'IFRAME'))) return
+    waitLoad = true; cover(); clearTimeout(settle)
+  })
+  observer.observe(host.value, { subtree: true, attributes: true, attributeFilter: ['src'], childList: true })
   cover()
 })
 watch(() => props.page, (page) => {

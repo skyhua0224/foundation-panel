@@ -19,6 +19,7 @@
       </div>
 
       <iframe
+        :key="frameKey"
         ref="sunshineIframe"
         :src="sunshineUrl"
         class="sunshine-iframe"
@@ -31,7 +32,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
 import { followRoot } from '../composables/frameRoot.js'
 import { ElMessage } from '../composables/notifyMessage.js'
 import { invoke } from '@tauri-apps/api/core'
@@ -53,6 +54,10 @@ const { t } = useI18n()
 // Refs
 const loading = ref(true)
 const sunshineUrl = ref('')
+// A frame whose address is set again navigates, and a navigation adds an entry to the window's joint history: the frame's step is then the first thing Back (the mouse button, Alt+Left) undoes,
+// no popstate comes to the panel, and the person stays on the page. Every address gets a frame of its own: the first navigation of a new frame replaces its empty page and adds no entry.
+const frameKey = ref(0)
+watch(sunshineUrl, () => { frameKey.value++ }, { flush: 'sync' })
 const currentPath = ref('/')
 const sunshineIframe = ref(null)
 const sidebarMenuRef = ref(null)
