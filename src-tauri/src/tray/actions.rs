@@ -589,15 +589,46 @@ fn check_for_updates<R: Runtime>(app: &AppHandle<R>) {
     });
 }
 
-/// 切换防止睡眠功能
+/// The tray's start-up item. With SunshineService it sets the service start
+/// type through the same back end as 系统 › Sunshine 服务; turning it off
+/// (Manual) first asks for confirmation that the host will not be reachable
+/// after a reboot. Without the service it toggles the panel's own start-up.
 #[cfg(target_os = "windows")]
 fn toggle_auto_start<R: Runtime + 'static>(app: &AppHandle<R>) {
     let enabled = !desktop_settings::is_combined_auto_start_enabled();
     refresh_menu(app);
+    let needs_confirmation = !enabled
+        && matches!(
+            desktop_settings::startup_owner(),
+            Ok(desktop_settings::StartupOwner::Service(_))
+        );
+    if needs_confirmation {
+        use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+        let strings = get_tray_strings();
+        let app_handle = app.clone();
+        app.dialog()
+            .message(strings.auto_start_off_confirm)
+            .title(strings.auto_start)
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::YesNo)
+            .show(move |confirmed| {
+                if confirmed {
+                    apply_auto_start(&app_handle, false, true);
+                } else {
+                    refresh_menu(&app_handle);
+                }
+            });
+        return;
+    }
+    apply_auto_start(app, enabled, false);
+}
+
+#[cfg(target_os = "windows")]
+fn apply_auto_start<R: Runtime + 'static>(app: &AppHandle<R>, enabled: bool, acknowledged: bool) {
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
         let result = tauri::async_runtime::spawn_blocking(move || {
-            desktop_settings::set_combined_auto_start_enabled(enabled)
+            desktop_settings::set_combined_auto_start_enabled(enabled, acknowledged)
         })
         .await
         .map_err(|error| error.to_string())
@@ -606,9 +637,9 @@ fn toggle_auto_start<R: Runtime + 'static>(app: &AppHandle<R>) {
         let menu_handle = app_handle.clone();
         let _ = app_handle.run_on_main_thread(move || {
             match result {
-                Ok(()) => info!("Combined Core and tray auto-start changed: {}", enabled),
+                Ok(()) => info!("Start-up changed from the tray: {}", enabled),
                 Err(error) => {
-                    error!("Failed to update combined auto-start: {}", error);
+                    error!("Failed to update start-up: {}", error);
                     emit_message(
                         &menu_handle,
                         "error",

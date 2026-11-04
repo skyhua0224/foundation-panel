@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
+use crate::sunshine_service::StartType;
 use tauri::AppHandle;
 #[cfg(debug_assertions)]
 use tauri::Manager;
@@ -194,92 +195,40 @@ pub fn is_auto_start_registered() -> bool {
     false
 }
 
+/// The start type of SunshineService when it is the service of this install.
+/// Read from the SCM (QueryServiceConfigW / QueryServiceConfig2W).
 #[cfg(target_os = "windows")]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum ServiceStartMode {
-    Auto,
-    DelayedAuto,
-    Demand,
-    Disabled,
-}
-
-#[cfg(target_os = "windows")]
-fn sunshine_service_start_mode() -> Result<Option<ServiceStartMode>, String> {
-    use winreg::RegKey;
-    use winreg::enums::*;
-
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let service = match hklm.open_subkey(r"SYSTEM\CurrentControlSet\Services\SunshineService") {
-        Ok(service) => service,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(error.to_string()),
-    };
-    let start = service
-        .get_value::<u32, _>("Start")
-        .map_err(|error| error.to_string())?;
-    match start {
-        2 if service.get_value::<u32, _>("DelayedAutoStart").unwrap_or(0) != 0 => {
-            Ok(Some(ServiceStartMode::DelayedAuto))
-        }
-        2 => Ok(Some(ServiceStartMode::Auto)),
-        3 => Ok(Some(ServiceStartMode::Demand)),
-        4 => Ok(Some(ServiceStartMode::Disabled)),
-        value => Err(format!("Unsupported Sunshine service start type: {value}")),
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn service_image_path_matches_install(image_path: &str, install_dir: &Path) -> bool {
-    let image_path = image_path.trim().trim_matches('"');
-    let expected = install_dir.join("tools").join("sunshinesvc.exe");
-
-    image_path.eq_ignore_ascii_case(&expected.to_string_lossy())
+fn managed_service_start_mode() -> Result<Option<StartType>, String> {
+    let install_dir = crate::sunshine::install_dir();
+    Ok(crate::sunshine_service::registered_service()?
+        .filter(|service| {
+            crate::sunshine_service::service_binary_matches_install(
+                &service.binary_path,
+                &install_dir.to_string_lossy(),
+            )
+        })
+        .map(|service| service.start_type))
 }
 
 #[cfg(target_os = "windows")]
 pub(crate) fn sunshine_service_matches_install(install_dir: &Path) -> Result<bool, String> {
-    use winreg::RegKey;
-    use winreg::enums::*;
-
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let service = match hklm.open_subkey(r"SYSTEM\CurrentControlSet\Services\SunshineService") {
-        Ok(service) => service,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-        Err(error) => return Err(error.to_string()),
-    };
-    let image_path = service
-        .get_value::<String, _>("ImagePath")
-        .map_err(|error| error.to_string())?;
-
-    Ok(service_image_path_matches_install(&image_path, install_dir))
+    Ok(crate::sunshine_service::registered_service()?.is_some_and(|service| {
+        crate::sunshine_service::service_binary_matches_install(
+            &service.binary_path,
+            &install_dir.to_string_lossy(),
+        )
+    }))
 }
 
 #[cfg(target_os = "windows")]
-fn managed_service_start_mode() -> Result<Option<ServiceStartMode>, String> {
-    let install_dir = crate::sunshine::install_dir();
-    if sunshine_service_matches_install(&install_dir)? {
-        sunshine_service_start_mode()
-    } else {
-        Ok(None)
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn should_register_gui_auto_start(
-    requested: bool,
-    managed_service_mode: Option<ServiceStartMode>,
-) -> bool {
+fn should_register_gui_auto_start(requested: bool, managed_service_mode: Option<StartType>) -> bool {
     requested && managed_service_mode.is_none()
 }
 
 #[cfg(target_os = "windows")]
-fn combined_auto_start_ready(
-    managed_service_mode: Option<ServiceStartMode>,
-    gui_registered: bool,
-) -> bool {
+fn combined_auto_start_ready(managed_service_mode: Option<StartType>, gui_registered: bool) -> bool {
     match managed_service_mode {
-        Some(ServiceStartMode::Auto | ServiceStartMode::DelayedAuto) => true,
-        Some(ServiceStartMode::Demand | ServiceStartMode::Disabled) => false,
+        Some(mode) => mode.starts_at_boot(),
         None => gui_registered,
     }
 }
@@ -296,71 +245,64 @@ pub fn is_combined_auto_start_enabled() -> bool {
     false
 }
 
-#[cfg(target_os = "windows")]
-fn configure_sunshine_service_start(mode: ServiceStartMode) -> Result<(), String> {
-    let start_mode = match mode {
-        ServiceStartMode::Auto => "auto",
-        ServiceStartMode::DelayedAuto => "delayed-auto",
-        ServiceStartMode::Demand => "demand",
-        ServiceStartMode::Disabled => "disabled",
-    };
-    let script_path = std::env::temp_dir().join("sunshine-set-service-start.bat");
-    let script = format!(
-        "@echo off\r\nsc.exe config SunshineService start= {start_mode}\r\nexit /b %ERRORLEVEL%\r\n"
-    );
-    fs::write(&script_path, script).map_err(|e| e.to_string())?;
-    let result = crate::bat_runner::run_elevated(&script_path, "service-start", &[]);
-    let _ = fs::remove_file(&script_path);
-    result
+/// What the tray's start-up item changes: the SunshineService start type
+/// when this install has the service (the service also starts the panel),
+/// otherwise the panel's own Run entry, which starts Sunshine in user mode.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum StartupOwner {
+    Service(StartType),
+    Panel,
 }
 
-pub fn set_combined_auto_start_enabled(enabled: bool) -> Result<(), String> {
-    let mut previous = load_desktop_settings_from_disk();
+#[cfg(target_os = "windows")]
+pub fn startup_owner() -> Result<StartupOwner, String> {
+    Ok(managed_service_start_mode()?.map_or(StartupOwner::Panel, StartupOwner::Service))
+}
+
+#[cfg(not(target_os = "windows"))]
+pub fn startup_owner() -> Result<StartupOwner, String> {
+    Ok(StartupOwner::Panel)
+}
+
+/// Turn start-up on or off. With the service, this sets its start type
+/// through the shared service back end (Auto, or Manual, which needs
+/// `acknowledge_unreachable_after_reboot`) and leaves the panel settings
+/// alone. Without it, this registers the panel's Run entry and its
+/// "make sure Sunshine runs" option.
+pub fn set_combined_auto_start_enabled(
+    enabled: bool,
+    acknowledge_unreachable_after_reboot: bool,
+) -> Result<(), String> {
+    if let StartupOwner::Service(mode) = startup_owner()? {
+        let target = if enabled { StartType::Auto } else { StartType::Manual };
+        if mode.starts_at_boot() == enabled {
+            return Ok(());
+        }
+        return crate::sunshine_service::set_start_type_blocking(
+            target,
+            acknowledge_unreachable_after_reboot,
+        );
+    }
+
+    let previous = load_desktop_settings_from_disk();
     let mut settings = previous.clone();
     settings.auto_start = enabled;
     settings.auto_start_sunshine = enabled;
 
-    #[cfg(target_os = "windows")]
-    let previous_service_mode = managed_service_start_mode()?;
-    #[cfg(target_os = "windows")]
-    let mut service_changed = false;
-    #[cfg(target_os = "windows")]
-    if let Some(mode) = previous_service_mode {
-        let target_mode = if enabled {
-            ServiceStartMode::Auto
-        } else {
-            ServiceStartMode::Demand
-        };
-        if mode != target_mode {
-            configure_sunshine_service_start(target_mode)?;
-            service_changed = true;
-        }
-    }
-
     let _settings_guard = lock_desktop_settings();
     let toolbar_shortcut_enabled = load_desktop_settings_from_disk().toolbar_shortcut_enabled;
     settings.toolbar_shortcut_enabled = toolbar_shortcut_enabled;
+    let mut previous = previous;
     previous.toolbar_shortcut_enabled = toolbar_shortcut_enabled;
 
-    if let Err(error) = save_desktop_settings_to_disk(&settings) {
-        #[cfg(target_os = "windows")]
-        if service_changed && let Some(mode) = previous_service_mode {
-            let _ = configure_sunshine_service_start(mode);
-        }
-        return Err(error);
-    }
-
+    save_desktop_settings_to_disk(&settings)?;
     if let Err(error) = apply_auto_start(&settings) {
         let _ = save_desktop_settings_to_disk(&previous);
-        #[cfg(target_os = "windows")]
-        if service_changed && let Some(mode) = previous_service_mode {
-            let _ = configure_sunshine_service_start(mode);
-        }
         return Err(error);
     }
-
     Ok(())
 }
+
 
 fn status() -> DesktopSettingsStatus {
     DesktopSettingsStatus {
@@ -604,19 +546,19 @@ mod tests {
     #[test]
     fn service_managed_startup_uses_service_mode_only() {
         assert!(combined_auto_start_ready(
-            Some(ServiceStartMode::Auto),
+            Some(StartType::Auto),
             false
         ));
         assert!(combined_auto_start_ready(
-            Some(ServiceStartMode::DelayedAuto),
+            Some(StartType::DelayedAuto),
             false
         ));
         assert!(!combined_auto_start_ready(
-            Some(ServiceStartMode::Demand),
+            Some(StartType::Manual),
             true
         ));
         assert!(!combined_auto_start_ready(
-            Some(ServiceStartMode::Disabled),
+            Some(StartType::Disabled),
             true
         ));
     }
@@ -633,21 +575,7 @@ mod tests {
     fn service_managed_startup_does_not_duplicate_gui_registration() {
         assert!(!should_register_gui_auto_start(
             true,
-            Some(ServiceStartMode::Auto)
-        ));
-    }
-
-    #[test]
-    fn service_must_belong_to_the_same_install() {
-        let install_dir = Path::new(r"C:\Portable Sunshine");
-
-        assert!(service_image_path_matches_install(
-            r#""C:\Portable Sunshine\tools\sunshinesvc.exe""#,
-            install_dir
-        ));
-        assert!(!service_image_path_matches_install(
-            r#""C:\Program Files\Sunshine\tools\sunshinesvc.exe""#,
-            install_dir
+            Some(StartType::Auto)
         ));
     }
 }

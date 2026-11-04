@@ -295,6 +295,8 @@ struct TrayStrings {
     open_desktop: &'static str,
     #[cfg(target_os = "windows")]
     auto_start: &'static str,
+    #[cfg(target_os = "windows")]
+    auto_start_off_confirm: &'static str,
     #[cfg(any(debug_assertions, feature = "beta"))]
     web_stream: &'static str,
     #[cfg(debug_assertions)]
@@ -368,7 +370,9 @@ const ZH_STRINGS: TrayStrings = TrayStrings {
     log_console: "日志控制台",
     open_desktop: "大屏模式",
     #[cfg(target_os = "windows")]
-    auto_start: "开机运行",
+    auto_start: "开机自动运行 Sunshine",
+    #[cfg(target_os = "windows")]
+    auto_start_off_confirm: "关闭后 Sunshine 服务改为手动启动：这台电脑重启后，Sunshine 不会自动运行，远程设备将无法连接，直到有人在这台电脑上启动它。确定关闭吗？",
     #[cfg(any(debug_assertions, feature = "beta"))]
     web_stream: "Web 串流服务",
     #[cfg(debug_assertions)]
@@ -442,7 +446,9 @@ const EN_STRINGS: TrayStrings = TrayStrings {
     log_console: "Log Console",
     open_desktop: "Large Screen Mode",
     #[cfg(target_os = "windows")]
-    auto_start: "Run at Startup",
+    auto_start: "Start Sunshine with Windows",
+    #[cfg(target_os = "windows")]
+    auto_start_off_confirm: "The Sunshine service will be set to Manual: after this PC restarts, Sunshine will not run and remote devices cannot connect until someone starts it on this PC. Turn it off?",
     #[cfg(any(debug_assertions, feature = "beta"))]
     web_stream: "Web Streaming",
     #[cfg(debug_assertions)]
@@ -516,7 +522,9 @@ const JA_STRINGS: TrayStrings = TrayStrings {
     log_console: "ログコンソール",
     open_desktop: "大画面モード",
     #[cfg(target_os = "windows")]
-    auto_start: "起動時に実行",
+    auto_start: "Windows と一緒に Sunshine を起動",
+    #[cfg(target_os = "windows")]
+    auto_start_off_confirm: "Sunshine サービスを手動に変更します。この PC を再起動すると Sunshine は起動せず、この PC で誰かが起動するまでリモートデバイスから接続できません。オフにしますか？",
     #[cfg(any(debug_assertions, feature = "beta"))]
     web_stream: "Web ストリーミング",
     #[cfg(debug_assertions)]
@@ -955,10 +963,10 @@ mod tests {
         assert_eq!(ZH_STRINGS.open_desktop, "大屏模式");
         assert_eq!(ZH_STRINGS.show_toolbar, "显示桌宠");
         #[cfg(target_os = "windows")]
-        assert_eq!(ZH_STRINGS.auto_start, "开机运行");
+        assert_eq!(ZH_STRINGS.auto_start, "开机自动运行 Sunshine");
         assert_eq!(EN_STRINGS.open_desktop, "Large Screen Mode");
         #[cfg(target_os = "windows")]
-        assert_eq!(EN_STRINGS.auto_start, "Run at Startup");
+        assert_eq!(EN_STRINGS.auto_start, "Start Sunshine with Windows");
         assert_eq!(ZH_STRINGS.shutdown, "退出 Sunshine");
         assert_eq!(EN_STRINGS.shutdown, "Exit Sunshine");
     }

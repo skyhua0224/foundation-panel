@@ -42,6 +42,7 @@ mod panel_page;
 mod shell_context_menu;
 mod stall_watch;
 mod sunshine;
+mod sunshine_service;
 mod system;
 mod system_load;
 mod system_load_core;
@@ -139,6 +140,12 @@ fn main() {
     if let Some(exit_code) =
         native_components::providers::nvidia_rtx_hdr::try_handle_elevated_command()
     {
+        std::process::exit(exit_code);
+    }
+
+    // Elevated SunshineService helper: one fixed verb, allowlisted operations.
+    #[cfg(target_os = "windows")]
+    if let Some(exit_code) = sunshine_service::try_handle_elevated_command() {
         std::process::exit(exit_code);
     }
 
@@ -262,6 +269,7 @@ fn main() {
             sunshine::is_sunshine_running_in_user_mode,
             sunshine::restart_sunshine_in_user_mode,
             sunshine::restart_sunshine_service,
+            sunshine_service::set_sunshine_service_start_type,
             proxy_server::get_proxy_url_command,
             proxy_server::get_proxy_health_check,
             proxy_server::probe_sunshine_host,
