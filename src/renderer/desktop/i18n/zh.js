@@ -284,6 +284,8 @@ export const zh = {
       debug: 'DEBUG（全部）',
     },
     pet: '桌宠',
+    petOn: '开',
+    petOff: '关',
     deskObserve: '桌面观察',
     deskObserveDesc: '米塔会定时偷看你的桌面并发表评论（需要启用 AI 并配置支持视觉的模型如 GPT-4o）',
     observeInterval: '观察间隔（秒）',

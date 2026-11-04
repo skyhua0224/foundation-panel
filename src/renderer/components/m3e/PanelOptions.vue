@@ -6,7 +6,7 @@ import { defaultDesktopSettings, desktopSettings, loadDesktopSettings, saveDeskt
 import { bigScreenSettings, defaultBigScreenSettings, setBigScreenSetting } from '../../desktop/composables/useBigScreenSettings.js'
 import { useLaunchHelpers } from '../../desktop/composables/useLaunchHelpers.js'
 import { useDesktopPet } from '../../composables/useDesktopPet.js'
-import { INTERVAL_PRESETS, JITTER_PRESETS, usePetSpeech } from '../../composables/usePetSpeech.js'
+import { INTERVAL_PRESETS, JITTER_PRESETS, VISION_INTERVAL_PRESETS, usePetSpeech } from '../../composables/usePetSpeech.js'
 import { usePanelPart } from '../../composables/panelParts.js'
 import { isTauriRuntime } from '../../desktop/composables/useTauri.js'
 import { fileMapping, sunshine } from '../../tauri-adapter.js'
@@ -15,7 +15,7 @@ import { fileMapping, sunshine } from '../../tauri-adapter.js'
 // mode, the launch helpers (paths), shared folders, the desktop pet and, behind 高级, the developer and log options. Nothing
 // here needs the old window any more. A change is saved at once (the old window had a save button).
 const props = defineProps({ locale: { type: String, default: 'zh' } })
-const { t } = useI18n()
+const { t, locale, toggleLocale } = useI18n()
 const zh = computed(() => String(props.locale).startsWith('zh'))
 const st = computed(() => t.value.settings)
 const settings = desktopSettings
@@ -129,7 +129,7 @@ const jitterOptions = computed(() => JITTER_PRESETS.map((v) => ({ value: v, labe
 const shortcutText = computed(() => (speech.shortcut.value.error ? t.value.petTool.toolbarShortcutStateError : speech.shortcut.value.enabled && !speech.shortcut.value.registered && !speech.shortcut.value.pending ? t.value.petTool.toolbarShortcutUnavailable : t.value.petTool.toolbarShortcutDesc))
 const historyTime = (ts) => { const d = new Date(ts); return Number.isNaN(d.getTime()) ? '' : `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}` }
 const petSeconds = computed({ get: () => Math.round(observeInterval.value / 1000), set: (v) => setIntervalSeconds(Number(v)) })
-const intervals = computed(() => [[15, 's15'], [30, 's30'], [60, 's60'], [120, 'm2'], [300, 'm5']].map(([value, key]) => ({ value, label: st.value.intervals[key] })))
+const intervals = computed(() => VISION_INTERVAL_PRESETS.map((value) => ({ value, label: value >= 60 ? `${value / 60} ${t.value.petTool.unitMin}` : `${value} ${t.value.petTool.unitSec}` })))
 const togglePet = (on) => { if (!on) stopObserving(); else consent.value = true }
 const acceptPet = () => { consent.value = false; startObserving() }
 
@@ -189,7 +189,7 @@ const resetAll = async () => {
     <MGroup>
       <MItem action icon="bolt" :title="st.launchAssistant" data-panel-option="launchAssistant" @click="open('helpers')" />
       <MItem action icon="folder_shared" :title="fs.title" data-panel-option="fileSharing" @click="openSharing" />
-      <MItem action icon="pets" :title="st.pet" data-panel-option="pet" @click="open('pet')" />
+      <MItem action icon="pets" :title="st.pet" :text="speech.masterEnabled.value ? st.petOn : st.petOff" data-panel-option="pet" @click="open('pet')" />
       <MItem action icon="tune" :title="st.advanced" data-panel-option="advanced" @click="open('expert')" />
     </MGroup>
   </MSection>
@@ -236,35 +236,60 @@ const resetAll = async () => {
   </MSheet>
 
   <MSheet :model-value="sheet === 'pet'" :title="st.pet" side="end" :close-label="fs.close" @update:model-value="closeSheet">
+    <!-- the pet on or off: the first row of the sheet -->
     <MGroup>
       <MSwitchItem v-model="speech.masterEnabled.value" icon="pets" :title="t.petTool.master" :info="t.petTool.masterDesc" data-panel-option="petMaster" />
-      <MSwitchItem v-model="speech.randomEnabled.value" icon="forum" :title="t.petTool.random" :info="t.petTool.randomDesc" :disabled="!speech.masterEnabled.value" data-panel-option="petRandom" />
-      <MItem v-if="speech.masterEnabled.value && speech.randomEnabled.value" icon="timer" :title="t.petTool.speechInterval" :text="t.petTool.speechIntervalDesc" stack data-panel-option="petSpeechInterval">
-        <template #control><MSeg v-model="speech.randomIntervalSec.value" block :label="t.petTool.speechInterval" :options="speechSeconds" /></template>
-      </MItem>
-      <MItem v-if="speech.masterEnabled.value && speech.randomEnabled.value" icon="swap_vert" :title="t.petTool.jitter" :text="t.petTool.jitterDesc" stack data-panel-option="petJitter">
-        <template #control><MSeg v-model="speech.jitterPercent.value" block :label="t.petTool.jitter" :options="jitterOptions" /></template>
-      </MItem>
-      <MSwitchItem :model-value="speech.shortcut.value.enabled" icon="keyboard" :title="t.petTool.toolbarShortcut" :info="shortcutText" :disabled="speech.shortcut.value.pending" data-panel-option="petShortcut" @update:model-value="speech.setShortcut" />
-    </MGroup>
-    <MGroup>
-      <MSwitchItem :model-value="petEnabled" :title="st.deskObserve" :info="st.deskObserveDesc" data-panel-option="deskObserve" @update:model-value="togglePet" />
-      <MItem v-if="petEnabled" icon="timer" :title="st.observeInterval" :text="st.observeIntervalDesc" stack data-panel-option="observeInterval">
-        <template #control><MSeg v-model="petSeconds" block :label="st.observeInterval" :options="intervals" /></template>
-      </MItem>
-      <MItem v-if="petEnabled" action icon="touch_app" :title="st.pokeMita" :text="pokeFailed ? t.petTool.pokeFailed : st.pokeMitaDesc" :disabled="isObserving" data-panel-option="pokeMita" @click="poke">
-        <template #trail><span class="m-item__count">{{ isObserving ? st.pokeBtnObserving : st.pokeBtn }}</span></template>
+      <MItem action icon="language" :title="t.petTool.language" :text="t.petTool.languageDesc" data-panel-option="petLanguage" @click="toggleLocale">
+        <template #trail><span class="m-item__count">{{ locale === 'zh' ? 'EN' : '中' }}</span></template>
       </MItem>
     </MGroup>
+
+    <!-- 对话 -->
+    <MSection :title="t.petTool.tabs.speech">
+      <MGroup>
+        <MSwitchItem v-model="speech.randomEnabled.value" icon="forum" :title="t.petTool.random" :info="t.petTool.randomDesc" :disabled="!speech.masterEnabled.value" data-panel-option="petRandom" />
+        <MItem v-if="speech.masterEnabled.value && speech.randomEnabled.value" icon="timer" :title="t.petTool.speechInterval" :text="t.petTool.speechIntervalDesc" stack data-panel-option="petSpeechInterval">
+          <template #control><MSeg v-model="speech.randomIntervalSec.value" block :label="t.petTool.speechInterval" :options="speechSeconds" /></template>
+        </MItem>
+        <MItem v-if="speech.masterEnabled.value && speech.randomEnabled.value" icon="swap_vert" :title="t.petTool.jitter" :text="t.petTool.jitterDesc" stack data-panel-option="petJitter">
+          <template #control><MSeg v-model="speech.jitterPercent.value" block :label="t.petTool.jitter" :options="jitterOptions" /></template>
+        </MItem>
+      </MGroup>
+    </MSection>
+
+    <!-- 桌面观察 -->
+    <MSection :title="t.petTool.vision">
+      <MGroup>
+        <MSwitchItem :model-value="petEnabled" icon="visibility" :title="st.deskObserve" :info="t.petTool.visionHelp" :disabled="!speech.masterEnabled.value || !speech.aiReady.value" data-panel-option="deskObserve" @update:model-value="togglePet" />
+        <MItem v-if="speech.masterEnabled.value && !speech.aiReady.value" icon="warning" :title="t.petTool.aiKeyMissing" :text="t.petTool.aiKeyMissingDesc" data-panel-option="petAiMissing" />
+        <MItem v-if="speech.masterEnabled.value && petEnabled" icon="timer" :title="st.observeInterval" :text="petSeconds < 60 ? `${st.observeIntervalDesc} ⚠ ${t.petTool.visionCostHint}` : st.observeIntervalDesc" stack data-panel-option="observeInterval">
+          <template #control><MSeg v-model="petSeconds" block :label="st.observeInterval" :options="intervals" /></template>
+        </MItem>
+        <MItem v-if="speech.masterEnabled.value && petEnabled" action icon="touch_app" :title="st.pokeMita" :text="pokeFailed ? t.petTool.pokeFailed : st.pokeMitaDesc" :disabled="isObserving || !speech.aiReady.value" data-panel-option="pokeMita" @click="poke">
+          <template #trail><span class="m-item__count">{{ isObserving ? st.pokeBtnObserving : st.pokeBtn }}</span></template>
+        </MItem>
+        <MItem action icon="history" :title="t.petTool.visionHistory" :text="t.petTool.visionHistoryDesc" data-panel-option="petHistory" @click="speech.toggleHistory">
+          <template #trail><span class="m-item__count">{{ t.petTool.visionHistoryView }}</span></template>
+        </MItem>
+        <template v-if="speech.historyOpen.value">
+          <MItem v-if="!speech.history.value.length" icon="inbox" :title="t.petTool.visionHistoryEmpty" />
+          <MItem v-for="(entry, i) in speech.history.value" :key="i" icon="schedule" :title="entry.text" :text="historyTime(entry.timestamp)" />
+          <MItem v-if="speech.history.value.length" action icon="delete" :title="t.petTool.visionHistoryClear" data-panel-option="petHistoryClear" @click="speech.clearHistory" />
+        </template>
+      </MGroup>
+      <MFooter>{{ t.petTool.visionDesc }}</MFooter>
+    </MSection>
+
+    <!-- 快捷键 -->
+    <MSection :title="t.petTool.tabs.shortcuts">
+      <MGroup>
+        <MSwitchItem :model-value="speech.shortcut.value.enabled" icon="keyboard" :title="t.petTool.toolbarShortcut" :info="t.petTool.toolbarShortcutDesc" :disabled="speech.shortcut.value.pending" data-panel-option="petShortcut" @update:model-value="speech.setShortcut" />
+        <MItem v-if="speech.shortcut.value.error" icon="error" :title="t.petTool.toolbarShortcutStateError" data-panel-option="petShortcutError" />
+        <MItem v-else-if="speech.shortcut.value.enabled && !speech.shortcut.value.registered && !speech.shortcut.value.pending" icon="warning" :title="t.petTool.toolbarShortcutUnavailable" data-panel-option="petShortcutUnavailable" />
+      </MGroup>
+    </MSection>
+
     <MGroup>
-      <MItem action icon="history" :title="t.petTool.visionHistory" :text="t.petTool.visionHistoryDesc" data-panel-option="petHistory" @click="speech.toggleHistory">
-        <template #trail><span class="m-item__count">{{ t.petTool.visionHistoryView }}</span></template>
-      </MItem>
-      <template v-if="speech.historyOpen.value">
-        <MItem v-if="!speech.history.value.length" icon="inbox" :title="t.petTool.visionHistoryEmpty" />
-        <MItem v-for="(entry, i) in speech.history.value" :key="i" icon="schedule" :title="entry.text" :text="historyTime(entry.timestamp)" />
-        <MItem v-if="speech.history.value.length" action icon="delete" :title="t.petTool.visionHistoryClear" data-panel-option="petHistoryClear" @click="speech.clearHistory" />
-      </template>
       <MItem action icon="restart_alt" :title="t.petTool.reset" :text="t.petTool.resetTooltip" data-panel-option="petReset" @click="speech.resetDefaults" />
     </MGroup>
   </MSheet>

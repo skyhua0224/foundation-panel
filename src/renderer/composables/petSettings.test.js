@@ -7,7 +7,7 @@ const sheet = fs.readFileSync(new URL('../components/m3e/PanelOptions.vue', impo
 const speech = fs.readFileSync(new URL('./usePetSpeech.js', import.meta.url), 'utf8')
 
 test('the pet sheet has the five controls of the old pet window', () => {
-  for (const id of ['petMaster', 'petRandom', 'petSpeechInterval', 'petJitter', 'petShortcut']) assert.ok(sheet.includes(`data-panel-option="${id}"`), id)
+  for (const id of ['petMaster', 'petLanguage', 'petRandom', 'petSpeechInterval', 'petJitter', 'deskObserve', 'observeInterval', 'pokeMita', 'petAiMissing', 'petShortcut', 'petShortcutError', 'petShortcutUnavailable']) assert.ok(sheet.includes(`data-panel-option="${id}"`), id)
 })
 test('the pet sheet has its three buttons: the history (view, clear) and the defaults', () => {
   for (const id of ['petHistory', 'petHistoryClear', 'petReset']) assert.ok(sheet.includes(`data-panel-option="${id}"`), id)
@@ -17,4 +17,21 @@ test('the speech writes the keys of the pet and tells it, as the old window did'
   assert.match(speech, /notifyPetConfigChanged\(\)/)
   assert.match(speech, /load_toolbar_shortcut_status/)
   assert.match(speech, /set_toolbar_shortcut_enabled/)
+})
+
+test('the pet on or off is the first row of the sheet, and the row of 面板设置 shows its state', () => {
+  const at = sheet.indexOf("sheet === 'pet'")
+  assert.ok(at > 0)
+  assert.ok(sheet.indexOf('data-panel-option="petMaster"', at) < sheet.indexOf('data-panel-option="petRandom"', at), 'the master switch comes first')
+  assert.match(sheet, /:text="speech\.masterEnabled\.value \? st\.petOn : st\.petOff" data-panel-option="pet"/)
+})
+test('the groups of the sheet: 对话, 桌面观察, 快捷键, then the reset', () => {
+  const at = sheet.indexOf("sheet === 'pet'")
+  const marks = ['t.petTool.tabs.speech', 't.petTool.vision', 't.petTool.tabs.shortcuts', 'data-panel-option="petReset"'].map((m) => sheet.indexOf(m, at))
+  assert.ok(marks.every((m) => m > at) && marks.every((m, i) => i === 0 || m > marks[i - 1]), String(marks))
+})
+test('the desktop observation asks for consent and needs a configured assistant', () => {
+  assert.match(sheet, /const togglePet = \(on\) => \{ if \(!on\) stopObserving\(\); else consent\.value = true \}/)
+  assert.match(sheet, /:disabled="!speech\.masterEnabled\.value \|\| !speech\.aiReady\.value"/)
+  assert.match(speech, /\/api\/ai\/config/)
 })

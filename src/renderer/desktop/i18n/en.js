@@ -284,6 +284,8 @@ export const en = {
       debug: 'Debug (All)',
     },
     pet: 'Desktop Pet',
+    petOn: 'On',
+    petOff: 'Off',
     deskObserve: 'Desktop Observation',
     deskObserveDesc: 'Mita will periodically peek at your desktop and make comments (requires AI enabled with vision-capable model like GPT-4o)',
     observeInterval: 'Observation Interval (seconds)',
