@@ -39,3 +39,10 @@ test('the offline state is drawn once: a web page has it in the overlay over the
   assert.match(src, /<template #overlay>[\s\S]*<MHostOffline v-if=\"offlineShown\"/)
   assert.equal((src.match(/<MHostOffline/g) || []).length, 2)
 })
+
+test('the offline tips get the real port of the Web UI from the URL the panel talks to', async () => {
+  const fs = await import('node:fs')
+  const src = fs.readFileSync(new URL('./SidebarMenu.vue', import.meta.url), 'utf8')
+  assert.equal((src.match(/:port=\"hostPort\"/g) || []).length, 2)
+  assert.match(src, /new URL\(String\(await sunshine\.getUrl\(\)\)\)\.port/)
+})

@@ -25,7 +25,7 @@
         />
       </template>
       <template #detail="{ entry }">
-        <MHostOffline v-if="offlineShown && !isWebPage" :state="hostConn.state" :locale="locale" can-restart can-user-mode can-logs @retry="hostConn.retry" @restart="hostConn.restart('service')" @user-mode="hostConn.restart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" />
+        <MHostOffline v-if="offlineShown && !isWebPage" :state="hostConn.state" :locale="locale" :port="hostPort" can-restart can-user-mode can-logs @retry="hostConn.retry" @restart="hostConn.restart('service')" @user-mode="hostConn.restart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" />
         <PanelHome v-else-if="entry.id === ROUTES.HOME" :runtime="runtime" :update-available="!!updateInfo" @open="openDestination" @webui-navigate="openWebUi" />
         <Welcome v-else-if="entry.id === ROUTES.WELCOME" @close="goHome" @webui-navigate="openWebUi" />
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />
@@ -72,7 +72,7 @@
       <template #overlay>
         <!-- the frame stays mounted while the host is away (it only is hidden): it loads again when the host is back -->
         <div v-show="!offlineShown" class="panel-web-keep"><PanelWebHost :sub="frameSub" :page="isWebPage ? router.currentRoute.value : ''"><slot /></PanelWebHost></div>
-        <MHostOffline v-if="offlineShown" :state="hostConn.state" :locale="locale" can-restart can-user-mode can-logs @retry="hostConn.retry" @restart="hostConn.restart('service')" @user-mode="hostConn.restart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" />
+        <MHostOffline v-if="offlineShown" :state="hostConn.state" :locale="locale" :port="hostPort" can-restart can-user-mode can-logs @retry="hostConn.retry" @restart="hostConn.restart('service')" @user-mode="hostConn.restart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" />
       </template>
     </MScene>
     </div>
@@ -272,6 +272,9 @@ const shellApp = getCurrentInstance()?.appContext.app
 const remoteOpen = ref(false)
 const remoteData = createGuideData({ proxyUrl: () => sunshine.getProxyUrl(), openUrl: (url) => actions_openExternal(url), copy: (text) => navigator.clipboard.writeText(text), reach: useHostReach(), vddStatus: async () => null, openApps: () => {}, navigate: () => {} })
 const announceVersion = ref('')
+// the offline tips name the port of the Web UI this panel talks to (the host's real one, not the default 47990)
+const hostPort = ref(47990)
+onMounted(async () => { try { const port = Number(new URL(String(await sunshine.getUrl())).port); if (port) hostPort.value = port } catch { /* the default stays */ } })
 onMounted(async () => { try { announceVersion.value = (await sunshine.getVersion()) || '' } catch { /* the version only narrows version-bound notices */ } })
 const announcements = useAnnouncements({ locale, version: announceVersion })
 const appearanceLabel = computed(() => labelOf(locale.value, 'shell.appearance'))
