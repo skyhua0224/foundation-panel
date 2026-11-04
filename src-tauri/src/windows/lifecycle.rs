@@ -328,12 +328,6 @@ pub(super) fn note_activity() {
     display::note_activity();
 }
 
-/// The page's content changed: the warm snapshot is out of date.
-pub(super) fn note_content_changed() {
-    #[cfg(target_os = "windows")]
-    display::note_content_changed();
-}
-
 pub(super) fn heartbeat(label: &str, generation: u64) {
     if let Some(panel) = get(label).filter(|panel| panel.generation == generation) {
         panel.state.lock().unwrap().heartbeat(Instant::now());

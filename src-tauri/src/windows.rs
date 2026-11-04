@@ -260,12 +260,6 @@ pub fn panel_activity() {
     lifecycle::note_activity();
 }
 
-/// The page's content changed (at most once in 800 ms): the warm snapshot of the cover is out of date.
-#[tauri::command]
-pub fn panel_content_changed() {
-    lifecycle::note_content_changed();
-}
-
 /// Measurement instances only: the message Windows sends when the scale of the window's monitor changes, with the size the window gets at the new scale.
 /// An off-screen window gets none from the system, and the display of whoever uses the machine stays as it is.
 #[tauri::command]

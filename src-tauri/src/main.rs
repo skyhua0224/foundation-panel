@@ -345,7 +345,6 @@ fn main() {
             windows::panel_dpi_settled,
             windows::panel_activity,
             windows::panel_first_paint,
-            windows::panel_content_changed,
             windows::test_synthetic_dpi,
             windows::resize_about_window,
             windows::resize_tool_window,

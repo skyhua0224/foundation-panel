@@ -67,14 +67,12 @@ static ACTIVITY_BASE: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
 pub(super) fn note_activity() {
     let base = ACTIVITY_BASE.get_or_init(Instant::now);
     ACTIVITY.store(base.elapsed().as_millis() as u64 + 1, AtomicOrdering::Relaxed);
-}
-
-/// Counts the changes of the page's content that the page reported (`panel_content_changed`).
-static CONTENT_EPOCH: AtomicU64 = AtomicU64::new(0);
-
-pub(super) fn note_content_changed() {
     CONTENT_EPOCH.fetch_add(1, AtomicOrdering::Relaxed);
 }
+
+/// Counts the uses of the page (a use is what can change what it shows; the page changes by itself all the time, a dashboard of live numbers every few seconds, and
+/// a frame per such change cost 9 % of a core when idle).
+static CONTENT_EPOCH: AtomicU64 = AtomicU64::new(0);
 
 /// Milliseconds since the page was last used (a page that never was: very long).
 fn idle_ms() -> u64 {
@@ -528,7 +526,7 @@ fn warm_tick<R: Runtime>(hwnd: windows::Win32::Foundation::HWND, context: &Hook<
     }
     let quiet = idle_ms() >= WARM_QUIET_MS;
     let mut warm = context.warm.lock().unwrap();
-    // the page says when its content changed: a page that shows the same as when the last frame was taken costs nothing
+    // a page that was not used since the last frame was taken costs nothing
     let epoch = CONTENT_EPOCH.load(AtomicOrdering::Relaxed);
     if epoch != warm.seen_epoch {
         warm.seen_epoch = epoch;
