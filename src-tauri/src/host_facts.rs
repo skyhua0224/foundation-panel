@@ -46,7 +46,7 @@ fn service_state() -> (String, u32) {
             Ok(service) => Owned::new(service),
             // ERROR_SERVICE_DOES_NOT_EXIST (1060): Sunshine runs in user mode, without the service
             Err(error) if error.code().0 as u32 & 0xFFFF == 1060 => return ("missing".to_string(), 0),
-            Err(_) => return "unknown".to_string(),
+            Err(_) => return ("unknown".to_string(), 0),
         };
         let mut status = SERVICE_STATUS_PROCESS::default();
         let mut needed = 0;
