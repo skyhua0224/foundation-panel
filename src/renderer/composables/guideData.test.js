@@ -23,12 +23,13 @@ test('a host with an account answers the config, one without sends a page: the a
   const withAccount = make({ '/api/config': { version: '1', platform: 'windows' } })
   await withAccount.probeAccount()
   assert.equal(withAccount.state.account.exists, true)
-  assert.equal(buildGuideSteps({ skip: withAccount.state.account.exists ? ['account'] : [] })[0].id, 'basics')
+  assert.equal(buildGuideSteps({ skip: withAccount.state.account.exists ? ['account'] : [] })[0].id, 'intro') // the first screen (the project and the language) comes first, with or without the account step
+  assert.ok(!buildGuideSteps({ skip: ['account'] }).some((s) => s.id === 'account'))
 
   const without = make({ '/api/config': () => new Response('<html>create account</html>', { status: 200 }) })
   await without.probeAccount()
   assert.equal(without.state.account.exists, false)
-  assert.equal(buildGuideSteps({ skip: without.state.account.exists ? ['account'] : [] })[0].id, 'account')
+  assert.deepEqual(buildGuideSteps({ skip: without.state.account.exists ? ['account'] : [] }).slice(0, 3).map((s) => s.id), ['intro', 'consent', 'account'])
 
   const down = make({})
   await down.probeAccount()

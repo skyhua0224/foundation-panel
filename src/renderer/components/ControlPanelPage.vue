@@ -4,7 +4,7 @@
       <MSection :title="t.sidebar.language">
         <MGroup>
           <MItem icon="language" :title="t.sidebar.language" stack>
-            <template #control><MSeg block :label="t.sidebar.language" :model-value="locale" :options="localeOptions" @update:model-value="emit('locale-change', $event)" /></template>
+            <template #control><MSeg block :label="t.sidebar.language" :model-value="localeChoice" :options="localeOptions" @update:model-value="emit('locale-change', $event)" /></template>
           </MItem>
         </MGroup>
       </MSection>
@@ -100,6 +100,10 @@ const props = defineProps({
   tools: { type: Array, default: () => [] },
   themeMode: { type: String, default: 'system' },
   locale: { type: String, default: 'en' },
+  /** what the person chose: 'system' (跟随系统, the default) or a language */
+  localeChoice: { type: String, default: 'system' },
+  /** the language the system resolves to ('zh' or 'en'), for the line 跟随系统 · 简体中文 */
+  systemLocale: { type: String, default: 'en' },
   includePrerelease: Boolean,
   currentVersion: { type: String, default: '' },
   clipboardSyncEnabled: Boolean,
@@ -126,7 +130,7 @@ const heading = computed(() => {
 const themeOptions = computed(() => [
   { value: 'system', label: t.value.sidebar.systemTheme, icon: 'tonality' }, { value: 'light', label: t.value.sidebar.lightMode, icon: 'light_mode' }, { value: 'dark', label: t.value.sidebar.darkMode, icon: 'dark_mode' },
 ])
-const localeOptions = [{ value: 'zh', label: '简体中文' }, { value: 'en', label: 'English' }]
+const localeOptions = computed(() => [{ value: 'system', label: `${guide.value.intro.followSystem} · ${props.systemLocale === 'zh' ? '简体中文' : 'English'}` }, { value: 'zh', label: '简体中文' }, { value: 'en', label: 'English' }])
 const channelOptions = computed(() => [{ value: false, label: t.value.sidebar.stableChannel }, { value: true, label: t.value.sidebar.betaChannel }])
 const lastCheck = useUpdateCheckTime()
 // the update source and the Mirror酱 CDK (the CDK stays in the native side; this window only sets it and asks about it)

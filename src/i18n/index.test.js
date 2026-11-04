@@ -71,3 +71,24 @@ test('document.lang maps locale codes to BCP 47 tags', async () => {
   // Vue watch 默认异步冲刷，等微任务后再断言
   assert.deepEqual(tags, ['zh-TW', 'ja', 'de', 'zh-CN', 'en-GB'])
 })
+
+const { setLocaleChoice, localeChoice, systemLocale } = await import('./index.js')
+
+test('跟随系统 is a real choice: stored as system (not as the code), the language of the system is shown, and a language of the person\'s own replaces it', () => {
+  globalThis.localStorage.store = {}
+  globalThis.navigator.languages = ['zh-CN', 'en-US']
+  assert.equal(systemLocale(), 'zh')
+  assert.equal(setLocaleChoice('system'), true)
+  assert.equal(globalThis.localStorage.getItem('foundation-ui.locale'), 'system')
+  assert.equal(localeChoice.value, 'system')
+  assert.equal(getDefaultLocale(), 'zh')
+  // the operating system's language changes: a restart (or the languagechange event) gives the new one, the stored choice is still system
+  globalThis.navigator.languages = ['de-DE']
+  assert.equal(getDefaultLocale(), 'de'); assert.equal(globalThis.localStorage.getItem('foundation-ui.locale'), 'system')
+  // a language of the person's own is stored as that code
+  assert.equal(setLocaleChoice('fr'), true)
+  assert.equal(globalThis.localStorage.getItem('foundation-ui.locale'), 'fr'); assert.equal(localeChoice.value, 'fr'); assert.equal(getDefaultLocale(), 'fr')
+  assert.equal(setLocaleChoice('klingon'), false)
+  globalThis.localStorage.store = {}
+  delete globalThis.navigator.languages
+})

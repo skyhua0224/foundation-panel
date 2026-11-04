@@ -51,14 +51,14 @@
           :page="entry.id"
           :tools="toolsMenuItems"
           :theme-mode="themeMode"
-          :locale="locale"
+          :locale="locale" :locale-choice="localeChoice" :system-locale="systemLocale"
           :include-prerelease="includePrerelease"
           :current-version="currentVersion"
           :clipboard-sync-enabled="clipboardSyncEnabled"
           :is-admin="isAdmin"
           :actions="toolsCtx"
           @theme-change="setTheme"
-          @locale-change="locale = $event"
+          @locale-change="setLocaleChoice"
           @channel-change="setIncludePrerelease"
           @webui-navigate="openWebUi"
           @open-guide="openWelcome"
@@ -151,7 +151,7 @@ import { useDualSenseText } from '../composables/useDualSenseText.js'
 const UpdateDialog = defineAsyncComponent(() => import('./UpdateDialog.vue'))
 const props = defineProps({ webuiPath: { type: String, default: '/' } })
 const emit = defineEmits(['route-change', 'webui-navigate'])
-const { t, locale } = useI18n()
+const { t, locale, choice: localeChoice, setChoice: setLocaleChoice, systemLocale } = useI18n()
 const {
   isMaximized, isAdmin, showUpdateDialog, updateInfo, currentVersion, router, themeMode, setTheme,
   openVddSettings, openWelcome, openWebStream, openAiAssistant, openControllers, openRtxHdr, skipVersion,

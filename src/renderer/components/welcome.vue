@@ -1,7 +1,7 @@
 <template>
   <MOnboardWindow :mode="onboardMode" :label="accountTexts?.title || ''" @close="closeGuide">
   <div class="panel-guide">
-    <MLoading v-if="state.account.exists === null" class="panel-guide__loading" />
+    <MLoading v-if="state.account.exists === null || consentShow === null" class="panel-guide__loading" />
     <MGuideFlow
       v-else
       :steps="steps"
@@ -15,14 +15,6 @@
       @close="closeGuide"
       @finish="closeGuide"
     >
-      <template #top>
-        <label class="welcome-lang">
-          <MIcon name="language" />
-          <select v-model="currentLocale" :aria-label="supportedLocales.find((l) => l.code === currentLocale)?.name" @change="handleLocaleChange">
-            <option v-for="loc in supportedLocales" :key="loc.code" :value="loc.code">{{ loc.name }}</option>
-          </select>
-        </label>
-      </template>
     </MGuideFlow>
   </div>
   </MOnboardWindow>
@@ -32,8 +24,10 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import QRCode from 'qrcode'
 import { invoke } from '@tauri-apps/api/core'
-import { MGuideFlow, MIcon, MLoading, MOnboardWindow, buildGuideSteps } from 'foundation-ui/vue'
-import { supportedLocales, setLocale as setI18nLocale, getDefaultLocale, useWelcomeI18n } from '../../i18n/index.js'
+import { MGuideFlow, MLoading, MOnboardWindow, buildGuideSteps, useTelemetryConsent } from 'foundation-ui/vue'
+import { supportedLocales, setLocaleChoice as setWelcomeChoice, localeChoice, systemLocale, useWelcomeI18n } from '../../i18n/index.js'
+import { useI18n as useDesktopI18n } from '../desktop/i18n/index.js'
+import { telemetryApi } from '../composables/telemetryApi.js'
 import { openExternalUrl, sunshine } from '../tauri-adapter.js'
 import { GUIDE_DISMISSED_KEY, GUIDE_STORAGE_KEY, createGuideData } from '../composables/guideData.js'
 import { useHostReach } from '../composables/useHostReach.js'
@@ -44,15 +38,10 @@ import { useUpdateSource } from '../composables/useUpdateSource.js'
 const emit = defineEmits(['close', 'webui-navigate'])
 const { t, locale } = useWelcomeI18n()
 
-const currentLocale = ref(locale.value)
-watch(locale, (val) => { currentLocale.value = val })
-watch(currentLocale, (val) => {
-  if (locale.value !== val) {
-    setI18nLocale(val)
-    locale.value = val
-  }
-})
-const handleLocaleChange = () => setI18nLocale(currentLocale.value)
+// The language is chosen on the first screen of the flow (跟随系统 by default) and applies at once, to the flow and to the shell; the usage-count question is the step after it, only where it was not answered before
+const desktop = useDesktopI18n()
+const telemetry = useTelemetryConsent({ api: telemetryApi })
+const consentShow = ref(null) // settled once the host has answered: it does not change while the person answers
 
 const data = createGuideData({
   proxyUrl: () => sunshine.getProxyUrl(),
@@ -69,17 +58,21 @@ const { state, probeAccount } = data
 const updateSource = useUpdateSource()
 const flowState = computed(() => ({
   ...state,
+  locale: { choice: localeChoice.value, resolved: systemLocale(), languages: supportedLocales },
+  consent: { value: telemetry.consent.value, show: consentShow.value === true },
   update: { source: updateSource.source.value, available: updateSource.available.value, cdk: true, hasCdk: updateSource.hasCdk.value, status: updateSource.status.value, lastValid: updateSource.lastValid.value, busy: updateSource.busy.value },
 }))
 const callbacks = {
   ...data.callbacks,
   createAccount: data.createAccount(t),
+  setLocale: (choice) => { setWelcomeChoice(choice); desktop.setChoice(choice) },
+  setConsent: (value) => telemetry.answer(value),
   loadUpdate: () => updateSource.refresh(),
   setUpdateSource: (value) => updateSource.setSource(value),
   saveCdk: async (cdk) => ({ ok: await updateSource.saveCdk(cdk) }),
   clearCdk: () => updateSource.clearCdk(),
 }
-const steps = computed(() => buildGuideSteps({ skip: state.account.exists ? ['account'] : [] }))
+const steps = computed(() => buildGuideSteps({ skip: [...(state.account.exists ? ['account'] : []), ...(consentShow.value === false ? ['consent'] : [])] }))
 const qrMatrix = (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules
 
 // The credential form keeps the texts of the welcome page, in every language it has. The title and the lead of the step say it is the Web UI account (the shared
@@ -105,16 +98,11 @@ const closeGuide = () => {
 }
 
 onMounted(async () => {
-  const defaultLocale = getDefaultLocale()
-  currentLocale.value = defaultLocale
-  setI18nLocale(defaultLocale)
-  await probeAccount()
+  await Promise.all([probeAccount(), telemetry.refresh().then(() => { consentShow.value = telemetry.consent.value === 'ask' })])
 })
 </script>
 
 <style>
-.welcome-lang { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 12px 0 14px; border-radius: 20px; background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); }
-.welcome-lang select { border: 0; outline: 0; background: transparent; color: var(--md-sys-color-on-surface); font: var(--m-label-large); cursor: pointer; }
 .panel-guide { min-height: 100dvh; }
 .panel-guide .m-guide { min-height: 100dvh; }
 .panel-guide__loading { margin: 120px auto; }
