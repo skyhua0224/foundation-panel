@@ -1,7 +1,9 @@
 import { ref } from 'vue'
 import { ElLoading } from 'element-plus'
 import { ElMessage, ElNotification, ElMessageBox } from './notifyMessage.js'
-import { openExternalUrl, tools, controllerMeta } from '@/tauri-adapter.js'
+import { openExternalUrl, tools, controllerMeta, sunshine } from '@/tauri-adapter.js'
+import { latencyClockTexts } from 'foundation-ui/vue'
+import { pickStreamMonitor, centredOn } from './streamMonitor.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { formatMessage } from '../shared/format-message.js'
 
@@ -14,7 +16,7 @@ let clipboardSyncPollTimer = null
  * 工具操作 Composable
  */
 export function useTools() {
-  const { t } = useI18n()
+  const { t, locale } = useI18n()
 
   /**
    * 打开串流计时器
@@ -25,6 +27,36 @@ export function useTools() {
       width: 1080,
       height: 600,
     })
+  }
+
+  /**
+   * 延迟测试时钟: full screen in a window of its own on the display the stream captures (Sunshine's output_name, streamMonitor.js).
+   * The window is made centred on that monitor and then set full screen, so it fills that monitor; with no match it opens on the primary one and says so.
+   */
+  const openLatencyClockOnStream = async ({ mode = 'dark' } = {}) => {
+    const lang = String(locale.value || 'zh').slice(0, 2)
+    const T = latencyClockTexts(lang)
+    let pick = { monitor: null, found: false }
+    try {
+      const { availableMonitors, primaryMonitor } = await import('@tauri-apps/api/window')
+      const [monitors, primary] = await Promise.all([availableMonitors(), primaryMonitor()])
+      let config = {}
+      try { const base = await sunshine.getProxyUrl(); const r = await fetch(`${base}/api/config`, { signal: AbortSignal.timeout(3000) }); config = await r.json() } catch { /* the host is not answering: the primary display */ }
+      pick = pickStreamMonitor({ outputName: config.output_name, displayDevices: config.display_devices, monitors, primary })
+    } catch { /* not in Tauri */ }
+    try {
+      const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
+      const rect = pick.monitor ? centredOn(pick.monitor, 960, 600) : { width: 960, height: 600 }
+      const win = new WebviewWindow(`latency_${Date.now()}`, {
+        url: `${window.location.origin}/latency-clock/index.html?mode=${encodeURIComponent(mode)}&locale=${lang}`,
+        title: T.title, ...rect, ...(pick.monitor ? {} : { center: true }), decorations: false, focus: true,
+      })
+      win.once('tauri://created', async () => { try { await win.setFullscreen(true); await win.setFocus() } catch (e) { console.error('[LatencyClock] full screen failed:', e) } })
+      win.once('tauri://error', (e) => { console.error('[LatencyClock] window failed:', e); ElMessage.error(formatMessage(t.value.toolActions.windowCreateFailed, { title: T.title })) })
+      if (!pick.found) ElMessage.warning(T.streamFailed)
+    } catch (e) {
+      console.error('[LatencyClock] window failed:', e)
+    }
   }
 
   /**
@@ -476,6 +508,7 @@ export function useTools() {
 
   return {
     openTimer,
+    openLatencyClockOnStream,
     openStylusInputProbe,
     openUrl,
     cleanupCovers,

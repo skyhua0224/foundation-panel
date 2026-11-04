@@ -78,6 +78,13 @@ export function createUtilityTools(ctx) {
   const labels = ctx.t.value.sidebar
   return [
     {
+      id: 'latency-clock',
+      icon: Timer,
+      label: labels.latencyClock,
+      description: labels.latencyClockDescription,
+      action: () => ctx.router.navigate(ROUTES.LATENCY_CLOCK),
+    },
+    {
       id: 'stream-timer',
       icon: Timer,
       label: labels.streamTimer,
