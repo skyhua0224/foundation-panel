@@ -85,7 +85,7 @@
       <template #overlay>
         <!-- the frame stays mounted while the host is away (it only is hidden): it loads again when the host is back -->
         <div v-show="!offlineShown" class="panel-web-keep" :inert="offlineShown ? '' : undefined"><PanelWebHost :sub="frameSub" :page="isWebPage ? router.currentRoute.value : ''"><slot /></PanelWebHost></div>
-        <MHostOffline v-if="offlineShown" :cause="offlineCause" :state="offlineState" :locale="locale" :port="hostPort" :can-restart="offlineCause !== 'proxy'" :can-user-mode="offlineCause !== 'proxy'" can-logs @retry="retryOffline" @restart="confirmedRestart('service')" @user-mode="confirmedRestart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" />
+        <MHostOffline v-if="offlineShown" :cause="offlineCause" :state="offlineState" :locale="locale" :port="hostPort" :can-restart="offlineCause !== 'proxy'" :can-user-mode="offlineCause !== 'proxy'" can-logs can-doctor @retry="retryOffline" @restart="confirmedRestart('service')" @user-mode="confirmedRestart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" @doctor="openDoctor" />
       </template>
     </MScene>
     </div>
@@ -299,7 +299,7 @@ window.addEventListener('panel-force-host-state', forceHostState)
 window.addEventListener('panel-force-proxy-state', forceProxyState)
 onBeforeUnmount(() => { window.removeEventListener('panel-force-host-state', forceHostState); window.removeEventListener('panel-force-proxy-state', forceProxyState) })
 // the pages of the panel itself, which work without the host: 面板设置, 个性化, 帮助与关于, 公告 (from the announcement feed), the diagnostics, 米塔 AI, the guide
-const NEEDS_NO_HOST = new Set([ROUTES.SUNSHINE_SERVICE, ROUTES.DEVELOPER, ROUTES.PANEL_SETTINGS, ROUTES.CFG_APPEARANCE, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.ANNOUNCEMENTS, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
+const NEEDS_NO_HOST = new Set([ROUTES.DOCTOR, ROUTES.SUNSHINE_SERVICE, ROUTES.DEVELOPER, ROUTES.PANEL_SETTINGS, ROUTES.CFG_APPEARANCE, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.ANNOUNCEMENTS, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
 // The host cannot be used for one of three causes, and the content area is then ONE status page (MScene status): the host is down, it runs and does not answer, or the panel's own proxy does not answer the window.
 // The rail and the caption bar stay: the pages of the panel itself (NEEDS_NO_HOST) still work and open as always. What needs the host does not look live: the pages give way to the status page and are inert, the
 // frame stays mounted but hidden, so an unsaved edit is there when the connection is back, and 连接设备 (it pairs through the host) is disabled.

@@ -13,6 +13,7 @@ mod controllermeta;
 mod desktop_settings;
 mod dev_tools;
 mod device_config;
+mod doctor_local;
 mod dualsense;
 #[cfg(target_os = "windows")]
 mod elevation;
@@ -232,6 +233,7 @@ fn main() {
             desktop_settings::set_toolbar_shortcut_enabled,
             vdd::get_vdd_status,
             vdd::install_vdd_driver,
+            doctor_local::doctor_local,
             vdd::set_vdd_keep_enabled,
             vdd::set_vdd_headless_create_enabled,
             vdd::get_vdd_tools_dir_path,
