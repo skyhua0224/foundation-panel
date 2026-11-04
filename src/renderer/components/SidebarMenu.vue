@@ -25,7 +25,7 @@
         />
       </template>
       <template #detail="{ entry }">
-        <MHostOffline v-if="offlineShown" :state="hostConn.state" :locale="locale" can-restart can-user-mode can-logs @retry="hostConn.retry" @restart="hostConn.restart('service')" @user-mode="hostConn.restart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" />
+        <MHostOffline v-if="offlineShown && !isWebPage" :state="hostConn.state" :locale="locale" can-restart can-user-mode can-logs @retry="hostConn.retry" @restart="hostConn.restart('service')" @user-mode="hostConn.restart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" />
         <PanelHome v-else-if="entry.id === ROUTES.HOME" :runtime="runtime" :update-available="!!updateInfo" @open="openDestination" @webui-navigate="openWebUi" />
         <Welcome v-else-if="entry.id === ROUTES.WELCOME" @close="goHome" @webui-navigate="openWebUi" />
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />

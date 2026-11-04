@@ -31,3 +31,11 @@ test('the facts carry the process id of the service wrapper, so that a restart o
   assert.match(rust, /status\.dwProcessId/)
   assert.match(rust, /let \(service, service_pid\) = service_state\(\)/)
 })
+
+test('the offline state is drawn once: a web page has it in the overlay over the frame, the other pages in the detail pane', async () => {
+  const fs = await import('node:fs')
+  const src = fs.readFileSync(new URL('./SidebarMenu.vue', import.meta.url), 'utf8')
+  assert.match(src, /<template #detail=\"\{ entry \}\">\s*<MHostOffline v-if=\"offlineShown && !isWebPage\"/)
+  assert.match(src, /<template #overlay>[\s\S]*<MHostOffline v-if=\"offlineShown\"/)
+  assert.equal((src.match(/<MHostOffline/g) || []).length, 2)
+})
