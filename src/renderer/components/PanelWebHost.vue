@@ -22,9 +22,19 @@ let ceiling = 0
 let observer = null
 const uncover = () => { clearTimeout(settle); clearTimeout(ceiling); waitLoad = false; covered.value = false }
 const cover = () => { covered.value = true; clearTimeout(ceiling); ceiling = setTimeout(uncover, 6000) }
-const onLoad = () => { if (!waitLoad && !covered.value) return; clearTimeout(settle); settle = setTimeout(uncover, 80) }
+// The frame is shown when its page says that it has painted its first frame (`panel-painted`, sent by the script the proxy puts into every page): the load event comes
+// 50 to 100 ms before that, and a frame shown at load showed 4 to 6 frames with nothing in them. Where no such message comes (a page the proxy does not change) the load
+// event shows the frame after a longer settle.
+const onLoad = () => { if (!waitLoad && !covered.value) return; clearTimeout(settle); settle = setTimeout(uncover, 450) }
+const onMessage = (event) => {
+  if (event.data?.type !== 'panel-painted' || !covered.value) return
+  if (event.source !== host.value?.querySelector('iframe')?.contentWindow) return
+  clearTimeout(settle)
+  requestAnimationFrame(uncover)
+}
 onMounted(() => {
   host.value.addEventListener('load', onLoad, true)
+  window.addEventListener('message', onMessage)
   observer = new MutationObserver(() => { waitLoad = true; cover(); clearTimeout(settle) })
   observer.observe(host.value, { subtree: true, attributes: true, attributeFilter: ['src'] })
   cover()
@@ -35,7 +45,7 @@ watch(() => props.page, (page) => {
   clearTimeout(settle)
   settle = setTimeout(() => { if (!waitLoad) uncover() }, 320)
 })
-onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); observer?.disconnect(); clearTimeout(settle); clearTimeout(ceiling) })
+onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); window.removeEventListener('message', onMessage); observer?.disconnect(); clearTimeout(settle); clearTimeout(ceiling) })
 </script>
 
 <template>

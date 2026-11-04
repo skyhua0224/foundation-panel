@@ -276,6 +276,17 @@
     disableContextMenu()
     initNavigation()
     postToParent('request-theme')
+    // the panel keeps the frame covered until the page has painted: its load event comes 50 to 100 ms before the first frame (measured, Skyindows panel)
+    try {
+      new PerformanceObserver((list, observer) => {
+        if (list.getEntries().some((entry) => entry.name === 'first-contentful-paint')) {
+          observer.disconnect()
+          postToParent('panel-painted')
+        }
+      }).observe({ type: 'paint', buffered: true })
+    } catch {
+      postToParent('panel-painted')
+    }
     if (window.parent !== window && parentOrigin) {
       window.parent.postMessage(
         { type: 'native-navigation-context-request', source: 'sunshine-webui' },
