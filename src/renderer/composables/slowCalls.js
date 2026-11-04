@@ -39,7 +39,7 @@ export function startSlowCallLog(report, win = window, extraPending = null) {
   const watch = []
   if (typeof win.fetch === 'function') {
     // the long poll of the pairing list takes 25 s by design: it is neither reported as slow nor listed as what a late timer was waiting for
-    const { wrapped, pending } = trackCalls(win.fetch.bind(win), { report, kind: 'fetch', nameOf: (args) => pathOf(args[0]), ignore: (args) => isLongPoll(typeof args[0] === 'string' ? args[0] : args[0]?.url) })
+    const { wrapped, pending } = trackCalls(win.fetch.bind(win), { report, kind: 'fetch', nameOf: (args) => pathOf(args[0]), ignore: (args) => isLongPoll(String(args[0]?.href ?? args[0]?.url ?? args[0])) })
     win.fetch = wrapped
     watch.push(pending)
   }

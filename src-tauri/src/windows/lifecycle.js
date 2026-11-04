@@ -44,17 +44,17 @@
 
     // WebView 心跳：每 10 秒向 Rust 后端发送心跳信号
     // 若渲染进程崩溃，心跳停止，后端检测到后可触发自动恢复
-    setInterval(function() {
+    // Only the page of the window beats: the Web UI frame (another origin) is not allowed to call the command, and every beat of it was an unhandled rejection in its console and in the log
+    // (`Command webview_heartbeat not allowed by ACL`, every 10 s). A rejection of a beat is swallowed in any case.
+    var beat = function() {
         try {
-            if (window.__TAURI_INTERNALS__) {
-                window.__TAURI_INTERNALS__.invoke('webview_heartbeat', {generation: __LIFECYCLE_GENERATION__});
+            if (window.__TAURI_INTERNALS__ && window.top === window) {
+                var answer = window.__TAURI_INTERNALS__.invoke('webview_heartbeat', {generation: __LIFECYCLE_GENERATION__});
+                if (answer && typeof answer.catch === 'function') answer.catch(function() {});
             }
         } catch(e) {}
-    }, 10000);
+    };
+    setInterval(beat, 10000);
     // 立即发送首次心跳
-    try {
-        if (window.__TAURI_INTERNALS__) {
-            window.__TAURI_INTERNALS__.invoke('webview_heartbeat', {generation: __LIFECYCLE_GENERATION__});
-        }
-    } catch(e) {}
+    beat();
 })();

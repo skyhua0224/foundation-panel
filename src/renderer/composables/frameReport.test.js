@@ -47,3 +47,16 @@ test('an error of the panel is a line with its message and where it was', () => 
   assert.equal(faultReport({ reason: 'plain text' }).name, 'plain text')
   assert.equal(faultReport({}).name, 'error')
 })
+
+test('the long poll is recognised whatever the call is made with: a string, a URL, a Request', async () => {
+  const { trackCalls } = await import('./slowCalls.js')
+  let t = 0
+  const lines = []
+  const { wrapped } = trackCalls(async () => { t += 25000 }, { report: (...l) => lines.push(l), now: () => t, kind: 'fetch', limit: 500, ignore: (args) => isLongPoll(String(args[0]?.href ?? args[0]?.url ?? args[0])) })
+  await wrapped('http://127.0.0.1:48081/api/pairing/pending?wait=25')
+  await wrapped(new URL('http://127.0.0.1:48081/api/pairing/pending?wait=25&since=3'))
+  await wrapped({ url: 'http://127.0.0.1:48081/api/pairing/pending' })
+  assert.deepEqual(lines, [])
+  await wrapped(new URL('http://127.0.0.1:48081/api/clients/list'))
+  assert.equal(lines.length, 1)
+})
