@@ -37,6 +37,7 @@ export const ROUTES = {
   COMPONENT_STATUS: 'component-status',
   SUNSHINE_SERVICE: 'sunshine-service', // 系统 › Sunshine 服务: the SCM, process and API layers, the startup type, start, stop, restart
   DIAGNOSTICS: 'diagnostics',
+  DOCTOR: 'doctor', // 体检: the host's health check
   // Pages of the Web UI shown in the embedded frame
   WEB_CLIENTS: 'web-clients',
   WEB_APPS: 'web-apps',
@@ -90,6 +91,7 @@ export const PAGES = {
   [ROUTES.STREAM_TIMER]: { rail: 'system', list: false, push: true },
   [ROUTES.TEST_TOOLS]: { rail: 'system', list: false, push: true },
   [ROUTES.DIAGNOSTICS]: { rail: 'system' },
+  [ROUTES.DOCTOR]: { rail: 'system' },
   [ROUTES.AI_ASSISTANT]: { rail: 'assistant', list: false }, // 米塔 AI: the chat takes the whole width, its settings are behind the gear of the chat header
   [ROUTES.WEB_TROUBLESHOOTING]: { rail: 'system' },
   [ROUTES.RTSS]: { rail: 'system' },

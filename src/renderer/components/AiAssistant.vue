@@ -89,7 +89,7 @@
 import { ref, nextTick, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import MarkdownIt from 'markdown-it'
 import { MPage, MGroup, MItem, MChoiceItem, MFieldItem, MSwitchItem, MButton, MIconButton, MChip, MIcon, MLoading, useSubpage } from 'foundation-ui/vue'
-import { useAiAssistant, AI_PROVIDERS } from '../composables/useAiAssistant.js'
+import { useAiAssistant, AI_PROVIDERS, MITA_PENDING_PROMPT } from '../composables/useAiAssistant.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { mitaOpened } from '../composables/mitaState.js'
 
@@ -118,7 +118,12 @@ const {
 
 const providers = AI_PROVIDERS
 // the caption bar's Mita button shows an unread answer only while the chat is closed
-onMounted(() => mitaOpened(true))
+onMounted(() => {
+  mitaOpened(true)
+  let pending = ''
+  try { pending = sessionStorage.getItem(MITA_PENDING_PROMPT) || ''; sessionStorage.removeItem(MITA_PENDING_PROMPT) } catch { /* nothing handed over */ }
+  if (pending) { currentInput.value = pending; nextTick(handleSend) }
+})
 onBeforeUnmount(() => mitaOpened(false))
 const chatContainer = ref(null)
 const scrolled = ref(false) // the header gains its surface only when the conversation scrolls under it

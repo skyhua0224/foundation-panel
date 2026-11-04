@@ -57,6 +57,7 @@
           @open-guide="openWelcome"
           @open-remote="remoteOpen = true"
         />
+        <DoctorPage v-else-if="entry.id === ROUTES.DOCTOR" :autostart="!!entry.params?.autostart" @go="goDoctorTarget" @restart="hostConn.restart('service')" @ai="askMita" />
         <MAnnouncementPage v-else-if="entry.id === ROUTES.ANNOUNCEMENTS" :items="announcements.list.value" :locale="locale" :acked-at="ackedAt" :open-id="entry.params?.id || ''" :on-refresh="() => announcements.refresh(true)" @dismiss="announcements.dismiss" @read="announcements.read" @open-url="actions_openExternal" @back="back" />
         <DeveloperPage v-else-if="entry.id === ROUTES.DEVELOPER" :locale="locale" :version="currentVersion" :consent="telemetry.consent.value" :error-context="errorContext" :simulate-host="simulateHost" @disabled="back" />
         <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" :on-refresh="() => announcements.refresh(true)" :consent="telemetry.consent.value" @consent="telemetry.answer" :include-prerelease="includePrerelease" @channel-change="setIncludePrerelease" @open-update="showUpdateDialog = true" @open="actions_openExternal" @open-developer="router.navigate(ROUTES.DEVELOPER)" />
@@ -78,6 +79,7 @@
           @open-guide="openWelcome"
           @open-remote="remoteOpen = true"
           @open-about="router.navigate(ROUTES.ABOUT)"
+          @open-doctor="openDoctor"
         />
       </template>
       <template #overlay>
@@ -161,6 +163,8 @@ import TestToolsPage from './m3e/TestToolsPage.vue'
 import LiveSessionPage from './m3e/LiveSessionPage.vue'
 import RtssPage from './m3e/RtssPage.vue'
 import DiagnosticsPage from './m3e/DiagnosticsPage.vue'
+import DoctorPage from './m3e/DoctorPage.vue'
+import { MITA_PENDING_PROMPT } from '../composables/useAiAssistant.js'
 import { useDeviceRuntime } from '../composables/useDeviceRuntime.js'
 import { useGuideAutoOpen } from '../composables/useGuideAutoOpen.js'
 import { useSidebarState } from '../composables/useSidebarState.js'
@@ -487,6 +491,7 @@ const actionHandlers = {
   setupGuide: () => openWelcome(),
   quitHost: () => hostAction('/api/boom', diagnosticsTexts(locale.value).boom, 'GET'),
   openDesktop: () => openBigScreenWithNotice((m) => useNotify().snack(m), t.value.sidebar.openBigScreenFailed),
+  doctor: () => openDoctor(),
 }
 const searchDocs = computed(() => [
   ...settingDocs(searchItems.value, { prefix: settingsPlace, locale: locale.value }),
@@ -504,6 +509,27 @@ const onUnifiedChoose = (doc) => {
 }
 const uni = useUnifiedSearch({ docs: searchDocs, onPin: (doc) => pinToHome('panel-home', doc.pin), isPinned: (doc) => isPinnedOnHome('panel-home', doc.pin), recentSettings: recentSettingDocs, onChoose: onUnifiedChoose })
 // Where an error of the diagnostics page leads
+// 体检: the entries of help and search open it running; a fix leads to a setting row or a page of the panel; 米塔 AI gets the result
+const openDoctor = () => router.navigate(ROUTES.DOCTOR, { autostart: true })
+const DOCTOR_PAGES = {
+  network: () => openConfig({ tab: 'network' }),
+  audio: () => openConfig({ tab: 'audio', sub: 'sound' }),
+  display: () => openConfig({ tab: 'display', sub: 'output' }),
+  vdd: () => router.navigate(ROUTES.VDD_SETTINGS),
+  components: () => router.navigate(ROUTES.COMPONENTS),
+  logs: () => router.navigate(ROUTES.DIAGNOSTICS),
+  config: () => openConfig({ tab: 'files' }),
+  update: () => router.navigate(ROUTES.ABOUT),
+}
+const goDoctorTarget = (target) => {
+  const [kind, id] = String(target).split(':')
+  if (kind === 'setting') { const entry = settingsList.searchItems.value.find((e) => e.keyName === id); if (entry) openSettingsRoute(entry) }
+  else DOCTOR_PAGES[id]?.()
+}
+const askMita = (prompt) => {
+  try { sessionStorage.setItem(MITA_PENDING_PROMPT, prompt) } catch { /* the chat opens empty */ }
+  router.navigate(ROUTES.AI_ASSISTANT)
+}
 const goDiagnosticsPlace = (place) => {
   if (place === 'drivers') router.navigate(ROUTES.COMPONENTS)
   else if (place === 'encoder') openConfig({ tab: 'display', sub: 'encoders' })

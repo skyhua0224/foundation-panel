@@ -206,6 +206,9 @@ Reply to the user in ${replyLanguage}. All user-facing explanations, command nam
 /**
  * AI 助手 Composable — 状态管理 + 对话逻辑
  */
+/** sessionStorage key of a message another page hands to the chat (体检's result); the chat sends it when it opens. */
+export const MITA_PENDING_PROMPT = 'sunshine-ai-pending-prompt'
+
 export function useAiAssistant() {
   const { t, locale } = useI18n()
   const ui = () => t.value.aiAssistant.runtime
