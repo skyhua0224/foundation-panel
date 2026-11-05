@@ -21,9 +21,6 @@
     @open="openUrl"
     @go="goPlace"
   >
-    <template #actions>
-      <HostActionsPanel @open-web-page="(path) => emit('webui-navigate', path)" @open-guide="emit('open-guide')" />
-    </template>
     <template #tools>
       <MSection :title="logText.title">
         <MGroup>
@@ -48,7 +45,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { MDiagnostics, MDialog, MButton, diagnosticsTexts, guideTexts, coachTexts, remoteTexts, MGroup, MSection, useDialogs, useNotify } from 'foundation-ui/vue'
-import HostActionsPanel from './HostActionsPanel.vue'
 import { useDiagnostics } from '../../composables/useDiagnostics.js'
 import { useLogDiagnosis } from '../../composables/useLogDiagnosis.js'
 import { usbipStatusChannel, dualsenseStatusChannel, micStatusChannel, vigemStatusChannel } from '../../composables/deviceStatusStore.js'
