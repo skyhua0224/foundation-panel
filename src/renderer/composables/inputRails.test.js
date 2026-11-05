@@ -57,3 +57,12 @@ test('in 系统 the two log pages have two names: 诊断 (the panel page) and �
   assert.ok(zh.includes("    diagnostics: '诊断',") && en.includes("    diagnostics: 'Diagnostics',"))
   assert.ok(zh.includes("troubleshooting: '日志与排错', components:") && en.includes("troubleshooting: 'Logs and troubleshooting', lead:"))
 })
+
+test('the overview gets 最近操作 and the live controls of a stream: the keys used last, the bitrate command, the DualSense tuning', () => {
+  const home = read('../components/PanelHome.vue')
+  assert.ok(home.includes('recent: recentKeys.value, canRuntime: canRuntime.value, ds5Keys: ds5Keys.value'))
+  assert.ok(home.includes("case 'runtime-bitrate': runtimeBitrate(a.value); break") && home.includes("case 'ds5-tune': ds5Tune(a.value); break"))
+  assert.ok(home.includes('/api/runtime/bitrate?bitrate=${kbps}&clientname=${encodeURIComponent(client)}'))
+  assert.ok(home.includes("{ schema: 'ALK-DS5T/1', values: { [key]: value } }"))
+  assert.ok(home.includes('if (r.ok) { state.config = r.config; rememberRecent(key) }'), 'a setting saved from a tile is a recent one')
+})
