@@ -149,31 +149,34 @@ export function useTools() {
         duration: 0,
       })
 
-      // 调用 Tauri 命令
-      const result = await invoke('cleanup_unused_covers')
+      try {
+        // 调用 Tauri 命令
+        const result = await invoke('cleanup_unused_covers')
 
-      loading.close()
-
-      // 显示结果
-      if (result.success) {
-        if (result.deleted_count > 0) {
-          ElMessageBox.alert(
-            formatMessage(t.value.toolActions.cleanupSummary, {
-              count: result.deleted_count,
-              size: (result.freed_space / 1024).toFixed(2),
-            }),
-            t.value.toolActions.cleanupComplete,
-            {
-              confirmButtonText: t.value.common.confirm,
-              type: 'success',
-            },
-          )
+        // 显示结果
+        if (result.success) {
+          if (result.deleted_count > 0) {
+            ElMessageBox.alert(
+              formatMessage(t.value.toolActions.cleanupSummary, {
+                count: result.deleted_count,
+                size: (result.freed_space / 1024).toFixed(2),
+              }),
+              t.value.toolActions.cleanupComplete,
+              {
+                confirmButtonText: t.value.common.confirm,
+                type: 'success',
+              },
+            )
+          } else {
+            ElMessage.success(t.value.toolActions.cleanupEmpty)
+          }
         } else {
-          ElMessage.success(t.value.toolActions.cleanupEmpty)
+          console.error('Cleanup failed:', result.message)
+          ElMessage.error(t.value.toolActions.cleanupFailed)
         }
-      } else {
-        console.error('Cleanup failed:', result.message)
-        ElMessage.error(t.value.toolActions.cleanupFailed)
+      } finally {
+        // the message with duration 0 ends on every path: a failed clean leaves the queue free for the notices that follow
+        loading.close()
       }
     } catch (error) {
       if (error !== 'cancel') {
