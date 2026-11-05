@@ -36,10 +36,12 @@
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
 import { MUpdateSheet, sheetFromPanelInfo, downloadView } from 'foundation-ui/vue'
-import { channelOfVersion, fetchReleaseMetadata } from 'foundation-ui/update'
+import { channelOfVersion, fetchReleaseMetadata, orderedDownloadUrls } from 'foundation-ui/update'
+import { useUpdateSource } from '../composables/useUpdateSource.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
 const { t, locale } = useI18n()
+const updateSource = useUpdateSource()
 
 const DOWNLOAD_ERROR_MESSAGE_KEYS = Object.freeze({
   setup_failed: 'downloadSetupFailed',
@@ -216,9 +218,11 @@ const handleDownload = async () => {
     })
 
     const filename = props.updateInfo.download_name || `sunshine-update-${props.updateInfo.version}.exe`
+    // the host that is tried first follows the interface language and the source of the update settings; the other is the one tried when it fails
+    const urls = orderedDownloadUrls({ url: downloadUrl, fallbackUrl: props.updateInfo.download_fallback_url || '' }, { source: updateSource.source.value, hasCdk: updateSource.hasCdk.value, locale: locale.value })
     const result = await invoke('download_update', {
-      url: downloadUrl,
-      fallbackUrl: props.updateInfo.download_fallback_url || null,
+      url: urls.url,
+      fallbackUrl: urls.fallbackUrl,
       filename,
       expectedSize: props.updateInfo.download_size || null,
       expectedSha256: props.updateInfo.download_sha256 || null,

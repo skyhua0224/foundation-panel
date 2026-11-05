@@ -144,7 +144,8 @@ const sourceOptions = computed(() => UPDATE_SOURCES.map((value) => ({ value, lab
 const cdkDraft = ref('')
 // the state of the CDK and its sentences are the same words as in the first run (foundation-ui/update cdkView)
 const cdkResult = computed(() => cdkView(updateSource.status.value, src.value, { lastValid: updateSource.lastValid.value }))
-const sourceHint = computed(() => (updateSource.source.value === 'auto' ? src.value.autoHint + '.' : updateSource.source.value === 'mirror' ? src.value.mirrorTip : ''))
+// no sentence names the host that is tried first: a sentence appears only when a source failed (the update sheet says so then)
+const sourceHint = computed(() => (updateSource.source.value === 'mirror' ? src.value.mirrorTip : ''))
 const saveCdk = async () => { if (await updateSource.saveCdk(cdkDraft.value)) cdkDraft.value = '' }
 onMounted(() => { void updateSource.refresh() })
 const sponsorOpen = ref(false)
