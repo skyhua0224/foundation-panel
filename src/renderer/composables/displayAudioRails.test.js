@@ -20,7 +20,7 @@ test('音频 and 显示与视频 are two rails of their own, between 输入与�
 test('the rows of the two rails: the places of the display and audio tabs, none alone in its list', () => {
   assert.deepEqual(rowsOf('display').map((r) => r.route), ['WEB_DISPLAY_MODES', 'WEB_DISPLAY_OUTPUT', 'WEB_DISPLAY_HDR', 'VDD_SETTINGS', 'WEB_DISPLAY_VIDEO', 'HDR_ENHANCED'])
   assert.deepEqual(rowsOf('audio').map((r) => r.route), ['WEB_AUDIO_SOUND', 'MICROPHONE'])
-  assert.deepEqual(rowsOf('input').map((r) => r.route), ['GAMEPAD', 'USB'])
+  assert.deepEqual(rowsOf('input').map((r) => r.route), ['GAMEPAD', 'WEB_INPUT_KEYBOARD', 'WEB_INPUT_MOUSE', 'USB'])
   assert.match(router, /\[ROUTES\.MICROPHONE\]: \{ rail: 'audio' \}/)
 })
 test('a rail opens on the first row of its list (the first page of the rail in PAGES)', () => {
@@ -36,7 +36,7 @@ test('every row of the two rails has an icon of its own, and the two rails diffe
   assert.notEqual(rail.audio, rail.display)
 })
 test('each page of the frame has the Web path of its place, and a path of a place leads back to its row', () => {
-  for (const [route, tab, sub] of [['WEB_DISPLAY_OUTPUT', 'display', 'output'], ['WEB_DISPLAY_MODES', 'display', 'modes'], ['WEB_DISPLAY_HDR', 'display', 'hdr'], ['WEB_DISPLAY_VIDEO', 'display', 'video'], ['WEB_AUDIO_SOUND', 'audio', 'sound']]) {
+  for (const [route, tab, sub] of [['WEB_DISPLAY_OUTPUT', 'display', 'output'], ['WEB_DISPLAY_MODES', 'display', 'modes'], ['WEB_DISPLAY_HDR', 'display', 'hdr'], ['WEB_DISPLAY_VIDEO', 'display', 'video'], ['WEB_AUDIO_SOUND', 'audio', 'sound'], ['GAMEPAD', 'input', 'gamepad'], ['WEB_INPUT_KEYBOARD', 'input', 'keyboard'], ['WEB_INPUT_MOUSE', 'input', 'mouse']]) {
     assert.match(router, new RegExp(`\\[ROUTES\\.${route}\\]: \`/config\\$\\{settingsHash\\(\\{ tab: '${tab}', sub: '${sub}' \\}\\)\\}\``))
     assert.match(router, new RegExp(`'${tab}:${sub}': ROUTES\\.${route}`))
   }

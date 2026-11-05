@@ -12,7 +12,7 @@ export function railItems(t) {
 
 /** The row id of foundation-ui's rowLines for a page of the list panes (the second line and the search words of the page). */
 export const ROW_OF_ROUTE = {
-  [ROUTES.WEB_CLIENTS]: 'clients', [ROUTES.WEB_APPS]: 'apps', [ROUTES.WEB_DOWNLOADS]: 'downloads', [ROUTES.GAMEPAD]: 'gamepad', [ROUTES.MICROPHONE]: 'microphone', [ROUTES.USB]: 'usb',
+  [ROUTES.WEB_CLIENTS]: 'clients', [ROUTES.WEB_APPS]: 'apps', [ROUTES.WEB_DOWNLOADS]: 'downloads', [ROUTES.GAMEPAD]: 'gamepad', [ROUTES.WEB_INPUT_KEYBOARD]: 'keyboard', [ROUTES.WEB_INPUT_MOUSE]: 'mouse', [ROUTES.MICROPHONE]: 'microphone', [ROUTES.USB]: 'usb',
   [ROUTES.WEB_DISPLAY_OUTPUT]: 'display-output', [ROUTES.WEB_DISPLAY_MODES]: 'display-modes', [ROUTES.WEB_DISPLAY_HDR]: 'display-hdr', [ROUTES.WEB_DISPLAY_VIDEO]: 'display-video', [ROUTES.WEB_AUDIO_SOUND]: 'audio-output',
   [ROUTES.VDD_SETTINGS]: 'vdd', [ROUTES.HDR_ENHANCED]: 'quality', [ROUTES.COMPONENT_STATUS]: 'components', [ROUTES.DIAGNOSTICS]: 'diagnostics', [ROUTES.TOOLBOX]: 'toolbox',
   [ROUTES.WEB_TROUBLESHOOTING]: 'troubleshooting', [ROUTES.PANEL_SETTINGS]: 'panel', [ROUTES.HELP]: 'help', [ROUTES.AI_ASSISTANT]: 'assistant',
@@ -31,6 +31,8 @@ export function pageItems(t, rail, runtime = {}) {
     ],
     input: [
       { id: ROUTES.GAMEPAD, icon: 'sports_esports', tone: 'primary', label: c.input.gamepad, text: lines.gamepad },
+      { id: ROUTES.WEB_INPUT_KEYBOARD, icon: 'keyboard', tone: 'secondary', label: c.input.keyboard, text: lines.keyboard },
+      { id: ROUTES.WEB_INPUT_MOUSE, icon: 'mouse', tone: 'tertiary', label: c.input.mouse, text: lines.mouse },
       { id: ROUTES.USB, icon: 'usb', tone: 'success', label: c.input.usb, text: lines.usb },
     ],
     audio: [

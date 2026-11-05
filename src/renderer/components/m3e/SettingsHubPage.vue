@@ -1,21 +1,28 @@
 <script setup>
-import { MPage, MGroup, MItem } from 'foundation-ui/vue'
+import { computed } from 'vue'
+import { MPage, MGroup, MItem, MSection } from 'foundation-ui/vue'
 import { useI18n } from '../../desktop/i18n/index.js'
-import { railItems } from '../../composables/panelNav.js'
+import { pageItems, railItems } from '../../composables/panelNav.js'
 
-// The one "设置" entry of the bottom bar of a narrow window: a list of the five settings categories, each opening its own list.
-const emit = defineEmits(['select'])
-// lines: the second line of every row (rowLines of foundation-ui): what is inside a category, so an option is found without opening each
-const props = defineProps({ lines: { type: Object, default: () => ({}) } })
+// The one "设置" entry of the bottom bar of a narrow window: every page of the five settings categories at once, in sections named by the category, so any page is two presses away
+// (the bar entry, the page). `groups`: the stream settings' rows (the shared model); `runtime.lines`: the second line of every row, what is inside.
+const emit = defineEmits(['open'])
+const props = defineProps({ groups: { type: Array, default: () => [] }, runtime: { type: Object, default: () => ({}) } })
 const { t } = useI18n()
 const CATEGORIES = ['config', 'input', 'audio', 'display', 'system']
-const items = () => railItems(t.value).filter((i) => CATEGORIES.includes(i.id))
+const sections = computed(() => railItems(t.value).filter((r) => CATEGORIES.includes(r.id)).map((rail) => ({
+  id: rail.id,
+  label: rail.label,
+  items: rail.id === 'config' ? props.groups.flatMap((g) => g.items) : pageItems(t.value, rail.id, props.runtime),
+})))
 </script>
 
 <template>
   <MPage :title="t.m3e.nav.barSettings">
-    <MGroup>
-      <MItem v-for="item in items()" :key="item.id" action :icon="item.icon" :title="item.label" :text="props.lines[`rail:${item.id}`]" @click="emit('select', item)" />
-    </MGroup>
+    <MSection v-for="section in sections" :key="section.id" :title="section.label">
+      <MGroup>
+        <MItem v-for="item in section.items" :key="item.id" action :icon="item.icon" :title="item.label" :text="item.text" @click="emit('open', item)" />
+      </MGroup>
+    </MSection>
   </MPage>
 </template>
