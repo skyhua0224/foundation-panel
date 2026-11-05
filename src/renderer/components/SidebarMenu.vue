@@ -266,7 +266,8 @@ const forceProxyState = (event) => { proxyBlock.attempts = Number(event.detail?.
 window.addEventListener('panel-force-host-state', forceHostState)
 window.addEventListener('panel-force-proxy-state', forceProxyState)
 onBeforeUnmount(() => { window.removeEventListener('panel-force-host-state', forceHostState); window.removeEventListener('panel-force-proxy-state', forceProxyState) })
-const NEEDS_NO_HOST = new Set([ROUTES.PANEL_SETTINGS, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
+// the pages of the panel itself, which work without the host: 面板设置, 个性化, 帮助与关于, 公告 (from the announcement feed), the diagnostics, 米塔 AI, the guide
+const NEEDS_NO_HOST = new Set([ROUTES.PANEL_SETTINGS, ROUTES.CFG_APPEARANCE, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.ANNOUNCEMENTS, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
 // The host cannot be used for one of three causes, and the content area is then ONE status page (MScene status): the host is down, it runs and does not answer, or the panel's own proxy does not answer the window.
 // The rail and the caption bar stay: the pages of the panel itself (NEEDS_NO_HOST) still work and open as always. What needs the host does not look live: the pages give way to the status page and are inert, the
 // frame stays mounted but hidden, so an unsaved edit is there when the connection is back, and 连接设备 (it pairs through the host) is disabled.

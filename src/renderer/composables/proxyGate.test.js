@@ -64,3 +64,9 @@ test('the status page is one design for the three causes, in the shell, and the 
   const frame = fs.readFileSync(new URL('../components/SunshineFrame.vue', import.meta.url), 'utf8')
   assert.match(frame, /proxyBlock\.blocked = true/)
 })
+
+test('the pages of the panel itself still open while the host cannot be used', () => {
+  const shell = fs.readFileSync(new URL('../components/SidebarMenu.vue', import.meta.url), 'utf8')
+  const set = shell.match(/const NEEDS_NO_HOST = new Set\(\[([^\]]+)\]\)/)[1]
+  for (const route of ['PANEL_SETTINGS', 'CFG_APPEARANCE', 'HELP', 'ABOUT', 'ANNOUNCEMENTS']) assert.match(set, new RegExp(`ROUTES\\.${route}\\b`), `${route} works without the host`)
+})
