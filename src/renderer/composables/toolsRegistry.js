@@ -69,7 +69,7 @@ export function createUtilityTools(ctx) {
     },
     {
       id: 'test-tools',
-      icon: Operation,
+      icon: 'science',
       label: labels.testTools,
       description: labels.testToolsDescription,
       action: () => ctx.router.navigate(ROUTES.TEST_TOOLS),
