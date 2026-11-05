@@ -19,12 +19,23 @@
     <template #actions>
       <HostActionsPanel @open-web-page="(path) => emit('webui-navigate', path)" @open-guide="emit('open-guide')" />
     </template>
+    <template #tools>
+      <MSection :title="logText.title">
+        <MGroup>
+          <MButton variant="tonal" icon="refresh" :loading="refreshing" @click="refreshLogs">{{ logText.refresh }}</MButton>
+          <MButton variant="tonal" icon="download" @click="exportLogs('txt')">{{ logText.exportTxt }}</MButton>
+          <MButton variant="tonal" icon="data_object" @click="exportLogs('json')">{{ logText.exportJson }}</MButton>
+          <MButton variant="danger" icon="delete" @click="clearLogs">{{ logText.clear }}</MButton>
+        </MGroup>
+      </MSection>
+    </template>
   </MDiagnostics>
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
-import { MDiagnostics, diagnosticsTexts } from 'foundation-ui/vue'
+import { computed, onMounted, ref } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import { MButton, MDiagnostics, diagnosticsTexts, MGroup, MSection, useDialogs, useNotify } from 'foundation-ui/vue'
 import HostActionsPanel from './HostActionsPanel.vue'
 import { useDiagnostics } from '../../composables/useDiagnostics.js'
 import { usbipStatusChannel, dualsenseStatusChannel, micStatusChannel, vigemStatusChannel } from '../../composables/deviceStatusStore.js'
@@ -35,6 +46,9 @@ import { useI18n } from '../../desktop/i18n/index.js'
 // bundle and the error centre on one tab, the whole log on the other. The small tools moved to 工具箱.
 const emit = defineEmits(['back', 'go', 'webui-navigate', 'open-guide'])
 const { t, locale } = useI18n()
+const logText = computed(() => t.value.logConsole)
+const refreshing = ref(false)
+const say = (text) => useNotify().snack(text)
 
 const data = (r) => (r?.success ? r.data : null)
 const devices = async () => {
@@ -50,5 +64,21 @@ const devices = async () => {
 const diag = useDiagnostics({ devices })
 const openUrl = (url) => { openExternalUrl(url) }
 const goPlace = (place) => emit('go', place)
+async function refreshLogs() {
+  refreshing.value = true
+  try { await diag.refresh(); say(logText.value.refreshed.replace('{count}', String(diag.records.value.length))) }
+  catch (error) { say(`${logText.value.refreshFailed}: ${error}`) }
+  finally { refreshing.value = false }
+}
+async function clearLogs() {
+  const confirmed = await useDialogs().confirm(logText.value.confirmClear, logText.value.clearLogsTitle, { type: 'warning', danger: true, confirmText: logText.value.clear }).then(() => true, () => false)
+  if (!confirmed) return
+  try { await invoke('clear_logs'); await diag.refresh(); say(logText.value.logsCleared) }
+  catch (error) { say(`${logText.value.clearFailed}: ${error}`) }
+}
+async function exportLogs(format) {
+  try { const result = await invoke('export_logs', { format }); await useDialogs().alert(result || logText.value.exportSuccess, logText.value.exportComplete, { type: 'info' }) }
+  catch (error) { await useDialogs().alert(`${logText.value.exportFailed}: ${error}`, logText.value.dialogError, { type: 'error' }) }
+}
 onMounted(() => { diag.loadFacts(); diag.start() })
 </script>

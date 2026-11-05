@@ -139,5 +139,5 @@ export function useDiagnostics({ update, devices = async () => ({}) } = {}) {
     return out
   }
 
-  return { text, records, live, facts, hostNames, clientNames, statsFor, collect, save: saveBundle, start, stop, loadFacts }
+  return { text, records, live, facts, hostNames, clientNames, statsFor, collect, save: saveBundle, refresh, start, stop, loadFacts }
 }
