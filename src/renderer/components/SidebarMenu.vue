@@ -124,7 +124,7 @@ import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
-import { MContextProvider, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton } from 'foundation-ui/vue'
+import { MContextProvider, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey } from 'foundation-ui/vue'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelBusyLayer from './PanelBusyLayer.vue'
@@ -324,6 +324,16 @@ const dualsenseKeys = ref([])
 const hostClients = ref([])
 const hostApps = ref([])
 const settingsList = useSettingsList({ locale, config: hostConfig, dualsenseKeys, sources: { clients: hostClients, apps: hostApps, components: computed(() => componentStatus.rows.value), ds: computed(() => runtime.ds), mic: computed(() => runtime.mic), usb: computed(() => runtime.usb) } })
+// the settings used last belong to the host this window manages: the proxy target is this machine's host while it is a loopback address, and the origin of the host it points at
+// otherwise (the panel accepts a --url that turns the whole window to another host); the first scoping keeps the list this window already has
+onMounted(async () => {
+  const target = await sunshine.refreshTarget()
+  try {
+    const u = new URL(String(target))
+    const local = u.hostname === 'localhost' || u.hostname === '127.0.0.1' || u.hostname === '[::1]' || u.hostname === '::1'
+    scopeRecent(hostRecentKey(local ? 'local' : u.origin))
+  } catch { scopeRecent(hostRecentKey('local')) }
+})
 const loadHostData = async () => {
   try {
     const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')
