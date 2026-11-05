@@ -171,7 +171,7 @@ function onAction(a) {
     case 'pair-pin': pairPin(a.value?.pin, a.value?.name); break
     case 'pair-qr': emit('open', 'pair:qr'); break
     case 'star-dismiss': star.dismiss(); break
-    case 'address-save': saveSetting({ key: 'external_endpoints', value: a.value?.value ?? '' }).then(() => saveSetting({ key: 'external_ip', value: '' })).then(() => hostReach.refresh(true)); break
+    case 'address-save': saveSetting({ key: 'external_endpoints', value: a.value?.value ?? '' }).then(() => saveSetting({ key: 'external_ip', value: '' })).then(() => hostReach.refresh(true)).catch(() => {}); break
     case 'reach-check': hostReach.refresh(true); break
     case 'pin-open': emit('open', `setting:${a.value?.key}`); break
     case 'detail-external': emit('open', 'check-update'); break
@@ -220,7 +220,7 @@ async function pairPin(pin, name = '') {
   try { const data = await hostApi.postJson('/api/pin', { pin: String(pin), name: String(name || '').trim() || dashTexts.value.pairDefaultName }); say(String(data.status) === 'true' ? dashTexts.value.pairSent : dashTexts.value.pairFailed) } catch { say(dashTexts.value.pairFailed) }
 }
 // a control the keyboard repeats (a slider held on an arrow key) posts one command per destination at a time; the value that is sent is always the last one chosen
-const saveSetting = createSerialCalls(async ({ key, value }) => { const r = await saveSettingKey(hostApi, key, value); if (r.ok) { state.config = r.config; rememberRecent(key) } }, (a) => a.key)
+const saveSetting = createSerialCalls(async ({ key, value, failed }) => { const r = await saveSettingKey(hostApi, key, value); if (r.ok) { state.config = r.config; rememberRecent(key) } else { say(T.value.saveFailed); failed?.() } }, (a) => a.key)
 // what acts on a running stream (host audit 2026-11-05): the host takes the bitrate command from this computer only; the DualSense tuning applies to the controller in use
 const canRuntime = computed(() => { try { return !proxyUrl.value || isLoopbackHost(new URL(proxyUrl.value).hostname) } catch { return true } })
 const ds5Keys = ref([])
