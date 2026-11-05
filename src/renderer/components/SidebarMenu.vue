@@ -258,6 +258,10 @@ const hostConn = useHostConnection({
   onHung: ({ at, seconds }) => reportHostHung({ at, seconds }),
   onHungEnd: () => dismissHostHung(),
 })
+// tools/realshot shows the offline states with an event of the page itself (see SunshineFrame): the verdict and the numbers the card shows; the next real probe of a host that answers puts it back
+const forceHostState = (event) => { const d = event.detail || {}; Object.assign(hostConn.state, { verdict: d.verdict || 'down', status: 'offline', fails: d.fails ?? 3, round: 1, nextIn: d.nextIn ?? 12, probing: false }) }
+window.addEventListener('panel-force-host-state', forceHostState)
+onBeforeUnmount(() => window.removeEventListener('panel-force-host-state', forceHostState))
 const NEEDS_NO_HOST = new Set([ROUTES.PANEL_SETTINGS, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
 const offlineShown = computed(() => hostConn.state.status !== 'online' && !NEEDS_NO_HOST.has(router.currentRoute.value))
 const back = () => nav.pop()
@@ -526,7 +530,6 @@ const openPanelPage = (page) => { const route = requestPanelPage(page); if (rout
 defineExpose({
   openVddSettings, openWelcome, openWebStream, openAiAssistant, openControllers, openRtxHdr, openPanelPage,
   goHome, checkForUpdates: handleCheckForUpdates, router,
-  hostConn, // the realshot tool forces the failure states of the host through its state (tools/realshot: the real faults would make the panel show its window)
 })
 </script>
 
