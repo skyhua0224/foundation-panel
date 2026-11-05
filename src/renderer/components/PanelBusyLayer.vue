@@ -17,12 +17,15 @@ watch(controllerBusyText, async (text) => {
   if (text && !el.open) el.showModal()
   else if (!text && el.open) el.close()
 }, { immediate: true, flush: 'post' })
+// Chromium may skip the cancel event of a close request when nothing activated the page since the dialog opened (close watchers), so preventing it
+// is not enough: while the work runs, a layer that was closed anyway comes straight back.
+const keepOpen = () => { const el = layer.value; if (controllerBusyText.value && el && !el.open) el.showModal() }
 onBeforeUnmount(() => { if (layer.value?.open) layer.value.close() })
 </script>
 
 <template>
   <Teleport to="body">
-    <dialog ref="layer" class="panel-busy" aria-labelledby="panel-busy-text" :aria-busy="controllerBusyText ? 'true' : 'false'" @cancel.prevent>
+    <dialog ref="layer" class="panel-busy" aria-labelledby="panel-busy-text" :aria-busy="controllerBusyText ? 'true' : 'false'" closedby="none" @cancel.prevent @close="keepOpen">
       <div class="panel-busy__card" role="status" aria-live="polite">
         <MLoading size="28px" />
         <span id="panel-busy-text" class="panel-busy__text">{{ controllerBusyText }}</span>
