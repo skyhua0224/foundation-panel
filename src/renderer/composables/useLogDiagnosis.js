@@ -1,8 +1,9 @@
 import { reactive, ref } from 'vue'
 import { sunshine } from '../tauri-adapter.js'
+import { diagnosisRequestBody, openLogDiagnosis } from 'foundation-ui/diagnostics'
 
 // The log assistant of 诊断与日志 in the control panel. The request goes to the host through the local proxy, the same routes the Web UI uses.
-// The rule-based pre-diagnosis lives with the Web UI; this window shows the reply the proxy returns.
+// Local findings come from the shared diagnosis path before any request, and the request body is redacted there.
 const DEFAULT_CONFIG = { enabled: false, provider: 'openai', apiBase: '', apiKey: '', apiKeyConfigured: false, model: '', compatibility: 'openai-chat', temperature: 0.3, max_tokens: 2048 }
 
 const proxy = async () => String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')
@@ -50,26 +51,20 @@ export function useLogDiagnosis() {
 
   async function diagnose(logs) {
     if (!logs) { error.value = 'No log content is available.'; return }
+    const prepared = openLogDiagnosis(logs)
+    localFindings.value = prepared.findings
+    localSuggestions.value = prepared.suggestions
     await loadConfig()
     const problem = invalid()
     if (problem) { error.value = problem; return }
     isLoading.value = true
     result.value = ''
     error.value = ''
-    const tail = String(logs).split('\n').slice(-200).join('\n')
     try {
       const data = await fetchJson('/api/ai/chat/completions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: config.model,
-          messages: [
-            { role: 'system', content: 'You are a game streaming log diagnosis assistant. Reply concisely. Summarise the problem, cite the log, and list fixes.' },
-            { role: 'user', content: tail },
-          ],
-          temperature: Number(config.temperature) || 0.3,
-          max_tokens: Number(config.max_tokens) || 2048,
-        }),
+        body: JSON.stringify(diagnosisRequestBody({ model: config.model, requestText: prepared.requestText, temperature: config.temperature, maxTokens: config.max_tokens })),
       })
       result.value = data.choices?.[0]?.message?.content || 'Unable to read the analysis result.'
     } catch (e) { error.value = e.message }
