@@ -16,6 +16,8 @@ test('native About, pairing, and log entries target the main shell pages', () =>
   const toolWindow = read('src/renderer/tool-window/ToolWindow.vue')
   const updater = read('src-tauri/src/update.rs')
   const nrControls = read('src/renderer/components/NrSessionControls.vue')
+  const desktopMain = read('src/renderer/desktop/main.js')
+  const desktopStyle = read('src/renderer/desktop/desktop.less')
   assert.doesNotMatch(rust, /(?:about|console|pin)\/index\.html/)
   assert.match(parts, /about: \{ route: 'about'/)
   assert.match(parts, /pairing: \{ route: 'web-clients'/)
@@ -41,6 +43,8 @@ test('native About, pairing, and log entries target the main shell pages', () =>
   assert.match(updater, /updater_dark_theme/)
   assert.doesNotMatch(nrControls, /<el-switch|element-plus/)
   assert.match(nrControls, /<MSwitchItem/)
+  assert.match(desktopMain, /foundation-ui\/all\.css/)
+  assert.match(desktopStyle, /var\(--md-sys-color-surface/)
 })
 
 function readFileExists(path) {

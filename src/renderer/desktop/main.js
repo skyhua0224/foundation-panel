@@ -1,4 +1,5 @@
 import { createApp } from 'vue'
+import 'foundation-ui/all.css'
 import '../styles/global.less'
 import './desktop.less'
 import App from './DesktopApp.vue'

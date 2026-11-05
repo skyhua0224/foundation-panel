@@ -574,3 +574,24 @@ html:not([data-fd-gamepad='true']) {
 .delay-3 { animation-delay: 0.3s; }
 .delay-4 { animation-delay: 0.4s; }
 
+// Big-screen keeps its workflows, gamepad navigation, and wallpaper, while
+// its chrome uses the same surface roles as the compact panel in light, dark,
+// and black schemes.
+.desktop-window {
+  color-scheme: light dark;
+  background: var(--md-sys-color-surface, #141218) !important;
+  color: var(--md-sys-color-on-surface, #f5f2fa) !important;
+}
+.desktop-window .wallpaper-layer::after { background: color-mix(in srgb, var(--md-sys-color-scrim, #000) 42%, transparent); }
+.desktop-window .desktop-window-main { color: var(--md-sys-color-on-surface, #f5f2fa); }
+.desktop-window .desktop-sidebar { background: color-mix(in srgb, var(--md-sys-color-surface-container, #211f26) 86%, transparent); border-right: 1px solid var(--md-sys-color-outline-variant, #49454f); }
+.desktop-window .desktop-sidebar .nav-item { color: var(--md-sys-color-on-surface-variant, #cac4d0); border-radius: 16px; }
+.desktop-window .desktop-sidebar .nav-item.active { color: var(--md-sys-color-on-secondary-container, #1d192b); background: var(--md-sys-color-secondary-container, #e8def8); }
+.desktop-window .desktop-card { background: var(--md-sys-color-surface-container, #211f26) !important; border-color: var(--md-sys-color-outline-variant, #49454f) !important; border-radius: 20px; box-shadow: none; }
+.desktop-window .desktop-card:hover { border-color: var(--md-sys-color-outline, #938f99) !important; box-shadow: 0 12px 28px color-mix(in srgb, var(--md-sys-color-shadow, #000) 22%, transparent); }
+.desktop-window .desktop-btn { color: var(--md-sys-color-primary, #a6d8ff); background: transparent; border-color: var(--md-sys-color-outline, #938f99); border-radius: 999px; }
+.desktop-window .desktop-btn:hover { background: var(--md-sys-color-primary-container, #31556b); border-color: var(--md-sys-color-primary, #a6d8ff); box-shadow: none; }
+.desktop-window .desktop-btn.primary { background: var(--md-sys-color-primary, #a6d8ff); color: var(--md-sys-color-on-primary, #00344c); border-color: transparent; }
+.desktop-window .desktop-btn.danger { color: var(--md-sys-color-error, #ffb4ab); border-color: var(--md-sys-color-error, #ffb4ab); }
+.desktop-window .desktop-btn.danger:hover { background: var(--md-sys-color-error-container, #5f1b25); }
+
