@@ -1,16 +1,13 @@
 <template>
   <section class="live-controls" :aria-busy="busy || pending" @pointerdown.capture="beginEdit" @keydown.capture="beginEdit" @focusout="cancelEdit">
     <div class="live-control-row">
-      <div>
-        <strong>{{ text.liveTitle }}</strong>
-        <p>{{ text.liveHint }}</p>
-      </div>
-      <el-switch
-        :model-value="pipeline.nr_requested_enabled"
-        :aria-label="text.liveTitle"
+      <MSwitchItem
+        :model-value="!!pipeline.nr_requested_enabled"
+        icon="wand_stars"
+        :title="text.liveTitle"
+        :text="text.liveHint"
         :disabled="!canChange"
-        :loading="busy || pending"
-        @change="(enabled) => send({ enabled }, pipeline.id)"
+        @update:model-value="(enabled) => send({ enabled }, pipeline.id)"
       />
     </div>
     <template v-if="pipeline.nr_live_controls_version >= 2">

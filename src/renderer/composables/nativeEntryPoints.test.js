@@ -15,6 +15,7 @@ test('native About, pairing, and log entries target the main shell pages', () =>
   const petMain = read('src/renderer/toolbar/main.js')
   const toolWindow = read('src/renderer/tool-window/ToolWindow.vue')
   const updater = read('src-tauri/src/update.rs')
+  const nrControls = read('src/renderer/components/NrSessionControls.vue')
   assert.doesNotMatch(rust, /(?:about|console|pin)\/index\.html/)
   assert.match(parts, /about: \{ route: 'about'/)
   assert.match(parts, /pairing: \{ route: 'web-clients'/)
@@ -38,6 +39,8 @@ test('native About, pairing, and log entries target the main shell pages', () =>
   assert.match(updater, /Segoe UI Variable Text/)
   assert.match(updater, /Microsoft YaHei UI/)
   assert.match(updater, /updater_dark_theme/)
+  assert.doesNotMatch(nrControls, /<el-switch|element-plus/)
+  assert.match(nrControls, /<MSwitchItem/)
 })
 
 function readFileExists(path) {
