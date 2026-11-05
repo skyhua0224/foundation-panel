@@ -5,6 +5,7 @@
 
 import { ElMessage } from './notifyMessage.js'
 import { useI18n } from '../desktop/i18n/index.js'
+import { scrubText } from 'foundation-ui/telemetry'
 
 function strings() {
   const { locale } = useI18n()
@@ -117,7 +118,7 @@ export async function getLogsContext(maxLines = 150) {
     if (!resp.ok) return ''
     const text = await resp.text()
     const lines = text.split('\n')
-    const recent = lines.slice(-maxLines).join('\n')
+    const recent = scrubText(lines.slice(-maxLines).join('\n'), Math.max(200000, text.length))
     const msg = strings()
     return `\n\n${format(msg.logsHeader, { count: Math.min(lines.length, maxLines) })}\n\`\`\`\n${recent}\n\`\`\``
   } catch {

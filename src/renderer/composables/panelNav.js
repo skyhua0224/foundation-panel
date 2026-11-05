@@ -13,9 +13,9 @@ export function railItems(t) {
 /** The row id of foundation-ui's rowLines for a page of the list panes (the second line and the search words of the page). */
 export const ROW_OF_ROUTE = {
   [ROUTES.WEB_CLIENTS]: 'clients', [ROUTES.WEB_APPS]: 'apps', [ROUTES.WEB_DOWNLOADS]: 'downloads', [ROUTES.GAMEPAD]: 'gamepad', [ROUTES.WEB_INPUT_KEYBOARD]: 'keyboard', [ROUTES.WEB_INPUT_MOUSE]: 'mouse', [ROUTES.MICROPHONE]: 'microphone', [ROUTES.USB]: 'usb',
-  [ROUTES.WEB_DISPLAY_OUTPUT]: 'display-output', [ROUTES.WEB_DISPLAY_MODES]: 'display-modes', [ROUTES.WEB_DISPLAY_HDR]: 'display-hdr', [ROUTES.WEB_DISPLAY_VIDEO]: 'display-video', [ROUTES.WEB_AUDIO_SOUND]: 'audio-output',
+  [ROUTES.WEB_DISPLAY_OUTPUT]: 'display-output', [ROUTES.WEB_DISPLAY_MODES]: 'display-modes', [ROUTES.WEB_DISPLAY_ENCODERS]: 'display-encoders', [ROUTES.WEB_DISPLAY_VIDEO]: 'display-video', [ROUTES.WEB_DISPLAY_HDR]: 'display-hdr', [ROUTES.WEB_AUDIO_SOUND]: 'audio-output',
   [ROUTES.VDD_SETTINGS]: 'vdd', [ROUTES.HDR_ENHANCED]: 'quality', [ROUTES.COMPONENT_STATUS]: 'components', [ROUTES.DIAGNOSTICS]: 'diagnostics', [ROUTES.TOOLBOX]: 'toolbox',
-  [ROUTES.WEB_TROUBLESHOOTING]: 'troubleshooting', [ROUTES.PANEL_SETTINGS]: 'panel', [ROUTES.HELP]: 'help', [ROUTES.AI_ASSISTANT]: 'assistant',
+  [ROUTES.PANEL_SETTINGS]: 'panel', [ROUTES.HELP]: 'help', [ROUTES.AI_ASSISTANT]: 'assistant',
   [ROUTES.LIVE_SESSION]: 'session', [ROUTES.RTSS]: 'rtss',
 }
 
@@ -42,16 +42,16 @@ export function pageItems(t, rail, runtime = {}) {
     display: [
       { id: ROUTES.WEB_DISPLAY_MODES, icon: 'aspect_ratio', tone: 'secondary', label: c.display.modes, text: lines['display-modes'] },
       { id: ROUTES.WEB_DISPLAY_OUTPUT, icon: 'monitor', tone: 'primary', label: c.display.output, text: lines['display-output'] },
+      { id: ROUTES.WEB_DISPLAY_ENCODERS, icon: 'memory', tone: 'secondary', label: c.display.encoders, text: lines['display-encoders'] },
+      { id: ROUTES.WEB_DISPLAY_VIDEO, icon: 'videocam', tone: 'primary', label: c.display.video, text: lines['display-video'] },
       { id: ROUTES.WEB_DISPLAY_HDR, icon: 'hdr_on', tone: 'warn', label: c.display.hdr, text: lines['display-hdr'] },
       { id: ROUTES.VDD_SETTINGS, icon: 'desktop_windows', tone: 'success', label: c.display.vdd, text: lines.vdd },
-      { id: ROUTES.WEB_DISPLAY_VIDEO, icon: 'videocam', tone: 'primary', label: c.display.video, text: lines['display-video'] },
       { id: ROUTES.HDR_ENHANCED, icon: 'wand_stars', tone: 'tertiary', label: c.display.quality, text: lines.quality },
     ],
     system: [
       { id: ROUTES.COMPONENT_STATUS, icon: 'monitor_heart', tone: 'success', label: runtime.statusTitle || 'Components', text: lines.components },
       { id: ROUTES.DIAGNOSTICS, icon: 'stethoscope', tone: 'warn', label: runtime.diagTitle || c.system.diagnostics, text: lines.diagnostics },
       { id: ROUTES.TOOLBOX, icon: 'build', tone: 'secondary', label: t.sidebar.toolbox, text: lines.toolbox },
-      { id: ROUTES.WEB_TROUBLESHOOTING, icon: 'troubleshoot', tone: 'primary', label: c.system.troubleshooting, text: lines.troubleshooting },
       { id: ROUTES.RTSS, icon: 'speed', tone: 'tertiary', label: c.rtss.title, text: lines.rtss },
     ],
   }

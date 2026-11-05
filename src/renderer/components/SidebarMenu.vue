@@ -46,10 +46,11 @@
         <LiveSessionPage v-else-if="entry.id === ROUTES.LIVE_SESSION" @open-quality="router.navigate(ROUTES.HDR_ENHANCED)" />
         <RtssPage v-else-if="entry.id === ROUTES.RTSS" />
         <DiagnosticsPage
-          v-else-if="entry.id === ROUTES.DIAGNOSTICS"
+          v-else-if="entry.id === ROUTES.DIAGNOSTICS || entry.id === ROUTES.WEB_TROUBLESHOOTING"
           @go="goDiagnosticsPlace"
           @webui-navigate="openWebUi"
           @open-guide="openWelcome"
+          @open-remote="remoteOpen = true"
         />
         <MAnnouncementPage v-else-if="entry.id === ROUTES.ANNOUNCEMENTS" :items="announcements.list.value" :locale="locale" :acked-at="ackedAt" :open-id="entry.params?.id || ''" :on-refresh="() => announcements.refresh(true)" @dismiss="announcements.dismiss" @read="announcements.read" @open-url="actions_openExternal" @back="back" />
         <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" :on-refresh="() => announcements.refresh(true)" :consent="telemetry.consent.value" @consent="telemetry.answer" :include-prerelease="includePrerelease" @channel-change="setIncludePrerelease" @open-update="showUpdateDialog = true" @open="actions_openExternal" />
@@ -334,6 +335,7 @@ const currentRow = computed(() => {
   const route = nav.current.value
   if (route === ROUTES.WEB_CONFIG) return `config:${nav.detail.value?.params?.tab || 'general'}`
   if (route === ROUTES.WEB_PASSWORD) return 'password'
+  if (route === ROUTES.WEB_TROUBLESHOOTING) return ROUTES.DIAGNOSTICS
   return route
 })
 // the settings of the display and audio rails are not under 主机设置: their path starts with the rail's own name (the category of the entry)
@@ -423,13 +425,15 @@ const uni = useUnifiedSearch({ docs: searchDocs, onPin: (doc) => pinToHome('pane
 // Where an error of the diagnostics page leads
 const goDiagnosticsPlace = (place) => {
   if (place === 'drivers') router.navigate(ROUTES.COMPONENTS)
-  else if (place === 'encoder') openConfig({ tab: 'encoders' })
+  else if (place === 'encoder') openConfig({ tab: 'display', sub: 'encoders' })
   else if (place === 'network') openConfig({ tab: 'network' })
   else if (place === 'audio') openConfig({ tab: 'audio', sub: 'sound' })
   else if (place === 'display') openConfig({ tab: 'display', sub: 'output' })
 }
 // A place of the stream settings: the list pane opens the Web page in the frame at that tab, section and row
 const openConfig = (params = { tab: 'general' }) => {
+  // The Web row stays in 捕获与视频, while the panel's native manager has its own 画质增强 place.
+  if (params.focus === 'hdr_enhanced') { router.navigate(ROUTES.HDR_ENHANCED); return }
   // the display and audio places are destinations of their own rails (the virtual display and the microphone are pages of the panel)
   const place = routeOfPlace(params.tab, params.sub)
   if (place) {

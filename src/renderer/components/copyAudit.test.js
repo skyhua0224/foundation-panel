@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url'
 // talked about the interface itself, so they were removed; they must not come back.
 const here = dirname(fileURLToPath(import.meta.url))
 const read = (path) => readFileSync(join(here, path), 'utf8')
-const TEXT_FILES = ['../desktop/i18n/zh.js', '../desktop/i18n/en.js', 'm3e/HostActionsPanel.vue', 'ControlPanelPage.vue', 'VddSettings.vue']
+const TEXT_FILES = ['../desktop/i18n/zh.js', '../desktop/i18n/en.js', 'ControlPanelPage.vue', 'VddSettings.vue']
 
 const BANNED = [
   '查看串流剪贴板同步的连接状态', 'View the connection status of streaming clipboard sync',

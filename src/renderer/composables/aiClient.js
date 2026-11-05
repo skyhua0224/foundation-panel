@@ -7,6 +7,35 @@
  */
 
 import { AI_PROVIDERS } from './aiProviders.js'
+import { scrubText } from 'foundation-ui/telemetry'
+
+const OUTBOUND_TEXT_MAX = 200000
+
+function scrubOutboundText(value) {
+  const text = typeof value === 'string' ? value : ''
+  if (!text) return text
+  return scrubText(text, Math.max(OUTBOUND_TEXT_MAX, text.length))
+}
+
+/** String content and text parts only. Image bytes stay, so a screenshot is not mistaken for a token. */
+export function scrubOutboundContent(content) {
+  if (typeof content === 'string') return scrubOutboundText(content)
+  if (!Array.isArray(content)) return content
+  return content.map((part) => {
+    if (!part || typeof part !== 'object') return part
+    if (part.type === 'image_url' || part.type === 'image' || part.type === 'input_audio') return part
+    if (typeof part.text !== 'string') return part
+    return { ...part, text: scrubOutboundText(part.text) }
+  })
+}
+
+export function scrubOutboundMessages(messages) {
+  return (messages || []).map((message) => {
+    if (!message || typeof message !== 'object') return message
+    return { ...message, content: scrubOutboundContent(message.content) }
+  })
+}
+
 
 async function getProxyUrl() {
   try {
@@ -102,7 +131,7 @@ export async function callOpenAI(apiBase, apiKey, model, messages, maxTokens = 2
   const base = apiBase.replace(/\/+$/, '')
   const data = await proxyFetch(`${base}/chat/completions`, 'POST', headers, {
     model,
-    messages,
+    messages: scrubOutboundMessages(messages),
     temperature: 0.7,
     max_tokens: maxTokens,
   })
@@ -110,8 +139,9 @@ export async function callOpenAI(apiBase, apiKey, model, messages, maxTokens = 2
 }
 
 export async function callAnthropic(apiBase, apiKey, model, messages, maxTokens = 2048) {
-  const systemMsg = messages.find((m) => m.role === 'system')?.content || ''
-  const chatMsgs = messages.filter((m) => m.role !== 'system')
+  const clean = scrubOutboundMessages(messages)
+  const systemMsg = clean.find((m) => m.role === 'system')?.content || ''
+  const chatMsgs = clean.filter((m) => m.role !== 'system')
 
   const base = apiBase.replace(/\/+$/, '')
   const data = await proxyFetch(
@@ -135,7 +165,7 @@ export async function callLLM(config, messages, maxTokens = 2048, requestOptions
     signal: requestOptions.signal,
     body: JSON.stringify({
       model: config.model,
-      messages,
+      messages: scrubOutboundMessages(messages),
       temperature: Number(config.temperature) || 0.3,
       max_tokens: Number(maxTokens || config.max_tokens) || 2048,
     }),
