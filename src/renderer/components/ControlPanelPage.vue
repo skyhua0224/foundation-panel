@@ -76,7 +76,7 @@
         <MGroup>
           <MItem action icon="download" :title="t.sidebar.clientDownloads" @click="emit('webui-navigate', '/downloads')" />
           <MItem action icon="keyboard" :title="t.toolbar.shortcutGuide" @click="shortcutsOpen = true" />
-          <MItem action icon="bug_report" :title="t.sidebar.diagnostics" @click="emit('webui-navigate', '/troubleshooting')" />
+          <MItem action icon="bug_report" :title="t.m3e.system.troubleshooting" @click="emit('webui-navigate', '/troubleshooting')" />
           <MItem action icon="public" :title="t.sidebar.officialWebsite" @click="actions.openUrl('https://www.alkaidlab.com/')"><template #trail><MIcon name="open_in_new" /></template></MItem>
           <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="sponsorOpen = true" />
         </MGroup>

@@ -81,3 +81,8 @@ test('the test tools are a page of the toolbox: a route, an entry of the registr
   assert.ok(read('../components/SidebarMenu.vue').includes('<TestToolsPage v-else-if="entry.id === ROUTES.TEST_TOOLS" />'))
   assert.ok(read('../components/m3e/ToolboxPage.vue').includes("'test-tools': 'science'"))
 })
+
+test('the help page names the Web page of the logs with the name that page has (日志与排错), not the panel\'s 诊断', () => {
+  const help = read('../components/ControlPanelPage.vue')
+  assert.ok(help.includes(`:title="t.m3e.system.troubleshooting" @click="emit('webui-navigate', '/troubleshooting')"`))
+})
