@@ -207,7 +207,7 @@ onBeforeUnmount(() => pairQr.stop())
 const releases = useReleaseAssets()
 const journey = useJourneyHome({ storageKey: 'panel-home', assetsOf: releases.assetsOf, versionOf: releases.versionOf, count: () => (state.clients ? state.clients.length : null), latest: () => (state.clients?.length ? state.clients[state.clients.length - 1].name : ''), locale: () => locale.value, qr: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules, pairQr: pairQr.view })
 // the star card: due after the first pairing or the first stream; while a stream runs the star of the client in use, otherwise the host and the sponsor entry; 以后再说 hides it until the next stream
-const star = useStarCard({ storageKey: 'panel-home', triggered: () => journey.done.value || sessionSeen.value, streaming: () => !!session.value })
+const star = useStarCard({ storageKey: 'panel-home', triggered: () => journey.done.value || sessionSeen.value, paired: () => state.clients?.length || 0, streaming: () => !!session.value })
 // the PIN typed on the pairing card goes to the host like the pairing sheet sends it
 async function pairPin(pin, name = '') {
   if (!/^\d{4}$/.test(String(pin || ''))) return
