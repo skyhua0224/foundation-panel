@@ -53,13 +53,13 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
         "show_toolbar" => toggle_toolbar(app),
         "rtss_control" => {
             info!("🎯 托盘菜单：打开 RTSS 控制");
-            if let Err(e) = toolbar::create_tool_window_internal(app, "rtss") {
+            if let Err(e) = windows::open_main_panel_page(app, "rtss") {
                 error!("创建工具窗口失败: {}", e);
             }
         }
         "host_performance" => {
             info!("📊 托盘菜单：打开主机性能监控");
-            if let Err(e) = toolbar::create_tool_window_internal(app, "performance") {
+            if let Err(e) = windows::open_main_panel_page(app, "live-session") {
                 error!("创建工具窗口失败: {}", e);
             }
         }

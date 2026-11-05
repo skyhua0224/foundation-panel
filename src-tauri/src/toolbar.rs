@@ -468,11 +468,8 @@ pub fn handle_toolbar_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str)
         "vdd" | "toolbar_vdd" => open_panel_page(app, "vdd"),
         "dpi" | "toolbar_dpi" => open_panel_page(app, "desktop-scale"),
         "bitrate" | "toolbar_bitrate" => open_panel_page(app, "live-session"),
-        "performance" | "toolbar_performance" => {
-            if let Err(e) = create_tool_window_internal(app, "performance") {
-                error!("创建工具窗口失败: {}", e);
-            }
-        }
+        "performance" | "toolbar_performance" => open_panel_page(app, "live-session"),
+        "rtss" | "toolbar_rtss" => open_panel_page(app, "rtss"),
         "shortcuts" | "toolbar_shortcuts" => open_panel_page(app, "shortcuts"),
         "pet" | "toolbar_pet" => open_panel_page(app, "pet"),
         "close" | "toolbar_close" => {

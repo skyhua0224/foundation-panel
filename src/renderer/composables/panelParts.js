@@ -6,6 +6,8 @@ export const PANEL_PAGES = Object.freeze({
   about: { route: 'about', part: '' },
   pairing: { route: 'web-clients', part: '' },
   logs: { route: 'diagnostics', part: '' },
+  quality: { route: 'hdr-enhanced', part: '' },
+  rtss: { route: 'rtss', part: '' },
   vdd: { route: 'vdd-settings', part: '' }, // 虚拟显示器 (toolbar, tray)
   'desktop-scale': { route: 'vdd-settings', part: 'desktop-scale' }, // 调整 DPI -> 显示与视频 › 虚拟显示器 › 桌面缩放
   'live-session': { route: 'live-session', part: '' }, // 码率调整 -> 串流 › 当前串流

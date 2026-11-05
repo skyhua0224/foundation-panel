@@ -8,7 +8,7 @@ const ROUTES = Object.fromEntries([...readFileSync(new URL('./useRouter.js', imp
 
 test('native entries open the shell pages and the toolbar menu keeps its routes', () => {
   assert.deepEqual(Object.fromEntries(Object.entries(PANEL_PAGES).map(([k, v]) => [k, v.route])), {
-    about: ROUTES.ABOUT, pairing: ROUTES.WEB_CLIENTS, logs: ROUTES.DIAGNOSTICS,
+    about: ROUTES.ABOUT, pairing: ROUTES.WEB_CLIENTS, logs: ROUTES.DIAGNOSTICS, quality: ROUTES.HDR_ENHANCED, rtss: ROUTES.RTSS,
     vdd: ROUTES.VDD_SETTINGS, 'desktop-scale': ROUTES.VDD_SETTINGS, 'live-session': ROUTES.LIVE_SESSION, shortcuts: ROUTES.HELP, pet: ROUTES.PANEL_SETTINGS,
   })
   assert.equal(requestPanelPage('nothing'), null)
