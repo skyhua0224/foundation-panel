@@ -45,10 +45,11 @@
         <LiveSessionPage v-else-if="entry.id === ROUTES.LIVE_SESSION" @open-quality="router.navigate(ROUTES.HDR_ENHANCED)" />
         <RtssPage v-else-if="entry.id === ROUTES.RTSS" />
         <DiagnosticsPage
-          v-else-if="entry.id === ROUTES.DIAGNOSTICS"
+          v-else-if="entry.id === ROUTES.DIAGNOSTICS || entry.id === ROUTES.WEB_TROUBLESHOOTING"
           @go="goDiagnosticsPlace"
           @webui-navigate="openWebUi"
           @open-guide="openWelcome"
+          @open-remote="remoteOpen = true"
         />
         <MAnnouncementPage v-else-if="entry.id === ROUTES.ANNOUNCEMENTS" :items="announcements.list.value" :locale="locale" :acked-at="ackedAt" :open-id="entry.params?.id || ''" :on-refresh="() => announcements.refresh(true)" @dismiss="announcements.dismiss" @read="announcements.read" @open-url="actions_openExternal" @back="back" />
         <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" :on-refresh="() => announcements.refresh(true)" :consent="telemetry.consent.value" @consent="telemetry.answer" :include-prerelease="includePrerelease" @channel-change="setIncludePrerelease" @open-update="showUpdateDialog = true" @open="actions_openExternal" />
@@ -332,6 +333,7 @@ const currentRow = computed(() => {
   const route = nav.current.value
   if (route === ROUTES.WEB_CONFIG) return `config:${nav.detail.value?.params?.tab || 'general'}`
   if (route === ROUTES.WEB_PASSWORD) return 'password'
+  if (route === ROUTES.WEB_TROUBLESHOOTING) return ROUTES.DIAGNOSTICS
   return route
 })
 // the settings of the display and audio rails are not under 主机设置: their path starts with the rail's own name (the category of the entry)

@@ -13,28 +13,36 @@
     :client-names="diag.clientNames.value"
     :locale="locale"
     :close-label="t.m3e.home.done"
+    :commands="commands"
+    :notes="notes"
+    :disabled="disabled"
+    :labels="labels"
+    :ai="aiSheet"
     @open="openUrl"
     @go="goPlace"
-  >
+  />
+  <MDialog v-model="boomAsk" :title="texts.boom" icon="warning" tone="error">
+    <p>{{ texts.boomText }}</p>
     <template #actions>
-      <HostActionsPanel @open-web-page="(path) => emit('webui-navigate', path)" @open-guide="emit('open-guide')" />
+      <MButton variant="text" @click="boomAsk = false">{{ texts.cancel || t.m3e.home.done }}</MButton>
+      <MButton variant="danger" icon="warning" @click="confirmBoom">{{ texts.boom }}</MButton>
     </template>
-  </MDiagnostics>
+  </MDialog>
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
-import { MDiagnostics, diagnosticsTexts } from 'foundation-ui/vue'
-import HostActionsPanel from './HostActionsPanel.vue'
+import { computed, onMounted, ref } from 'vue'
+import { MDiagnostics, MDialog, MButton, diagnosticsTexts, guideTexts, coachTexts, remoteTexts } from 'foundation-ui/vue'
 import { useDiagnostics } from '../../composables/useDiagnostics.js'
+import { useLogDiagnosis } from '../../composables/useLogDiagnosis.js'
 import { usbipStatusChannel, dualsenseStatusChannel, micStatusChannel, vigemStatusChannel } from '../../composables/deviceStatusStore.js'
-import { openExternalUrl } from '../../tauri-adapter.js'
+import { openExternalUrl, sunshine } from '../../tauri-adapter.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
-// 诊断 of the control panel, one destination for the old 诊断工具 and 故障诊断: the host actions, the problem summary, the bug report, the
-// bundle and the error centre on one tab, the whole log on the other. The small tools moved to 工具箱.
-const emit = defineEmits(['back', 'go', 'webui-navigate', 'open-guide'])
+// 诊断与日志. The same page as the Web UI. What only this window can read (the panel log, the device status) is passed as facts.
+const emit = defineEmits(['back', 'go', 'webui-navigate', 'open-guide', 'open-remote'])
 const { t, locale } = useI18n()
+const texts = computed(() => diagnosticsTexts(locale.value))
 
 const data = (r) => (r?.success ? r.data : null)
 const devices = async () => {
@@ -48,6 +56,96 @@ const devices = async () => {
   }
 }
 const diag = useDiagnostics({ devices })
+const ai = useLogDiagnosis()
+const boomAsk = ref(false)
+const note = ref({ restart: '', resetDisplay: '', forceClose: '', boom: '' })
+const busy = ref({ restart: false, resetDisplay: false, forceClose: false, boom: false })
+
+const base = async () => String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')
+const post = async (path, body) => {
+  const response = await fetch(`${await base()}${path}`, { method: 'POST', headers: body ? { 'Content-Type': 'application/json' } : undefined, body: body ? JSON.stringify(body) : undefined })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  return response
+}
+async function run(id, action) {
+  busy.value = { ...busy.value, [id]: true }
+  try { await action(); return true } catch { note.value = { ...note.value, [id]: { text: texts.value.failed, tone: 'error' } }; return false }
+  finally { busy.value = { ...busy.value, [id]: false } }
+}
+const restart = () => run('restart', () => post('/api/restart')).then((ok) => { if (ok) note.value = { ...note.value, restart: texts.value.restart } })
+const resetDisplay = () => run('resetDisplay', () => post('/api/reset-display-device-persistence')).then((ok) => { note.value = { ...note.value, resetDisplay: ok ? { text: texts.value.resetDisplay, tone: 'info' } : { text: texts.value.resetDisplay, tone: 'error' } } })
+const forceClose = () => run('forceClose', () => post('/api/apps/close')).then((ok) => { note.value = { ...note.value, forceClose: ok ? { text: texts.value.forceClose, tone: 'info' } : { text: texts.value.forceClose, tone: 'error' } } })
+async function confirmBoom() {
+  boomAsk.value = false
+  const ok = await run('boom', async () => { await fetch(`${await base()}/api/boom`) })
+  if (ok) note.value = { ...note.value, boom: texts.value.boom }
+}
+async function wizard() {
+  await run('wizard', async () => {
+    const response = await fetch(`${await base()}/api/config`)
+    if (!response.ok) throw new Error('config')
+    const config = await response.json()
+    config.setup_wizard_completed = false
+    await post('/api/config', config)
+    emit('open-guide')
+  })
+}
+async function copyLogs() { try { await navigator.clipboard.writeText(diag.text.value || '') } catch { /* the clipboard is not available */ } }
+async function copyConfig() {
+  try {
+    const response = await fetch(`${await base()}/api/config`)
+    if (!response.ok) throw new Error('config')
+    await navigator.clipboard.writeText(JSON.stringify(await response.json(), null, 2))
+  } catch { /* the configuration stays where it is */ }
+}
+async function downloadLogs() {
+  const name = 'sunshine-logs-' + new Date().toISOString().slice(0, 19).replace(/[:.]/g, '-') + '.txt'
+  try {
+    const response = await fetch(`${await base()}/api/logs`)
+    if (!response.ok) throw new Error('logs')
+    const content = await response.text()
+    const invoke = window.__TAURI_INTERNALS__?.invoke
+    if (invoke) { await invoke('save_text_file', { content, defaultName: name, filterName: 'Text', extensions: ['txt'] }); return }
+    const link = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([content], { type: 'text/plain' })), download: name })
+    link.click()
+    URL.revokeObjectURL(link.href)
+  } catch (e) { if (e !== 'cancelled') note.value = { ...note.value, downloadLogs: { text: texts.value.downloadLogs, tone: 'error' } } }
+}
+
+const commands = computed(() => ({
+  restart,
+  resetDisplay: diag.platform.value === 'windows' ? resetDisplay : undefined,
+  ai: () => ai.open(),
+  diagnose: () => ai.diagnose(diag.text.value),
+  downloadLogs,
+  copyLogs,
+  copyConfig,
+  guide: () => emit('open-guide'),
+  coach: () => window.dispatchEvent(new CustomEvent('foundation-coach-start')),
+  remote: () => emit('open-remote'),
+  wizard,
+  forceClose,
+  boom: () => { boomAsk.value = true },
+}))
+const notes = computed(() => note.value)
+const disabled = computed(() => busy.value)
+const labels = computed(() => ({
+  guide: { title: guideTexts(locale.value).guide, text: guideTexts(locale.value).helpRow },
+  coach: { title: coachTexts(locale.value).rerun },
+  remote: { title: remoteTexts(locale.value).openText },
+}))
+const aiSheet = computed(() => ({
+  show: ai.show.value,
+  config: ai.config,
+  isConfigLoading: ai.isConfigLoading.value,
+  isSavingConfig: ai.isSavingConfig.value,
+  isLoading: ai.isLoading.value,
+  result: ai.result.value,
+  error: ai.error.value,
+  localFindings: ai.localFindings.value,
+  localSuggestions: ai.localSuggestions.value,
+  onClose: ai.close,
+}))
 const openUrl = (url) => { openExternalUrl(url) }
 const goPlace = (place) => emit('go', place)
 onMounted(() => { diag.loadFacts(); diag.start() })

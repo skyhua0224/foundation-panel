@@ -15,7 +15,7 @@ export const ROW_OF_ROUTE = {
   [ROUTES.WEB_CLIENTS]: 'clients', [ROUTES.WEB_APPS]: 'apps', [ROUTES.WEB_DOWNLOADS]: 'downloads', [ROUTES.GAMEPAD]: 'gamepad', [ROUTES.WEB_INPUT_KEYBOARD]: 'keyboard', [ROUTES.WEB_INPUT_MOUSE]: 'mouse', [ROUTES.MICROPHONE]: 'microphone', [ROUTES.USB]: 'usb',
   [ROUTES.WEB_DISPLAY_OUTPUT]: 'display-output', [ROUTES.WEB_DISPLAY_MODES]: 'display-modes', [ROUTES.WEB_DISPLAY_HDR]: 'display-hdr', [ROUTES.WEB_DISPLAY_VIDEO]: 'display-video', [ROUTES.WEB_AUDIO_SOUND]: 'audio-output',
   [ROUTES.VDD_SETTINGS]: 'vdd', [ROUTES.HDR_ENHANCED]: 'quality', [ROUTES.COMPONENT_STATUS]: 'components', [ROUTES.DIAGNOSTICS]: 'diagnostics', [ROUTES.TOOLBOX]: 'toolbox',
-  [ROUTES.WEB_TROUBLESHOOTING]: 'troubleshooting', [ROUTES.PANEL_SETTINGS]: 'panel', [ROUTES.HELP]: 'help', [ROUTES.AI_ASSISTANT]: 'assistant',
+  [ROUTES.PANEL_SETTINGS]: 'panel', [ROUTES.HELP]: 'help', [ROUTES.AI_ASSISTANT]: 'assistant',
   [ROUTES.LIVE_SESSION]: 'session', [ROUTES.RTSS]: 'rtss',
 }
 
@@ -51,7 +51,6 @@ export function pageItems(t, rail, runtime = {}) {
       { id: ROUTES.COMPONENT_STATUS, icon: 'monitor_heart', tone: 'success', label: runtime.statusTitle || 'Components', text: lines.components },
       { id: ROUTES.DIAGNOSTICS, icon: 'stethoscope', tone: 'warn', label: runtime.diagTitle || c.system.diagnostics, text: lines.diagnostics },
       { id: ROUTES.TOOLBOX, icon: 'build', tone: 'secondary', label: t.sidebar.toolbox, text: lines.toolbox },
-      { id: ROUTES.WEB_TROUBLESHOOTING, icon: 'troubleshoot', tone: 'primary', label: c.system.troubleshooting, text: lines.troubleshooting },
       { id: ROUTES.RTSS, icon: 'speed', tone: 'tertiary', label: c.rtss.title, text: lines.rtss },
     ],
   }
