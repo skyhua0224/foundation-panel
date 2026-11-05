@@ -6,7 +6,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::AppHandle;
 
 /// In-memory log entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -29,7 +29,6 @@ fn panel_source() -> String {
 pub struct LogCollector {
     logs: Arc<Mutex<Vec<LogEntry>>>,
     max_logs: usize,
-    app_handle: Arc<Mutex<Option<AppHandle>>>,
     file: Mutex<Option<File>>,
     file_path: PathBuf,
 }
@@ -41,14 +40,9 @@ impl LogCollector {
         Self {
             logs: Arc::new(Mutex::new(Vec::with_capacity(max_logs))),
             max_logs,
-            app_handle: Arc::new(Mutex::new(None)),
             file: Mutex::new(file),
             file_path,
         }
-    }
-
-    pub fn set_app_handle(&self, app: AppHandle) {
-        *self.app_handle.lock().unwrap() = Some(app);
     }
 
     pub fn add_log(&self, record: &Record) {
@@ -92,15 +86,6 @@ impl LogCollector {
         if let Ok(mut guard) = self.file.lock() {
             if let Some(file) = guard.as_mut() {
                 let _ = writeln!(file, "{}", format_entry_line(&entry));
-            }
-        }
-
-        // Stream new entries to the log console when it is open.
-        if let Ok(app_guard) = self.app_handle.lock() {
-            if let Some(app) = app_guard.as_ref() {
-                if let Some(window) = app.get_webview_window("log_console") {
-                    let _ = window.emit("log-entry", &entry);
-                }
             }
         }
     }
@@ -239,9 +224,8 @@ pub fn set_log_level(level: &str) {
 }
 
 /// Initialize logging.
-pub fn init_logger(app: AppHandle) {
+pub fn init_logger() {
     let collector = Arc::new(LogCollector::new(10000));
-    collector.set_app_handle(app);
     let settings = crate::desktop_settings::load_desktop_settings_from_disk();
     set_log_level(&settings.log_level);
 

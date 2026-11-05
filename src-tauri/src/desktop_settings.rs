@@ -469,7 +469,7 @@ fn apply_dev_mode(_app: &AppHandle, enabled: bool) {
 
     #[cfg(debug_assertions)]
     {
-        for label in ["main", "desktop", "log_console"] {
+        for label in ["main", "desktop"] {
             if let Some(window) = _app.get_webview_window(label) {
                 window.open_devtools();
             }
