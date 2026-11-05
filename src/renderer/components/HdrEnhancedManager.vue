@@ -107,7 +107,6 @@ import {
 import { shortcutCapture } from '../composables/shortcutCapture.js'
 import { nrOverlayText } from '../composables/nrOverlayMessages.js'
 // Element Plus has no keyboard glyph; use its established input icon.
-import { EditPen as Keyboard } from '@element-plus/icons-vue'
 const { locale } = useI18n()
 const text = computed(() => enhancementControlsText(locale.value)),
   overlayText = computed(() => nrOverlayText(locale.value))
