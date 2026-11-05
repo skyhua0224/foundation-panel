@@ -8,7 +8,9 @@
         :text="text.liveHint"
         :disabled="!canChange"
         @update:model-value="(enabled) => send({ enabled }, pipeline.id)"
-      />
+      >
+        <template #extra><MLoading v-if="busy || pending" size="18px" /></template>
+      </MSwitchItem>
     </div>
     <template v-if="pipeline.nr_live_controls_version >= 2">
       <div class="live-scale">
@@ -74,7 +76,7 @@
 </template>
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { MSlider, MSliderItem, MSwitchItem, MSeg, MItem, MGroup, MSection, MButton } from 'foundation-ui/vue'
+import { MLoading, MSlider, MSliderItem, MSwitchItem, MSeg, MItem, MGroup, MSection, MButton } from 'foundation-ui/vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../desktop/i18n/index.js'
 import { enhancementControlsText } from '../composables/enhancementControls.js'
