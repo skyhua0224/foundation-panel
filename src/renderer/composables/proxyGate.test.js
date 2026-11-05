@@ -53,3 +53,11 @@ test('the frame uses the gate: no single check that blanks the session, and the 
   assert.doesNotMatch(src, /loading-overlay|loading-container|loading-text|proxy-health-retry|PixelMplus|YouYuan|skew\(|morandi/, 'the old failure page and its styles')
   assert.doesNotMatch(src, /window\.location\.reload\(\)/, 'a retry does not reload the whole panel')
 })
+
+test('the state does not repeat its title in its line, and covers the page behind it', () => {
+  const zh = fs.readFileSync(new URL('../desktop/i18n/zh.js', import.meta.url), 'utf8')
+  const title = zh.match(/proxyTitle: '([^']+)'/)[1]
+  const line = zh.match(/proxyUnavailable: '([^']+)'/)[1]
+  assert.ok(!line.startsWith(title), 'the line restates the title')
+  assert.match(fs.readFileSync(new URL('../components/SunshineFrame.vue', import.meta.url), 'utf8'), /\.proxy-blocked-host \{[^}]*background: var\(--md-sys-color-surface\)/)
+})

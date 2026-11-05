@@ -635,6 +635,7 @@ onUnmounted(() => window.removeEventListener('panel-force-proxy-state', forcePro
   inset: 0;
   z-index: 10;
   overflow: auto;
+  background: var(--md-sys-color-surface); /* nothing of a page shows through it */
 }
 
 .fade-loading-enter-active,
