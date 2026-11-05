@@ -485,7 +485,8 @@ const handleLocaleChanged = () => {
 // Lifecycle
 // the frame follows the panel's root element: a new wallpaper colour, light or dark, the picture on or off
 let rootFollow = null
-const frameOrigin = () => { try { return new URL(sunshineUrl.value || sunshineIframe.value?.src || '', window.location.href).origin } catch { return '' } }
+// the origin a message to the frame can be sent to: an http(s) address only ('' for about:blank and any custom scheme, whose origin is 'null': postMessage(message, 'null') throws a SyntaxError)
+const frameOrigin = () => { try { const url = new URL(sunshineUrl.value || sunshineIframe.value?.src || '', window.location.href); return /^https?:$/.test(url.protocol) ? url.origin : '' } catch { return '' } }
 
 onUnmounted(() => {
   rootFollow?.stop()

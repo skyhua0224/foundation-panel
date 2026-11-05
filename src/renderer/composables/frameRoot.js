@@ -31,7 +31,7 @@ export function followRoot(getFrame, getOrigin, root = document.documentElement)
       queued = false
       const target = getFrame()?.contentWindow
       const origin = getOrigin()
-      if (target && origin && origin !== 'null') target.postMessage(rootSnapshot(root), origin)
+      if (target && /^https?:\/\//.test(origin || '')) target.postMessage(rootSnapshot(root), origin) // never 'null': that throws
     })
   }
   const observer = new MutationObserver(push)
