@@ -43,6 +43,7 @@
         <ToolboxPage v-else-if="entry.id === ROUTES.TOOLBOX" :tools="toolsMenuItems" />
         <LatencyClockPage v-else-if="entry.id === ROUTES.LATENCY_CLOCK" />
         <StreamTimerPage v-else-if="entry.id === ROUTES.STREAM_TIMER" />
+        <TestToolsPage v-else-if="entry.id === ROUTES.TEST_TOOLS" />
         <LiveSessionPage v-else-if="entry.id === ROUTES.LIVE_SESSION" @open-quality="router.navigate(ROUTES.HDR_ENHANCED)" />
         <RtssPage v-else-if="entry.id === ROUTES.RTSS" />
         <DiagnosticsPage
@@ -82,6 +83,7 @@
     </MScene>
     </div>
     <MContextMenu ref="contextMenu" @select="onContextSelect" />
+    <MContextProvider :locale="locale" :callbacks="ctxCallbacks" :capabilities="{ product: 'panel' }" />
     <!-- every uncaught error is drawn in our own surface: the way back, the restart of Sunshine, then copy, download and the report to the developers -->
     <MTelemetryConsent v-model="consentOpen" :locale="locale" @answer="telemetry.answer" />
     <MErrorHost :locale="locale" :can-go-back="nav.canPop.value" :host-online="hostConn.state.status === 'online'" :restart="() => hostConn.restart('service')" :open-url="actions_openExternal" @back="errorBack" />
@@ -122,7 +124,7 @@ import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
-import { MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton } from 'foundation-ui/vue'
+import { MContextProvider, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton } from 'foundation-ui/vue'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelBusyLayer from './PanelBusyLayer.vue'
@@ -144,6 +146,7 @@ import { useComponentStatus } from '../composables/useComponentStatus.js'
 import ToolboxPage from './m3e/ToolboxPage.vue'
 import LatencyClockPage from './m3e/LatencyClockPage.vue'
 import StreamTimerPage from './m3e/StreamTimerPage.vue'
+import TestToolsPage from './m3e/TestToolsPage.vue'
 import LiveSessionPage from './m3e/LiveSessionPage.vue'
 import RtssPage from './m3e/RtssPage.vue'
 import DiagnosticsPage from './m3e/DiagnosticsPage.vue'
@@ -524,6 +527,8 @@ const onFrameMessage = (event) => {
 onMounted(() => { window.addEventListener('message', onFrameMessage); loadHostData(); componentStatus.start(60000) })
 onBeforeUnmount(() => { window.removeEventListener('message', onFrameMessage); componentStatus.stop() })
 const contextMenu = ref(null)
+// the window's own context menu (SPEC-context-menu): what this product can do for it; an action that is not here is not an item
+const ctxCallbacks = { search: (text) => { uni.query.value = text; uni.show() }, connect: () => { connect.open.value = true }, notice: (m) => useNotify().snack(m), openExternal: (u) => openExternalUrl(u), restartHost: () => hostConn.restart('service') }
 const onRowContext = (event, item) => {
   const items = [{ id: 'open', label: t.value.m3e.ctx.open, icon: 'open_in_new' }]
   if (webPathOf(item.id)) items.push({ id: 'browser', label: t.value.m3e.ctx.browser, icon: 'public' })

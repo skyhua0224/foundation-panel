@@ -61,3 +61,32 @@ test('系统 names the one page of logs, errors, export, AI diagnosis, restart a
   assert.ok(router.includes('[ROUTES.WEB_TROUBLESHOOTING]: ROUTES.DIAGNOSTICS'), 'the old route opens the same page')
   assert.ok(router.includes('/troubleshooting(?:\\.html)?(?:[?#/]|$)/, ROUTES.DIAGNOSTICS'), 'the old address opens the same page')
 })
+
+test('the overview gets 最近操作 and the live controls of a stream: the keys used last, the bitrate command, the DualSense tuning', () => {
+  const home = read('../components/PanelHome.vue')
+  assert.ok(home.includes('recent: recentKeys.value, canRuntime: canRuntime.value, ds5Keys: ds5Keys.value'))
+  assert.ok(home.includes("case 'runtime-bitrate': runtimeBitrate(a.value); break") && home.includes("case 'ds5-tune': ds5Tune(a.value); break"))
+  assert.ok(home.includes('/api/runtime/bitrate?bitrate=${kbps}&clientname=${encodeURIComponent(client)}'))
+  assert.ok(home.includes("{ schema: 'ALK-DS5T/1', values: { [key]: value } }"))
+  assert.ok(home.includes('if (r.ok) { state.config = r.config; rememberRecent(key) }'), 'a setting saved from a tile is a recent one')
+})
+
+test('the window\'s own context menu is mounted with what the panel can do, and the production build lets Shift+right-click through to the platform', () => {
+  const menu = read('../components/SidebarMenu.vue'); const poly = read('../tauri-polyfill.js')
+  assert.ok(menu.includes('<MContextProvider :locale="locale" :callbacks="ctxCallbacks" :capabilities="{ product: \'panel\' }" />'))
+  assert.ok(menu.includes("restartHost: () => hostConn.restart('service')") && menu.includes('openExternal: (u) => openExternalUrl(u)'))
+  assert.ok(poly.includes("if (e.shiftKey || localStorage.getItem('foundation-ui.contextmenu') === 'native') return undefined"))
+})
+
+test('the test tools are a page of the toolbox: a route, an entry of the registry in both languages, the page in the shell', () => {
+  assert.ok(router.includes("TEST_TOOLS: 'test-tools'") && router.includes('[ROUTES.TEST_TOOLS]: { rail: \'system\', list: false, push: true }'))
+  const registry = read('./toolsRegistry.js'); assert.ok(registry.includes("id: 'test-tools'") && registry.includes('ctx.router.navigate(ROUTES.TEST_TOOLS)'))
+  assert.ok(zh.includes("testTools: '测试工具'") && en.includes("testTools: 'Test tools'"))
+  assert.ok(read('../components/SidebarMenu.vue').includes('<TestToolsPage v-else-if="entry.id === ROUTES.TEST_TOOLS" />'))
+  assert.ok(read('../components/m3e/ToolboxPage.vue').includes("'test-tools': 'science'"))
+})
+
+test('the help page names the Web page of the logs with the name that page has (日志与排错), not the panel\'s 诊断', () => {
+  const help = read('../components/ControlPanelPage.vue')
+  assert.ok(help.includes(`:title="t.m3e.system.troubleshooting" @click="emit('webui-navigate', '/troubleshooting')"`))
+})

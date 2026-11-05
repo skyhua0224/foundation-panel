@@ -15,6 +15,7 @@ export const ROUTES = {
   TOOLBOX: 'toolbox', // old name of DIAGNOSTICS
   LATENCY_CLOCK: 'latency-clock', // 延迟测试时钟, opened from the toolbox
   STREAM_TIMER: 'stream-timer', // 串流计时器, opened from the toolbox
+  TEST_TOOLS: 'test-tools', // 测试工具 (patterns, frame pacing, A/V sync, channels, input, keep awake), opened from the toolbox
   PANEL_SETTINGS: 'panel-settings',
   SETTINGS_HUB: 'settings-hub', // the bottom bar's one entry for 主机设置, 输入与外设, 显示 and 系统: a list of those four
   HELP: 'help',
@@ -84,6 +85,7 @@ export const PAGES = {
   [ROUTES.TOOLBOX]: { rail: 'system' },
   [ROUTES.LATENCY_CLOCK]: { rail: 'system', list: false, push: true },
   [ROUTES.STREAM_TIMER]: { rail: 'system', list: false, push: true },
+  [ROUTES.TEST_TOOLS]: { rail: 'system', list: false, push: true },
   [ROUTES.DIAGNOSTICS]: { rail: 'system' },
   [ROUTES.AI_ASSISTANT]: { rail: 'assistant', list: false }, // 米塔 AI: the chat takes the whole width, its settings are behind the gear of the chat header
   [ROUTES.WEB_TROUBLESHOOTING]: { rail: 'system' },

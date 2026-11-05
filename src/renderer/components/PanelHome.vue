@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { firstImage, micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
-import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, useSystemInfo, reachProblemOf, registeredComponentStatus, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf } from 'foundation-ui/vue'
+import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, useSystemInfo, reachProblemOf, registeredComponentStatus, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf, recentKeys, rememberRecent, isLoopbackHost } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
 import { usePanelHome } from '../composables/usePanelHome.js'
@@ -134,6 +134,7 @@ const catalogueInput = computed(() => {
     session: s ? { ...s, fpsMeasured: p?.frame_rates?.encoded?.fps, latencyMs: p?.host_latency?.avg_ms, latencyP95Ms: p?.host_latency?.p95_ms, uptimeMs: p?.uptime_ms ?? s.uptimeMs } : null,
     history: { samples: history.samples, sessions: history.sessions, days: history.days, last: () => history.last() },
     sys: model.value.info.some((i) => i.id === 'memory') && state.memory ? { memTotal: state.memory.system_total_memory, memAvail: state.memory.system_available_memory } : null,
+    recent: recentKeys.value, canRuntime: canRuntime.value, ds5Keys: ds5Keys.value,
     config: state.config, logText: state.logText, logs: state.errorLog, clients: state.clients ? state.clients.map((c) => ({ ...c, icon: 'devices' })) : null,
     apps: state.apps ? state.apps.map((a) => ({ id: a.name, name: a.name, cover: coverOf(a) })) : null,
     codecModes: state.config && state.config.hevc_mode !== undefined ? { hevc: state.config.hevc_mode, av1: state.config.av1_mode } : null,
@@ -186,6 +187,8 @@ function onAction(a) {
     case 'download': emit('open', `downloads:${a.value}`); break
     case 'link': openExternalUrl(a.value); break
     case 'setting': saveSetting(a.value); break
+    case 'runtime-bitrate': runtimeBitrate(a.value); break
+    case 'ds5-tune': ds5Tune(a.value); break
     case 'sponsor': { const target = SPONSORS.find((x) => x.id === a.value); if (a.value === 'star') openExternalUrl('https://github.com/AlkaidLab/foundation-sunshine'); else if (target) openExternalUrl(target.url); else sponsorOpen.value = true; break }
     default: break
   }
@@ -213,7 +216,18 @@ async function pairPin(pin, name = '') {
   if (!/^\d{4}$/.test(String(pin || ''))) return
   try { const data = await hostApi.postJson('/api/pin', { pin: String(pin), name: String(name || '').trim() || dashTexts.value.pairDefaultName }); say(String(data.status) === 'true' ? dashTexts.value.pairSent : dashTexts.value.pairFailed) } catch { say(dashTexts.value.pairFailed) }
 }
-async function saveSetting({ key, value }) { const r = await saveSettingKey(hostApi, key, value); if (r.ok) state.config = r.config }
+async function saveSetting({ key, value }) { const r = await saveSettingKey(hostApi, key, value); if (r.ok) { state.config = r.config; rememberRecent(key) } }
+// what acts on a running stream (host audit 2026-11-05): the host takes the bitrate command from this computer only; the DualSense tuning applies to the controller in use
+const canRuntime = computed(() => { try { return !proxyUrl.value || isLoopbackHost(new URL(proxyUrl.value).hostname) } catch { return true } })
+const ds5Keys = ref([])
+async function loadDs5() { try { ds5Keys.value = (await hostApi.getJson('/api/dualsense/tuning'))?.keys || [] } catch { ds5Keys.value = [] } }
+watch(() => !!session.value, (live) => { if (live) loadDs5() }, { immediate: true })
+async function runtimeBitrate({ client, kbps }) {
+  try { const r = await hostFetch(base, `/api/runtime/bitrate?bitrate=${kbps}&clientname=${encodeURIComponent(client)}`); const d = await r.json().catch(() => ({})); say(r.ok && d.success !== false ? T.value.lbSent.replace('{client}', client) : T.value.lbFailed) } catch { say(T.value.lbFailed) }
+}
+async function ds5Tune({ key, value }) {
+  try { const d = await hostApi.postJson('/api/dualsense/tuning', { schema: 'ALK-DS5T/1', values: { [key]: value } }); if (d?.keys) ds5Keys.value = d.keys; else if (d?.status === false) say(T.value.dsFailed) } catch { say(T.value.dsFailed) }
+}
 async function onStripGroup(v) { pad.selectedMode.value = v }
 async function onStripSwitch({ id, value }) {
   stripBusy.value = true
