@@ -31,7 +31,7 @@ import { usbipStatusChannel, dualsenseStatusChannel, micStatusChannel, vigemStat
 import { openExternalUrl } from '../../tauri-adapter.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
-// 日志与诊断 of the control panel, one destination for the old 诊断工具 and 故障诊断: the host actions, the problem summary, the bug report, the
+// 诊断 of the control panel, one destination for the old 诊断工具 and 故障诊断: the host actions, the problem summary, the bug report, the
 // bundle and the error centre on one tab, the whole log on the other. The small tools moved to 工具箱.
 const emit = defineEmits(['back', 'go', 'webui-navigate', 'open-guide'])
 const { t, locale } = useI18n()

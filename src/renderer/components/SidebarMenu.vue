@@ -15,11 +15,13 @@
     <div class="panel-body">
     <MScene :nav="nav" :caption-height="48" :rail-items="rail" :bar-items="bar" :bar-current="barCur" :texts="sceneTexts" :overlay="isWebPage || offlineShown" :status="offlineShown" storage-key="foundation-ui.panel.list" @rail="onRail">
       <template #rail-foot><MIconButton icon="palette" :label="appearanceLabel" :current="router.currentRoute.value === ROUTES.CFG_APPEARANCE" @click="router.navigate(ROUTES.CFG_APPEARANCE)" /><MIconButton icon="info" :label="aboutTexts(locale).title" :current="router.currentRoute.value === ROUTES.ABOUT" @click="router.navigate(ROUTES.ABOUT)" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
-      <template #list="{ entry }">
+      <template #list="{ entry, scene }">
         <MNavList
           :groups="listGroups(entry.rail)"
           :current="currentRow"
           :label="railLabel(entry.rail)"
+          :title="railLabel(entry.rail)"
+          :titled="scene.kind === 'single'"
           @navigate="onListNavigate"
           @context="onRowContext"
         />
@@ -32,7 +34,7 @@
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
-        <SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" :lines="settingsList.lines.value" @select="onRail" />
+        <SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" :groups="settingsList.groups.value" :runtime="runtimeView" @open="onListNavigate" />
         <HdrEnhancedManager v-else-if="entry.id === ROUTES.HDR_ENHANCED" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <AppearancePage v-else-if="entry.id === ROUTES.CFG_APPEARANCE" />
         <MicrophonePage v-else-if="entry.id === ROUTES.MICROPHONE" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
@@ -87,6 +89,7 @@
         <MItem action icon="search" :title="t.m3e.search" @click="moreGo(() => uni.show())" />
         <MItem action icon="settings" :title="t.m3e.nav.settings" :text="settingsList.lines.value.panel" @click="moreGo(() => onRail({ id: 'settings' }))" />
         <MItem action icon="palette" :title="appearanceLabel" @click="moreGo(() => router.navigate(ROUTES.CFG_APPEARANCE))" />
+        <MItem action icon="info" :title="aboutTexts(locale).title" :text="currentVersion" @click="moreGo(() => router.navigate(ROUTES.ABOUT))" />
         <MItem action icon="help" :title="t.m3e.nav.help" :text="settingsList.lines.value.help" :tone="updateWaiting ? 'warn' : ''" @click="moreGo(() => onRail({ id: 'help' }))" />
         <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="moreGo(() => { sponsorOpen = true })" />
       </MGroup>
@@ -331,8 +334,8 @@ const currentRow = computed(() => {
   if (route === ROUTES.WEB_PASSWORD) return 'password'
   return route
 })
-// the settings of the display and audio rails are not under 串流设置: their path starts with the rail's own name (the category of the entry)
-const settingsPlace = (e) => (e.params?.tab === 'display' || e.params?.tab === 'audio' ? '' : railLabel('config'))
+// the settings of the display and audio rails are not under 主机设置: their path starts with the rail's own name (the category of the entry)
+const settingsPlace = (e) => (e.params?.tab === 'display' || e.params?.tab === 'audio' || e.params?.tab === 'input' ? '' : railLabel('config'))
 const searchItems = computed(() => [
   ...Object.keys(PAGES)
     .filter((id) => PAGES[id].list !== false)

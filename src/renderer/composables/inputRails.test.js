@@ -1,0 +1,59 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+
+// round 42: 输入与外设 is four pages (手柄, 键盘, 鼠标与触控, USB 转发); 串流设置 has no 输入 row; the settings entry of the bottom bar lists every page
+const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8')
+const router = read('./useRouter.js'); const nav = read('./panelNav.js'); const zh = read('../desktop/i18n/zh.js'); const en = read('../desktop/i18n/en.js')
+
+test('the four pages: the places of the input tab lead to them, a page inside the gamepad page leads to 手柄', () => {
+  assert.ok(router.includes("'input:gamepad': ROUTES.GAMEPAD, 'input:keyboard': ROUTES.WEB_INPUT_KEYBOARD, 'input:mouse': ROUTES.WEB_INPUT_MOUSE, 'input:usb': ROUTES.USB"))
+  assert.ok(router.includes('PLACE_ROUTE[`${tab}:${parentPlace(tab, sub)}`]'), 'a page inside the gamepad page (per game, a DualSense group) is 手柄 at that page')
+  assert.ok(router.includes("parentPlace } from 'foundation-ui/settings/index.js'"))
+})
+
+test('the Web address of each page is its place, and the address of a place leads back to its page', () => {
+  assert.ok(router.includes('#tab=(display|audio|input)'))
+  for (const [route, sub] of [['GAMEPAD', 'gamepad'], ['WEB_INPUT_KEYBOARD', 'keyboard'], ['WEB_INPUT_MOUSE', 'mouse']]) assert.ok(router.includes(`[ROUTES.${route}]: \`/config\${settingsHash({ tab: 'input', sub: '${sub}' })}\``), route)
+  assert.ok(router.includes('/^\\/dualsense'), 'the old address of the DualSense page still leads to 手柄')
+})
+
+test('the rail 输入与外设 lists the four pages with their names, and the second lines come from the rows', () => {
+  const input = nav.slice(nav.indexOf('    input: ['), nav.indexOf('    audio: ['))
+  assert.deepEqual([...input.matchAll(/id: ROUTES\.(\w+),/g)].map((m) => m[1]), ['GAMEPAD', 'WEB_INPUT_KEYBOARD', 'WEB_INPUT_MOUSE', 'USB'])
+  assert.deepEqual([...input.matchAll(/text: lines\.(\w+)/g)].map((m) => m[1]), ['gamepad', 'keyboard', 'mouse', 'usb'])
+  assert.ok(nav.includes("[ROUTES.WEB_INPUT_KEYBOARD]: 'keyboard', [ROUTES.WEB_INPUT_MOUSE]: 'mouse'"))
+  assert.ok(zh.includes("gamepad: '手柄', keyboard: '键盘', mouse: '鼠标与触控', microphone: '麦克风', usb: 'USB 转发'"))
+  assert.ok(en.includes("gamepad: 'Controller', keyboard: 'Keyboard', mouse: 'Mouse and touch', microphone: 'Microphone', usb: 'USB forwarding'"))
+})
+
+test('the settings entry of the bottom bar lists every page of the five categories in sections: any page is two presses away', () => {
+  const hub = read('../components/m3e/SettingsHubPage.vue'); const menu = read('../components/SidebarMenu.vue')
+  assert.ok(hub.includes('<MSection v-for="section in sections"')); assert.ok(hub.includes("const CATEGORIES = ['config', 'input', 'audio', 'display', 'system']"))
+  assert.ok(hub.includes("emit('open', item)")); assert.ok(!/select/.test(hub), 'a row opens a page, not another list')
+  assert.ok(menu.includes('<SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" :groups="settingsList.groups.value" :runtime="runtimeView" @open="onListNavigate" />'))
+})
+
+test('the list of a rail has its title at the top left where the list is a page of its own (the bottom bar of a narrow window), as 设置 has', () => {
+  const menu = read('../components/SidebarMenu.vue')
+  assert.ok(menu.includes('<template #list="{ entry, scene }">'))
+  assert.ok(menu.includes(':title="railLabel(entry.rail)"') && menu.includes(':titled="scene.kind === \'single\'"'))
+})
+
+test('更多 of the bottom bar lists 关于 (the update check is on that page): 检查更新 is two presses away on a phone', () => {
+  const menu = read('../components/SidebarMenu.vue')
+  const sheet = menu.slice(menu.indexOf('<MSheet v-model="moreOpen"'), menu.indexOf('<MAnnouncementPopup'))
+  assert.ok(sheet.includes('icon="info" :title="aboutTexts(locale).title"') && sheet.includes('router.navigate(ROUTES.ABOUT)'))
+  assert.ok(sheet.indexOf('icon="info"') < sheet.indexOf('icon="help"'))
+})
+
+test('the rail of 常规, 配置文件, 网络 and 安全与登录 is 主机设置 in both languages, hub and rail alike', () => {
+  assert.ok(zh.includes("config: '主机设置', input:") && en.includes("config: 'Host settings', input:"))
+  assert.ok(zh.includes("settings: ['主机设置', '常规、配置文件、网络、安全与登录']") && en.includes("settings: ['Host settings', 'General, profiles, network, security and sign-in']"))
+  assert.ok(!/streamSettings: '串流设置'/.test(zh) && zh.includes("streamSettings: '主机设置'"))
+})
+
+test('in 系统 the two log pages have two names: 诊断 (the panel page) and 日志与排错 (the Web page), the same words as the Web UI', () => {
+  assert.ok(zh.includes("    diagnostics: '诊断',") && en.includes("    diagnostics: 'Diagnostics',"))
+  assert.ok(zh.includes("troubleshooting: '日志与排错', components:") && en.includes("troubleshooting: 'Logs and troubleshooting', lead:"))
+})

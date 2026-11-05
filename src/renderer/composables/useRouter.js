@@ -1,6 +1,6 @@
 import { computed } from 'vue'
 import { createNav } from 'foundation-ui/vue'
-import { settingsHash, DEFAULT_PLACE } from 'foundation-ui/settings/index.js'
+import { settingsHash, DEFAULT_PLACE, parentPlace } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
 /** Destinations of the control panel. A page is a detail entry of one back stack (see foundation-ui createNav). */
@@ -15,7 +15,7 @@ export const ROUTES = {
   TOOLBOX: 'toolbox', // old name of DIAGNOSTICS
   LATENCY_CLOCK: 'latency-clock', // 延迟测试时钟, opened from the toolbox
   PANEL_SETTINGS: 'panel-settings',
-  SETTINGS_HUB: 'settings-hub', // the bottom bar's one entry for 串流设置, 输入与外设, 显示 and 系统: a list of those four
+  SETTINGS_HUB: 'settings-hub', // the bottom bar's one entry for 主机设置, 输入与外设, 显示 and 系统: a list of those four
   HELP: 'help',
   ABOUT: 'about',
   ANNOUNCEMENTS: 'announcements', // 公告: every announcement, opened from the bell of the caption bar
@@ -27,6 +27,9 @@ export const ROUTES = {
   GAMEPAD: 'gamepad',
   MICROPHONE: 'microphone',
   USB: 'usb',
+  // the Web pages of 输入与外设 in the frame (/config#tab=input&sub=keyboard); the gamepad is a page of 手柄 beside them, USB 转发 is the panel's own page
+  WEB_INPUT_KEYBOARD: 'web-input-keyboard',
+  WEB_INPUT_MOUSE: 'web-input-mouse',
   COMPONENTS: 'components',
   COMPONENT_STATUS: 'component-status',
   DIAGNOSTICS: 'diagnostics',
@@ -62,6 +65,8 @@ export const PAGES = {
   [ROUTES.CFG_APPEARANCE]: { rail: 'appearance', list: false },
   [ROUTES.WEB_PASSWORD]: { rail: 'config' },
   [ROUTES.GAMEPAD]: { rail: 'input' },
+  [ROUTES.WEB_INPUT_KEYBOARD]: { rail: 'input' },
+  [ROUTES.WEB_INPUT_MOUSE]: { rail: 'input' },
   [ROUTES.WEB_AUDIO_SOUND]: { rail: 'audio' }, // the first page of a rail is the one the rail opens on
   [ROUTES.MICROPHONE]: { rail: 'audio' },
   [ROUTES.USB]: { rail: 'input' },
@@ -94,9 +99,11 @@ const CATEGORY = { [ROUTES.CAT_CONFIG]: 'config', [ROUTES.CAT_STREAM]: 'stream',
 const PLACE_ROUTE = {
   'display:output': ROUTES.WEB_DISPLAY_OUTPUT, 'display:modes': ROUTES.WEB_DISPLAY_MODES, 'display:hdr': ROUTES.WEB_DISPLAY_HDR, 'display:virtual': ROUTES.VDD_SETTINGS, 'display:video': ROUTES.WEB_DISPLAY_VIDEO,
   'audio:sound': ROUTES.WEB_AUDIO_SOUND, 'audio:microphone': ROUTES.MICROPHONE,
+  'input:gamepad': ROUTES.GAMEPAD, 'input:keyboard': ROUTES.WEB_INPUT_KEYBOARD, 'input:mouse': ROUTES.WEB_INPUT_MOUSE, 'input:usb': ROUTES.USB,
 }
-export const routeOfPlace = (tab, sub) => PLACE_ROUTE[`${tab}:${sub || DEFAULT_PLACE[tab]}`] || null
-const PLACE_PATH = /^\/config(?:\.html)?#tab=(display|audio)(?:&sub=([\w-]+))?/
+// a page inside the gamepad page (per game, a DualSense group) is 手柄 at that page
+export const routeOfPlace = (tab, sub) => PLACE_ROUTE[`${tab}:${sub || DEFAULT_PLACE[tab]}`] || PLACE_ROUTE[`${tab}:${parentPlace(tab, sub)}`] || null
+const PLACE_PATH = /^\/config(?:\.html)?#tab=(display|audio|input)(?:&sub=([\w-]+))?/
 const WEB_PATHS = [
   [/^\/(?:pin|clients)(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_CLIENTS],
   [/^\/apps(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_APPS],
@@ -121,8 +128,10 @@ export const webPathOf = (route) => ({
   [ROUTES.WEB_DISPLAY_OUTPUT]: `/config${settingsHash({ tab: 'display', sub: 'output' })}`, [ROUTES.WEB_DISPLAY_MODES]: `/config${settingsHash({ tab: 'display', sub: 'modes' })}`,
   [ROUTES.WEB_DISPLAY_HDR]: `/config${settingsHash({ tab: 'display', sub: 'hdr' })}`, [ROUTES.WEB_DISPLAY_VIDEO]: `/config${settingsHash({ tab: 'display', sub: 'video' })}`,
   [ROUTES.WEB_AUDIO_SOUND]: `/config${settingsHash({ tab: 'audio', sub: 'sound' })}`,
-  // the gamepad is a page of 输入 in the Web UI: the rail destination shows that page in the frame
-  [ROUTES.GAMEPAD]: `/config${settingsHash({ tab: 'input', focus: 'ds5-block' })}`,
+  // the gamepad, the keyboard and the mouse are pages of 输入与外设 in the Web UI: the rail destinations show those pages in the frame
+  [ROUTES.GAMEPAD]: `/config${settingsHash({ tab: 'input', sub: 'gamepad' })}`,
+  [ROUTES.WEB_INPUT_KEYBOARD]: `/config${settingsHash({ tab: 'input', sub: 'keyboard' })}`,
+  [ROUTES.WEB_INPUT_MOUSE]: `/config${settingsHash({ tab: 'input', sub: 'mouse' })}`,
 }[route] || null)
 
 const routes = {}
