@@ -1,5 +1,5 @@
 <template>
-  <SettingsCard :title="text.title" :icon="FolderOpened">
+  <SettingsCard :title="text.title" icon="folder_open">
     <SettingsRow :name="text.status" :description="text.statusDesc">
       <div class="sharing-status">
         <span class="status-indicator" :class="statusClass"></span>
@@ -10,10 +10,10 @@
     <SettingsRow :name="text.sharedFolders" :description="text.sharedFoldersDesc">
       <div class="sharing-control-group">
         <button class="desktop-btn icon-btn" :disabled="refreshDisabled" :title="text.refresh" @click="loadMappings">
-          <Refresh />
+          <MIcon name="refresh" />
         </button>
         <button class="desktop-btn primary" :disabled="actionDisabled" @click="addFolder">
-          <Plus />
+          <MIcon name="add" />
           {{ text.add }}
         </button>
       </div>
@@ -22,7 +22,7 @@
     <SettingsRow :name="text.explorerMenu" :description="text.explorerMenuDesc">
       <div class="sharing-control-group">
         <button class="desktop-btn compact" :disabled="actionDisabled" @click="installMenu">
-          <Link />
+          <MIcon name="link" />
           {{ text.enable }}
         </button>
         <button class="desktop-btn compact" :disabled="actionDisabled" @click="uninstallMenu">
@@ -60,7 +60,7 @@
       <div class="empty-title">{{ text.empty }}</div>
       <div class="empty-actions">
         <button class="desktop-btn primary" :disabled="actionDisabled" @click="addFolder">
-          <Plus />
+          <MIcon name="add" />
           {{ text.chooseFolder }}
         </button>
       </div>
@@ -83,7 +83,7 @@
           :title="text.revoke"
           @click="removeMapping(mapping)"
         >
-          <Delete />
+          <MIcon name="delete" />
         </button>
       </div>
     </div>
@@ -92,7 +92,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { Delete, FolderOpened, Link, Plus, Refresh } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import { open } from '@tauri-apps/plugin-dialog'
 import { isTauriRuntime } from '../../composables/useTauri.js'
 import { useI18n } from '../../i18n/index.js'

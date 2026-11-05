@@ -9,26 +9,26 @@
       @keydown.esc.prevent="$emit('close')"
     >
       <button type="button" class="menu-item" data-focusable data-focus-key="ctx-launch" @click="$emit('launch')">
-        <span class="menu-icon"><VideoPlay /></span> {{ t.appContext.launch }}
+        <span class="menu-icon"><MIcon name="play_circle" /></span> {{ t.appContext.launch }}
       </button>
       <button type="button" class="menu-item" data-focusable data-focus-key="ctx-favorite" @click="$emit('toggleFavorite')">
         <span class="menu-icon">
-          <component :is="isFavorited ? StarFilled : Star" />
+          <MIcon name="star" :fill="isFavorited" />
         </span>
         {{ isFavorited ? t.appContext.unfavorite : t.appContext.favorite }}
       </button>
       <div class="menu-divider"></div>
       <button type="button" class="menu-item" data-focusable data-focus-key="ctx-cover" @click="$emit('updateCover')">
-        <span class="menu-icon"><Picture /></span> {{ t.appContext.updateCover }}
+        <span class="menu-icon"><MIcon name="image" /></span> {{ t.appContext.updateCover }}
       </button>
       <button type="button" class="menu-item" data-focusable data-focus-key="ctx-helpers" @click="$emit('configHelpers')">
-        <span class="menu-icon"><Lightning /></span> {{ t.appContext.launchHelper }}
+        <span class="menu-icon"><MIcon name="bolt" /></span> {{ t.appContext.launchHelper }}
       </button>
       <button type="button" class="menu-item" data-focusable data-focus-key="ctx-copy" v-if="hasCmd" @click="$emit('copyCmd')">
-        <span class="menu-icon"><DocumentCopy /></span> {{ t.appContext.copyCommand }}
+        <span class="menu-icon"><MIcon name="content_copy" /></span> {{ t.appContext.copyCommand }}
       </button>
       <button type="button" class="menu-item" data-focusable data-focus-key="ctx-dir" v-if="hasWorkingDir" @click="$emit('openDir')">
-        <span class="menu-icon"><Folder /></span> {{ t.appContext.openDirectory }}
+        <span class="menu-icon"><MIcon name="folder" /></span> {{ t.appContext.openDirectory }}
       </button>
     </div>
   </Teleport>
@@ -38,7 +38,7 @@
 import { nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from '../i18n/index.js'
 import { popFocusScope, pushFocusScope } from '../composables/useFocusNav.js'
-import { DocumentCopy, Folder, Lightning, Picture, Star, StarFilled, VideoPlay } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 const { t } = useI18n()
 
 const props = defineProps({

@@ -16,7 +16,7 @@
       <div class="desktop-card fade-in">
         <div class="card-header">
           <div class="card-title">
-            <span class="title-icon"><Film /></span>
+            <span class="title-icon"><MIcon name="movie" /></span>
             {{ t.stream.codec.format }}
           </div>
         </div>
@@ -49,7 +49,7 @@
         <div class="desktop-card">
           <div class="card-header">
             <div class="card-title">
-              <span class="title-icon"><DataAnalysis /></span>
+              <span class="title-icon"><MIcon name="monitoring" /></span>
               {{ t.stream.bitrateLimit }}
             </div>
             <div class="card-actions">
@@ -81,7 +81,7 @@
         <div class="desktop-card">
           <div class="card-header">
             <div class="card-title">
-              <span class="title-icon"><Sunny /></span>
+              <span class="title-icon"><MIcon name="light_mode" /></span>
               {{ t.stream.hdr }}
             </div>
           </div>
@@ -107,7 +107,7 @@
       <div class="desktop-card fade-in">
         <div class="card-header">
           <div class="card-title">
-            <span class="title-icon"><Monitor /></span>
+            <span class="title-icon"><MIcon name="monitor" /></span>
             {{ t.stream.displayCapture }}
           </div>
         </div>
@@ -164,7 +164,7 @@
       <div class="desktop-card fade-in">
         <div class="card-header">
           <div class="card-title">
-            <span class="title-icon"><Promotion /></span>
+            <span class="title-icon"><MIcon name="send" /></span>
             {{ t.stream.launchMode }}
           </div>
         </div>
@@ -193,7 +193,7 @@
       <div class="desktop-card fade-in">
         <div class="card-header">
           <div class="card-title">
-            <span class="title-icon"><Monitor /></span>
+            <span class="title-icon"><MIcon name="monitor" /></span>
             {{ t.stream.virtualDisplay }}
           </div>
           <div class="card-actions">
@@ -278,7 +278,7 @@
       <div class="desktop-card fade-in">
         <div class="card-header">
           <div class="card-title">
-            <span class="title-icon"><Mouse /></span>
+            <span class="title-icon"><MIcon name="mouse" /></span>
             {{ t.stream.vmouse }}
           </div>
           <div class="card-actions">
@@ -339,7 +339,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { DataAnalysis, Film, Monitor, Mouse, Promotion, Sunny } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import PillGroup from '../components/PillGroup.vue'
 import FdDropdown from '../components/FdDropdown.vue'
 import { useVmouse, reloadVmouseAfterOperation } from '../../composables/useVmouse.js'

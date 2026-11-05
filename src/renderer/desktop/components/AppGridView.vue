@@ -28,7 +28,7 @@
         </div>
         <!-- 收藏角标 -->
         <div v-if="isFavorite(app.name)" class="favorite-badge" @click.stop="$emit('toggleFavorite', app.name)">
-          <StarFilled />
+          <MIcon name="star" fill />
         </div>
         <!-- 启动助手角标 -->
         <div v-if="helperIds(app.name).length" class="helper-badges">
@@ -42,7 +42,7 @@
         </div>
         <!-- Hover 遮罩 -->
         <div class="tile-overlay">
-          <span class="play-icon"><VideoPlay /></span>
+          <span class="play-icon"><MIcon name="play_circle" /></span>
         </div>
         <!-- 启动动画 -->
         <div v-if="launchingApp === app.name" class="launch-overlay">
@@ -61,7 +61,7 @@
 
 <script setup>
 import { useI18n } from '../i18n/index.js'
-import { StarFilled, VideoPlay } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import LaunchHelperIcon from './LaunchHelperIcon.vue'
 import { formatDuration } from '../composables/useGameSession.js'
 const { t } = useI18n()

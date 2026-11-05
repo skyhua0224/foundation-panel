@@ -93,7 +93,7 @@
                       @click="browseFile(helper.templateId, param.key)"
                       :title="t.launchHelper.browse"
                       data-focusable
-                    ><FolderOpened /></button>
+                    ><MIcon name="folder_open" /></button>
                   </div>
                   <div v-if="hasFieldError(helper.templateId, param.key)" class="field-error-msg">
                     ⚠ {{ getFieldError(helper.templateId, param.key) }}
@@ -144,7 +144,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { FolderOpened } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import { useLaunchHelpers } from '../composables/useLaunchHelpers.js'
 import { isTauriRuntime } from '../composables/useTauri.js'
 import { useModalFocusScope } from '../composables/useFocusNav.js'

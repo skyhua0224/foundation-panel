@@ -4,7 +4,7 @@
       <div v-if="open" class="cover-modal-mask" @click.self="$emit('close')">
         <div ref="modalRef" class="cover-modal">
           <div class="modal-header">
-            <h3><Picture /> {{ t.coverPicker.title }} — {{ appName }}</h3>
+            <h3><MIcon name="image" /> {{ t.coverPicker.title }} — {{ appName }}</h3>
             <button class="modal-close" @click="$emit('close')">✕</button>
           </div>
 
@@ -51,7 +51,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import { Picture } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import { useI18n } from '../i18n/index.js'
 
 const { t } = useI18n()

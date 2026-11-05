@@ -9,7 +9,7 @@
 
     <SettingsToggleSection
       :title="t.settings.startup"
-      :icon="Promotion"
+      icon="rocket_launch"
       :items="startupSettings"
       :values="settings"
       @update-value="setSettingValue"
@@ -17,7 +17,7 @@
 
     <SettingsToggleSection
       :title="t.settings.bigScreen"
-      :icon="Monitor"
+      icon="monitor"
       :items="bigScreenItems"
       :values="bigScreenSettings"
       @update-value="setBigScreenSetting"
@@ -29,7 +29,7 @@
 
     <SettingsToggleSection
       :title="t.settings.notifications"
-      :icon="Bell"
+      icon="notifications"
       :items="notificationSettings"
       :values="settings"
       @update-value="setSettingValue"
@@ -57,7 +57,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
-import { Bell, Monitor, Promotion } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import { useSettingsState } from '../composables/useSettingsState'
 import { bigScreenSettings, setBigScreenSetting } from '../composables/useBigScreenSettings.js'
 import { useI18n } from '../i18n/index.js'

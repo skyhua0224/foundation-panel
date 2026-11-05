@@ -29,17 +29,17 @@
       </div>
       <div class="list-tags">
         <span v-if="playtimeLabel(app.name)" class="list-tag playtime">{{ playtimeLabel(app.name) }}</span>
-        <span v-if="isFavorite(app.name)" class="list-tag fav"><StarFilled /> {{ t.appContext.favorite }}</span>
+        <span v-if="isFavorite(app.name)" class="list-tag fav"><MIcon name="star" fill /> {{ t.appContext.favorite }}</span>
         <span v-if="app.elevated && app.elevated !== 'false'" class="list-tag admin">{{ t.appContext.admin }}</span>
       </div>
-      <button class="list-play" tabindex="-1"><VideoPlay /></button>
+      <button class="list-play" tabindex="-1"><MIcon name="play_circle" /></button>
     </div>
   </div>
 </template>
 
 <script setup>
 import { useI18n } from '../i18n/index.js'
-import { StarFilled, VideoPlay } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import { formatDuration } from '../composables/useGameSession.js'
 const { t } = useI18n()
 

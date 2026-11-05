@@ -1,5 +1,5 @@
 <template>
-  <SettingsCard :title="t.settings.appearance" :icon="Brush">
+  <SettingsCard :title="t.settings.appearance" icon="palette">
     <SettingsRow
       :name="t.settings.themeEditorName"
       :description="t.settings.appearanceDesc"
@@ -12,7 +12,6 @@
 </template>
 
 <script setup>
-import { Brush } from '@element-plus/icons-vue'
 import { useI18n } from '../../i18n/index.js'
 import SettingsCard from './SettingsCard.vue'
 import SettingsRow from './SettingsRow.vue'

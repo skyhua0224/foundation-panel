@@ -1,5 +1,5 @@
 <template>
-  <SettingsCard :title="t.settings.pet" :icon="ChatDotRound">
+  <SettingsCard :title="t.settings.pet" icon="forum">
     <SettingsRow :name="t.settings.deskObserve" :description="t.settings.deskObserveDesc">
       <SettingsSwitch
         v-model="petEnabled"
@@ -44,7 +44,6 @@
 
 <script setup>
 import { computed, ref, watch } from 'vue'
-import { ChatDotRound } from '@element-plus/icons-vue'
 import { useDesktopPet } from '../../../composables/useDesktopPet.js'
 import PetVisionConsentDialog from '../../../components/PetVisionConsentDialog.vue'
 import { useI18n } from '../../i18n/index.js'

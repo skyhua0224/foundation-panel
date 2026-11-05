@@ -1,7 +1,7 @@
 <template>
   <div class="desktop-card about-card fade-in">
     <div class="about-content">
-      <div class="about-logo"><Sunny /></div>
+      <div class="about-logo"><MIcon name="light_mode" /></div>
       <div class="about-info">
         <div class="about-name">Foundation Desktop</div>
         <div class="about-version">{{ t.settings.version }} {{ appVersion }}</div>
@@ -21,7 +21,7 @@
 </template>
 
 <script setup>
-import { Sunny } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import { useI18n } from '../../i18n/index.js'
 
 defineProps({

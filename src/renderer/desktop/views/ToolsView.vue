@@ -10,7 +10,7 @@
       <!-- 码率调节器 -->
       <DesktopCard variant="success" hoverable class="tool-panel-card bitrate-card">
         <template #title>
-          <span class="title-icon"><DataAnalysis /></span>
+          <span class="title-icon"><MIcon name="monitoring" /></span>
           {{ t.tools.bitrateAdjust }}
         </template>
 
@@ -22,7 +22,7 @@
       <!-- Host performance panel -->
       <DesktopCard variant="primary" hoverable class="tool-panel-card host-performance-card">
         <template #title>
-          <span class="title-icon"><Monitor /></span>
+          <span class="title-icon"><MIcon name="monitor" /></span>
           {{ t.tools.hostPerformance }}
         </template>
 
@@ -34,7 +34,7 @@
       <!-- DPI adjuster -->
       <DesktopCard variant="secondary" hoverable class="tool-panel-card dpi-card">
         <template #title>
-          <span class="title-icon"><Search /></span>
+          <span class="title-icon"><MIcon name="search" /></span>
           {{ t.tools.dpiScaling }}
         </template>
 
@@ -46,7 +46,7 @@
       <!-- 快捷键管理 -->
       <DesktopCard variant="warning" hoverable class="tool-panel-card shortcuts-card">
         <template #title>
-          <span class="title-icon"><Key /></span>
+          <span class="title-icon"><MIcon name="key" /></span>
           {{ t.tools.shortcutGuide }}
         </template>
 
@@ -58,13 +58,13 @@
 
     <!-- 系统诊断 -->
     <div class="section-title fade-in">
-      <span class="title-icon"><Search /></span>
+      <span class="title-icon"><MIcon name="search" /></span>
       {{ t.tools.diagnostics }}
     </div>
 
     <DesktopCard class="diagnostics-card fade-in">
       <template #title>
-        <span class="title-icon"><Monitor /></span>
+        <span class="title-icon"><MIcon name="monitor" /></span>
         {{ t.tools.systemStatus }}
       </template>
 
@@ -137,11 +137,11 @@
 
       <template #footer>
         <button class="desktop-btn" @click="restartGraphicsDriver">
-          <Refresh />
+          <MIcon name="refresh" />
           {{ t.tools.restartGraphicsDriver }}
         </button>
         <button class="desktop-btn" :disabled="diagnosing" @click="runDiagnostics">
-          <Refresh />
+          <MIcon name="refresh" />
           {{ t.tools.rediagnose }}
         </button>
       </template>
@@ -152,7 +152,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { probeSystemDiagnostics } from '../../composables/systemDiagnostics.js'
-import { DataAnalysis, Key, Monitor, Refresh, Search } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import { useI18n } from '../i18n/index.js'
 
 // 桌面 UI 组件

@@ -1,5 +1,5 @@
 <template>
-  <SettingsCard :title="t.settings.launchAssistant" :icon="Lightning">
+  <SettingsCard :title="t.settings.launchAssistant" icon="bolt">
     <p class="section-desc">
       {{ t.settings.launchAssistantDesc }}
     </p>
@@ -18,7 +18,6 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Lightning } from '@element-plus/icons-vue'
 import { useLaunchHelpers } from '../../composables/useLaunchHelpers'
 import { useI18n } from '../../i18n/index.js'
 import SettingsCard from './SettingsCard.vue'

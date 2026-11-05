@@ -9,7 +9,7 @@
     <Transition name="slide">
       <div v-if="open" ref="editorRef" class="theme-editor" @click.stop>
         <div class="editor-header">
-          <h2><Brush /> {{ t.themeEditor.title }}</h2>
+          <h2><MIcon name="palette" /> {{ t.themeEditor.title }}</h2>
           <button class="close-btn" @click="$emit('close')">✕</button>
         </div>
 
@@ -28,12 +28,12 @@
               <template v-if="wallpaper">
                 <img :src="wallpaper" class="wallpaper-preview" />
                 <div class="wallpaper-actions">
-                  <button class="wp-btn" @click.stop="triggerFileInput"><Refresh /> {{ t.themeEditor.replace }}</button>
+                  <button class="wp-btn" @click.stop="triggerFileInput"><MIcon name="refresh" /> {{ t.themeEditor.replace }}</button>
                   <button class="wp-btn danger" @click.stop="$emit('removeWallpaper')">✕ {{ t.themeEditor.remove }}</button>
                 </div>
               </template>
               <template v-else>
-                <div class="drop-icon"><Picture /></div>
+                <div class="drop-icon"><MIcon name="image" /></div>
                 <div class="drop-text">{{ t.themeEditor.dropImage }}<br/><small>{{ t.themeEditor.chooseFile }}</small></div>
               </template>
             </div>
@@ -145,8 +145,8 @@
           <section class="editor-section">
             <label class="section-title">{{ t.themeEditor.data }}</label>
             <div class="action-row">
-              <button class="action-btn" @click="handleExport"><Upload /> {{ t.themeEditor.exportTheme }}</button>
-              <button class="action-btn" @click="handleImport"><Download /> {{ t.themeEditor.importTheme }}</button>
+              <button class="action-btn" @click="handleExport"><MIcon name="upload" /> {{ t.themeEditor.exportTheme }}</button>
+              <button class="action-btn" @click="handleImport"><MIcon name="download" /> {{ t.themeEditor.importTheme }}</button>
             </div>
           </section>
         </div>
@@ -157,7 +157,7 @@
 
 <script setup>
 import { ref } from 'vue'
-import { Brush, Refresh, Picture, Upload, Download } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import { useModalFocusScope } from '../composables/useFocusNav.js'
 import { useI18n } from '../i18n/index.js'
 

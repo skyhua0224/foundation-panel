@@ -1,5 +1,5 @@
 <template>
-  <SettingsCard :title="t.settings.advanced" :icon="Setting">
+  <SettingsCard :title="t.settings.advanced" icon="settings">
     <SettingsRow :name="t.settings.devMode" :description="t.settings.devModeDesc">
       <SettingsSwitch
         :model-value="Boolean(values.devMode)"
@@ -29,7 +29,6 @@
 
 <script setup>
 import { computed } from 'vue'
-import { Setting } from '@element-plus/icons-vue'
 import { useI18n } from '../../i18n/index.js'
 import SettingsCard from './SettingsCard.vue'
 import SettingsRow from './SettingsRow.vue'

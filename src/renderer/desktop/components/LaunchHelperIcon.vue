@@ -1,12 +1,12 @@
 <template>
   <span class="launch-helper-icon" :style="{ '--helper-icon-size': `${size}px` }">
-    <component :is="iconComponent" />
+    <MIcon :name="iconName" />
   </span>
 </template>
 
 <script setup>
 import { computed } from 'vue'
-import { Aim, Connection, Document, Key, Setting, Tools } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 
 const props = defineProps({
   templateId: { type: String, default: '' },
@@ -14,15 +14,15 @@ const props = defineProps({
 })
 
 const helperIconMap = {
-  'controller-mapper': Key,
-  'locale-emulator': Connection,
-  translator: Document,
-  'game-trainer': Tools,
-  'rtss-fps-limiter': Aim,
-  custom: Setting,
+  'controller-mapper': 'key',
+  'locale-emulator': 'language',
+  translator: 'description',
+  'game-trainer': 'build',
+  'rtss-fps-limiter': 'speed',
+  custom: 'settings',
 }
 
-const iconComponent = computed(() => helperIconMap[props.templateId] || Setting)
+const iconName = computed(() => helperIconMap[props.templateId] || 'settings')
 </script>
 
 <style lang="less" scoped>

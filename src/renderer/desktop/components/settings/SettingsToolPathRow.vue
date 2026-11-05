@@ -27,7 +27,7 @@
         class="browse-btn-small"
         @click="emit('browse', helper.id, param.key)"
       >
-        <FolderOpened />
+        <MIcon name="folder_open" />
       </button>
     </div>
   </SettingsRow>
@@ -35,7 +35,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { FolderOpened } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import LaunchHelperIcon from '../LaunchHelperIcon.vue'
 import SettingsRow from './SettingsRow.vue'
 

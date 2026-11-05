@@ -3,7 +3,7 @@
     <div class="card-header">
       <div class="card-title">
         <span class="title-icon">
-          <component :is="icon" />
+          <MIcon :name="icon" />
         </span>
         {{ title }}
       </div>
@@ -18,13 +18,15 @@
 </template>
 
 <script setup>
+import { MIcon } from 'foundation-ui/vue'
+
 defineProps({
   title: {
     type: String,
     required: true,
   },
   icon: {
-    type: [Object, Function, String],
+    type: String,
     required: true,
   },
 })
