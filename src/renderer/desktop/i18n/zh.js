@@ -1107,6 +1107,8 @@ export const zh = {
     latencyTest: 'D-lay 延迟测试（网页版）',
     latencyClock: '延迟测试时钟',
     latencyClockDescription: '拍下主机和客户端两块屏幕，读数之差就是延迟',
+    testTools: '测试工具',
+    testToolsDescription: '画面测试图、帧率与卡顿、音画同步、声道、键盘鼠标触控、防休眠',
     gamepadTest: '手柄测试',
     clipboardSync: '剪贴板同步',
     lightMode: '浅色模式',

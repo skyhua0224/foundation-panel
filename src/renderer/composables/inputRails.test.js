@@ -73,3 +73,11 @@ test('the window\'s own context menu is mounted with what the panel can do, and 
   assert.ok(menu.includes("restartHost: () => hostConn.restart('service')") && menu.includes('openExternal: (u) => openExternalUrl(u)'))
   assert.ok(poly.includes("if (e.shiftKey || localStorage.getItem('foundation-ui.contextmenu') === 'native') return undefined"))
 })
+
+test('the test tools are a page of the toolbox: a route, an entry of the registry in both languages, the page in the shell', () => {
+  assert.ok(router.includes("TEST_TOOLS: 'test-tools'") && router.includes('[ROUTES.TEST_TOOLS]: { rail: \'system\', list: false, push: true }'))
+  const registry = read('./toolsRegistry.js'); assert.ok(registry.includes("id: 'test-tools'") && registry.includes('ctx.router.navigate(ROUTES.TEST_TOOLS)'))
+  assert.ok(zh.includes("testTools: '测试工具'") && en.includes("testTools: 'Test tools'"))
+  assert.ok(read('../components/SidebarMenu.vue').includes('<TestToolsPage v-else-if="entry.id === ROUTES.TEST_TOOLS" />'))
+  assert.ok(read('../components/m3e/ToolboxPage.vue').includes("'test-tools': 'science'"))
+})

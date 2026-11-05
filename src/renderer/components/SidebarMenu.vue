@@ -42,6 +42,7 @@
         <ComponentStatusPage v-else-if="entry.id === ROUTES.COMPONENT_STATUS" />
         <ToolboxPage v-else-if="entry.id === ROUTES.TOOLBOX" :tools="toolsMenuItems" />
         <LatencyClockPage v-else-if="entry.id === ROUTES.LATENCY_CLOCK" />
+        <TestToolsPage v-else-if="entry.id === ROUTES.TEST_TOOLS" />
         <LiveSessionPage v-else-if="entry.id === ROUTES.LIVE_SESSION" @open-quality="router.navigate(ROUTES.HDR_ENHANCED)" />
         <RtssPage v-else-if="entry.id === ROUTES.RTSS" />
         <DiagnosticsPage
@@ -140,6 +141,7 @@ import ComponentStatusPage from './m3e/ComponentStatusPage.vue'
 import { useComponentStatus } from '../composables/useComponentStatus.js'
 import ToolboxPage from './m3e/ToolboxPage.vue'
 import LatencyClockPage from './m3e/LatencyClockPage.vue'
+import TestToolsPage from './m3e/TestToolsPage.vue'
 import LiveSessionPage from './m3e/LiveSessionPage.vue'
 import RtssPage from './m3e/RtssPage.vue'
 import DiagnosticsPage from './m3e/DiagnosticsPage.vue'

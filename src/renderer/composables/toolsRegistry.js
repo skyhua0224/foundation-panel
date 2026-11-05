@@ -85,6 +85,13 @@ export function createUtilityTools(ctx) {
       action: () => ctx.router.navigate(ROUTES.LATENCY_CLOCK),
     },
     {
+      id: 'test-tools',
+      icon: Operation,
+      label: labels.testTools,
+      description: labels.testToolsDescription,
+      action: () => ctx.router.navigate(ROUTES.TEST_TOOLS),
+    },
+    {
       id: 'stream-timer',
       icon: Timer,
       label: labels.streamTimer,

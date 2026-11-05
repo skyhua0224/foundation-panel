@@ -24,7 +24,7 @@ import { useI18n } from '../../desktop/i18n/index.js'
 // ControllerMeta is installed and its version, as the diagnostics card did.
 const props = defineProps({ tools: { type: Array, default: () => [] } })
 const { t } = useI18n()
-const ICONS = { 'latency-clock': 'speed', 'stream-timer': 'timer', 'latency-test': 'public' }
+const ICONS = { 'test-tools': 'science', 'latency-clock': 'speed', 'stream-timer': 'timer', 'latency-test': 'public' }
 const byId = (id) => props.tools.find((tool) => tool.id === id)
 const others = computed(() => props.tools.filter((tool) => !['gamepad-test', 'stylus-input-probe'].includes(tool.id)))
 const meta = reactive({ installed: false, version: '' })
