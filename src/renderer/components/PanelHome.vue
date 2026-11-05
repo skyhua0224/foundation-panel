@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { firstImage, micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
+import { firstImage, micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, useNotify, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
 import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, useSystemInfo, reachProblemOf, registeredComponentStatus, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf, recentKeys, rememberRecent, isLoopbackHost } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
@@ -211,6 +211,9 @@ const releases = useReleaseAssets()
 const journey = useJourneyHome({ storageKey: 'panel-home', assetsOf: releases.assetsOf, versionOf: releases.versionOf, count: () => (state.clients ? state.clients.length : null), latest: () => (state.clients?.length ? state.clients[state.clients.length - 1].name : ''), locale: () => locale.value, qr: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules, pairQr: pairQr.view })
 // the star card: due after the first pairing or the first stream; while a stream runs the star of the client in use, otherwise the host and the sponsor entry; 以后再说 hides it until the next stream
 const star = useStarCard({ storageKey: 'panel-home', triggered: () => journey.done.value || sessionSeen.value, paired: () => state.clients?.length || 0, streaming: () => !!session.value })
+// the panel's snackbars: the one notification host of this window (MNotifyHost in PanelPending); the overview says its results with it, like the Web UI says them with its own snackbar
+const notify = useNotify()
+const say = (text) => notify.snack(String(text))
 // the PIN typed on the pairing card goes to the host like the pairing sheet sends it
 async function pairPin(pin, name = '') {
   if (!/^\d{4}$/.test(String(pin || ''))) return
