@@ -1,4 +1,4 @@
-use crate::{toolbar, windows};
+use crate::windows;
 use base64::Engine as _;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
