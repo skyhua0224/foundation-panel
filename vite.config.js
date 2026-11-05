@@ -40,7 +40,6 @@ export default defineConfig(() => ({
     rollupOptions: {
       input: {
         sunshineFrame: resolve(rendererSrcPath, 'sunshine-frame.html'),
-        clock: resolve(rendererSrcPath, 'stop-clock-canvas/index.html'),
         latencyClock: resolve(rendererSrcPath, 'latency-clock/index.html'),
         home: resolve(rendererSrcPath, 'home/index.html'),
         toolbar: resolve(rendererSrcPath, 'toolbar/index.html'),
