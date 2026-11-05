@@ -44,6 +44,7 @@ export const ROUTES = {
   // Places of 显示与视频 and 音频 that are pages of the Web UI, shown in the frame (/config#tab=display&sub=output)
   WEB_DISPLAY_OUTPUT: 'web-display-output',
   WEB_DISPLAY_MODES: 'web-display-modes',
+  WEB_DISPLAY_ENCODERS: 'web-display-encoders',
   WEB_DISPLAY_HDR: 'web-display-hdr',
   WEB_DISPLAY_VIDEO: 'web-display-video',
   WEB_AUDIO_SOUND: 'web-audio-sound',
@@ -72,9 +73,10 @@ export const PAGES = {
   [ROUTES.USB]: { rail: 'input' },
   [ROUTES.WEB_DISPLAY_MODES]: { rail: 'display' }, // the page the rail opens on: resolution, frame rates and bitrate (the most common change)
   [ROUTES.WEB_DISPLAY_OUTPUT]: { rail: 'display' },
+  [ROUTES.WEB_DISPLAY_ENCODERS]: { rail: 'display' },
+  [ROUTES.WEB_DISPLAY_VIDEO]: { rail: 'display' },
   [ROUTES.WEB_DISPLAY_HDR]: { rail: 'display' },
   [ROUTES.VDD_SETTINGS]: { rail: 'display' },
-  [ROUTES.WEB_DISPLAY_VIDEO]: { rail: 'display' },
   [ROUTES.HDR_ENHANCED]: { rail: 'display' },
   [ROUTES.COMPONENT_STATUS]: { rail: 'system' },
   [ROUTES.COMPONENTS]: { rail: 'system' },
@@ -97,7 +99,7 @@ const ALIAS = { [ROUTES.CONTROLLERS]: ROUTES.GAMEPAD, [ROUTES.COMPONENTS]: ROUTE
 const CATEGORY = { [ROUTES.CAT_CONFIG]: 'config', [ROUTES.CAT_STREAM]: 'stream', [ROUTES.CAT_INPUT]: 'input', [ROUTES.CAT_AUDIO]: 'audio', [ROUTES.CAT_DISPLAY]: 'display', [ROUTES.CAT_SYSTEM]: 'system' }
 // The panel destination of a place of the display and audio tabs (the same places as foundation-ui's DISPLAY_PLACES and AUDIO_PLACES): the virtual display and the microphone are pages of the panel itself
 const PLACE_ROUTE = {
-  'display:output': ROUTES.WEB_DISPLAY_OUTPUT, 'display:modes': ROUTES.WEB_DISPLAY_MODES, 'display:hdr': ROUTES.WEB_DISPLAY_HDR, 'display:virtual': ROUTES.VDD_SETTINGS, 'display:video': ROUTES.WEB_DISPLAY_VIDEO,
+  'display:output': ROUTES.WEB_DISPLAY_OUTPUT, 'display:modes': ROUTES.WEB_DISPLAY_MODES, 'display:encoders': ROUTES.WEB_DISPLAY_ENCODERS, 'display:video': ROUTES.WEB_DISPLAY_VIDEO, 'display:hdr': ROUTES.WEB_DISPLAY_HDR, 'display:virtual': ROUTES.VDD_SETTINGS, 'display:quality': ROUTES.HDR_ENHANCED,
   'audio:sound': ROUTES.WEB_AUDIO_SOUND, 'audio:microphone': ROUTES.MICROPHONE,
   'input:gamepad': ROUTES.GAMEPAD, 'input:keyboard': ROUTES.WEB_INPUT_KEYBOARD, 'input:mouse': ROUTES.WEB_INPUT_MOUSE, 'input:usb': ROUTES.USB,
 }
@@ -126,7 +128,8 @@ export const webPathOf = (route) => ({
   [ROUTES.WEB_CLIENTS]: '/pin', [ROUTES.WEB_APPS]: '/apps', [ROUTES.WEB_CONFIG]: '/config', [ROUTES.WEB_DOWNLOADS]: '/downloads',
   [ROUTES.WEB_PASSWORD]: '/password', [ROUTES.WEB_TROUBLESHOOTING]: '/troubleshooting',
   [ROUTES.WEB_DISPLAY_OUTPUT]: `/config${settingsHash({ tab: 'display', sub: 'output' })}`, [ROUTES.WEB_DISPLAY_MODES]: `/config${settingsHash({ tab: 'display', sub: 'modes' })}`,
-  [ROUTES.WEB_DISPLAY_HDR]: `/config${settingsHash({ tab: 'display', sub: 'hdr' })}`, [ROUTES.WEB_DISPLAY_VIDEO]: `/config${settingsHash({ tab: 'display', sub: 'video' })}`,
+  [ROUTES.WEB_DISPLAY_ENCODERS]: `/config${settingsHash({ tab: 'display', sub: 'encoders' })}`, [ROUTES.WEB_DISPLAY_VIDEO]: `/config${settingsHash({ tab: 'display', sub: 'video' })}`,
+  [ROUTES.WEB_DISPLAY_HDR]: `/config${settingsHash({ tab: 'display', sub: 'hdr' })}`,
   [ROUTES.WEB_AUDIO_SOUND]: `/config${settingsHash({ tab: 'audio', sub: 'sound' })}`,
   // the gamepad, the keyboard and the mouse are pages of 输入与外设 in the Web UI: the rail destinations show those pages in the frame
   [ROUTES.GAMEPAD]: `/config${settingsHash({ tab: 'input', sub: 'gamepad' })}`,

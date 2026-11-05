@@ -421,13 +421,15 @@ const uni = useUnifiedSearch({ docs: searchDocs, onPin: (doc) => pinToHome('pane
 // Where an error of the diagnostics page leads
 const goDiagnosticsPlace = (place) => {
   if (place === 'drivers') router.navigate(ROUTES.COMPONENTS)
-  else if (place === 'encoder') openConfig({ tab: 'encoders' })
+  else if (place === 'encoder') openConfig({ tab: 'display', sub: 'encoders' })
   else if (place === 'network') openConfig({ tab: 'network' })
   else if (place === 'audio') openConfig({ tab: 'audio', sub: 'sound' })
   else if (place === 'display') openConfig({ tab: 'display', sub: 'output' })
 }
 // A place of the stream settings: the list pane opens the Web page in the frame at that tab, section and row
 const openConfig = (params = { tab: 'general' }) => {
+  // The Web row stays in 捕获与视频, while the panel's native manager has its own 画质增强 place.
+  if (params.focus === 'hdr_enhanced') { router.navigate(ROUTES.HDR_ENHANCED); return }
   // the display and audio places are destinations of their own rails (the virtual display and the microphone are pages of the panel)
   const place = routeOfPlace(params.tab, params.sub)
   if (place) {
