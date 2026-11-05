@@ -89,6 +89,7 @@
         <MItem action icon="search" :title="t.m3e.search" @click="moreGo(() => uni.show())" />
         <MItem action icon="settings" :title="t.m3e.nav.settings" :text="settingsList.lines.value.panel" @click="moreGo(() => onRail({ id: 'settings' }))" />
         <MItem action icon="palette" :title="appearanceLabel" @click="moreGo(() => router.navigate(ROUTES.CFG_APPEARANCE))" />
+        <MItem action icon="info" :title="aboutTexts(locale).title" :text="currentVersion" @click="moreGo(() => router.navigate(ROUTES.ABOUT))" />
         <MItem action icon="help" :title="t.m3e.nav.help" :text="settingsList.lines.value.help" :tone="updateWaiting ? 'warn' : ''" @click="moreGo(() => onRail({ id: 'help' }))" />
         <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="moreGo(() => { sponsorOpen = true })" />
       </MGroup>
