@@ -1,0 +1,2 @@
+/* The tool windows do not load the foundation-ui stylesheet; this is the one rule MIcon needs from it (base.css): the glyph is as big as the text and takes its colour. */
+.m-icon { width: 1em; height: 1em; fill: currentColor; flex: none; display: inline-block; vertical-align: middle; }

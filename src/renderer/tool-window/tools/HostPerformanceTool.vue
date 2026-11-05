@@ -12,30 +12,30 @@
 
       <div class="head-actions">
         <button class="icon-btn" :disabled="refreshing" :title="t.performanceTool.refresh" @click="loadSnapshot(true)">
-          <RefreshRight :class="{ spinning: refreshing }" />
+          <MIcon name="refresh" :class="{ spinning: refreshing }" />
         </button>
         <button v-if="!embedded" class="icon-btn" :title="expandTitle" @click="isExpanded = !isExpanded">
-          <ArrowUp v-if="isExpanded" />
-          <ArrowDown v-else />
+          <MIcon name="keyboard_arrow_up" v-if="isExpanded" />
+          <MIcon name="keyboard_arrow_down" v-else />
         </button>
         <button v-if="!embedded" class="icon-btn close-btn" :title="t.performanceTool.close" @click="$emit('close')">
-          <Close />
+          <MIcon name="close" />
         </button>
       </div>
     </div>
 
     <div v-if="loading" class="state-panel compact-state">
-      <Monitor class="state-icon" />
+      <MIcon name="monitor" class="state-icon" />
       <span>{{ t.performanceTool.loading }}</span>
     </div>
 
     <div v-else-if="error" class="state-panel compact-state error">
-      <Warning class="state-icon" />
+      <MIcon name="warning" class="state-icon" />
       <span>{{ t.performanceTool.loadFailed.replace('{error}', error) }}</span>
     </div>
 
     <div v-else-if="!currentSession" class="state-panel compact-state">
-      <Monitor class="state-icon" />
+      <MIcon name="monitor" class="state-icon" />
       <span>{{ t.performanceTool.noStream }}</span>
     </div>
 
@@ -123,7 +123,7 @@
 <script setup>
 import { useTouchWindowDrag } from '../../composables/useTouchWindowDrag.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ArrowDown, ArrowUp, Close, Monitor, RefreshRight, Warning } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import { sunshine } from '../../tauri-adapter.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 import { useAdaptiveWindowSize } from '../../composables/useAdaptiveWindowSize.js'

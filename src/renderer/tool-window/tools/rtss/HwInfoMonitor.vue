@@ -1,16 +1,16 @@
 <template>
   <SectionPanel :title="t.hwinfo.title">
-    <template #icon><Monitor /></template>
+    <template #icon><MIcon name="monitor" /></template>
     <template #actions>
       <button class="refresh-btn" @click="loadSensors" :disabled="loading">
-        <Refresh />
+        <MIcon name="refresh" />
       </button>
       <ToggleSwitch :modelValue="injecting" @update:modelValue="toggleInject" :disabled="!available" />
     </template>
 
     <!-- 不可用提示 -->
     <div v-if="!available && !loading" class="unavailable-hint">
-      <WarningFilled class="warn-icon" />
+      <MIcon name="warning" fill class="warn-icon" />
       <span>{{ t.hwinfo.unavailable }}</span>
       <div class="hint-sub">{{ t.hwinfo.enableHint }}</div>
     </div>
@@ -62,7 +62,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { Monitor, Refresh, WarningFilled } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../../../desktop/i18n/index.js'
 import SectionPanel from '../../components/SectionPanel.vue'

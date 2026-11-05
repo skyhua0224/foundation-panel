@@ -1,6 +1,6 @@
 <template>
   <SectionPanel :title="t.rtssTool.fpsLimiter">
-    <template #icon><Aim /></template>
+    <template #icon><MIcon name="speed" /></template>
     <template #actions>
       <ToggleSwitch :modelValue="limiterEnabled" @update:modelValue="onToggleLimiter" />
     </template>
@@ -54,7 +54,7 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { Aim } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../../../desktop/i18n/index.js'
 import SectionPanel from '../../components/SectionPanel.vue'

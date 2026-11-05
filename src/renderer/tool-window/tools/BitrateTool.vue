@@ -27,7 +27,7 @@
           :disabled="isLoading || applying"
           :title="t.bitrateTool.refresh"
         >
-          <RefreshRight class="refresh-icon" :class="{ spinning: refreshing }" />
+          <MIcon name="refresh" class="refresh-icon" :class="{ spinning: refreshing }" />
         </button>
       </div>
 
@@ -39,7 +39,7 @@
       <!-- 无会话提示 -->
       <template v-else-if="activeSessions.length === 0">
         <div class="empty-state">
-          <div class="icon"><Connection /></div>
+          <div class="icon"><MIcon name="link" /></div>
           <p>{{ t.bitrateTool.noStream }}</p>
           <p class="subtitle">{{ t.bitrateTool.noStreamSub }}</p>
           <p v-if="allSessions.length > 0" class="subtitle warning-text">
@@ -118,7 +118,7 @@
 
       <!-- 未选择客户端提示 -->
       <div v-else class="empty-state">
-        <div class="icon"><Top /></div>
+        <div class="icon"><MIcon name="arrow_upward" /></div>
         <p>{{ t.bitrateTool.selectFirst }}</p>
       </div>
 
@@ -135,7 +135,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { sunshine } from '../../tauri-adapter.js'
-import { RefreshRight, Connection, Top } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import { useI18n } from '../../desktop/i18n/index.js'
 
 const { t } = useI18n()

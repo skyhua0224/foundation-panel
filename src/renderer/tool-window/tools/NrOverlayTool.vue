@@ -5,9 +5,9 @@
       <button class="pill" :aria-expanded="expanded" :aria-label="text.states[state] + (state === 'active' ? ' · ' + (pipeline?.nr_scale_percent ?? 100) + '%' : '')" @click="expanded = !expanded">
         <span class="dot" :class="state" />
         <span>{{ expanded ? 'DLSS NR' : compactLabel }}</span>
-        <ArrowDown class="chevron" :class="{ rotated: expanded }" aria-hidden="true" />
+        <MIcon name="keyboard_arrow_down" class="chevron" :class="{ rotated: expanded }" aria-hidden="true" />
       </button>
-      <button v-if="expanded" class="close" :aria-label="text.close" :title="text.close" @click="$emit('close')"><Close aria-hidden="true" /></button>
+      <button v-if="expanded" class="close" :aria-label="text.close" :title="text.close" @click="$emit('close')"><MIcon name="close" aria-hidden="true" /></button>
     </header>
     <div class="nr-reveal" :inert="!expanded" :aria-hidden="!expanded">
       <div class="nr-clip">
@@ -85,7 +85,7 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { ArrowDown, Close } from '@element-plus/icons-vue'
+import { MIcon } from 'foundation-ui/vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window'
