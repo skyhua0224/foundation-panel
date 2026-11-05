@@ -18,7 +18,6 @@ mod preferences;
 
 pub(crate) use preferences::{include_prerelease as get_include_prerelease, save_last_check_time};
 
-
 use metadata::{
     ReleaseAsset, ReleaseCandidate, ReleaseCatalog, UpdateChannel, candidate_is_newer_than,
     resolve_catalog, select_candidate,
@@ -515,6 +514,9 @@ fn is_gui_component_installer(path: &Path) -> bool {
 }
 
 #[cfg(target_os = "windows")]
+// Native boundary rationale and painting rules: panel-ms-createwindowex-20261105,
+// panel-ms-updatelayeredwindow-20261105, panel-ms-wmpaint-20261105,
+// panel-ms-layeredwindows-20261105 (docs/authority/source-index.tsv).
 fn run_updater_panel(state: UpdaterHelperState) -> Result<(), String> {
     use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
     use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, HBRUSH, PAINTSTRUCT};
@@ -706,6 +708,17 @@ fn updater_panel_position(width: i32, height: i32) -> (i32, i32) {
 }
 
 #[cfg(target_os = "windows")]
+fn updater_dark_theme() -> bool {
+    use windows::Win32::UI::WindowsAndMessaging::{COLOR_WINDOW, GetSysColor};
+
+    let color = unsafe { GetSysColor(COLOR_WINDOW) };
+    let red = color & 0xff;
+    let green = (color >> 8) & 0xff;
+    let blue = (color >> 16) & 0xff;
+    red + green + blue < 384
+}
+
+#[cfg(target_os = "windows")]
 fn draw_updater_panel_cutout(hwnd: windows::Win32::Foundation::HWND) {
     use std::ffi::c_void;
     use windows::Win32::Foundation::{POINT, RECT, SIZE};
@@ -773,7 +786,8 @@ fn draw_updater_panel_cutout(hwnd: windows::Win32::Foundation::HWND) {
         buffer.fill(0);
 
         draw_updater_animation_frame(buffer, width, height, &state);
-        draw_updater_bottom_copy(buffer, width, height);
+        let dark_theme = updater_dark_theme();
+        draw_updater_bottom_copy(buffer, width, height, dark_theme);
         let mem_hdc = CreateCompatibleDC(Some(screen_hdc));
         if mem_hdc.is_invalid() {
             let _ = DeleteObject(bitmap.into());
@@ -794,7 +808,11 @@ fn draw_updater_panel_cutout(hwnd: windows::Win32::Foundation::HWND) {
             DT_LEFT | DT_WORDBREAK,
             13,
             500,
-            windows::Win32::Foundation::COLORREF(0x00705F5A),
+            if dark_theme {
+                windows::Win32::Foundation::COLORREF(0x00FAF2F5)
+            } else {
+                windows::Win32::Foundation::COLORREF(0x00342D30)
+            },
         );
         restore_gdi_text_alpha(buffer, width, height, 82, 186, 486, 210);
 
@@ -865,38 +883,16 @@ fn draw_updater_animation_frame(
 }
 
 #[cfg(target_os = "windows")]
-fn draw_updater_bottom_copy(buffer: &mut [u8], width: i32, height: i32) {
-    fill_bgra_rect(buffer, width, height, 72, 186, 512, 224, (58, 63, 75, 220));
-    fill_bgra_rect(
-        buffer,
-        width,
-        height,
-        64,
-        178,
-        504,
-        216,
-        (255, 245, 221, 255),
-    );
-    fill_bgra_rect(
-        buffer,
-        width,
-        height,
-        82,
-        172,
-        132,
-        184,
-        (255, 231, 151, 255),
-    );
-    fill_bgra_rect(
-        buffer,
-        width,
-        height,
-        438,
-        210,
-        488,
-        222,
-        (255, 231, 151, 255),
-    );
+fn draw_updater_bottom_copy(buffer: &mut [u8], width: i32, height: i32, dark_theme: bool) {
+    let (shadow, surface, primary) = if dark_theme {
+        ((10, 9, 12, 220), (34, 32, 40, 255), (166, 216, 255, 255))
+    } else {
+        ((62, 58, 68, 180), (249, 247, 252, 255), (0, 92, 122, 255))
+    };
+    fill_bgra_rect(buffer, width, height, 72, 186, 512, 224, shadow);
+    fill_bgra_rect(buffer, width, height, 64, 178, 504, 216, surface);
+    fill_bgra_rect(buffer, width, height, 82, 172, 132, 184, primary);
+    fill_bgra_rect(buffer, width, height, 438, 210, 488, 222, primary);
 }
 
 #[cfg(target_os = "windows")]
@@ -1036,9 +1032,9 @@ unsafe fn draw_text_styled(
     use windows::core::PCWSTR;
 
     let face = to_wide_null(if text.is_ascii() {
-        "Cascadia Mono"
+        "Segoe UI Variable Text"
     } else {
-        "SimSun"
+        "Microsoft YaHei UI"
     });
     let font = unsafe {
         CreateFontW(

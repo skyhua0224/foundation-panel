@@ -14,6 +14,7 @@ test('native About, pairing, and log entries target the main shell pages', () =>
   const pet = read('src/renderer/toolbar/ToolbarApp.vue')
   const petMain = read('src/renderer/toolbar/main.js')
   const toolWindow = read('src/renderer/tool-window/ToolWindow.vue')
+  const updater = read('src-tauri/src/update.rs')
   assert.doesNotMatch(rust, /(?:about|console|pin)\/index\.html/)
   assert.match(parts, /about: \{ route: 'about'/)
   assert.match(parts, /pairing: \{ route: 'web-clients'/)
@@ -33,6 +34,10 @@ test('native About, pairing, and log entries target the main shell pages', () =>
   for (const oldTool of ['BitrateTool.vue', 'DpiAdjusterTool.vue', 'HostPerformanceTool.vue', 'RtssOsdTool.vue', 'ShortcutsTool.vue', 'PetSettingsTool.vue']) {
     assert.equal(readFileExists(`src/renderer/tool-window/tools/${oldTool}`), true, `${oldTool} is retained for the desktop compatibility surface`)
   }
+  assert.doesNotMatch(updater, /SimSun/)
+  assert.match(updater, /Segoe UI Variable Text/)
+  assert.match(updater, /Microsoft YaHei UI/)
+  assert.match(updater, /updater_dark_theme/)
 })
 
 function readFileExists(path) {
