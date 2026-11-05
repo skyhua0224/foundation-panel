@@ -314,7 +314,6 @@ onUnmounted(() => {
 })
 </script>
 
-<style src="../styles/EnhancementManager.css"></style>
 <style>
 /* the page: a status strip, the overlay as it looks in the game at a readable size, then its controls as rows */
 .m-qstrip { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 4px; margin-bottom: 12px; }
