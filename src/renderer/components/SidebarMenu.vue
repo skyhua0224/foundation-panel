@@ -364,12 +364,27 @@ const connectT = computed(() => connectTexts(locale.value))
 const connectNotice = ref('')
 // short results go to the one snackbar of the window
 watch(connectNotice, (message) => { if (message) { useNotify().snack(message); connectNotice.value = '' } })
-const hostApiOf = async (path, init) => { const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, ''); return (await fetch(`${base}${path}`, init)).json() }
+const hostApiOf = async (path, init) => {
+  const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')
+  const response = await fetch(`${base}${path}`, init)
+  let data = null
+  try { data = await response.json() } catch { /* the proxy may have no JSON body */ }
+  if (!response.ok) throw Object.assign(new Error(data?.error || `HTTP ${response.status}`), { status: response.status })
+  return data
+}
 const connect = useConnectDialog({
   hostApi: { getJson: (path) => hostApiOf(path), postJson: (path, body) => hostApiOf(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }) },
   render: (url) => qrSvgDataUrl(QRCode.create(url, { errorCorrectionLevel: 'M' }).modules),
   matrix: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules,
-  say: (kind) => { connectNotice.value = kind === 'sent' ? connectT.value.pinSent : connectT.value.pinFailed },
+  say: (kind, reason) => {
+    if (kind === 'sent') connectNotice.value = connectT.value.pinSent
+    else connectNotice.value = ({
+      incorrect: connectT.value.pinIncorrect || connectT.value.pinFailed,
+      timeout: connectT.value.pinTimeout || connectT.value.pinFailed,
+      network: connectT.value.pinNetwork || connectT.value.pinFailed,
+      'not-ready': connectT.value.pinNotReady || connectT.value.pinFailed,
+    }[reason] || connectT.value.pinFailed)
+  },
   defaultName: locale.value.startsWith('zh') ? '新客户端' : 'New client',
 })
 // a device waits for its PIN: the prompt comes forward on any page (the host's long poll through the proxy, docs/api/pairing-pending.md); the native notification and the tray are the host tray's own
