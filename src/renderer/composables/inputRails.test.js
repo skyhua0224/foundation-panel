@@ -66,3 +66,10 @@ test('the overview gets 最近操作 and the live controls of a stream: the keys
   assert.ok(home.includes("{ schema: 'ALK-DS5T/1', values: { [key]: value } }"))
   assert.ok(home.includes('if (r.ok) { state.config = r.config; rememberRecent(key) }'), 'a setting saved from a tile is a recent one')
 })
+
+test('the window\'s own context menu is mounted with what the panel can do, and the production build lets Shift+right-click through to the platform', () => {
+  const menu = read('../components/SidebarMenu.vue'); const poly = read('../tauri-polyfill.js')
+  assert.ok(menu.includes('<MContextProvider :locale="locale" :callbacks="ctxCallbacks" :capabilities="{ product: \'panel\' }" />'))
+  assert.ok(menu.includes("restartHost: () => hostConn.restart('service')") && menu.includes('openExternal: (u) => openExternalUrl(u)'))
+  assert.ok(poly.includes("if (e.shiftKey || localStorage.getItem('foundation-ui.contextmenu') === 'native') return undefined"))
+})

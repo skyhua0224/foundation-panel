@@ -101,7 +101,9 @@ const disableContextMenu = () => {
   }
   
   // 禁用右键菜单
+  // the window's own menu (MContextProvider) is the menu; Shift+right-click and the developer option give the platform's own back
   contextMenuHandler = (e) => {
+    if (e.shiftKey || localStorage.getItem('foundation-ui.contextmenu') === 'native') return undefined
     e.preventDefault()
     return false
   }
