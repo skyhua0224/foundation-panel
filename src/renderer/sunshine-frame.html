@@ -25,16 +25,13 @@
         box-sizing: border-box;
       }
 
+      /* the Material 3 surface of the shell before its first frame (the colour the window reports: src-tauri/src/windows/surface.rs) */
       :root {
-        --boot-background: linear-gradient(135deg, #2d2628 0%, #3d3235 100%);
-        --boot-foreground: #e6d5b8;
-        --boot-shadow: rgba(212, 165, 165, 0.3);
+        --boot-background: #131318;
       }
 
       :root[data-bs-theme='light'] {
-        --boot-background: linear-gradient(135deg, #f0f8ff 0%, #e6f2ff 100%);
-        --boot-foreground: #4a9eff;
-        --boot-shadow: rgba(74, 158, 255, 0.3);
+        --boot-background: #fbf8ff;
       }
 
       body {
@@ -45,12 +42,6 @@
       #app {
         width: 100%;
         height: 100vh;
-      }
-
-      @font-face {
-        font-family: 'PixelMplus12';
-        src: url('./public/fonts/PixelMplus12-Bold.woff2') format('woff2');
-        font-weight: 700;
       }
     </style>
   </head>

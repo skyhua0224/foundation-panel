@@ -9,7 +9,7 @@ use std::sync::Mutex;
 use tauri::window::Color;
 
 /// The shell's dark boot colour (sunshine-frame.html), until a theme has been reported.
-const FIRST_RUN: (u8, u8, u8) = (0x2d, 0x26, 0x28);
+const FIRST_RUN: (u8, u8, u8) = (0x13, 0x13, 0x18);
 
 static LAST_STORED: Mutex<Option<(u8, u8, u8)>> = Mutex::new(None);
 

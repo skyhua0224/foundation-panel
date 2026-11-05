@@ -611,8 +611,6 @@ const onLoad = () => {
 </script>
 
 <style scoped lang="less">
-@import '../styles/theme.less';
-
 .iframe-container {
   width: 100%;
   height: 100%;

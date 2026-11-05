@@ -410,40 +410,31 @@
     grid-column: 1/-1;
   }
 }
-[data-bs-theme='dark'] .quality-manager {
-  --enh-illustration: #b18a88;
-  --enh-link: #d4a5a5;
-  --enh-button-ink: #34272c;
-  --el-text-color-placeholder: #9d9494;
-  --el-color-primary-light-7: rgba(212, 165, 165, 0.28);
-  --el-border-color: rgba(230, 213, 184, 0.22);
-  --el-border-color-light: rgba(230, 213, 184, 0.16);
-  --el-border-color-lighter: rgba(230, 213, 184, 0.11);
-  --el-border-color-darker: rgba(230, 213, 184, 0.3);
-  --el-fill-color-blank: #3d3235;
-  --el-fill-color-light: rgba(255, 255, 255, 0.055);
-  color-scheme: dark;
-  --quality-surface: #3d3235;
-  --el-color-primary: #d4a5a5;
-  --el-color-primary-light-9: rgba(212, 165, 165, 0.12);
-  --el-color-primary-light-8: rgba(212, 165, 165, 0.2);
-  --el-text-color-primary: #f0dfc3;
-  --el-text-color-regular: #d6c3a7;
-  --el-text-color-secondary: #b9aca8;
-}
 .quality-manager .quality-tabs button[aria-selected='true'] {
   color: var(--el-color-primary);
   background: var(--el-color-primary-light-9);
 }
 
 .quality-manager {
-  --el-color-primary-light-7: #c6e2ff;
-  --el-color-primary-light-8: #d9ecff;
-  --el-color-primary-light-9: #ecf5ff;
-  --el-color-primary: #4a9eff;
-  --enh-illustration: #6fa6db;
-  --enh-link: #2f6db5;
-  --enh-button-ink: #153553;
+  /* the colours are the shell's (Material 3 tokens of the panel's theme), light and dark alike */
+  --el-color-primary: var(--md-sys-color-primary);
+  --el-color-primary-light-7: color-mix(in srgb, var(--md-sys-color-primary) 28%, transparent);
+  --el-color-primary-light-8: color-mix(in srgb, var(--md-sys-color-primary) 20%, transparent);
+  --el-color-primary-light-9: color-mix(in srgb, var(--md-sys-color-primary) 12%, transparent);
+  --enh-illustration: var(--md-sys-color-primary);
+  --enh-link: var(--md-sys-color-primary-text, var(--md-sys-color-primary));
+  --enh-button-ink: var(--md-sys-color-on-primary);
+  --quality-surface: var(--md-sys-color-surface-container);
+  --el-fill-color-blank: var(--md-sys-color-surface-container);
+  --el-fill-color-light: color-mix(in srgb, var(--md-sys-color-on-surface) 6%, transparent);
+  --el-text-color-primary: var(--md-sys-color-on-surface);
+  --el-text-color-regular: var(--md-sys-color-on-surface);
+  --el-text-color-secondary: var(--md-sys-color-on-surface-variant);
+  --el-text-color-placeholder: var(--md-sys-color-outline);
+  --el-border-color: var(--md-sys-color-outline-variant);
+  --el-border-color-light: var(--md-sys-color-outline-variant);
+  --el-border-color-lighter: var(--md-sys-color-outline-variant);
+  --el-border-color-darker: var(--md-sys-color-outline);
   font-family: inherit;
   color: var(--el-text-color-primary);
   margin: 0 auto;
