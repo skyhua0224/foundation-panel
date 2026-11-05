@@ -95,7 +95,7 @@ export const PAGES = {
 export const RAILS = ['overview', 'stream', 'config', 'input', 'audio', 'display', 'system', 'assistant', 'settings', 'help']
 
 // the old component page is part of the component status page now
-const ALIAS = { [ROUTES.CONTROLLERS]: ROUTES.GAMEPAD, [ROUTES.COMPONENTS]: ROUTES.COMPONENT_STATUS }
+const ALIAS = { [ROUTES.CONTROLLERS]: ROUTES.GAMEPAD, [ROUTES.COMPONENTS]: ROUTES.COMPONENT_STATUS, [ROUTES.WEB_TROUBLESHOOTING]: ROUTES.DIAGNOSTICS }
 const CATEGORY = { [ROUTES.CAT_CONFIG]: 'config', [ROUTES.CAT_STREAM]: 'stream', [ROUTES.CAT_INPUT]: 'input', [ROUTES.CAT_AUDIO]: 'audio', [ROUTES.CAT_DISPLAY]: 'display', [ROUTES.CAT_SYSTEM]: 'system' }
 // The panel destination of a place of the display and audio tabs (the same places as foundation-ui's DISPLAY_PLACES and AUDIO_PLACES): the virtual display and the microphone are pages of the panel itself
 const PLACE_ROUTE = {
@@ -115,7 +115,8 @@ const WEB_PATHS = [
   [/^\/config(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_CONFIG],
   [/^\/downloads(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_DOWNLOADS],
   [/^\/password(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_PASSWORD],
-  [/^\/troubleshooting(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_TROUBLESHOOTING],
+  [/^\/troubleshooting(?:\.html)?(?:[?#/]|$)/, ROUTES.DIAGNOSTICS],
+  [/^\/diagnostics(?:\.html)?(?:[?#/]|$)/, ROUTES.DIAGNOSTICS],
   [/^\/dualsense(?:\.html)?(?:[?#/]|$)/, ROUTES.GAMEPAD],
 ]
 /** The panel destination that shows a Web UI path; the Web home is the panel's own overview. */
@@ -131,7 +132,7 @@ export const routeForWebPath = (path) => {
 /** The Web UI path of a Web page destination (null for panel pages). */
 export const webPathOf = (route) => ({
   [ROUTES.WEB_CLIENTS]: '/pin', [ROUTES.WEB_APPS]: '/apps', [ROUTES.WEB_CONFIG]: '/config', [ROUTES.WEB_DOWNLOADS]: '/downloads',
-  [ROUTES.WEB_PASSWORD]: '/password', [ROUTES.WEB_TROUBLESHOOTING]: '/troubleshooting',
+  [ROUTES.WEB_PASSWORD]: '/password',
   [ROUTES.WEB_DISPLAY_OUTPUT]: `/config${settingsHash({ tab: 'display', sub: 'output' })}`, [ROUTES.WEB_DISPLAY_MODES]: `/config${settingsHash({ tab: 'display', sub: 'modes' })}`,
   [ROUTES.WEB_DISPLAY_ENCODERS]: `/config${settingsHash({ tab: 'display', sub: 'encoders' })}`, [ROUTES.WEB_DISPLAY_VIDEO]: `/config${settingsHash({ tab: 'display', sub: 'video' })}`,
   [ROUTES.WEB_DISPLAY_HDR]: `/config${settingsHash({ tab: 'display', sub: 'hdr' })}`,

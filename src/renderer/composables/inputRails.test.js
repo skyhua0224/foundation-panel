@@ -53,7 +53,11 @@ test('the rail of 常规, 配置文件, 网络 and 安全与登录 is 主机设�
   assert.ok(!/streamSettings: '串流设置'/.test(zh) && zh.includes("streamSettings: '主机设置'"))
 })
 
-test('in 系统 the two log pages have two names: 诊断 (the panel page) and 日志与排错 (the Web page), the same words as the Web UI', () => {
-  assert.ok(zh.includes("    diagnostics: '诊断',") && en.includes("    diagnostics: 'Diagnostics',"))
-  assert.ok(zh.includes("troubleshooting: '日志与排错', components:") && en.includes("troubleshooting: 'Logs and troubleshooting', lead:"))
+test('系统 names the one page of logs, errors, export, AI diagnosis, restart and reset 诊断与日志', () => {
+  assert.ok(zh.includes("diagnostics: '诊断与日志',") && en.includes("diagnostics: 'Diagnostics and logs',"))
+  assert.ok(zh.includes("troubleshooting: '诊断与日志', components:") && en.includes("troubleshooting: 'Diagnostics and logs', lead:"))
+  const system = nav.slice(nav.indexOf('system: ['), nav.indexOf('],', nav.indexOf('system: [')))
+  assert.ok(system.includes('ROUTES.DIAGNOSTICS') && !system.includes('WEB_TROUBLESHOOTING'), 'one row in the list')
+  assert.ok(router.includes('[ROUTES.WEB_TROUBLESHOOTING]: ROUTES.DIAGNOSTICS'), 'the old route opens the same page')
+  assert.ok(router.includes('/troubleshooting(?:\\.html)?(?:[?#/]|$)/, ROUTES.DIAGNOSTICS'), 'the old address opens the same page')
 })
