@@ -623,46 +623,6 @@ const overviewCards = computed(() => [
     value: gpuSummary.value,
   },
 ])
-const sectionTabs = computed(() => [
-  { key: 'overview', label: t.value.vddSettings.tabOverview, icon: DataAnalysis },
-  { key: 'display', label: t.value.vddSettings.tabDisplay, icon: Monitor },
-  { key: 'calibration', label: t.value.vddSettings.tabCalibration, icon: Sunny },
-  { key: 'driver', label: t.value.vddSettings.tabDriver, icon: Tools },
-])
-
-const focusSectionByIndex = async (index) => {
-  const tabs = sectionTabs.value
-  if (!tabs.length) return
-  const normalizedIndex = (index + tabs.length) % tabs.length
-  activeSection.value = tabs[normalizedIndex].key
-  await nextTick()
-  document.getElementById(`vdd-tab-${activeSection.value}`)?.focus()
-}
-
-const focusAdjacentSection = (key, offset) => {
-  const currentIndex = sectionTabs.value.findIndex((tab) => tab.key === key)
-  if (currentIndex >= 0) focusSectionByIndex(currentIndex + offset)
-}
-const heroActions = computed(() => [
-  {
-    key: 'reload',
-    label: t.value.vddSettings.reload,
-    icon: Refresh,
-    loading: isLoading.value,
-    plain: true,
-    type: undefined,
-    onClick: reloadSettings,
-  },
-  {
-    key: 'save',
-    label: t.value.vddSettings.saveAndApply,
-    icon: UploadFilled,
-    loading: isSaving.value,
-    plain: !hasUnsavedChanges.value,
-    type: hasUnsavedChanges.value ? 'primary' : undefined,
-    onClick: saveSettings,
-  },
-])
 const buildSettingsPayload = () => ({
   ...settings,
   gpu: {

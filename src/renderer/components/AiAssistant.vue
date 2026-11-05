@@ -189,12 +189,8 @@ function getActionHint(action) {
  */
 async function handleSend() {
   if (!currentInput.value.trim() || isLoading.value) return
-  showConfig.value = false
   const accepted = await sendMessage(currentInput.value)
-  if (!accepted) {
-    showConfig.value = true
-    return
-  }
+  if (!accepted) return
   await nextTick()
   scrollToBottom()
 }
