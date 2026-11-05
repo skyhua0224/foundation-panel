@@ -44,8 +44,6 @@ export default defineConfig(() => ({
         clock: resolve(rendererSrcPath, 'stop-clock-canvas/index.html'),
         latencyClock: resolve(rendererSrcPath, 'latency-clock/index.html'),
         home: resolve(rendererSrcPath, 'home/index.html'),
-        about: resolve(rendererSrcPath, 'about/index.html'),
-        pin: resolve(rendererSrcPath, 'pin/index.html'),
         toolbar: resolve(rendererSrcPath, 'toolbar/index.html'),
         toolWindow: resolve(rendererSrcPath, 'tool-window/index.html'),
         desktop: resolve(rendererSrcPath, 'desktop/index.html'),
