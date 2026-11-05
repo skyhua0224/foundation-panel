@@ -13,6 +13,7 @@ test('native About, pairing, and log entries target the main shell pages', () =>
   const toolbar = read('src-tauri/src/toolbar.rs')
   const pet = read('src/renderer/toolbar/ToolbarApp.vue')
   const petMain = read('src/renderer/toolbar/main.js')
+  const toolWindow = read('src/renderer/tool-window/ToolWindow.vue')
   assert.doesNotMatch(rust, /(?:about|console|pin)\/index\.html/)
   assert.match(parts, /about: \{ route: 'about'/)
   assert.match(parts, /pairing: \{ route: 'web-clients'/)
@@ -28,4 +29,12 @@ test('native About, pairing, and log entries target the main shell pages', () =>
   assert.match(pet, /toggleMenu/)
   assert.match(pet, /--pet-surface/)
   assert.match(petMain, /foundation-ui\/all\.css/)
+  assert.match(toolWindow, /NrOverlayTool\.vue/)
+  for (const oldTool of ['BitrateTool.vue', 'DpiAdjusterTool.vue', 'HostPerformanceTool.vue', 'RtssOsdTool.vue', 'ShortcutsTool.vue', 'PetSettingsTool.vue']) {
+    assert.equal(readFileExists(`src/renderer/tool-window/tools/${oldTool}`), true, `${oldTool} is retained for the desktop compatibility surface`)
+  }
 })
+
+function readFileExists(path) {
+  try { readFileSync(new URL(`../../../${path}`, import.meta.url)); return true } catch { return false }
+}

@@ -569,7 +569,7 @@ pub fn open_pin_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std
     open_main_panel_page(app, "pairing").map_err(Into::into)
 }
 
-fn open_main_panel_page<R: Runtime>(app: &AppHandle<R>, page: &str) -> Result<(), String> {
+pub fn open_main_panel_page<R: Runtime>(app: &AppHandle<R>, page: &str) -> Result<(), String> {
     if app.get_webview_window(MAIN_WINDOW_ID).is_none() {
         create_main_window(app).map_err(|error| error.to_string())?;
     }

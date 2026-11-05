@@ -57,35 +57,11 @@ onMounted(async () => {
   // 添加键盘事件监听
   window.addEventListener('keydown', handleKeyDown)
 
-  try {
-    switch (toolType.value) {
-      case 'dpi':
-        currentTool.value = defineAsyncComponent(() => import('./tools/DpiAdjusterTool.vue'))
-        break
-      case 'bitrate':
-        currentTool.value = defineAsyncComponent(() => import('./tools/BitrateTool.vue'))
-        break
-      case 'shortcuts':
-        currentTool.value = defineAsyncComponent(() => import('./tools/ShortcutsTool.vue'))
-        break
-      case 'rtss':
-        currentTool.value = defineAsyncComponent(() => import('./tools/RtssOsdTool.vue'))
-        break
-      case 'nr':
-        currentTool.value = defineAsyncComponent(() => import('./tools/NrOverlayTool.vue'))
-        break
-      case 'performance':
-        currentTool.value = defineAsyncComponent(() => import('./tools/HostPerformanceTool.vue'))
-        break
-      case 'pet':
-        currentTool.value = defineAsyncComponent(() => import('./tools/PetSettingsTool.vue'))
-        break
-      default:
-        console.error('未知的工具类型:', toolType.value)
-    }
-  } catch (error) {
-    console.error('加载工具失败:', error)
-  }
+  // The only remaining secondary tool surface is the stream overlay. The
+  // bitrate, performance, DPI, RTSS, pet, and shortcuts tools now live in
+  // their main shell pages, while this overlay remains for its hotkeys.
+  currentTool.value = defineAsyncComponent(() => import('./tools/NrOverlayTool.vue'))
+  toolType.value = 'nr'
 })
 
 // 清理事件监听
@@ -147,6 +123,19 @@ onUnmounted(() => {
   overflow: hidden;
   cursor: default;
   animation: panelIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.tool-window-overlay {
+  color-scheme: light dark;
+  background: color-mix(in srgb, var(--md-sys-color-scrim, #000) 42%, transparent);
+  backdrop-filter: blur(16px) saturate(1.1);
+}
+
+.tool-panel {
+  background: var(--md-sys-color-surface-container-high, #242229);
+  color: var(--md-sys-color-on-surface, #f5f2fa);
+  border: 1px solid var(--md-sys-color-outline-variant, rgba(255,255,255,.18));
+  box-shadow: 0 24px 64px color-mix(in srgb, var(--md-sys-color-shadow, #000) 34%, transparent);
 }
 
 @keyframes panelIn {
