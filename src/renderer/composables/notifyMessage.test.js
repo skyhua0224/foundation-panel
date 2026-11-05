@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { ElMessage, ElMessageBox, ElNotification, showBusy } from './notifyMessage.js'
+import { ElMessage, ElMessageBox, ElNotification } from './notifyMessage.js'
 import { useDialogs } from 'foundation-ui/dialog'
 import { useNotify } from 'foundation-ui/notify'
 
@@ -58,32 +58,37 @@ test('a message with duration 0 stays until its handle is closed', async () => {
   useNotify().dismissSnack(snacks()[0].id)
 })
 
-test('a notification with a click and an action text becomes a snackbar whose action runs the click', async () => {
+test('a notification that waits for the person stands in the status notices and never holds the snackbar queue', async () => {
   let clicked = 0
-  ElNotification({ title: '新版本', message: '当前 1.0', duration: 0, actionText: '更新', onClick: () => { clicked += 1 } })
+  const handle = ElNotification({ title: '新版本', message: '当前 1.0，最新 2.0', duration: 0, actionText: '更新', standing: 'tool-update', revision: '2.0', onClick: () => { clicked += 1 } })
   await settled()
-  const snack = snacks()[0]
-  assert.equal(snack.message, '新版本 · 当前 1.0')
-  assert.equal(snack.action, '更新')
-  assert.equal(snack.timeout, 0)
-  useNotify().runSnackAction(snack.id)
-  assert.equal(clicked, 1)
   assert.equal(snacks().length, 0)
+  const systems = useNotify().state.systems
+  assert.equal(systems['tool-update'].title, '新版本')
+  assert.equal(systems['tool-update'].text, '当前 1.0，最新 2.0')
+  assert.equal(systems['tool-update'].dismissible, true)
+  assert.equal(systems['tool-update'].revision, '2.0')
+  ElMessage.error('另一件事失败了')
+  await settled()
+  assert.equal(snacks()[0].message, '另一件事失败了')
+  useNotify().dismissSnack(snacks()[0].id)
+  systems['tool-update'].actions[0].onClick(systems['tool-update'])
+  assert.equal(clicked, 1)
+  await handle.close()
+  assert.equal(systems['tool-update'], undefined)
 })
 
-test('a wait with words rewrites one snackbar in place and leaves with close', async () => {
-  const busy = showBusy('准备中')
+test('a dismissed standing notice stays away until what it reports changes', async () => {
+  const offer = (revision) => ElNotification({ title: '新版本', message: `最新 ${revision}`, duration: 0, actionText: '更新', standing: 'tool-update-2', revision, onClick: () => {} })
+  await offer('2.0')
   await settled()
-  assert.equal(snacks().length, 1)
-  assert.equal(snacks()[0].timeout, 0)
-  const id = snacks()[0].id
-  busy.setText('下载 50%')
+  useNotify().dismissSystem('tool-update-2')
+  assert.equal(useNotify().state.systems['tool-update-2'], undefined)
+  await offer('2.0')
   await settled()
-  assert.equal(snacks().length, 1)
-  assert.equal(snacks()[0].id, id)
-  assert.equal(snacks()[0].message, '下载 50%')
-  await busy.close()
-  assert.equal(snacks().length, 0)
-  await busy.setText('迟到的进度')
-  assert.equal(snacks().length, 0)
+  assert.equal(useNotify().state.systems['tool-update-2'], undefined)
+  await offer('3.0')
+  await settled()
+  assert.equal(useNotify().state.systems['tool-update-2'].revision, '3.0')
+  useNotify().clearSystem('tool-update-2')
 })
