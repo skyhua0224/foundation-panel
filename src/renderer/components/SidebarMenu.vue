@@ -238,10 +238,11 @@ watch(() => router.currentRoute.value, (route) => {
 }, { flush: 'post', immediate: true })
 // The host (Sunshine) does not answer: the content area shows the offline state (Vivi, the actions, the countdown); the rail stays usable and the pages that
 // do not need the host (the panel's settings, 米塔 AI, help, about, the diagnostics) stay as they are. When the host is back the frame loads again.
+// The probe is made by the panel's own process (sunshine.probeHost), not by a fetch of this window: at a start the window's connections to the proxy are taken by the pages' first requests,
+// and a probe queued behind them made a host that answers in milliseconds look silent.
 const probeHost = async () => {
-  const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')
-  const response = await fetch(`${base}/`, { cache: 'no-store', signal: AbortSignal.timeout(2500) })
-  return response.status !== 502 && response.status !== 503
+  const status = await sunshine.probeHost(2500)
+  return status !== 502 && status !== 503
 }
 const hostConn = useHostConnection({
   probe: probeHost,

@@ -123,6 +123,21 @@ pub fn get_proxy_health_check() -> ProxyHealthCheck {
     }
 }
 
+/// One probe of the host behind the proxy, made by this process and not by the WebView. At a start the WebView's six connections to the proxy are taken by the pages' own first
+/// requests, and a probe queued behind them looks like a silent host (the 「主机无响应」 card on a host that answers in a few milliseconds). Returns the HTTP status.
+#[tauri::command]
+pub async fn probe_sunshine_host(timeout_ms: Option<u64>) -> Result<u16, String> {
+    let timeout = std::time::Duration::from_millis(timeout_ms.unwrap_or(2500).clamp(500, 10_000));
+    let url = format!("{}/", get_sunshine_target().trim_end_matches('/'));
+    get_http_client()
+        .get(url)
+        .timeout(timeout)
+        .send()
+        .await
+        .map(|response| response.status().as_u16())
+        .map_err(|error| error.to_string())
+}
+
 async fn proxy_health_handler(request: Request) -> Response {
     let valid_token = request.uri().query().is_some_and(|query| {
         query

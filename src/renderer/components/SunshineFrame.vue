@@ -7,16 +7,7 @@
   >
     <div class="iframe-container">
       <!-- no loading page: a page switch shows the new shell at once and the page fills in (its own skeletons); only a proxy that does not answer says so -->
-      <div v-if="proxyHealthFailed" class="loading-overlay" role="alert">
-        <div class="loading-container">
-          <div class="loading-text">
-            <p class="proxy-health-error">{{ t.sunshineFrame.proxyUnavailable }}</p>
-            <button class="proxy-health-retry" type="button" @click="retryProxyHealthCheck">
-              {{ t.sunshineFrame.retry }}
-            </button>
-          </div>
-        </div>
-      </div>
+      <ProxyBlocked v-if="proxyHealthFailed" class="proxy-blocked-host" :attempts="proxyAttempts" :checking="proxyChecking" @retry="proxyGate.retryNow()" />
 
       <iframe
         :key="frameKey"
@@ -42,6 +33,8 @@ import { checkLocalProxyHealth } from '../utils/proxyHealth.js'
 import { isNativeControlPanelMessage, isTrustedNativeControlPanelMessage } from '../composables/nativeBridge.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import SidebarMenu from './SidebarMenu.vue'
+import ProxyBlocked from './ProxyBlocked.vue'
+import { createProxyGate } from '../composables/proxyGate.js'
 import { isWebuiNavigationPath } from '../composables/webuiNavigation.js'
 import { BLANK, routeChanged, webuiNavigated } from '../composables/frameRoute.js'
 import { webPathOf, routeForWebPath } from '../composables/useRouter.js'
@@ -62,6 +55,8 @@ const currentPath = ref('/')
 const sunshineIframe = ref(null)
 const sidebarMenuRef = ref(null)
 const proxyHealthFailed = ref(false)
+const proxyAttempts = ref(0)
+const proxyChecking = ref(false)
 
 // State
 let pollTimer = null
@@ -156,9 +151,24 @@ const verifyLocalProxy = async () => {
   }
 }
 
-const retryProxyHealthCheck = () => {
-  window.location.reload()
-}
+// One try: the proxy listens (the first start takes a moment) and the WebView reaches it. The gate tries again with a backoff before the page says anything, and goes on in the
+// background while it does (composables/proxyGate.js): a slow start never blanks the session.
+const proxyGate = createProxyGate({
+  verify: async () => {
+    proxyChecking.value = true
+    try {
+      try { proxyBase = await invoke('wait_for_proxy_ready') } catch (error) { console.warn('[SunshineFrame] the local proxy is not ready:', error); return false }
+      return await verifyLocalProxy()
+    } finally { proxyChecking.value = false }
+  },
+  onAttempt: (n) => { proxyAttempts.value = n },
+  onShown: () => {
+    proxyHealthFailed.value = true
+    sunshineUrl.value = 'about:blank'
+    invoke('main_panel_ready').catch(() => {})
+  },
+  onCleared: () => { proxyHealthFailed.value = false },
+})
 
 // Navigation handler
 const handleNavigateFrame = (event) => {
@@ -489,6 +499,7 @@ onUnmounted(() => {
   if (visibilityHandlerRef) document.removeEventListener('visibilitychange', visibilityHandlerRef)
   if (pollTimer) clearInterval(pollTimer)
   clearLoadedFrameReveal()
+  proxyGate.stop()
   unlistenVddSettings?.()
   unlistenDragDrop?.()
 })
@@ -499,15 +510,8 @@ onMounted(async () => {
   window.addEventListener('locale-changed', handleLocaleChanged)
 
   try {
-    const proxyBaseUrl = await invoke('wait_for_proxy_ready')
-    proxyBase = proxyBaseUrl
-
-    if (!await verifyLocalProxy()) {
-      proxyHealthFailed.value = true
-      sunshineUrl.value = 'about:blank'
-      await invoke('main_panel_ready').catch(() => {})
-      return
-    }
+    if (!await proxyGate.run()) return
+    const proxyBaseUrl = proxyBase
     localProxyVerified = true
     await refreshProxyTarget()
 
@@ -565,12 +569,7 @@ onMounted(async () => {
     await invoke('main_panel_ready')
   } catch (error) {
     console.error('初始化失败:', error)
-    if (!localProxyVerified) {
-      proxyHealthFailed.value = true
-      sunshineUrl.value = 'about:blank'
-      await invoke('main_panel_ready').catch(() => {})
-      return
-    }
+    if (!localProxyVerified) return
     sunshineUrl.value = proxyBase + '/'
   }
 })
@@ -628,70 +627,11 @@ const onLoad = () => {
   transition: opacity 0.3s ease;
 }
 
-.loading-overlay {
+.proxy-blocked-host {
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, @morandi-dark-bg 0%, @morandi-mid-bg 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
   z-index: 10;
-  backdrop-filter: blur(10px);
-}
-
-.loading-container {
-  text-align: center;
-  padding: 20px;
-  max-width: 400px;
-}
-
-.loading-text {
-  color: @morandi-yellow;
-  font-size: 18px;
-  line-height: 1.6;
-  font-family: 'PixelMplus12', 'YouYuan', cursive, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.4);
-  letter-spacing: 0.5px;
-  font-weight: 500;
-  transform: skew(-3deg);
-
-  p {
-    margin: 12px 0;
-    animation: pulse 2s ease-in-out infinite;
-  }
-
-  .proxy-health-error {
-    animation: none;
-    color: #f2c8c8;
-    font-size: 15px;
-    transform: none;
-  }
-}
-
-.proxy-health-retry {
-  margin-top: 12px;
-  padding: 8px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  border-radius: 6px;
-  color: inherit;
-  background: rgba(255, 255, 255, 0.08);
-  cursor: pointer;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.16);
-  }
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  50% {
-    opacity: 0.7;
-    transform: translateY(-2px);
-  }
+  overflow: auto;
 }
 
 .fade-loading-enter-active,
@@ -704,22 +644,6 @@ const onLoad = () => {
   opacity: 0;
 }
 
-:global(html[data-bs-theme='light'] .loading-overlay) {
-  background: linear-gradient(135deg, @brand-bg-light 0%, @brand-bg-mid 100%);
-}
-
-:global(html[data-bs-theme='light'] .loading-image) {
-  filter: drop-shadow(0 4px 12px rgba(74, 158, 255, 0.3));
-}
-
-:global(html[data-bs-theme='light'] .loading-text) {
-  color: @brand-blue;
-  text-shadow: 1px 1px 3px rgba(74, 158, 255, 0.2);
-}
-
-:global(html[data-bs-theme='light'] .proxy-health-error) {
-  color: #8f3434;
-}
 </style>
 
 <style>

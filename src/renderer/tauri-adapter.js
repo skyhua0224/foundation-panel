@@ -176,6 +176,8 @@ export const sunshine = {
   getProxyUrl: () => wrapDefault('get_proxy_url_command', 'http://localhost:48081'),
   waitForProxyReady: () => wrapResult('wait_for_proxy_ready'),
   refreshTarget: () => wrapDefault('refresh_sunshine_target', null),
+  // one probe of the host made by the panel's own process (the WebView's connections to the proxy may be busy): the HTTP status, or a rejection when nothing answered
+  probeHost: (timeoutMs = 2500) => invoke('probe_sunshine_host', { timeoutMs }),
   getActiveSessions: () => wrapDefault('get_active_sessions', []),
   getLocale: () => wrapDefault('get_sunshine_locale', 'en'),
   setLocale: (locale) => invoke('set_sunshine_locale', { locale }),

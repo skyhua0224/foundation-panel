@@ -259,6 +259,7 @@ fn main() {
             sunshine::restart_sunshine_service,
             proxy_server::get_proxy_url_command,
             proxy_server::get_proxy_health_check,
+            proxy_server::probe_sunshine_host,
             proxy_server::refresh_sunshine_target,
             proxy_server::wait_for_proxy_ready,
             native_components::native_component_get_status,

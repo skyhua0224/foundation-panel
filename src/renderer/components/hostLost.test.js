@@ -55,3 +55,13 @@ test('the pairing code of the connect dialog is an SVG, not a PNG made by a canv
     assert.match(src, /render: \(url\) => qrSvgDataUrl\(QRCode\.create\(url, \{ errorCorrectionLevel: 'M' \}\)\.modules\)/, f)
   }
 })
+
+test('the host is probed by the panel\'s own process, not by a fetch that can queue behind the window\'s own first requests', () => {
+  assert.match(shell, /const status = await sunshine\.probeHost\(2500\)/)
+  assert.doesNotMatch(shell, /const probeHost = async \(\) => \{\s*\n\s*const base/, 'the old fetch probe')
+  const adapter = fs.readFileSync(new URL('../tauri-adapter.js', import.meta.url), 'utf8')
+  assert.match(adapter, /probeHost: \(timeoutMs = 2500\) => invoke\('probe_sunshine_host', \{ timeoutMs \}\)/)
+  const rust = fs.readFileSync(new URL('../../../src-tauri/src/proxy_server.rs', import.meta.url), 'utf8')
+  assert.match(rust, /pub async fn probe_sunshine_host\(timeout_ms: Option<u64>\) -> Result<u16, String>/)
+  assert.match(fs.readFileSync(new URL('../../../src-tauri/src/main.rs', import.meta.url), 'utf8'), /proxy_server::probe_sunshine_host,/)
+})
