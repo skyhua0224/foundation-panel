@@ -150,7 +150,7 @@ const isNew = computed(() => guide.visible.value)
 const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue: catalogue.value, guide: guideCardData(T.value, guide.steps.value, guide.visible.value), download: downloadCardData(T.value, { locale: locale.value, assetsOf: releases.assetsOf, versionOf: releases.versionOf, qr: (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules }), sponsor: sponsorCardData(T.value, SPONSORS), journey: journey.data.value, sysinfo: nics.info.value, temps: state.hw.available ? { cpu: state.hw.cpuTemp, gpu: state.hw.gpuTemp } : null }))
 const compRows = () => registeredComponentStatus()?.rows?.value || []
 const smartSignals = computed(() => ({
-  pairedCount: state.clients ? state.clients.length : null, streaming: !!session.value, lastStreamAt: 0,
+  pairedCount: state.clients ? state.clients.length : null, streaming: !!session.value, lastStreamAt: (void historyTick.value, history.last()?.end || 0), // ms since epoch of the end of the last finished session this interface saw (0: none): the smart overview's after-stream scenario runs 30 minutes from it
   problems: 0, problemComponents: compRows().filter((r) => r.state === 'error' || r.state === 'warn').map((r) => r.id),
   recentErrors: (state.errorLog?.rows || state.errorLog || []).length || 0, isNew: isNew.value,
   wifiHost: nics.defaultNic.value?.type === 'wifi', linkSlowMbps: nics.defaultNic.value?.link_speed_mbps && nics.defaultNic.value.link_speed_mbps < 1000 ? nics.defaultNic.value.link_speed_mbps : 0,
