@@ -21,9 +21,6 @@ static TOOL_WINDOW_MOVE_SAVE: LazyLock<Mutex<ToolWindowMoveSave>> =
     LazyLock::new(|| Mutex::new(ToolWindowMoveSave::default()));
 
 const MAIN_WINDOW_ID: &str = "main";
-const ABOUT_WINDOW_ID: &str = "about";
-const LOG_CONSOLE_WINDOW_ID: &str = "log_console";
-const PIN_WINDOW_ID: &str = "pin_pairing";
 const DESKTOP_WINDOW_ID: &str = "desktop";
 const TOOL_WINDOW_ID: &str = "tool_window";
 #[cfg(debug_assertions)]
@@ -320,45 +317,6 @@ pub fn webview_heartbeat(webview: tauri::Webview, generation: u64) {
     lifecycle::heartbeat(webview.label(), generation);
 }
 
-/// Resize the About window to match its web content height.
-#[tauri::command]
-pub fn resize_about_window(window: tauri::Window, height: f64) -> Result<(), String> {
-    if window.label() != ABOUT_WINDOW_ID {
-        return Err("resize_about_window can only be called from the About window".to_string());
-    }
-
-    if !height.is_finite() {
-        return Err("Invalid about window height".to_string());
-    }
-
-    let scale_factor = window
-        .scale_factor()
-        .map_err(|e| format!("Failed to get window scale factor: {}", e))?;
-    let current_size = window
-        .inner_size()
-        .map_err(|e| format!("Failed to get window size: {}", e))?;
-    let current_width = current_size.width as f64 / scale_factor;
-    let current_height = current_size.height as f64 / scale_factor;
-    let max_height = window
-        .current_monitor()
-        .ok()
-        .flatten()
-        .map(|monitor| (monitor.size().height as f64 / scale_factor - 120.0).max(420.0))
-        .unwrap_or(900.0);
-    let target_height = height.clamp(420.0, max_height);
-
-    if (current_height - target_height).abs() < 1.0 {
-        return Ok(());
-    }
-
-    window
-        .set_size(tauri::Size::Logical(tauri::LogicalSize::new(
-            current_width,
-            target_height,
-        )))
-        .map_err(|e| format!("Failed to resize about window: {}", e))
-}
-
 /// Resize the floating tool window to match its web content size.
 // These synchronous commands execute on the GUI thread. Do not resize/reposition
 // a caption while Windows owns its native move loop (there are no DOM pointers).
@@ -597,95 +555,30 @@ where
 
 /// 打开关于窗口（单例模式）
 pub fn open_about_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
-    let window = get_or_create_window(app, ABOUT_WINDOW_ID, |app| {
-        tauri::WebviewWindowBuilder::new(
-            app,
-            ABOUT_WINDOW_ID,
-            tauri::WebviewUrl::App("about/index.html".into()),
-        )
-        .title("关于 Sunshine Control Panel")
-        .inner_size(540.0, 620.0)
-        .resizable(false)
-        .maximizable(false)
-        .minimizable(true)
-        .decorations(true)
-        .center()
-        .build()
-    })?;
-
-    #[cfg(target_os = "windows")]
-    configure_webview_security(&window);
-
-    disable_context_menu(&window);
-    debug!("✅ 关于窗口已打开");
-    Ok(())
+    open_main_panel_page(app, "about")
 }
 
 /// 打开日志控制台窗口（单例模式）
 pub fn open_log_console<R: Runtime>(app: &AppHandle<R>) {
-    match get_or_create_window(app, LOG_CONSOLE_WINDOW_ID, |app| {
-        tauri::WebviewWindowBuilder::new(
-            app,
-            LOG_CONSOLE_WINDOW_ID,
-            tauri::WebviewUrl::App("console/index.html".into()),
-        )
-        .title("日志控制台")
-        .inner_size(1000.0, 700.0)
-        .resizable(true)
-        .maximizable(true)
-        .minimizable(true)
-        .decorations(true)
-        .center()
-        .build()
-    }) {
-        Ok(window) => {
-            #[cfg(target_os = "windows")]
-            configure_webview_security(&window);
-            disable_context_menu(&window);
-            debug!("✅ 日志控制台窗口已打开");
-        }
-        Err(e) => error!("❌ {}", e),
+    if let Err(error) = open_main_panel_page(app, "logs") {
+        error!("❌ {}", error);
     }
 }
 
 pub fn open_pin_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Error>> {
-    if let Some(window) = app.get_webview_window(PIN_WINDOW_ID) {
-        let _ = window.unminimize();
-        let _ = window.show();
-        let _ = window.set_focus();
-        debug!("✅ PIN 窗口已激活");
-        crate::power::refresh_ecoqos_state(app);
-        return Ok(());
+    open_main_panel_page(app, "pairing").map_err(Into::into)
+}
+
+fn open_main_panel_page<R: Runtime>(app: &AppHandle<R>, page: &str) -> Result<(), String> {
+    if app.get_webview_window(MAIN_WINDOW_ID).is_none() {
+        create_main_window(app).map_err(|error| error.to_string())?;
     }
-
-    let window = tauri::WebviewWindowBuilder::new(
-        app,
-        PIN_WINDOW_ID,
-        tauri::WebviewUrl::App("pin/index.html".into()),
-    )
-    .title("PIN 配对")
-    .fullscreen(true)
-    .decorations(false)
-    .transparent(true)
-    .always_on_top(true)
-    .skip_taskbar(true)
-    .visible(false)
-    .build()
-    .map_err(|e| format!("创建 PIN 窗口失败: {}", e))?;
-
-    disable_context_menu(&window);
-
-    // 禁用自动填充和密码保存提示
-    #[cfg(target_os = "windows")]
-    configure_webview_security(&window);
-
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-        let _ = window.show();
-    });
-
-    debug!("✅ PIN 配对窗口创建成功");
-    crate::power::refresh_ecoqos_state(app);
+    let window = app
+        .get_webview_window(MAIN_WINDOW_ID)
+        .ok_or_else(|| "main panel window is unavailable".to_string())?;
+    show_and_activate_window(&window);
+    crate::panel_page::open_page(&window, page);
+    debug!("✅ main panel page requested: {page}");
     Ok(())
 }
 

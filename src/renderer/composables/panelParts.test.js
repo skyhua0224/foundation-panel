@@ -6,8 +6,9 @@ import { readFileSync } from 'node:fs'
 // ROUTES of useRouter.js, read from its source (it imports the UI framework)
 const ROUTES = Object.fromEntries([...readFileSync(new URL('./useRouter.js', import.meta.url), 'utf8').matchAll(/^  ([A-Z_]+): '([\w-]+)',/gm)].map((m) => [m[1], m[2]]))
 
-test('the toolbar menu opens the new pages: DPI, bitrate, the shortcuts guide and the pet', () => {
+test('native entries open the shell pages and the toolbar menu keeps its routes', () => {
   assert.deepEqual(Object.fromEntries(Object.entries(PANEL_PAGES).map(([k, v]) => [k, v.route])), {
+    about: ROUTES.ABOUT, pairing: ROUTES.WEB_CLIENTS, logs: ROUTES.DIAGNOSTICS,
     vdd: ROUTES.VDD_SETTINGS, 'desktop-scale': ROUTES.VDD_SETTINGS, 'live-session': ROUTES.LIVE_SESSION, shortcuts: ROUTES.HELP, pet: ROUTES.PANEL_SETTINGS,
   })
   assert.equal(requestPanelPage('nothing'), null)

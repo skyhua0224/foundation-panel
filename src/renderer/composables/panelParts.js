@@ -3,12 +3,20 @@ import { nextTick, ref, watch } from 'vue'
 // The pages another window opens in the main window (the floating toolbar's menu, toolbar.rs emits `open-panel-page`): the route, and the part
 // of the page to show there (route ids of useRouter.js ROUTES, as strings: this module is loaded by tests without the UI framework). SidebarMenu navigates; the page takes its part once it shows (a section scrolls into view, a sheet opens).
 export const PANEL_PAGES = Object.freeze({
+  about: { route: 'about', part: '' },
+  pairing: { route: 'web-clients', part: '' },
+  logs: { route: 'diagnostics', part: '' },
   vdd: { route: 'vdd-settings', part: '' }, // 虚拟显示器 (toolbar, tray)
   'desktop-scale': { route: 'vdd-settings', part: 'desktop-scale' }, // 调整 DPI -> 显示与视频 › 虚拟显示器 › 桌面缩放
   'live-session': { route: 'live-session', part: '' }, // 码率调整 -> 串流 › 当前串流
   shortcuts: { route: 'help', part: 'shortcuts' }, // 快捷键手册 -> 帮助与关于 › 快捷键手册
   pet: { route: 'panel-settings', part: 'pet' }, // 桌宠设置 -> 面板设置 › 桌宠
 })
+
+// Pages that live in the Web frame need their address changed as well as the
+// panel route. Native tray and command entries use these names so they keep a
+// single main window and do not create a second HTML document.
+export const PANEL_PAGE_PATHS = Object.freeze({ pairing: '/pin#pairing', logs: '/troubleshooting' })
 
 /**
  * Take the page the toolbar or the tray left for this window (src-tauri panel_page.rs) and open it. Called on its `panel-page-pending` ping and

@@ -351,7 +351,6 @@ fn main() {
             windows::panel_activity,
             windows::panel_first_paint,
             windows::test_synthetic_dpi,
-            windows::resize_about_window,
             windows::resize_tool_window,
             hdr_enhanced::nr_live_status,
             hdr_enhanced::nr_live_set_enabled,

@@ -150,7 +150,7 @@ import { useTools } from '../composables/useTools.js'
 import { useTouchWindowDrag } from '../composables/useTouchWindowDrag.js'
 import { createUtilityTools } from '../composables/toolsRegistry.js'
 import { ROUTES, PAGES, routeForWebPath, routeOfPlace, webPathOf } from '../composables/useRouter.js'
-import { requestPanelPage } from '../composables/panelParts.js'
+import { PANEL_PAGE_PATHS, requestPanelPage } from '../composables/panelParts.js'
 import { proxyBlock } from '../composables/proxyBlock.js'
 import { createGuideData } from '../composables/guideData.js'
 import PanelPending from './PanelPending.vue'
@@ -542,7 +542,12 @@ watch(
   },
 )
 // a page another window opens here (the toolbar menu: toolbar.rs `open-panel-page`, SunshineFrame passes it on)
-const openPanelPage = (page) => { const route = requestPanelPage(page); if (route) router.navigate(route) }
+const openPanelPage = (page) => {
+  const route = requestPanelPage(page)
+  if (!route) return
+  if (PANEL_PAGE_PATHS[page]) emit('webui-navigate', PANEL_PAGE_PATHS[page])
+  router.navigate(route)
+}
 defineExpose({
   openVddSettings, openWelcome, openWebStream, openAiAssistant, openControllers, openRtxHdr, openPanelPage,
   goHome, checkForUpdates: handleCheckForUpdates, router,
