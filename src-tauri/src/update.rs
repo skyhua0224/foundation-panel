@@ -108,6 +108,10 @@ struct UpdaterHelperState {
     gui_exe_path: String,
     result_path: String,
     parent_pid: u32,
+    /// The panel resolves its theme before elevation; older state files fall
+    /// back to the helper's documented WinRT colour query.
+    #[serde(default)]
+    dark_theme: Option<bool>,
 }
 
 #[cfg(target_os = "windows")]
@@ -516,7 +520,8 @@ fn is_gui_component_installer(path: &Path) -> bool {
 #[cfg(target_os = "windows")]
 // Native boundary rationale and painting rules: panel-ms-createwindowex-20261105,
 // panel-ms-updatelayeredwindow-20261105, panel-ms-wmpaint-20261105,
-// panel-ms-layeredwindows-20261105 (docs/authority/source-index.tsv).
+// panel-ms-layeredwindows-20261105, panel-ms-uisettings-getcolorvalue-20261106
+// (docs/authority/source-index.tsv).
 fn run_updater_panel(state: UpdaterHelperState) -> Result<(), String> {
     use windows::Win32::Foundation::{HINSTANCE, HWND, LPARAM, LRESULT, WPARAM};
     use windows::Win32::Graphics::Gdi::{BeginPaint, EndPaint, HBRUSH, PAINTSTRUCT};
@@ -709,13 +714,15 @@ fn updater_panel_position(width: i32, height: i32) -> (i32, i32) {
 
 #[cfg(target_os = "windows")]
 fn updater_dark_theme() -> bool {
-    use windows::Win32::UI::WindowsAndMessaging::{COLOR_WINDOW, GetSysColor};
+    // GetSysColor(COLOR_WINDOW) is a legacy GDI colour and does not track the
+    // user's light/dark preference. Microsoft documents UISettings.GetColorValue
+    // as the Windows UI colour source.
+    use windows::UI::ViewManagement::{UIColorType, UISettings};
 
-    let color = unsafe { GetSysColor(COLOR_WINDOW) };
-    let red = color & 0xff;
-    let green = (color >> 8) & 0xff;
-    let blue = (color >> 16) & 0xff;
-    red + green + blue < 384
+    UISettings::new()
+        .and_then(|settings| settings.GetColorValue(UIColorType::Background))
+        .map(|color| u16::from(color.R) + u16::from(color.G) + u16::from(color.B) < 384)
+        .unwrap_or(false)
 }
 
 #[cfg(target_os = "windows")]
@@ -786,7 +793,7 @@ fn draw_updater_panel_cutout(hwnd: windows::Win32::Foundation::HWND) {
         buffer.fill(0);
 
         draw_updater_animation_frame(buffer, width, height, &state);
-        let dark_theme = updater_dark_theme();
+        let dark_theme = state.dark_theme.unwrap_or_else(updater_dark_theme);
         draw_updater_bottom_copy(buffer, width, height, dark_theme);
         let mem_hdc = CreateCompatibleDC(Some(screen_hdc));
         if mem_hdc.is_invalid() {
@@ -2231,14 +2238,14 @@ mod updater_staging_tests {
     #[test]
     fn unlaunched_handoff_is_cleaned_but_launched_handoff_survives() {
         let (_, state_path, _, guard) =
-            prepare_updater_helper("unused.exe", "exe", None, &"a".repeat(64), None).unwrap();
+            prepare_updater_helper("unused.exe", "exe", None, &"a".repeat(64), None, None).unwrap();
         let directory = guard.path().to_path_buf();
         assert!(state_path.is_file());
         drop(guard);
         assert!(!directory.exists());
 
         let (_, state_path, _, guard) =
-            prepare_updater_helper("unused.exe", "exe", None, &"a".repeat(64), None).unwrap();
+            prepare_updater_helper("unused.exe", "exe", None, &"a".repeat(64), None, None).unwrap();
         let directory = guard.keep();
         assert!(state_path.is_file());
         assert_eq!(
@@ -2264,6 +2271,7 @@ mod updater_staging_tests {
             gui_exe_path: String::new(),
             result_path: String::new(),
             parent_pid: std::process::id(),
+            dark_theme: None,
         };
         let staged = stage_installer_in_directory(&state, &destination).unwrap();
         assert_eq!(staged.extension().unwrap(), "exe");
@@ -2288,6 +2296,7 @@ fn prepare_updater_helper(
     expected_size: Option<u64>,
     expected_sha256: &str,
     target_version: Option<String>,
+    dark_theme: Option<bool>,
 ) -> Result<(PathBuf, PathBuf, UpdaterHelperState, tempfile::TempDir), String> {
     let current_exe =
         std::env::current_exe().map_err(|e| format!("get current exe failed: {}", e))?;
@@ -2312,6 +2321,7 @@ fn prepare_updater_helper(
         gui_exe_path: current_exe.to_string_lossy().to_string(),
         result_path: result_path.to_string_lossy().to_string(),
         parent_pid: std::process::id(),
+        dark_theme,
     };
 
     let state_content = serde_json::to_string_pretty(&state)
@@ -2357,6 +2367,7 @@ pub async fn install_update(
     target_version: Option<String>,
     expected_size: Option<u64>,
     expected_sha256: Option<String>,
+    dark_theme: Option<bool>,
     app_handle: AppHandle,
 ) -> Result<(), String> {
     #[cfg(target_os = "windows")]
@@ -2397,6 +2408,7 @@ pub async fn install_update(
             expected_size,
             &expected_sha256,
             target_version,
+            dark_theme,
         ) {
             Ok(paths) => paths,
             Err(e) => {

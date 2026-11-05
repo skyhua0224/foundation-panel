@@ -281,6 +281,7 @@ const handleInstall = async (filePath) => {
       targetVersion: props.updateInfo?.version || null,
       expectedSize: props.updateInfo?.download_size || null,
       expectedSha256: props.updateInfo?.download_sha256 || null,
+      darkTheme: document.documentElement?.getAttribute('data-bs-theme') === 'dark',
     })
 
     ElMessage.success(t.value.updateDialog.installStarted)
