@@ -1,237 +1,60 @@
 <template>
-  <section class="enhancement-card">
-    <div class="enhancement-summary">
-      <header class="component-page-header">
-        <div class="component-title-row">
-          <span class="enhancement-icon" aria-hidden="true"
-            ><el-icon
-              ><component :is="kind === 'nr' ? MagicStick : Sunny" /></el-icon
-          ></span>
-          <h2>{{ kind === 'nr' ? 'DLSS NR' : 'RTX HDR' }}</h2>
-          <span class="component-hud-state" aria-live="polite"
-            ><i
-              class="component-status-dot"
-              :class="`state-${status.state}`"
-              aria-hidden="true"
-            /><span>{{ componentState }}</span></span
-          >
-        </div>
-        <p class="component-intro">
-          {{ kind === 'nr' ? controlsText.nrIntro : controlsText.hdrIntro }}
-        </p>
-      </header>
-      <EnhancementSketch :kind="kind" />
-    </div>
+  <MSection :title="kind === 'nr' ? 'DLSS NR' : 'RTX HDR'">
+    <MStatusPill :icon="kind === 'nr' ? 'wand_stars' : 'light_mode'" :label="componentState" :tone="status.enabled && statusKnown && status.installed ? 'ok' : ''" :action="false" />
+    <MFooter>{{ kind === 'nr' ? controlsText.nrIntro : controlsText.hdrIntro }}</MFooter>
 
-    <article
-      v-if="status.installed"
-      class="component-window"
-      :class="`state-${status.state}`"
-    >
-      <div class="component-headline">
-        <el-switch
-          :model-value="status.enabled"
-          :aria-label="
-            controlsText.allowUse + (kind === 'nr' ? 'DLSS NR' : 'RTX HDR')
-          "
-          :disabled="
-            !statusKnown ||
-            !status.installed ||
-            (!status.enabled && status.state === 'repair_required') ||
-            status.maintenance ||
-            controlsBusy
-          "
-          :loading="operation === 'saving'"
-          :active-text="
-            controlsText.allowUse + (kind === 'nr' ? 'DLSS NR' : 'RTX HDR')
-          "
-          @change="setEnabled"
-        />
-        <p>
-          {{
-            kind === 'nr'
-              ? controlsText.nrPermissionHint
-              : controlsText.hdrPermissionHint
-          }}
-        </p>
-        <el-button
-          v-if="kind === 'nr' && status.enabled"
-          @click="openApplicationSettings"
-          >{{ controlsText.appDefaults }}</el-button
-        >
-      </div>
-    </article>
+    <MBanner v-if="statusKnown && !status.host_supported" tone="warn" icon="warning">{{ text.bridgeMissingNotice }}</MBanner>
+    <MBanner v-else-if="statusKnown && !status.adapter_present" tone="warn" icon="warning">{{ text.adapterMissingNotice }}</MBanner>
+    <MBanner v-else-if="statusKnown && !status.vc_runtime_present" tone="warn" icon="warning">
+      {{ text.vcRuntimeMissingNotice }}
+      <template #actions><MButton variant="text" size="sm" icon="download" @click="openVcRuntimeDownload">{{ text.vcRuntimeDownload }}</MButton></template>
+    </MBanner>
+    <MBanner v-else-if="statusKnown && !status.runtime_present" tone="info" icon="info">{{ text.runtimeMissingNotice }}</MBanner>
+    <MBanner v-if="status.maintenance" tone="warn" icon="build">
+      {{ maintenanceMessage }}
+      <template v-if="status.state !== 'maintenance_other'" #actions><MButton variant="text" size="sm" :disabled="controlsBusy" :loading="operation === 'recovering'" @click="recover">{{ status.state === 'pending_removal' ? text.retryRemoval : text.recover }}</MButton></template>
+    </MBanner>
+    <MBanner v-if="status.in_use" tone="warn" icon="warning">{{ text.inUseNotice }}</MBanner>
+    <MBanner v-if="operationError" tone="error" icon="error"><b>{{ text.technicalDetails }}</b><br>{{ operationError }}<template #actions><MButton variant="text" size="sm" @click="operationError = ''">×</MButton></template></MBanner>
 
-    <el-alert
-      v-if="statusKnown && !status.host_supported"
-      class="component-notice"
-      type="warning"
-      :title="text.bridgeMissingNotice"
-      :closable="false"
-      show-icon
-    />
-    <el-alert
-      v-else-if="statusKnown && !status.adapter_present"
-      class="component-notice"
-      type="warning"
-      :title="text.adapterMissingNotice"
-      :closable="false"
-      show-icon
-    />
-    <div
-      v-else-if="statusKnown && !status.vc_runtime_present"
-      class="component-notice"
-    >
-      <el-alert
-        type="warning"
-        :title="text.vcRuntimeMissingNotice"
-        :closable="false"
-        show-icon
+    <MGroup v-if="status.installed">
+      <MSwitchItem
+        :model-value="status.enabled"
+        icon="power_settings_new"
+        :title="controlsText.allowUse + (kind === 'nr' ? 'DLSS NR' : 'RTX HDR')"
+        :text="kind === 'nr' ? controlsText.nrPermissionHint : controlsText.hdrPermissionHint"
+        :disabled="!statusKnown || !status.installed || (!status.enabled && status.state === 'repair_required') || status.maintenance || controlsBusy"
+        @update:model-value="setEnabled"
       />
-      <el-button
-        class="mt-2"
-        type="primary"
-        plain
-        @click="openVcRuntimeDownload"
-      >
-        {{ text.vcRuntimeDownload }}
-      </el-button>
-    </div>
-    <el-alert
-      v-else-if="statusKnown && !status.runtime_present"
-      class="component-notice"
-      type="info"
-      :title="text.runtimeMissingNotice"
-      :closable="false"
-      show-icon
-    />
-    <el-alert
-      v-if="status.maintenance"
-      class="component-notice"
-      type="warning"
-      :title="maintenanceMessage"
-      :closable="false"
-    >
-      <el-button
-        v-if="status.state !== 'maintenance_other'"
-        :disabled="controlsBusy"
-        :loading="operation === 'recovering'"
-        @click="recover"
-        >{{ status.state === 'pending_removal' ? text.retryRemoval : text.recover }}</el-button
-      >
-    </el-alert>
-    <el-alert
-      v-if="status.in_use"
-      class="component-notice"
-      type="warning"
-      :title="text.inUseNotice"
-      :closable="false"
-      show-icon
-    />
-    <el-alert
-      v-if="operationError"
-      class="component-notice"
-      type="error"
-      :title="text.technicalDetails"
-      :description="operationError"
-      show-icon
-      @close="operationError = ''"
-    />
+      <MItem v-if="kind === 'nr' && status.enabled" action icon="tune" :title="controlsText.appDefaults" @click="openApplicationSettings" />
+    </MGroup>
 
-    <div v-if="statusKnown && !status.installed" class="first-setup">
-      <el-button
-        type="primary"
-        :loading="operation === 'install'"
-        :disabled="
-          controlsBusy ||
-          !status.host_supported ||
-          !status.adapter_present ||
-          status.in_use ||
-          status.maintenance
-        "
-        @click="install"
-        >{{ controlsText.installSetup }}</el-button
-      ><el-button text @click="showAcquisition">{{
-        controlsText.setupHelp
-      }}</el-button>
+    <div v-if="statusKnown && !status.installed" class="m-actions-row">
+      <MButton icon="download" :loading="operation === 'install'" :disabled="controlsBusy || !status.host_supported || !status.adapter_present || status.in_use || status.maintenance" @click="install">{{ controlsText.installSetup }}</MButton>
+      <MButton variant="text" icon="help" @click="showAcquisition">{{ controlsText.setupHelp }}</MButton>
     </div>
 
-    <details class="component-details">
-      <summary>{{ controlsText.maintenance }}</summary>
-      <div class="component-hud-actions">
-        <el-button text class="component-action" @click="showAcquisition">{{
-          text.acquisitionTitle
-        }}</el-button>
-        <el-button
-          v-if="statusKnown"
-          text
-          type="primary"
-          class="component-action"
-          :loading="operation === 'install'"
-          :disabled="
-            !status.host_supported ||
-            !status.adapter_present ||
-            status.in_use ||
-            status.maintenance ||
-            controlsBusy
-          "
-          @click="install"
-          >{{
-            status.installed
-              ? controlsText.replaceFile
-              : controlsText.installSetup
-          }}</el-button
-        >
-        <el-button
-          text
-          class="component-action"
-          :loading="refreshing"
-          :disabled="controlsBusy"
-          @click="refresh()"
-          ><el-icon aria-hidden="true"><Refresh /></el-icon>{{ text.refresh }}</el-button
-        >
-      </div>
-      <div class="maintenance-checks">
-        <div
-          v-for="item in healthRows"
-          :key="item.label"
-          class="component-health-row"
-        >
-          <span class="component-health-key">{{ item.label }}</span>
-          <span class="component-health-state"
-            ><i :class="item.tone" aria-hidden="true"></i>{{ item.state }}</span
-          >
-        </div>
-      </div>
-      <footer class="component-panel-footer">
-        <details class="maintenance-notes">
-          <summary>{{ controlsText.usageNotes }}</summary>
-          <p>{{ text.intro }}</p>
-        </details>
-        <el-button
-          v-if="status.installed"
-          link
-          type="danger"
-          :loading="operation === 'uninstall'"
-          :disabled="status.in_use || status.maintenance || controlsBusy"
-          @click="uninstall"
-          >{{ text.uninstall }}</el-button
-        >
-      </footer>
-    </details>
-  </section>
+    <MGroup>
+      <MItem action icon="folder_special" :title="text.acquisitionTitle" @click="showAcquisition" />
+      <MItem v-if="statusKnown" action icon="upload" :title="status.installed ? controlsText.replaceFile : controlsText.installSetup" :disabled="!status.host_supported || !status.adapter_present || status.in_use || status.maintenance || controlsBusy || operation === 'install'" @click="install" />
+      <MItem action icon="refresh" :title="text.refresh" :disabled="refreshing || controlsBusy" @click="refresh()" />
+      <MItem v-for="item in healthRows" :key="item.label" :icon="/ok|good|ready|success/i.test(String(item.tone)) ? 'check_circle' : 'warning'" :title="item.label" :value="item.state" />
+      <MItem v-if="status.installed" action icon="delete" :title="text.uninstall" :disabled="status.in_use || status.maintenance || controlsBusy || operation === 'uninstall'" @click="uninstall" />
+    </MGroup>
+    <MFooter>{{ text.intro }}</MFooter>
+  </MSection>
 </template>
 
 <script setup>
 import { enhancementControlsText } from '../composables/enhancementControls.js'
-import EnhancementSketch from './EnhancementSketch.vue'
+import { MSection, MGroup, MItem, MSwitchItem, MStatusPill, MBanner, MFooter, MButton } from 'foundation-ui/vue'
 import { computed } from 'vue'
 import { dlssNr, rtxHdr } from '../tauri-adapter.js'
 import { dlssNrText } from '../composables/dlssNrMessages.js'
 import { useI18n } from '../desktop/i18n/index.js'
-import { Refresh, MagicStick, Sunny } from '@element-plus/icons-vue'
 import { useRtxHdrI18n } from '../composables/rtxHdrI18n.js'
 import { useEnhancementManager } from '../composables/useEnhancementManager.js'
+import { noteDlssNrStatus } from '../composables/useDlssNrReady.js'
 
 const props = defineProps({ kind: { type: String, default: 'hdr' } })
 const { locale } = useI18n()
@@ -262,7 +85,9 @@ const {
 } = useEnhancementManager({
   api: props.kind === 'nr' ? dlssNr : rtxHdr,
   messages: text,
-  runtimeName: props.kind === 'nr' ? 'nvngx_dlssnr.dll' : 'nvngx_truehdr.dll'
+  runtimeName: props.kind === 'nr' ? 'nvngx_dlssnr.dll' : 'nvngx_truehdr.dll',
+  // the DLSS NR live controls elsewhere follow what this page reads (install, repair, uninstall)
+  onStatus: props.kind === 'nr' ? noteDlssNrStatus : undefined
 })
 const maintenanceMessage = computed(() => {
   if (status.value.state === 'pending_removal') return text.value.pendingRemovalNotice

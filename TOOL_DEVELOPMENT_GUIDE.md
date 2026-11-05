@@ -146,7 +146,7 @@ fn handle_toolbar_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str) {
 
 所有工具应使用 Sunshine 控制面板的主题色：
 
-**Gura 蓝色主题（浅色模式）**：
+**品牌蓝色主题（浅色模式）**：
 - 主色：`#4a9eff`
 - 次色：`#7ab8ff`
 - 文本色：`white`
@@ -205,7 +205,7 @@ fn handle_toolbar_menu_event<R: Runtime>(app: &AppHandle<R>, event_id: &str) {
 - ✅ **点击外部关闭**：点击遮罩区域关闭
 - ✅ **ESC 键关闭**：按 ESC 键关闭
 - ✅ **关闭按钮**：右上角 × 按钮
-- ✅ **主题色**：自动应用 Gura 蓝色渐变背景
+- ✅ **主题色**：自动应用 品牌蓝色渐变背景
 
 ### 窗口行为
 

@@ -1,8 +1,9 @@
 use chrono::Local;
 use log::{Level, LevelFilter, Log, Metadata, Record};
 use serde::{Deserialize, Serialize};
-use std::fs;
-use std::path::PathBuf;
+use std::fs::{self, File, OpenOptions};
+use std::io::Write;
+use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter, Manager};
@@ -10,6 +11,8 @@ use tauri::{AppHandle, Emitter, Manager};
 /// In-memory log entry.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogEntry {
+    #[serde(default = "panel_source")]
+    pub source: String,
     pub timestamp: String,
     pub level: String,
     pub message: String,
@@ -18,19 +21,29 @@ pub struct LogEntry {
     pub line: Option<u32>,
 }
 
+fn panel_source() -> String {
+    "panel".to_string()
+}
+
 /// Log collector state.
 pub struct LogCollector {
     logs: Arc<Mutex<Vec<LogEntry>>>,
     max_logs: usize,
     app_handle: Arc<Mutex<Option<AppHandle>>>,
+    file: Mutex<Option<File>>,
+    file_path: PathBuf,
 }
 
 impl LogCollector {
     pub fn new(max_logs: usize) -> Self {
+        let file_path = panel_log_path();
+        let file = open_panel_log(&file_path);
         Self {
             logs: Arc::new(Mutex::new(Vec::with_capacity(max_logs))),
             max_logs,
             app_handle: Arc::new(Mutex::new(None)),
+            file: Mutex::new(file),
+            file_path,
         }
     }
 
@@ -49,6 +62,7 @@ impl LogCollector {
         });
 
         let entry = LogEntry {
+            source: panel_source(),
             timestamp: Local::now().format("%Y-%m-%d %H:%M:%S%.3f").to_string(),
             level: match record.level() {
                 Level::Error => "error".to_string(),
@@ -73,6 +87,14 @@ impl LogCollector {
             }
         }
 
+        // The panel's own log file is UTF-8: message is a Rust String and every
+        // process or API source is decoded before it gets here.
+        if let Ok(mut guard) = self.file.lock() {
+            if let Some(file) = guard.as_mut() {
+                let _ = writeln!(file, "{}", format_entry_line(&entry));
+            }
+        }
+
         // Stream new entries to the log console when it is open.
         if let Ok(app_guard) = self.app_handle.lock() {
             if let Some(app) = app_guard.as_ref() {
@@ -89,7 +111,50 @@ impl LogCollector {
 
     pub fn clear_logs(&self) {
         self.logs.lock().unwrap().clear();
+        let _ = fs::write(&self.file_path, "");
+        *self.file.lock().unwrap() = open_panel_log(&self.file_path);
     }
+}
+
+/// Where the panel keeps its own log between runs. The viewer reads the
+/// in-memory entries; the file is the support copy and stays UTF-8.
+pub fn panel_log_path() -> PathBuf {
+    dirs::data_local_dir()
+        .unwrap_or_else(std::env::temp_dir)
+        .join("Sunshine GUI")
+        .join("logs")
+        .join("panel.log")
+}
+
+fn open_panel_log(path: &Path) -> Option<File> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent).ok()?;
+    }
+    if fs::metadata(path)
+        .map(|metadata| metadata.len() > 5 * 1024 * 1024)
+        .unwrap_or(false)
+    {
+        let _ = fs::rename(path, path.with_extension("1.log"));
+    }
+    OpenOptions::new().create(true).append(true).open(path).ok()
+}
+
+/// One line of the panel log; also the row the viewer and export read.
+pub fn format_entry_line(entry: &LogEntry) -> String {
+    let file_info = if let (Some(file), Some(line)) = (entry.file.as_ref(), entry.line) {
+        format!("{}:{}", file, line)
+    } else if let Some(file) = entry.file.as_ref() {
+        file.clone()
+    } else {
+        entry.target.clone().unwrap_or_else(|| "panel".to_string())
+    };
+    format!(
+        "[{}] [{}] [{}] {}",
+        entry.timestamp,
+        entry.level.to_uppercase(),
+        file_info,
+        entry.message
+    )
 }
 
 /// Logger that forwards accepted records to the in-memory collector.
@@ -135,8 +200,7 @@ impl Log for TauriLogger {
     }
 }
 
-static LOG_COLLECTOR: std::sync::OnceLock<Arc<LogCollector>> =
-    std::sync::OnceLock::new();
+static LOG_COLLECTOR: std::sync::OnceLock<Arc<LogCollector>> = std::sync::OnceLock::new();
 static LOG_LEVEL_FILTER: AtomicU8 = AtomicU8::new(3);
 
 fn level_to_u8(level: LevelFilter) -> u8 {
@@ -198,6 +262,12 @@ pub fn get_all_logs() -> Vec<LogEntry> {
     } else {
         Vec::new()
     }
+}
+
+/// A call of the renderer that took long (a fetch, a native command, a frame that was blocked): the log of the panel has it with the others.
+#[tauri::command]
+pub fn frontend_slow(kind: String, name: String, ms: f64, detail: Option<String>) {
+    log::warn!("[renderer] {kind} {name} {ms:.0} ms {}", detail.unwrap_or_default());
 }
 
 /// Clear all collected logs.
@@ -269,21 +339,8 @@ pub async fn export_logs(
             text.push_str(&format!("{}\n\n", "=".repeat(80)));
 
             for log in &logs {
-                let file_info = if let (Some(file), Some(line)) = (log.file.as_ref(), log.line) {
-                    format!("{}:{}", file, line)
-                } else if let Some(file) = log.file.as_ref() {
-                    file.clone()
-                } else {
-                    "unknown".to_string()
-                };
-
-                text.push_str(&format!(
-                    "[{}] [{}] [{}] {}\n",
-                    log.timestamp,
-                    log.level.to_uppercase(),
-                    file_info,
-                    log.message
-                ));
+                text.push_str(&format_entry_line(log));
+                text.push('\n');
             }
             text
         }
@@ -299,4 +356,41 @@ pub async fn export_logs(
         .to_string();
 
     Ok(format!("Logs exported to: {}", file_name))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn panel_line_carries_source_file_and_message() {
+        let entry = LogEntry {
+            source: panel_source(),
+            timestamp: "2026-11-02 10:00:00.123".to_string(),
+            level: "error".to_string(),
+            message: "系统找不到指定的文件。".to_string(),
+            target: Some("panel::logger".to_string()),
+            file: Some("logger.rs".to_string()),
+            line: Some(42),
+        };
+        assert_eq!(
+            format_entry_line(&entry),
+            "[2026-11-02 10:00:00.123] [ERROR] [logger.rs:42] 系统找不到指定的文件。"
+        );
+        assert_eq!(entry.source, "panel");
+    }
+
+    #[test]
+    fn panel_file_writes_the_line_as_utf8() {
+        let directory =
+            std::env::temp_dir().join(format!("sunshine-panel-log-test-{}", std::process::id()));
+        let path = directory.join("panel.log");
+        let line = "[2026-11-02 10:00:00.123] [ERROR] [logger.rs:42] 系统找不到指定的文件。";
+        {
+            let mut file = open_panel_log(&path).unwrap();
+            writeln!(file, "{line}").unwrap();
+        }
+        assert_eq!(fs::read_to_string(&path).unwrap(), format!("{line}\n"));
+        let _ = fs::remove_dir_all(&directory);
+    }
 }

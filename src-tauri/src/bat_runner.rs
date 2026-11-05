@@ -23,10 +23,10 @@ fn append_process_output(log_path: &Path, stdout: &[u8], stderr: &[u8]) {
         return;
     };
     if !stdout.is_empty() {
-        let _ = log.write_all(stdout);
+        let _ = log.write_all(crate::text_encoding::decode_console_bytes(stdout).as_bytes());
     }
     if !stderr.is_empty() {
-        let _ = log.write_all(stderr);
+        let _ = log.write_all(crate::text_encoding::decode_console_bytes(stderr).as_bytes());
     }
 }
 

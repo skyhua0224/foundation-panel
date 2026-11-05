@@ -3,7 +3,7 @@
  * 负责解析 AI 返回的 JSON 操作指令，并执行对 Sunshine 的修改
  */
 
-import { ElMessage } from 'element-plus'
+import { ElMessage } from './notifyMessage.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
 function strings() {

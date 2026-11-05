@@ -10,6 +10,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 
 const rendererSrcPath = join(__dirname, 'src', 'renderer')
+const foundationUi = process.env.FOUNDATION_UI_DIR || join(__dirname, '..', 'ds5-ui-m3e')
 
 /**
  * https://vitejs.dev/config
@@ -41,6 +42,7 @@ export default defineConfig(() => ({
         sunshineFrame: resolve(rendererSrcPath, 'sunshine-frame.html'),
         console: resolve(rendererSrcPath, 'console/index.html'),
         clock: resolve(rendererSrcPath, 'stop-clock-canvas/index.html'),
+        latencyClock: resolve(rendererSrcPath, 'latency-clock/index.html'),
         home: resolve(rendererSrcPath, 'home/index.html'),
         about: resolve(rendererSrcPath, 'about/index.html'),
         pin: resolve(rendererSrcPath, 'pin/index.html'),
@@ -51,7 +53,7 @@ export default defineConfig(() => ({
     },
   },
   plugins: [
-    vuePlugin(),
+    vuePlugin({ template: { compilerOptions: { isCustomElement: (tag) => tag.startsWith('md-') } } }),
     Components({
       dts: false,
       resolvers: [
@@ -62,9 +64,17 @@ export default defineConfig(() => ({
     }),
   ],
   resolve: {
-    alias: {
-      '@': rendererSrcPath,
-    },
+    // foundation-ui is the shared Material 3 Expressive package (sibling checkout); Vue must stay a single copy.
+    dedupe: ['vue'],
+    alias: [
+      // every call to the host goes through this import: the timed one (src/renderer/tauri-core-timed.js) gives the package back with a timed invoke
+      { find: /^@tauri-apps\/api\/core$/, replacement: join(rendererSrcPath, 'tauri-core-timed.js') },
+      { find: '@', replacement: rendererSrcPath },
+      { find: /^foundation-ui\/vue$/, replacement: join(foundationUi, 'src/vue/index.js') },
+      { find: /^foundation-ui\/all\.css$/, replacement: join(foundationUi, 'src/css/all.css') },
+      { find: /^foundation-ui\/(.*)$/, replacement: join(foundationUi, 'src/$1') },
+      { find: /^vue$/, replacement: join(__dirname, 'node_modules/vue/dist/vue.runtime.esm-bundler.js') },
+    ],
   },
   define: {
     // 根据构建模式设置环境变量

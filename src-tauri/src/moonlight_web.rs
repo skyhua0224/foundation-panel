@@ -305,7 +305,7 @@ pub async fn moonlight_web_stop() -> Result<String, String> {
             info!("✅ moonlight-web 进程已终止");
             Ok("moonlight-web 已停止".to_string())
         } else {
-            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stderr = crate::text_encoding::decode_console_bytes(&output.stderr);
             warn!("⚠️ taskkill 输出: {}", stderr);
             Ok("moonlight-web 可能已经停止".to_string())
         }
@@ -620,7 +620,7 @@ fn is_process_running() -> bool {
             .creation_flags(0x08000000)
             .output()
         {
-            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stdout = crate::text_encoding::decode_console_bytes(&output.stdout);
             return stdout.to_lowercase().contains("web-server");
         }
     }
@@ -649,7 +649,7 @@ fn get_installed_version() -> Option<String> {
             .creation_flags(0x08000000)
             .output()
         {
-            let stdout = String::from_utf8_lossy(&output.stdout);
+            let stdout = crate::text_encoding::decode_console_bytes(&output.stdout);
             // --version 输出格式: "web-server 2.4.0"，只取最后的版本号
             let version = stdout
                 .trim()
@@ -804,7 +804,7 @@ fn copy_dir_contents(src: &PathBuf, dest: &PathBuf) -> Result<(), String> {
 
         let exit_code = output.status.code().unwrap_or(-1);
         if exit_code >= 8 {
-            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stderr = crate::text_encoding::decode_console_bytes(&output.stderr);
             return Err(format!("robocopy 失败 (exit {}): {}", exit_code, stderr));
         }
         Ok(())
@@ -819,7 +819,7 @@ fn copy_dir_contents(src: &PathBuf, dest: &PathBuf) -> Result<(), String> {
             .map_err(|e| format!("执行 cp 失败: {}", e))?;
 
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stderr = crate::text_encoding::decode_console_bytes(&output.stderr);
             return Err(format!("cp 失败: {}", stderr));
         }
         Ok(())
@@ -881,7 +881,7 @@ fn extract_zip(zip_path: &PathBuf, target_dir: &PathBuf) -> Result<(), String> {
             .map_err(|e| format!("执行解压命令失败: {}", e))?;
 
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stderr = crate::text_encoding::decode_console_bytes(&output.stderr);
             return Err(format!("解压失败: {}", stderr));
         }
 
@@ -911,7 +911,7 @@ fn extract_tar_gz(archive_path: &PathBuf, target_dir: &PathBuf) -> Result<(), St
             .map_err(|e| format!("执行 tar 解压失败: {}", e))?;
 
         if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stderr = crate::text_encoding::decode_console_bytes(&output.stderr);
             return Err(format!("tar 解压失败: {}", stderr));
         }
 

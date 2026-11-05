@@ -95,22 +95,16 @@ async fn run_elevated_helper(token: uuid::Uuid, request: ElevatedRequest) -> i32
         }
         match request {
             ElevatedRequest::Install => {
-                crate::dualsense::ensure_no_active_session().await.map_err(|_| {
-                    "USBIP-SETUP-006: finish the active Sunshine stream before installing the transport"
-                        .to_string()
-                })?;
-                let root = crate::dualsense::component_root();
+                super::install::ensure_no_active_session().await?;
+                let root = super::install::staging_root();
                 tokio::fs::create_dir_all(&root).await.map_err(|error| {
-                    format!("USBIP-SETUP-005: unable to prepare component storage: {error}")
+                    format!("USBIP-SETUP-005: unable to prepare installer storage: {error}")
                 })?;
-                let progress = |_stage: &str, _value: u32| {};
-                let result = crate::dualsense::ensure_pinned_usbip(&progress, &root, None)
+                let result = super::install::ensure_pinned_usbip(&root)
                     .await
                     .map_err(|error| format!("USBIP-SETUP-007: transport installation failed: {error}"))?;
-                let reboot_recommended = matches!(
-                    result,
-                    crate::dualsense::UsbipInstallResult::RebootRecommended
-                );
+                let reboot_recommended =
+                    matches!(result, super::install::InstallResult::RebootRecommended);
                 Ok(ElevatedResponse {
                     success: true,
                     port: None,

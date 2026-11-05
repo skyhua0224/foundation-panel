@@ -1,5 +1,5 @@
 import { computed, onActivated, onMounted, reactive, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from './notifyMessage.js'
 import { usbip } from '../tauri-adapter.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { useDeviceComponentOperation } from './useDeviceComponentOperation.js'
@@ -144,7 +144,7 @@ export function useUsbTransport() {
       await ElMessageBox.confirm(
         t.value.deviceHub.usb.cleanupConfirm,
         removing ? t.value.deviceHub.components.uninstallTransport : t.value.deviceHub.usb.cleanupResidual,
-        { confirmButtonText: removing ? t.value.dualSense.uninstall : t.value.deviceHub.usb.continue, cancelButtonText: t.value.deviceHub.usb.cancel, type: 'warning' },
+        { confirmButtonText: removing ? t.value.dualSense.uninstall : t.value.deviceHub.usb.continue, cancelButtonText: t.value.deviceHub.usb.cancel, type: 'warning', danger: removing },
       )
     } catch { cleaning.value = false; return }
     if (statusRefreshPromise) await statusRefreshPromise

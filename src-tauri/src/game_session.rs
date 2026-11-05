@@ -512,7 +512,7 @@ fn kill_process_tree(pid: u32) {
             "taskkill on {} exited with {}: {}",
             pid,
             output.status,
-            String::from_utf8_lossy(&output.stderr).trim()
+            crate::text_encoding::decode_console_bytes(&output.stderr).trim()
         ),
         Err(error) => warn!("Could not run taskkill on {}: {}", pid, error),
     }

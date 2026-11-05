@@ -1,227 +1,99 @@
 <template>
-  <div class="ai-settings-wrapper">
-    <div class="ai-header">
-      <div class="ai-heading">
-        <span class="header-avatar" aria-hidden="true">
-          <img src="/mita-pixel.png" alt="" />
-        </span>
-        <div class="title-stack">
-          <span class="mita-kicker">
-            <span class="status-dot" :class="{ active: config.enabled }"></span>
-            M.I.T.A / AI ASSISTANT
-          </span>
-          <h2>{{ t.aiAssistant.title }}</h2>
-        </div>
+  <!-- 米塔 AI is a destination of the rail: the chat takes the whole pane (header, the conversation that scrolls, the input pinned at the bottom);
+       its settings are pages behind the gear of the header -->
+  <div v-if="!current" class="ai-shell">
+    <header class="ai-head" :class="{ 'is-scrolled': scrolled }">
+      <div class="ai-head__id">
+        <h2 class="ai-head__title">{{ t.aiAssistant.title }}</h2>
+        <p class="ai-head__line">{{ headLine }}</p>
       </div>
-      <el-tag :type="config.enabled ? 'success' : 'info'" size="small" round class="status-tag">
-        {{ config.enabled ? t.aiAssistant.enabled : t.aiAssistant.disabled }}
-      </el-tag>
+      <div class="ai-head__actions">
+        <MIconButton v-if="chatHistory.length" icon="delete" :label="t.aiAssistant.clearHistory" @click="clearHistory" />
+        <MIconButton icon="settings" :label="t.aiAssistant.modelConfig" @click="open('config')" />
+      </div>
+    </header>
+
+    <div ref="chatContainer" class="ai-scroll" aria-live="polite" @wheel="handleChatWheel" @scroll.passive="scrolled = $event.target.scrollTop > 2">
+      <div class="ai-col" data-wp-cover>
+        <div v-if="chatHistory.length === 0 && !isLoading" class="ai-hint">
+          <img src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="ai-avatar ai-avatar--lg ai-avatar--pixel">
+          <b>{{ t.aiAssistant.welcomeMsg }}</b>
+          <MButton v-if="!config.enabled" variant="tonal" icon="settings" @click="open('config')">{{ t.aiAssistant.modelConfig }}</MButton>
+          <div class="ai-examples">
+            <button v-for="example in exampleQueries" :key="example" type="button" class="ai-example" :disabled="!config.enabled" @click="selectExample(example)">{{ example }}</button>
+          </div>
+        </div>
+        <div v-for="(msg, idx) in chatHistory" :key="idx" class="ai-msg" :class="msg.role">
+          <span v-if="msg.role === 'user'" class="ai-avatar ai-avatar--user"><MIcon name="person" /></span>
+          <img v-else src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="ai-avatar ai-avatar--pixel">
+          <div class="ai-bubble">
+            <div class="ai-text" v-html="formatMessage(msg.content, msg.parsedAction)"></div>
+            <div v-if="msg.parsedAction" class="ai-action">
+              <MButton size="sm" variant="tonal" @click="applyAction(msg.parsedAction)">{{ getActionButtonText(msg.parsedAction) }}</MButton>
+              <span>{{ getActionHint(msg.parsedAction) }}</span>
+            </div>
+            <span class="ai-time">{{ formatTime(msg.timestamp) }}</span>
+            <MButton v-if="msg.isError" size="sm" variant="text" icon="refresh" @click="retryLastMessage">{{ t.aiAssistant.retry }}</MButton>
+          </div>
+        </div>
+        <div v-if="isLoading" class="ai-msg assistant"><img src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="ai-avatar ai-avatar--pixel"><div class="ai-bubble"><MLoading size="28px" /></div></div>
+      </div>
     </div>
 
-    <div class="ai-content" :class="{ chatting: isChatting }">
-      <!-- AI 配置区 -->
-      <div class="ai-section config-section" :class="{ collapsed: !showConfig }">
-        <div class="section-header">
-          <div class="config-heading">
-            <span class="section-title"><el-icon><Setting /></el-icon>{{ t.aiAssistant.modelConfig }}</span>
-            <span v-if="!showConfig" class="config-summary">
-              {{ activeProviderLabel }}<template v-if="config.model"> · {{ config.model }}</template>
-            </span>
-          </div>
-          <div class="section-actions">
-            <el-switch v-model="config.enabled" :disabled="isClearingApiKey" @change="saveConfig(false)" @click.stop />
-            <el-button
-              class="config-toggle"
-              text
-              circle
-              :icon="showConfig ? ArrowUp : ArrowDown"
-              :title="t.aiAssistant.modelConfig"
-              :aria-label="t.aiAssistant.modelConfig"
-              :aria-expanded="showConfig"
-              @click="showConfig = !showConfig"
-            />
-          </div>
-        </div>
-
-        <el-form v-show="showConfig" :model="config" label-width="120px" class="ai-form">
-          <el-form-item :label="t.aiAssistant.provider">
-            <el-select v-model="config.provider" class="field-control" @change="onProviderChange">
-              <el-option v-for="p in providers" :key="p.value" :label="p.label" :value="p.value" />
-            </el-select>
-          </el-form-item>
-
-          <el-form-item :label="t.aiAssistant.apiUrl">
-            <el-input v-model="config.apiBase" class="field-control" placeholder="https://api.openai.com/v1" />
-          </el-form-item>
-
-          <el-form-item label="Compatibility">
-            <el-select v-model="config.compatibility" class="field-control">
-              <el-option label="OpenAI Chat Completions" value="openai-chat" />
-              <el-option label="Anthropic Messages" value="anthropic-messages" />
-            </el-select>
-          </el-form-item>
-
-          <el-form-item :label="t.aiAssistant.apiKey">
-            <el-input
-              v-model="config.apiKey"
-              type="password"
-              show-password
-              class="field-control"
-              :placeholder="config.apiKeyConfigured ? '••••••••' : 'sk-...'"
-            >
-              <template v-if="config.apiKeyConfigured" #append>
-                <el-button :loading="isClearingApiKey" @click="clearApiKey">{{ t.aiAssistant.clearApiKey }}</el-button>
-              </template>
-            </el-input>
-            <span class="form-tip">{{ t.aiAssistant.apiKeyHint }}</span>
-          </el-form-item>
-
-          <el-form-item :label="t.aiAssistant.model">
-            <div class="model-field">
-              <el-select
-                v-model="config.model"
-                filterable
-                allow-create
-                default-first-option
-                style="flex: 1"
-                :placeholder="t.aiAssistant.modelPlaceholder"
-              >
-                <el-option-group v-if="availableModels.length > 0" :label="t.aiAssistant.availableModels">
-                  <el-option v-for="m in availableModels" :key="m" :label="m" :value="m" />
-                </el-option-group>
-              </el-select>
-              <el-button
-                :icon="Refresh"
-                :loading="isFetchingModels"
-                @click="fetchRemoteModels"
-                :title="t.aiAssistant.fetchModels"
-                circle
-              />
-            </div>
-            <span class="form-tip">{{ t.aiAssistant.modelHint }}</span>
-          </el-form-item>
-
-          <div class="form-actions">
-            <el-button type="primary" @click="testConnection" :loading="isLoading"> {{ t.aiAssistant.testConnection }} </el-button>
-            <el-button :disabled="isClearingApiKey" @click="saveConfig()">{{ t.aiAssistant.saveConfig }}</el-button>
-            <el-tag v-if="isConnected" type="success" class="conn-status"> {{ t.aiAssistant.connected }} </el-tag>
-          </div>
-        </el-form>
+    <div class="ai-dock">
+      <div class="ai-composer">
+        <textarea ref="chatInput" v-model="currentInput" rows="1" :placeholder="t.aiAssistant.inputPlaceholder" :disabled="!config.enabled" :aria-label="t.aiAssistant.inputPlaceholder" @keydown.enter.exact.prevent="handleSend"></textarea>
+        <MButton icon="send" :loading="isLoading" :disabled="!config.enabled || !currentInput.trim()" @click="handleSend">{{ t.aiAssistant.send }}</MButton>
       </div>
-
-      <!-- AI 对话区 -->
-      <div class="ai-section chat-section">
-        <div class="section-header">
-          <div class="chat-heading">
-            <span class="section-title"><el-icon><ChatDotRound /></el-icon>{{ t.aiAssistant.smartChat }}</span>
-          </div>
-          <el-button v-if="chatHistory.length" size="small" text @click="clearHistory">
-            {{ t.aiAssistant.clearHistory }}
-          </el-button>
-        </div>
-
-        <div
-          ref="chatContainer"
-          class="chat-messages"
-          :class="{ empty: chatHistory.length === 0 }"
-          aria-live="polite"
-          @wheel="handleChatWheel"
-        >
-          <div v-if="chatHistory.length === 0" class="welcome-hint">
-            <div class="mita-avatar-lg">
-              <img src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="mita-pixel-img-lg" />
-            </div>
-            <p>{{ t.aiAssistant.welcomeMsg }}</p>
-            <p class="hint-sub">{{ t.aiAssistant.welcomeHint }}</p>
-            <div class="hint-examples">
-              <button
-                v-for="example in exampleQueries"
-                :key="example"
-                type="button"
-                class="example-prompt"
-                :disabled="!config.enabled"
-                @click="selectExample(example)"
-              >
-                {{ example }}
-              </button>
-            </div>
-          </div>
-
-          <div v-for="(msg, idx) in chatHistory" :key="idx" class="chat-message" :class="msg.role">
-            <div class="msg-avatar">
-              <el-icon v-if="msg.role === 'user'" class="user-avatar"><UserFilled /></el-icon>
-              <img v-else src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="mita-pixel-img" />
-            </div>
-            <div class="msg-bubble">
-              <div class="msg-content" v-html="formatMessage(msg.content, msg.parsedAction)"></div>
-              <div v-if="msg.parsedAction" class="msg-action">
-                <div class="action-main">
-                  <el-button type="primary" size="small" @click="applyAction(msg.parsedAction)">
-                    {{ getActionButtonText(msg.parsedAction) }}
-                  </el-button>
-                  <span class="action-hint">{{ getActionHint(msg.parsedAction) }}</span>
-                </div>
-              </div>
-              <span class="msg-time">{{ formatTime(msg.timestamp) }}</span>
-              <el-button v-if="msg.isError" class="retry-btn" type="warning" size="small" :icon="RefreshRight" @click="retryLastMessage" round>
-                {{ t.aiAssistant.retry }}
-              </el-button>
-            </div>
-          </div>
-
-          <div v-if="isLoading" class="chat-message assistant">
-            <div class="msg-avatar"><img src="/mita-pixel.png" :alt="t.aiAssistant.mitaName" class="mita-pixel-img" /></div>
-            <div class="msg-bubble loading">
-              <span class="dot-loader"> <span></span><span></span><span></span> </span>
-            </div>
-          </div>
-        </div>
-
-        <div class="chat-input-area">
-          <el-input
-            ref="chatInput"
-            v-model="currentInput"
-            type="textarea"
-            :autosize="{ minRows: 1, maxRows: 4 }"
-            resize="none"
-            :placeholder="t.aiAssistant.inputPlaceholder"
-            @keydown.enter.exact.prevent="handleSend"
-            :disabled="!config.enabled"
-          />
-          <el-button
-            type="primary"
-            :icon="Promotion"
-            @click="handleSend"
-            :loading="isLoading"
-            :disabled="!config.enabled || !currentInput.trim()"
-            class="send-btn"
-          >
-            {{ t.aiAssistant.send }}
-          </el-button>
-        </div>
-      </div>
-
     </div>
   </div>
+
+  <MPage v-else :title="pageTitle" back :back-label="t.m3e.back" @back="back">
+    <!-- Settings: a short page (switch and three rows), the connection and the model are pages of their own -->
+    <template v-if="current === 'config'">
+      <MGroup>
+        <MSwitchItem v-model="config.enabled" icon="smart_toy" :title="t.aiAssistant.title" :text="config.enabled ? t.aiAssistant.enabled : t.aiAssistant.disabled" :disabled="isClearingApiKey" @update:model-value="saveConfig(false)" />
+        <MChoiceItem v-model="config.provider" icon="cloud" :title="t.aiAssistant.provider" :options="providers" :cancel-label="t.common.cancel" @update:model-value="onProviderChange" />
+        <MItem action icon="link" :title="labels.connection" :text="connectionLine" @click="open('connection')" />
+        <MItem action icon="memory" :title="t.aiAssistant.model" :text="config.model || t.aiAssistant.modelPlaceholder" @click="open('model')" />
+      </MGroup>
+      <div class="m-actions-row">
+        <MButton variant="tonal" icon="wifi" :loading="isLoading" @click="testConnection">{{ t.aiAssistant.testConnection }}</MButton>
+        <MButton icon="save" :disabled="isClearingApiKey" @click="saveConfig()">{{ t.aiAssistant.saveConfig }}</MButton>
+        <MChip v-if="isConnected" tone="ok" icon="check_circle">{{ t.aiAssistant.connected }}</MChip>
+      </div>
+    </template>
+
+    <template v-else-if="current === 'connection'">
+      <MGroup>
+        <MFieldItem v-model="config.apiBase" :label="t.aiAssistant.apiUrl" placeholder="https://api.openai.com/v1" />
+        <MFieldItem v-model="config.apiKey" type="password" :label="t.aiAssistant.apiKey" :placeholder="config.apiKeyConfigured ? '••••••••' : 'sk-...'" :supporting="t.aiAssistant.apiKeyHint" />
+        <MChoiceItem v-model="config.compatibility" icon="swap_horiz" title="Compatibility" :options="[{ value: 'openai-chat', label: 'OpenAI Chat Completions' }, { value: 'anthropic-messages', label: 'Anthropic Messages' }]" :cancel-label="t.common.cancel" />
+        <MItem v-if="config.apiKeyConfigured" action icon="delete" :title="t.aiAssistant.clearApiKey" :disabled="isClearingApiKey" @click="clearApiKey" />
+      </MGroup>
+      <div class="m-actions-row"><MButton icon="save" :disabled="isClearingApiKey" @click="saveConfig()">{{ t.aiAssistant.saveConfig }}</MButton></div>
+    </template>
+
+    <template v-else-if="current === 'model'">
+      <MGroup>
+        <MFieldItem v-model="config.model" :label="t.aiAssistant.model" :placeholder="t.aiAssistant.modelPlaceholder" :supporting="t.aiAssistant.modelHint" />
+        <MChoiceItem v-if="availableModels.length" :model-value="config.model" icon="list" :title="t.aiAssistant.availableModels" :options="availableModels.map((m) => ({ value: m, label: m }))" :cancel-label="t.common.cancel" @update:model-value="(v) => { config.model = v }" />
+        <MItem action icon="refresh" :title="t.aiAssistant.fetchModels" :disabled="isFetchingModels" @click="fetchRemoteModels" />
+      </MGroup>
+      <div class="m-actions-row"><MButton icon="save" @click="saveConfig()">{{ t.aiAssistant.saveConfig }}</MButton></div>
+    </template>
+  </MPage>
 </template>
 
 <script setup>
-import { ref, nextTick, watch, computed } from 'vue'
+import { ref, nextTick, watch, computed, onMounted, onBeforeUnmount } from 'vue'
 import MarkdownIt from 'markdown-it'
-import {
-  ArrowDown,
-  ArrowUp,
-  Promotion,
-  Setting,
-  ChatDotRound,
-  Refresh,
-  RefreshRight,
-  UserFilled,
-} from '@element-plus/icons-vue'
+import { MPage, MGroup, MItem, MChoiceItem, MFieldItem, MSwitchItem, MButton, MIconButton, MChip, MIcon, MLoading, useSubpage } from 'foundation-ui/vue'
 import { useAiAssistant, AI_PROVIDERS } from '../composables/useAiAssistant.js'
 import { useI18n } from '../desktop/i18n/index.js'
+import { mitaOpened } from '../composables/mitaState.js'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const {
   config,
@@ -245,9 +117,22 @@ const {
 } = useAiAssistant()
 
 const providers = AI_PROVIDERS
+// the caption bar's Mita button shows an unread answer only while the chat is closed
+onMounted(() => mitaOpened(true))
+onBeforeUnmount(() => mitaOpened(false))
 const chatContainer = ref(null)
+const scrolled = ref(false) // the header gains its surface only when the conversation scrolls under it
 const chatInput = ref(null)
-const showConfig = ref(needsConfiguration.value)
+const { current, open, back } = useSubpage('ai')
+// the chat page opens first; a banner on it leads to the settings when the assistant is not set up yet
+const labels = computed(() => (/^zh/i.test(String(locale.value)) ? { connection: '连接' } : { connection: 'Connection' }))
+const connectionLine = computed(() => {
+  let host = ''
+  try { host = new URL(config.apiBase).host } catch { host = config.apiBase || '' }
+  return [host, config.apiKeyConfigured ? '••••' : ''].filter(Boolean).join(' · ') || '—'
+})
+const headLine = computed(() => (config.enabled ? [activeProviderLabel.value, config.model].filter(Boolean).join(' · ') : t.value.aiAssistant.disabled))
+const pageTitle = computed(() => ({ config: t.value.aiAssistant.modelConfig, connection: labels.value.connection, model: t.value.aiAssistant.model }[current.value] || t.value.aiAssistant.title))
 const markdown = new MarkdownIt({
   breaks: true,
   html: false,
@@ -388,10 +273,7 @@ watch(
   },
 )
 
-watch(needsConfiguration, (required) => {
-  if (required) showConfig.value = true
-})
 </script>
 
 
-<style scoped lang="less" src="./AiAssistant.less"></style>
+<style src="./AiAssistant.css"></style>

@@ -123,6 +123,21 @@ pub fn get_proxy_health_check() -> ProxyHealthCheck {
     }
 }
 
+/// One probe of the host behind the proxy, made by this process and not by the WebView. At a start the WebView's six connections to the proxy are taken by the pages' own first
+/// requests, and a probe queued behind them looks like a silent host (the 「主机无响应」 card on a host that answers in a few milliseconds). Returns the HTTP status.
+#[tauri::command]
+pub async fn probe_sunshine_host(timeout_ms: Option<u64>) -> Result<u16, String> {
+    let timeout = std::time::Duration::from_millis(timeout_ms.unwrap_or(2500).clamp(500, 10_000));
+    let url = format!("{}/", get_sunshine_target().trim_end_matches('/'));
+    get_http_client()
+        .get(url)
+        .timeout(timeout)
+        .send()
+        .await
+        .map(|response| response.status().as_u16())
+        .map_err(|error| error.to_string())
+}
+
 async fn proxy_health_handler(request: Request) -> Response {
     let valid_token = request.uri().query().is_some_and(|query| {
         query
@@ -204,8 +219,10 @@ pub fn ensure_started<R: Runtime>(app: &AppHandle<R>) {
 /// 设置 Sunshine 目标 URL
 pub fn set_sunshine_target(url: String) {
     if let Ok(mut target) = SUNSHINE_TARGET.write() {
-        info!("🎯 代理目标已更新: {}", url);
-        *target = url;
+        if *target != url {
+            info!("🎯 代理目标已更新: {}", url);
+            *target = url;
+        }
     }
 }
 
@@ -853,6 +870,65 @@ fn streamed_response_body(
     }
 }
 
+/// How long a long poll of the Sunshine web UI may wait: the `wait` it asks for (seconds, at most 60) and five seconds more. The pairing list is polled as
+/// `/api/pairing/pending?wait=25&since=<generation>` and Sunshine holds the request until the list changes, so the plain 5 s limit of the proxy ended every
+/// poll as a failure, marked the service unavailable and refreshed the target again and again.
+fn long_poll_timeout(method: &axum::http::Method, url: &str) -> Option<std::time::Duration> {
+    if method != axum::http::Method::GET {
+        return None;
+    }
+    let url = url::Url::parse(url).ok()?;
+    if url.path() != "/api/pairing/pending" {
+        return None;
+    }
+    let wait = url.query_pairs().find(|(key, _)| key == "wait")?.1.parse::<u64>().ok()?;
+    Some(std::time::Duration::from_secs(wait.min(60) + 5))
+}
+
+const ERROR_LOG_WINDOW: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// `None` when a failure of the same kind on the same path was written less than a window ago (it is counted instead); otherwise the number of
+/// failures that were left out since the last line.
+fn throttle_log(
+    seen: &mut std::collections::HashMap<String, (std::time::Instant, u32)>,
+    key: &str,
+    now: std::time::Instant,
+) -> Option<u32> {
+    match seen.get_mut(key) {
+        Some((at, left_out)) if now.duration_since(*at) < ERROR_LOG_WINDOW => {
+            *left_out += 1;
+            None
+        }
+        Some((at, left_out)) => {
+            let n = *left_out;
+            *at = now;
+            *left_out = 0;
+            Some(n)
+        }
+        None => {
+            seen.insert(key.to_string(), (now, 0));
+            Some(0)
+        }
+    }
+}
+
+/// A failure of the proxy is written once a minute per path and kind, with the number of those left out; a page that polls does not fill the log.
+fn log_proxy_failure(path: &str, kind: &str, error: &str) {
+    use std::sync::{LazyLock, Mutex};
+    static SEEN: LazyLock<Mutex<std::collections::HashMap<String, (std::time::Instant, u32)>>> = LazyLock::new(Default::default);
+    let decision = SEEN
+        .lock()
+        .ok()
+        .and_then(|mut seen| throttle_log(&mut seen, &format!("{path}|{kind}"), std::time::Instant::now()));
+    if let Some(left_out) = decision {
+        if left_out == 0 {
+            error!("❌ 代理错误 [{}] ({}): {}", path, kind, error);
+        } else {
+            error!("❌ 代理错误 [{}] ({}): {} (另有 {} 次同类错误未记录)", path, kind, error, left_out);
+        }
+    }
+}
+
 fn proxy_response_body_limit(
     url: &str,
     method: &axum::http::Method,
@@ -943,6 +1019,11 @@ async fn proxy_handler(req: Request) -> Response {
         debug!("📡 代理请求: {} {}", method, path);
     }
 
+    // the Web UI's restart or quit button: the stop that follows is asked for, the panel must not call it a crash (host_facts.rs)
+    if crate::host_facts_math::is_stop_request(method.as_str(), &path) {
+        crate::host_facts::expect_stop(180_000);
+    }
+
     // 快速失败检查：在冷却时间内直接返回错误，避免大量无效请求。
     // AI 入口除外：它是用户显式触发的共享代理能力，需要真实尝试一次，
     // 否则会因为旧的全局不可用状态误报 "Sunshine service is unavailable"。
@@ -977,7 +1058,12 @@ async fn proxy_handler(req: Request) -> Response {
         Err(e) => {
             let error_str = e.to_string();
             let error_kind = proxy_error_kind(&error_str);
-            error!("❌ 代理错误 [{}] ({}): {}", path, error_kind, error_str);
+            if long_poll_timeout(&method, &target_url).is_some() && is_timeout_error(&error_str) {
+                // Sunshine did not answer within the wait it was given: the page asks again; the service is not marked unavailable and the target is not refreshed
+                debug!("long poll [{}] ended without an answer", path);
+                return (axum::http::StatusCode::GATEWAY_TIMEOUT, "long poll timed out").into_response();
+            }
+            log_proxy_failure(&path, error_kind, &error_str);
 
             if is_connection_error(&error_str) {
                 match refresh_sunshine_target_internal().await {
@@ -1074,7 +1160,7 @@ async fn handle_steam_api(
 
     // 发送请求并构建响应
     let client = get_http_client();
-    match send_request(client, &target_url, method, headers, &body).await {
+    match send_request(client, &target_url, method, headers, &body, None).await {
         Ok(response) => build_filtered_proxy_response(response).await,
         Err(e) => {
             error!("❌ Steam API 请求失败: {}", e);
@@ -1196,7 +1282,7 @@ async fn handle_external_proxy(
 
     // 发送请求
     let client = get_http_client();
-    match send_request(client, &target_url, method, headers, &body).await {
+    match send_request(client, &target_url, method, headers, &body, None).await {
         Ok(response) => build_filtered_proxy_response(response).await,
         Err(e) => {
             error!("❌ 外部代理请求失败: {}", e);
@@ -1263,6 +1349,7 @@ async fn send_request(
     method: &axum::http::Method,
     headers: &axum::http::HeaderMap,
     body: &Bytes,
+    timeout: Option<std::time::Duration>,
 ) -> Result<reqwest::Response, reqwest::Error> {
     let mut req_builder = match method.as_str() {
         "GET" => client.get(url),
@@ -1290,6 +1377,9 @@ async fn send_request(
     if !body.is_empty() {
         req_builder = req_builder.body(body.clone());
     }
+    if let Some(timeout) = timeout {
+        req_builder = req_builder.timeout(timeout);
+    }
 
     req_builder.send().await
 }
@@ -1312,12 +1402,13 @@ async fn fetch_and_proxy(
     };
 
     // 尝试请求，HTTPS 失败时降级到 HTTP（仅限非连接错误）
-    let response = match send_request(client, url, method, headers, body).await {
+    let long_poll = long_poll_timeout(method, url);
+    let response = match send_request(client, url, method, headers, body, long_poll).await {
         Ok(resp) => resp,
         Err(e) if url.starts_with("https://") && !is_connection_error(&e.to_string()) => {
             let http_url = url.replace("https://", "http://");
             warn!("⚠️  HTTPS 连接失败，尝试 HTTP: {}", http_url);
-            send_request(client, &http_url, method, headers, body).await?
+            send_request(client, &http_url, method, headers, body, long_poll).await?
         }
         Err(e) => return Err(e.into()),
     };
@@ -1637,6 +1728,28 @@ mod tests {
             acquire_proxy_permit_with_wait(active, pending, std::time::Duration::from_secs(1))
                 .await;
         assert!(permit.is_none());
+    }
+
+    #[test]
+    fn a_pairing_long_poll_may_wait_as_long_as_it_asks_plus_five_seconds() {
+        let get = axum::http::Method::GET;
+        let secs = |url: &str| long_poll_timeout(&get, url).map(|d| d.as_secs());
+        assert_eq!(secs("https://127.0.0.1:57990/api/pairing/pending?wait=25&since=7"), Some(30));
+        assert_eq!(secs("https://127.0.0.1:57990/api/pairing/pending?wait=600"), Some(65));
+        assert_eq!(secs("https://127.0.0.1:57990/api/pairing/pending"), None);
+        assert_eq!(secs("https://127.0.0.1:57990/api/config?wait=25"), None);
+        assert_eq!(long_poll_timeout(&axum::http::Method::POST, "https://x/api/pairing/pending?wait=25"), None);
+    }
+
+    #[test]
+    fn a_failure_is_written_once_a_minute_and_the_left_out_ones_are_counted() {
+        let mut seen = std::collections::HashMap::new();
+        let start = std::time::Instant::now();
+        assert_eq!(throttle_log(&mut seen, "a", start), Some(0));
+        assert_eq!(throttle_log(&mut seen, "a", start + std::time::Duration::from_secs(10)), None);
+        assert_eq!(throttle_log(&mut seen, "a", start + std::time::Duration::from_secs(20)), None);
+        assert_eq!(throttle_log(&mut seen, "b", start + std::time::Duration::from_secs(20)), Some(0));
+        assert_eq!(throttle_log(&mut seen, "a", start + std::time::Duration::from_secs(61)), Some(2));
     }
 
     #[tokio::test]

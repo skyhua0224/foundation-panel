@@ -56,9 +56,8 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
     let mut tasks = BackgroundTasks(vec![windows::lifecycle::start_monitor(app_handle.clone())]);
     #[cfg(target_os = "windows")]
     crate::vdd::start_hardware_cursor_migration();
-    #[cfg(target_os = "windows")]
-    crate::dualsense::start_installed_component_update(app_handle.clone());
-    let start_minimized = explicit_minimized || desktop_settings.start_minimized;
+    // a measurement instance (SUNSHINE_GUI_TEST_OFFSCREEN) shows its window, off screen, whatever the person's setting: a page of a hidden window sleeps
+    let start_minimized = (explicit_minimized || desktop_settings.start_minimized) && !windows::test_offscreen();
 
     // Agent-only startup keeps tray and session services alive without
     // allocating a hidden WebView. UI windows are created on demand.
@@ -80,6 +79,17 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
         }
     }
 
+    if !agent_only {
+        // The pages ask for these probes the moment they mount (0.05 to 1.7 s each on the Skyindows VM); started now, they are running or kept by then.
+        tauri::async_runtime::spawn(async {
+            let _ = tokio::join!(
+                crate::vdd::get_vdd_status(),
+                crate::vmouse::get_vmouse_status(),
+                crate::sunshine::get_sunshine_version(),
+                crate::system::get_sunshine_start_time(),
+            );
+        });
+    }
     tray::create_system_tray(&app_handle)?;
     crate::power::refresh_ecoqos_state(&app_handle);
     #[cfg(target_os = "windows")]

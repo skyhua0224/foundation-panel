@@ -1,9 +1,10 @@
 import { ref, reactive, computed, watch } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from './notifyMessage.js'
 import { callLLM, fetchModels } from './aiClient.js'
 import { getAppsContext, getLogsContext, parseAction, executeAction } from './aiActions.js'
 import { AI_PROVIDERS, DEFAULT_CONFIG, STORAGE_KEY } from './aiProviders.js'
 import { useI18n } from '../desktop/i18n/index.js'
+import { mitaBegin, mitaEnd } from './mitaState.js'
 
 // 重新导出供外部使用
 export { AI_PROVIDERS }
@@ -463,6 +464,8 @@ export function useAiAssistant() {
     chatHistory.value.push({ role: 'user', content: userMessage, timestamp: Date.now() })
     currentInput.value = ''
     isLoading.value = true
+    mitaBegin()
+    let answered = false
 
     try {
       const [appsContext, logsContext] = await Promise.all([getAppsContext(), getLogsContext()])
@@ -481,6 +484,7 @@ export function useAiAssistant() {
       if (action) msg.parsedAction = action
 
       chatHistory.value.push(msg)
+      answered = true
     } catch (error) {
       chatHistory.value.push({
         role: 'assistant',
@@ -488,8 +492,10 @@ export function useAiAssistant() {
         timestamp: Date.now(),
         isError: true,
       })
+      answered = true
     } finally {
       isLoading.value = false
+      mitaEnd(answered)
     }
 
     return true

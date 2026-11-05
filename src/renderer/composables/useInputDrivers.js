@@ -1,5 +1,5 @@
 import { reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from './notifyMessage.js'
 import { vigem, vmouse } from '../tauri-adapter.js'
 import { vigemStatusChannel } from './deviceStatusStore.js'
 import { useVmouse, reloadVmouseAfterOperation } from './useVmouse.js'

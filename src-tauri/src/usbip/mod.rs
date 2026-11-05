@@ -9,18 +9,23 @@ mod config;
 mod device;
 mod elevated;
 mod exec;
+mod install;
 mod manager;
+mod signature;
 mod status;
 
 use serde::{Deserialize, Serialize};
 
 use manager::REQUIRED_VERSION;
+pub(crate) use signature::driver_signature;
 const DEFAULT_TCP_PORT: u16 = 3240;
 const MAX_OUTPUT_BYTES: usize = 256 * 1024;
 const MAX_ELEVATED_RESPONSE_BYTES: usize = 16 * 1024;
 const ELEVATED_ARG: &str = "--elevated-usbip";
 const ELEVATED_CONNECT_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 const COMMAND_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30);
+const MAX_INSTALLER_BYTES: u64 = 48 * 1024 * 1024;
+const INSTALLER_DOWNLOAD_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(30 * 60);
 
 static OPERATION_LOCK: std::sync::LazyLock<tokio::sync::Mutex<()>> =
     std::sync::LazyLock::new(|| tokio::sync::Mutex::new(()));
@@ -103,7 +108,7 @@ struct ElevatedResponse {
 pub(crate) use manager::uninstall_entries as usbip_uninstall_entries;
 pub(crate) use manager::{
     INSTALLER_SHA256 as USBIP_SHA256, INSTALLER_URL as USBIP_URL, InstallDisposition,
-    PINNED_VERSION as USBIP_VERSION, TRANSPORT_POLICY as USBIP_POLICY, install_disposition,
+    PINNED_VERSION as USBIP_VERSION, install_disposition,
     installed_version as installed_usbip_version,
     supported_version_installed as supported_usbip_installed,
 };
@@ -166,7 +171,7 @@ fn validate_tcp_port(tcp_port: Option<u16>) -> Result<u16, String> {
 // Re-export the tauri commands and the elevated-helper entry point so callers
 // keep spelling `usbip::` with the same paths they used against the single-file
 // module. Glob re-exports carry the `#[tauri::command]`-generated hidden items
-// that generate_handler! resolves (same pattern as dualsense).
+// that generate_handler! resolves.
 pub use commands::*;
 pub use config::*;
 #[cfg(target_os = "windows")]

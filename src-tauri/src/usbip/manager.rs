@@ -1,17 +1,16 @@
 //! Shared usbip-win2 installation policy and discovery.
 //!
-//! Device Hub passthrough and the DualSense sidecar use the same system-wide
-//! VHCI driver. Keep the version, registry discovery, executable selection,
-//! and replacement policy here so one feature cannot silently replace the
-//! transport underneath the other.
+//! Device Hub passthrough and the host's native DualSense path use the same
+//! system-wide VHCI driver. Keep the version, registry discovery, executable
+//! selection, and replacement policy here so one feature cannot silently
+//! replace the transport underneath the other.
 
-// This tested combination is shared with the Sidecar build. The runtime may
-// use this driver, but must never install or replace it while creating devices.
+// This tested combination is shared with the host build. The host may use
+// this driver, but must never install or replace it while creating devices.
 pub(crate) const PINNED_VERSION: &str = env!("SUNSHINE_USBIP_VERSION");
 pub(super) const REQUIRED_VERSION: &str = PINNED_VERSION;
 pub(crate) const INSTALLER_URL: &str = env!("SUNSHINE_USBIP_URL");
 pub(crate) const INSTALLER_SHA256: &str = env!("SUNSHINE_USBIP_SHA256");
-pub(crate) const TRANSPORT_POLICY: &str = env!("SUNSHINE_USBIP_POLICY");
 
 /// Rejects missing or replaced transport binaries using the contract's SHA-256.
 #[cfg(target_os = "windows")]
@@ -27,9 +26,9 @@ fn verify_transport_file(path: &std::path::Path, expected: &str) -> Result<(), S
     Ok(())
 }
 
-/// Checks the registered driver path and bytes without changing driver state.
+/// Resolves the registered kernel driver inside the Windows driver store.
 #[cfg(target_os = "windows")]
-pub(super) fn verify_driver_compatibility() -> Result<(), String> {
+pub(super) fn registered_driver_path() -> Result<std::path::PathBuf, String> {
     use winreg::{RegKey, enums::HKEY_LOCAL_MACHINE};
     let service = RegKey::predef(HKEY_LOCAL_MACHINE)
         .open_subkey(r"SYSTEM\CurrentControlSet\Services\usbip2_ude")
@@ -67,6 +66,13 @@ pub(super) fn verify_driver_compatibility() -> Result<(), String> {
             "USBIP-EXEC-006: shared driver path is outside the Windows driver store".to_string(),
         );
     }
+    Ok(path)
+}
+
+/// Checks the registered driver path and bytes without changing driver state.
+#[cfg(target_os = "windows")]
+pub(super) fn verify_driver_compatibility() -> Result<(), String> {
+    let path = registered_driver_path()?;
     verify_transport_file(&path, env!("SUNSHINE_USBIP_DRIVER_SHA256"))
 }
 

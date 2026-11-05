@@ -1,22 +1,76 @@
 import { createApp } from 'vue'
 import SunshineFrame from './components/SunshineFrame.vue'
+import { invoke } from '@tauri-apps/api/core'
+import { followPanelSurface } from './composables/panelSurface.js'
+import { startWebPrewarm, createHiddenFrameLoader } from './composables/webPrewarm.js'
+import { startSlowCallLog, installFaultLog } from './composables/slowCalls.js'
+import { followDpiCover } from './composables/dpiSettle.js'
+import { listen } from '@tauri-apps/api/event'
+import { configureInvokeTiming, invokePending } from './tauri-core-timed.js'
 import 'element-plus/theme-chalk/el-loading.css'
 import 'element-plus/theme-chalk/el-message.css'
 import 'element-plus/theme-chalk/el-overlay.css'
 import 'element-plus/theme-chalk/el-message-box.css'
 import 'element-plus/theme-chalk/el-notification.css'
-import './styles/element-theme.less'  // Element Plus 深色 token，需早于各页面覆盖
-import './styles/dialog.less'  // 导入对话框样式
+import 'foundation-ui/all.css'  // Material 3 Expressive tokens, components and the Element Plus skin
+import './styles/pressed.css'  // pressed state at pointerdown for the controls that had none
+import './styles/m3e-compat.less'  // restyles the pages that still use their own markup
 // 导入 Tauri polyfill
 import './tauri-polyfill.js'
 import { getDefaultLocale, setLocale } from '../i18n/index.js'
-import { getInitialSimpleLocale } from './shared/simple-i18n.js'
-
-const bootMessage = document.querySelector('.boot-loading p')
-if (bootMessage && getInitialSimpleLocale() === 'zh') bootMessage.textContent = '正在准备 Sunshine...'
 
 // 初始化语言
 setLocale(getDefaultLocale())
 
 const app = createApp(SunshineFrame)
 app.mount('#app')
+
+// The first view is in the DOM: the native side may show the window now (WebView2 paints over the window's surface colour; it need not wait for
+// the load event, which waits for every frame inside the page) and learns the theme's surface colour for its first frame
+queueMicrotask(() => {
+  invoke('panel_content_ready').catch(() => {})
+  // the window may be cloaked until the first frame is painted: tell the host when it is
+  try {
+    new PerformanceObserver((list, observer) => {
+      if (list.getEntries().some((entry) => entry.name === 'first-contentful-paint')) { observer.disconnect(); invoke('panel_first_paint').catch(() => {}) }
+    }).observe({ type: 'paint', buffered: true })
+  } catch { invoke('panel_first_paint').catch(() => {}) }
+  followPanelSurface(invoke)
+  followPageActivity(invoke)
+  followDpiCover({ listen, invoke })  // the native cover after a change of scale fades out when the layout matches the window
+  prewarmWebPages()
+  // the calls, frames and timers that take long are in the panel's log, with what was waiting when a timer came late
+  const report = (kind, name, ms, detail) => { if (name !== 'frontend_slow') invoke('frontend_slow', { kind, name, ms, detail }).catch(() => {}) }
+  configureInvokeTiming({ report })
+  startSlowCallLog(report, window, invokePending)
+  installFaultLog(report, window)
+})
+
+// The page is being used: the native side takes no snapshot of it then (at most one report in 250 ms)
+function followPageActivity(invoke) {
+  let last = 0
+  const note = () => {
+    const now = performance.now()
+    if (now - last < 250) return
+    last = now
+    invoke('panel_activity').catch(() => {})
+  }
+  for (const type of ['pointerdown', 'pointermove', 'keydown', 'wheel']) window.addEventListener(type, note, { capture: true, passive: true })
+}
+
+// The Web UI pages load their scripts on the first visit (up to 1.6 s on the Skyindows panel): load them once in a hidden frame while nobody uses the window
+function prewarmWebPages() {
+  let lastInput = performance.now()
+  for (const type of ['pointerdown', 'pointermove', 'keydown', 'wheel']) window.addEventListener(type, () => { lastInput = performance.now() }, { capture: true, passive: true })
+  invoke('wait_for_proxy_ready').then((base) => {
+    const frame = createHiddenFrameLoader()
+    startWebPrewarm({
+      base: String(base).replace(/\/$/, ''),
+      load: frame.load,
+      visible: () => document.visibilityState === 'visible',
+      idleFor: () => performance.now() - lastInput,
+      done: frame.remove,
+      sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    })
+  }).catch(() => {})
+}

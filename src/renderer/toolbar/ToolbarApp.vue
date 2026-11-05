@@ -17,6 +17,7 @@
           >
             <div class="bubble-icon" v-html="item.icon"></div>
           </div>
+          <span class="bubble-caption" :class="{ danger: item.danger }">{{ captionOf(item.id) }}</span>
         </div>
       </div>
     </transition>
@@ -90,7 +91,7 @@ const loadPixi = async () => {
   return pixiModulePromise
 }
 
-// 基地娘资源 URL
+// 桌宠资源 URL
 const SPRITESHEET_URL =
   'https://assets.alkaidlab.com/toolbar-spritesheet.webp'
 const getSpritesheetRequestUrl = () => `${SPRITESHEET_URL}?t=${Date.now()}`
@@ -778,6 +779,14 @@ const menuItems = computed(() => [
   },
 ])
 
+// what each bubble does, in words under it: a right click (or a long press) opens the menu, and 隐藏桌宠 and 桌宠设置… are there to read, not to guess from an icon
+const captionOf = (id) => t.value.toolbar.captions?.[id] || ''
+
+// a long press on the pet opens the menu, as a right click does with a mouse
+let longPressTimer = null
+let longPressFired = false
+const clearLongPress = () => { if (longPressTimer !== null) { clearTimeout(longPressTimer); longPressTimer = null } }
+
 const toggleMenu = () => {
   menuVisible.value = !menuVisible.value
   if (menuVisible.value) {
@@ -881,7 +890,7 @@ const createSpriteFrameSet = async (imageSource) => {
       baseTexture.height % 4 !== 0
     ) {
       throw invalidSpritesheetError(
-        `基地娘资源必须是可被 4×4 整分的图集: ${baseTexture.width}x${baseTexture.height}`,
+        `桌宠资源必须是可被 4×4 整分的图集: ${baseTexture.width}x${baseTexture.height}`,
       )
     }
 
@@ -934,12 +943,12 @@ const createSpriteFrameSetFromBlob = async (blob) => {
   try {
     imageBitmap = await createImageBitmap(blob)
   } catch (error) {
-    throw invalidSpritesheetError(`基地娘资源无法解码: ${error?.message || String(error)}`)
+    throw invalidSpritesheetError(`桌宠资源无法解码: ${error?.message || String(error)}`)
   }
   return createSpriteFrameSet(imageBitmap)
 }
 
-// 后台更新基地娘缓存（ETag 条件请求）
+// 后台更新桌宠缓存（ETag 条件请求）
 const updateSpritesheetCacheInBackground = async (cachedEtag) => {
   if (componentDisposed) return false
   let pendingFrameSet = null
@@ -969,9 +978,9 @@ const updateSpritesheetCacheInBackground = async (cachedEtag) => {
       }
 
       if (applySpriteFrameSet(pendingFrameSet)) {
-        console.info('✅ [桌宠] 基地娘缓存和当前显示已更新')
+        console.info('✅ [桌宠] 桌宠缓存和当前显示已更新')
       } else {
-        console.info('ℹ️ [桌宠] 基地娘缓存已更新，当前显示不可用，下次启动时加载')
+        console.info('ℹ️ [桌宠] 桌宠缓存已更新，当前显示不可用，下次启动时加载')
       }
       pendingFrameSet = null
       return true // 表示有更新
@@ -979,12 +988,12 @@ const updateSpritesheetCacheInBackground = async (cachedEtag) => {
     return false // 304 未修改
   } catch (error) {
     if (pendingFrameSet) destroySpriteFrames(pendingFrameSet.frames)
-    console.warn('⚠️ [桌宠] 基地娘后台更新失败:', error?.message || String(error))
+    console.warn('⚠️ [桌宠] 桌宠后台更新失败:', error?.message || String(error))
     return false
   }
 }
 
-// 生成本地备用基地娘（当网络和缓存都不可用时）
+// 生成本地备用桌宠（当网络和缓存都不可用时）
 // 用 Canvas 绘制 4x4 共 16 帧简单表情图案
 const generateFallbackSpritesheet = () => {
   const frameSize = 64
@@ -1031,7 +1040,7 @@ const generateFallbackSpritesheet = () => {
     }
   }
 
-  console.info('🎨 [桌宠] 已生成本地备用基地娘:', canvas.width, 'x', canvas.height)
+  console.info('🎨 [桌宠] 已生成本地备用桌宠:', canvas.width, 'x', canvas.height)
   return canvas
 }
 
@@ -1088,9 +1097,9 @@ const initPixiApp = async () => {
       if (stopPixiInitialization(app, frameSet)) return false
       cachedEtag = cachedEntry.etag || null
       loadedFromCache = true
-      console.info('⚡ [桌宠] 基地娘缓存加载成功:', frameSet.width, 'x', frameSet.height, 'etag:', cachedEtag)
+      console.info('⚡ [桌宠] 桌宠缓存加载成功:', frameSet.width, 'x', frameSet.height, 'etag:', cachedEtag)
     } catch (error) {
-      console.warn('⚠️ [桌宠] 基地娘缓存加载失败，将重新下载:', error?.message || String(error))
+      console.warn('⚠️ [桌宠] 桌宠缓存加载失败，将重新下载:', error?.message || String(error))
       frameSet = null
       if (error?.invalidSpritesheet) {
         await deleteCacheEntry(CACHE_KEY_SPRITE)
@@ -1101,7 +1110,7 @@ const initPixiApp = async () => {
 
   if (!frameSet) {
     // 无缓存，全量下载
-    console.info('📥 [桌宠] 通过 Rust 代理下载基地娘...')
+    console.info('📥 [桌宠] 通过 Rust 代理下载桌宠...')
     try {
       const result = await invoke('fetch_remote_bytes', {
         url: getSpritesheetRequestUrl(),
@@ -1115,13 +1124,13 @@ const initPixiApp = async () => {
         if (stopPixiInitialization(app)) return false
         frameSet = await createSpriteFrameSetFromBlob(blob)
         if (stopPixiInitialization(app, frameSet)) return false
-        console.info('✅ [桌宠] 基地娘下载成功:', frameSet.width, 'x', frameSet.height)
+        console.info('✅ [桌宠] 桌宠下载成功:', frameSet.width, 'x', frameSet.height)
 
         await setCacheEntry(CACHE_KEY_SPRITE, blob, result.etag)
         if (stopPixiInitialization(app, frameSet)) return false
       }
     } catch (proxyErr) {
-      console.error('❌ [桌宠] 基地娘下载失败:', proxyErr?.message || String(proxyErr))
+      console.error('❌ [桌宠] 桌宠下载失败:', proxyErr?.message || String(proxyErr))
       if (stopPixiInitialization(app, frameSet)) return false
     }
   }
@@ -1136,13 +1145,13 @@ const initPixiApp = async () => {
 
   // 如果远程和缓存都失败了，使用本地生成的 fallback
   if (!frameSet) {
-    console.warn('⚠️ [桌宠] 远程和缓存均不可用，使用本地备用基地娘')
+    console.warn('⚠️ [桌宠] 远程和缓存均不可用，使用本地备用桌宠')
     try {
       const fallbackCanvas = generateFallbackSpritesheet()
       frameSet = await createSpriteFrameSet(fallbackCanvas)
       if (stopPixiInitialization(app, frameSet)) return false
     } catch (fallbackErr) {
-      console.error('❌ [桌宠] 本地备用基地娘也失败:', fallbackErr?.message || String(fallbackErr))
+      console.error('❌ [桌宠] 本地备用桌宠也失败:', fallbackErr?.message || String(fallbackErr))
       cleanupPixiApp()
       return false
     }
@@ -1217,7 +1226,7 @@ const startResourceRefresh = () => {
     await loadSpeechPhrases()
     if (componentDisposed) return
 
-    // 刷新基地娘缓存，并同步更新当前显示
+    // 刷新桌宠缓存，并同步更新当前显示
     try {
       const cachedSprite = await getCacheEntry(CACHE_KEY_SPRITE)
       if (componentDisposed) return
@@ -1584,6 +1593,11 @@ const onDragStart = (e) => {
     dragPointerTarget.setPointerCapture(dragPointerId)
   } catch {}
 
+  longPressFired = false
+  clearLongPress()
+  if (e.pointerType === 'touch' && !menuVisible.value) {
+    longPressTimer = setTimeout(() => { longPressTimer = null; if (!hasMoved && dragPointerId === pointerId && !menuVisible.value) { longPressFired = true; toggleMenu() } }, 550)
+  }
   document.addEventListener('pointermove', onDragMove, { passive: false })
   document.addEventListener('pointerup', onDragEnd)
   document.addEventListener('pointercancel', onDragEnd)
@@ -1680,6 +1694,7 @@ const onDragMove = (e) => {
     const dy = e.screenY - dragStartScreenY
     if (!hasMoved && Math.abs(dx) < DRAG_THRESHOLD && Math.abs(dy) < DRAG_THRESHOLD) return
     hasMoved = true
+    clearLongPress()
     e.preventDefault()
     const generation = dragGeneration
     const pointerId = dragPointerId
@@ -1713,6 +1728,7 @@ const onDragMove = (e) => {
 }
 
 const onDragEnd = async (e) => {
+  clearLongPress()
   if (
     dragPointerId === null ||
     e.pointerId !== dragPointerId ||
@@ -1787,6 +1803,7 @@ const onDragEnd = async (e) => {
 }
 
 const onIconClick = () => {
+  if (longPressFired) { longPressFired = false; return }
   if (!hasMoved) toggleMenu()
 }
 
@@ -2126,6 +2143,23 @@ onUnmounted(() => {
   pointer-events: all;
   will-change: transform, margin-top;
   .gpu-accelerate();
+}
+
+.bubble-caption {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: 2px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: none;
+  font: 600 11px/14px system-ui, 'Microsoft YaHei UI', sans-serif;
+  color: #fff;
+  text-shadow: 0 1px 3px rgba(60, 20, 90, 0.85), 0 0 2px rgba(60, 20, 90, 0.9);
+
+  &.danger {
+    color: #ffe3e3;
+  }
 }
 
 .bubble-item {

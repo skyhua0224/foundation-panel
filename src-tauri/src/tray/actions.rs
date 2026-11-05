@@ -7,6 +7,8 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
     let s = get_tray_strings();
     match menu_id {
         "open_main_panel" => open_main_panel_from_tray(app, "menu"),
+        "connect_device" => open_connect_dialog(app, "pair"),
+        "download_client" => open_connect_dialog(app, "install"),
         "open_sunshine" => open_sunshine_web_ui(app),
         "tray_notification_action" => handle_tray_notification_action(app),
         "open_desktop" => {
@@ -89,6 +91,12 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
         "restart" => restart_sunshine(app),
         _ => warn!("⚠️ 未知的托盘菜单事件: {}", menu_id),
     }
+}
+
+/// Open the main panel and tell it to show the connect dialog on a tab (`pair` or `install`); the panel gets the event when it is ready, also when it had to be created first.
+fn open_connect_dialog<R: Runtime>(app: &AppHandle<R>, tab: &str) {
+    open_main_panel_from_tray(app, "connect");
+    emit_to_main_when_ready(app, "open-connect", serde_json::json!({ "tab": tab }));
 }
 
 /// 打开 VDD 设置

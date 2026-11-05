@@ -1,139 +1,158 @@
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
+import { createNav } from 'foundation-ui/vue'
+import { settingsHash, DEFAULT_PLACE } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
-/**
- * 路由定义
- */
+/** Destinations of the control panel. A page is a detail entry of one back stack (see foundation-ui createNav). */
 export const ROUTES = {
-  HOME: 'home',           // 默认内容 (slot)
+  HOME: 'home', // overview: the tile page
   VDD_SETTINGS: 'vdd-settings',
   WELCOME: 'welcome',
   WEB_STREAM: 'web-stream',
   AI_ASSISTANT: 'ai-assistant',
-  CONTROLLERS: 'controllers',
+  CONTROLLERS: 'controllers', // old name of GAMEPAD
   HDR_ENHANCED: 'hdr-enhanced',
-  TOOLBOX: 'toolbox',
+  TOOLBOX: 'toolbox', // old name of DIAGNOSTICS
+  LATENCY_CLOCK: 'latency-clock', // 延迟测试时钟, opened from the toolbox
   PANEL_SETTINGS: 'panel-settings',
+  SETTINGS_HUB: 'settings-hub', // the bottom bar's one entry for 串流设置, 输入与外设, 显示 and 系统: a list of those four
   HELP: 'help',
+  ABOUT: 'about',
+  ANNOUNCEMENTS: 'announcements', // 公告: every announcement, opened from the bell of the caption bar
+  CAT_STREAM: 'cat-stream',
+  CAT_INPUT: 'cat-input',
+  CAT_AUDIO: 'cat-audio',
+  CAT_DISPLAY: 'cat-display',
+  CAT_SYSTEM: 'cat-system',
+  GAMEPAD: 'gamepad',
+  MICROPHONE: 'microphone',
+  USB: 'usb',
+  COMPONENTS: 'components',
+  COMPONENT_STATUS: 'component-status',
+  DIAGNOSTICS: 'diagnostics',
+  // Pages of the Web UI shown in the embedded frame
+  WEB_CLIENTS: 'web-clients',
+  WEB_APPS: 'web-apps',
+  WEB_CONFIG: 'web-config',
+  CAT_CONFIG: 'cat-config',
+  CFG_APPEARANCE: 'cfg-appearance', // 个性化: a destination of its own, the palette button in the foot of the rail
+  WEB_DOWNLOADS: 'web-downloads',
+  WEB_PASSWORD: 'web-password',
+  // Places of 显示与视频 and 音频 that are pages of the Web UI, shown in the frame (/config#tab=display&sub=output)
+  WEB_DISPLAY_OUTPUT: 'web-display-output',
+  WEB_DISPLAY_MODES: 'web-display-modes',
+  WEB_DISPLAY_HDR: 'web-display-hdr',
+  WEB_DISPLAY_VIDEO: 'web-display-video',
+  WEB_AUDIO_SOUND: 'web-audio-sound',
+  WEB_TROUBLESHOOTING: 'web-troubleshooting',
+  LIVE_SESSION: 'live-session', // 当前串流: the bitrate of a live session and the host performance (the old 码率调整 and 主机性能 tools)
+  RTSS: 'rtss', // RTSS 叠加: frame-rate limit, OSD, stream monitoring and HWiNFO (the old RTSS tool)
 }
 
-/**
- * 路由配置
- */
-const routeConfig = {
-  [ROUTES.HOME]: {
-    name: ROUTES.HOME,
-    component: null, // 使用 slot
-    titleKey: 'home',
-  },
-  [ROUTES.VDD_SETTINGS]: {
-    name: ROUTES.VDD_SETTINGS,
-    component: 'VddSettings',
-    titleKey: 'virtualDisplay',
-  },
-  [ROUTES.WELCOME]: {
-    name: ROUTES.WELCOME,
-    component: 'Welcome',
-    titleKey: 'welcome',
-  },
-  [ROUTES.WEB_STREAM]: {
-    name: ROUTES.WEB_STREAM,
-    component: 'WebStreamSettings',
-    titleKey: 'webStream',
-  },
-  [ROUTES.AI_ASSISTANT]: {
-    name: ROUTES.AI_ASSISTANT,
-    component: 'AiAssistant',
-    titleKey: 'aiAssistant',
-  },
-  [ROUTES.CONTROLLERS]: {
-    name: ROUTES.CONTROLLERS,
-    component: 'ControllersHub',
-    titleKey: 'deviceHub',
-  },
-  [ROUTES.HDR_ENHANCED]: {
-    name: ROUTES.HDR_ENHANCED,
-    component: 'HdrEnhancedManager',
-    titleKey: 'hdrEnhanced',
-  },
-  [ROUTES.TOOLBOX]: { name: ROUTES.TOOLBOX, component: 'ControlPanelPage', titleKey: 'toolbox' },
-  [ROUTES.PANEL_SETTINGS]: { name: ROUTES.PANEL_SETTINGS, component: 'ControlPanelPage', titleKey: 'panelSettings' },
-  [ROUTES.HELP]: { name: ROUTES.HELP, component: 'ControlPanelPage', titleKey: 'helpAbout' },
+/** rail: category of the page (rail item); list: false = the page takes the whole width (no list pane) */
+export const PAGES = {
+  [ROUTES.HOME]: { rail: 'overview', list: false },
+  [ROUTES.WELCOME]: { rail: 'overview', list: false, push: true },
+  [ROUTES.WEB_STREAM]: { rail: 'overview', list: false },
+  [ROUTES.WEB_CLIENTS]: { rail: 'stream' },
+  [ROUTES.WEB_APPS]: { rail: 'stream' },
+  [ROUTES.WEB_DOWNLOADS]: { rail: 'stream' },
+  [ROUTES.LIVE_SESSION]: { rail: 'stream' },
+  [ROUTES.WEB_CONFIG]: { rail: 'config' },
+  [ROUTES.CFG_APPEARANCE]: { rail: 'appearance', list: false },
+  [ROUTES.WEB_PASSWORD]: { rail: 'config' },
+  [ROUTES.GAMEPAD]: { rail: 'input' },
+  [ROUTES.WEB_AUDIO_SOUND]: { rail: 'audio' }, // the first page of a rail is the one the rail opens on
+  [ROUTES.MICROPHONE]: { rail: 'audio' },
+  [ROUTES.USB]: { rail: 'input' },
+  [ROUTES.WEB_DISPLAY_MODES]: { rail: 'display' }, // the page the rail opens on: resolution, frame rates and bitrate (the most common change)
+  [ROUTES.WEB_DISPLAY_OUTPUT]: { rail: 'display' },
+  [ROUTES.WEB_DISPLAY_HDR]: { rail: 'display' },
+  [ROUTES.VDD_SETTINGS]: { rail: 'display' },
+  [ROUTES.WEB_DISPLAY_VIDEO]: { rail: 'display' },
+  [ROUTES.HDR_ENHANCED]: { rail: 'display' },
+  [ROUTES.COMPONENT_STATUS]: { rail: 'system' },
+  [ROUTES.COMPONENTS]: { rail: 'system' },
+  [ROUTES.TOOLBOX]: { rail: 'system' },
+  [ROUTES.LATENCY_CLOCK]: { rail: 'system', list: false, push: true },
+  [ROUTES.DIAGNOSTICS]: { rail: 'system' },
+  [ROUTES.AI_ASSISTANT]: { rail: 'assistant', list: false }, // 米塔 AI: the chat takes the whole width, its settings are behind the gear of the chat header
+  [ROUTES.WEB_TROUBLESHOOTING]: { rail: 'system' },
+  [ROUTES.RTSS]: { rail: 'system' },
+  [ROUTES.PANEL_SETTINGS]: { rail: 'settings', list: false },
+  [ROUTES.SETTINGS_HUB]: { rail: 'config', list: false },
+  [ROUTES.HELP]: { rail: 'help', list: false },
+  [ROUTES.ABOUT]: { rail: 'help', list: false, push: true },
+  [ROUTES.ANNOUNCEMENTS]: { rail: 'overview', list: false, push: true },
 }
+export const RAILS = ['overview', 'stream', 'config', 'input', 'audio', 'display', 'system', 'assistant', 'settings', 'help']
 
-/**
- * 路由管理 Composable
- */
+// the old component page is part of the component status page now
+const ALIAS = { [ROUTES.CONTROLLERS]: ROUTES.GAMEPAD, [ROUTES.COMPONENTS]: ROUTES.COMPONENT_STATUS }
+const CATEGORY = { [ROUTES.CAT_CONFIG]: 'config', [ROUTES.CAT_STREAM]: 'stream', [ROUTES.CAT_INPUT]: 'input', [ROUTES.CAT_AUDIO]: 'audio', [ROUTES.CAT_DISPLAY]: 'display', [ROUTES.CAT_SYSTEM]: 'system' }
+// The panel destination of a place of the display and audio tabs (the same places as foundation-ui's DISPLAY_PLACES and AUDIO_PLACES): the virtual display and the microphone are pages of the panel itself
+const PLACE_ROUTE = {
+  'display:output': ROUTES.WEB_DISPLAY_OUTPUT, 'display:modes': ROUTES.WEB_DISPLAY_MODES, 'display:hdr': ROUTES.WEB_DISPLAY_HDR, 'display:virtual': ROUTES.VDD_SETTINGS, 'display:video': ROUTES.WEB_DISPLAY_VIDEO,
+  'audio:sound': ROUTES.WEB_AUDIO_SOUND, 'audio:microphone': ROUTES.MICROPHONE,
+}
+export const routeOfPlace = (tab, sub) => PLACE_ROUTE[`${tab}:${sub || DEFAULT_PLACE[tab]}`] || null
+const PLACE_PATH = /^\/config(?:\.html)?#tab=(display|audio)(?:&sub=([\w-]+))?/
+const WEB_PATHS = [
+  [/^\/(?:pin|clients)(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_CLIENTS],
+  [/^\/apps(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_APPS],
+  [/^\/config(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_CONFIG],
+  [/^\/downloads(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_DOWNLOADS],
+  [/^\/password(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_PASSWORD],
+  [/^\/troubleshooting(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_TROUBLESHOOTING],
+  [/^\/dualsense(?:\.html)?(?:[?#/]|$)/, ROUTES.GAMEPAD],
+]
+/** The panel destination that shows a Web UI path; the Web home is the panel's own overview. */
+export const routeForWebPath = (path) => {
+  const p = String(path || '/')
+  const place = PLACE_PATH.exec(p)
+  if (place && routeOfPlace(place[1], place[2])) return routeOfPlace(place[1], place[2])
+  for (const [re, route] of WEB_PATHS) if (re.test(p)) return route
+  return ROUTES.HOME
+}
+/** The Web UI path of a Web page destination (null for panel pages). */
+export const webPathOf = (route) => ({
+  [ROUTES.WEB_CLIENTS]: '/pin', [ROUTES.WEB_APPS]: '/apps', [ROUTES.WEB_CONFIG]: '/config', [ROUTES.WEB_DOWNLOADS]: '/downloads',
+  [ROUTES.WEB_PASSWORD]: '/password', [ROUTES.WEB_TROUBLESHOOTING]: '/troubleshooting',
+  [ROUTES.WEB_DISPLAY_OUTPUT]: `/config${settingsHash({ tab: 'display', sub: 'output' })}`, [ROUTES.WEB_DISPLAY_MODES]: `/config${settingsHash({ tab: 'display', sub: 'modes' })}`,
+  [ROUTES.WEB_DISPLAY_HDR]: `/config${settingsHash({ tab: 'display', sub: 'hdr' })}`, [ROUTES.WEB_DISPLAY_VIDEO]: `/config${settingsHash({ tab: 'display', sub: 'video' })}`,
+  [ROUTES.WEB_AUDIO_SOUND]: `/config${settingsHash({ tab: 'audio', sub: 'sound' })}`,
+  // the gamepad is a page of 输入 in the Web UI: the rail destination shows that page in the frame
+  [ROUTES.GAMEPAD]: `/config${settingsHash({ tab: 'input', focus: 'ds5-block' })}`,
+}[route] || null)
+
+const routes = {}
+for (const rail of new Set(Object.values(PAGES).filter((p) => p.list !== false).map((p) => p.rail))) routes[`${rail}:list`] = { role: 'list', rail }
+for (const [id, p] of Object.entries(PAGES)) routes[id] = { role: 'detail', rail: p.rail, list: p.list, supporting: p.supporting, push: p.push }
+
+let nav = null
+const shared = () => (nav ||= createNav({ routes, home: ROUTES.HOME }))
+
+/** Navigation of the panel: one back stack for the whole window. */
 export function useRouter() {
   const { t } = useI18n()
-  const currentRoute = ref(ROUTES.HOME)
-  const routeHistory = ref([ROUTES.HOME])
-
-  /**
-   * 导航到指定路由
-   * @param {string} routeName - 路由名称
-   * @param {object} options - 导航选项
-   */
-  const navigate = (routeName, options = {}) => {
-    if (!routeConfig[routeName]) {
-      console.warn(`路由 ${routeName} 不存在`)
-      return
-    }
-
-    // 如果需要替换当前历史记录而不是添加
-    if (options.replace) {
-      routeHistory.value[routeHistory.value.length - 1] = routeName
-    } else {
-      routeHistory.value.push(routeName)
-      // 限制历史记录长度
-      if (routeHistory.value.length > 10) {
-        routeHistory.value.shift()
-      }
-    }
-
-    currentRoute.value = routeName
+  const stack = shared()
+  const navigate = (name, params) => {
+    const to = ALIAS[name] || name
+    if (CATEGORY[to]) return stack.selectRail(CATEGORY[to])
+    if (!PAGES[to]) { console.warn(`route ${name} does not exist`); return }
+    stack.go(to, params)
   }
-
-  /**
-   * 返回上一页
-   */
-  const goBack = () => {
-    if (routeHistory.value.length > 1) {
-      routeHistory.value.pop() // 移除当前路由
-      currentRoute.value = routeHistory.value[routeHistory.value.length - 1]
-    }
-  }
-
-  /**
-   * 返回首页
-   */
-  const goHome = () => {
-    navigate(ROUTES.HOME, { replace: true })
-  }
-
-  /**
-   * 获取当前路由配置
-   */
-  const getCurrentRouteConfig = computed(() => {
-    const config = routeConfig[currentRoute.value] || routeConfig[ROUTES.HOME]
-    return { ...config, title: t.value.routeTitles[config.titleKey] || t.value.sidebar[config.titleKey] }
-  })
-
-  /**
-   * 检查是否是某个路由
-   */
-  const isRoute = (routeName) => {
-    return currentRoute.value === routeName
-  }
-
+  const currentRoute = computed(() => stack.current.value)
+  const goHome = () => navigate(ROUTES.HOME)
+  const goBack = () => stack.pop()
   return {
+    nav: stack,
     currentRoute,
-    routeHistory,
     navigate,
     goBack,
     goHome,
-    getCurrentRouteConfig,
-    isRoute,
+    isRoute: (name) => currentRoute.value === (ALIAS[name] || name),
+    getCurrentRouteConfig: computed(() => ({ name: currentRoute.value, title: t.value.routeTitles?.[currentRoute.value] || '' })),
     ROUTES,
   }
 }

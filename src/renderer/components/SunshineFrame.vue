@@ -6,26 +6,10 @@
     @webui-navigate="handleWebuiNavigate"
   >
     <div class="iframe-container">
-      <transition name="fade-loading">
-        <div v-if="loading" class="loading-overlay">
-          <div class="loading-container">
-            <img src="../public/gura-pix.png" class="loading-image" alt="Loading" />
-            <div class="loading-text">
-              <template v-if="proxyHealthFailed">
-                <p class="proxy-health-error">{{ t.sunshineFrame.proxyUnavailable }}</p>
-                <button class="proxy-health-retry" type="button" @click="retryProxyHealthCheck">
-                  {{ t.sunshineFrame.retry }}
-                </button>
-              </template>
-              <p v-else>{{ t.sunshineFrame.preparing.replace('{path}', currentPath) }}</p>
-            </div>
-          </div>
-        </div>
-      </transition>
-
+      <!-- no loading page: a page switch shows the new shell at once and the page fills in (its own skeletons); only a proxy that does not answer says so -->
       <iframe
+        :key="frameKey"
         ref="sunshineIframe"
-        v-show="!loading"
         :src="sunshineUrl"
         class="sunshine-iframe"
         @load="onLoad"
@@ -37,15 +21,23 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { followRoot } from '../composables/frameRoot.js'
+import { ElMessage } from '../composables/notifyMessage.js'
 import { invoke } from '@tauri-apps/api/core'
+import { deliverPendingPanelPage } from '../composables/panelParts.js'
 import { sunshine } from '@/tauri-adapter.js'
 import { checkLocalProxyHealth } from '../utils/proxyHealth.js'
 import { isNativeControlPanelMessage, isTrustedNativeControlPanelMessage } from '../composables/nativeBridge.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import SidebarMenu from './SidebarMenu.vue'
+import { proxyBlock } from '../composables/proxyBlock.js'
+import { createProxyGate } from '../composables/proxyGate.js'
 import { isWebuiNavigationPath } from '../composables/webuiNavigation.js'
+import { BLANK, routeChanged, webuiNavigated } from '../composables/frameRoute.js'
+import { webPathOf, routeForWebPath } from '../composables/useRouter.js'
+import { createReportLimiter, normalizeFrameReport } from '../composables/frameReport.js'
+import { parseSettingsHash } from 'foundation-ui/settings/index.js'
 
 invoke('main_panel_loading').catch(() => {})
 const { t } = useI18n()
@@ -53,10 +45,13 @@ const { t } = useI18n()
 // Refs
 const loading = ref(true)
 const sunshineUrl = ref('')
+// A frame whose address is set again navigates, and a navigation adds an entry to the window's joint history: the frame's step is then the first thing Back (the mouse button, Alt+Left) undoes,
+// no popstate comes to the panel, and the person stays on the page. Every address gets a frame of its own: the first navigation of a new frame replaces its empty page and adds no entry.
+const frameKey = ref(0)
+watch(sunshineUrl, () => { frameKey.value++ }, { flush: 'sync' })
 const currentPath = ref('/')
 const sunshineIframe = ref(null)
 const sidebarMenuRef = ref(null)
-const proxyHealthFailed = ref(false)
 
 // State
 let pollTimer = null
@@ -151,9 +146,25 @@ const verifyLocalProxy = async () => {
   }
 }
 
-const retryProxyHealthCheck = () => {
-  window.location.reload()
-}
+// One try: the proxy listens (the first start takes a moment) and the WebView reaches it. The gate tries again with a backoff before the page says anything, and goes on in the
+// background while it does (composables/proxyGate.js): a slow start never blanks the session.
+const proxyGate = createProxyGate({
+  verify: async () => {
+    proxyBlock.checking = true
+    try {
+      try { proxyBase = await invoke('wait_for_proxy_ready') } catch (error) { console.warn('[SunshineFrame] the local proxy is not ready:', error); return false }
+      return await verifyLocalProxy()
+    } finally { proxyBlock.checking = false }
+  },
+  onAttempt: (n) => { proxyBlock.attempts = n },
+  onShown: () => {
+    proxyBlock.blocked = true
+    sunshineUrl.value = 'about:blank'
+    invoke('main_panel_ready').catch(() => {})
+  },
+  onCleared: () => { proxyBlock.blocked = false },
+})
+proxyBlock.retryNow = () => proxyGate.retryNow()
 
 // Navigation handler
 const handleNavigateFrame = (event) => {
@@ -175,39 +186,51 @@ let savedIframeUrl = ''
 // 窗口隐藏/最小化时的 iframe URL 保存（与 tab 切换分开追踪）
 let windowSuspendedUrl = ''
 
+// A place inside the page that is already open (/config#tab=av&focus=hevc_mode): the page is told, nothing reloads
+const settingsPlaceMessage = (path) => {
+  const at = path.indexOf('#')
+  if (at < 0 || path.slice(0, at) !== '/config' || !sunshineUrl.value || sunshineUrl.value === 'about:blank') return false
+  if (new URL(sunshineUrl.value, window.location.href).pathname.replace(/\.html$/, '') !== '/config') return false
+  const place = parseSettingsHash(path.slice(at))
+  const frame = sunshineIframe.value?.contentWindow
+  if (!place || !frame) return false
+  // a frame that is not on an http(s) address has the origin 'null', and postMessage(message, 'null') throws: nothing is sent to it
+  const origin = new URL(sunshineUrl.value, window.location.href).origin
+  if (!/^https?:\/\//.test(origin)) return false
+  frame.postMessage({ type: 'foundation-settings-go', ...place }, origin)
+  currentPath.value = path
+  return true
+}
+// the address of a page of the frame; none until the proxy is known and verified
+const frameUrlOf = (path) => (proxyBase && localProxyVerified && path ? proxyBase + path : '')
 const handleWebuiNavigate = (path) => {
   if (!isWebuiNavigationPath(path)) return
+  if (settingsPlaceMessage(path)) return
   requestedWebuiPath = path
-  savedIframeUrl = ''
   windowSuspendedUrl = ''
-  if (path === currentPath.value && sunshineUrl.value && sunshineUrl.value !== 'about:blank') return
-  currentPath.value = path
+  const next = webuiNavigated(path, { currentPath: currentPath.value, url: sunshineUrl.value, saved: savedIframeUrl }, { urlOf: frameUrlOf })
+  savedIframeUrl = next.saved
+  currentPath.value = next.currentPath
+  if (next.url === null && sunshineUrl.value && sunshineUrl.value !== BLANK) return
   beginLoading()
-  if (proxyBase && localProxyVerified) sunshineUrl.value = proxyBase + path
+  if (next.url) sunshineUrl.value = next.url
 }
 
+// the overview and the pages of the panel itself: the frame sleeps behind them and wakes with the overview; a Web page is never shown over a sleeping frame (frameRoute.js)
 const handleRouteChange = ({ from, to }) => {
-  if (from === 'home' && to !== 'home') {
-    // Leaving the streaming pages suspends the iframe and its timers.
-    savedIframeUrl = proxyBase ? proxyBase + currentPath.value : sunshineUrl.value
-    sunshineUrl.value = 'about:blank'
-    beginLoading()
-    if (pollTimer) {
-      clearInterval(pollTimer)
-      pollTimer = null
-    }
-    console.log('[SunshineFrame] iframe 休眠: 已导航到 about:blank')
-  } else if (from !== 'home' && to === 'home') {
-    // Resume the last page unless an explicit sidebar destination was requested.
-    if (savedIframeUrl && savedIframeUrl !== 'about:blank') {
-      sunshineUrl.value = savedIframeUrl
-      savedIframeUrl = ''
-      console.log('[SunshineFrame] iframe 唤醒: 恢复 URL')
-    }
-    // 重启窗口状态轮询
-    if (!pollTimer && checkWindowStateFn) {
-      pollTimer = setInterval(checkWindowStateFn, POLL_INTERVAL)
-    }
+  const decision = routeChanged({ from, to }, { currentPath: currentPath.value, url: sunshineUrl.value, saved: savedIframeUrl }, { urlOf: frameUrlOf, webPathOf, routeForWebPath })
+  if (decision) {
+    if (decision.kind !== 'resume') beginLoading()
+    sunshineUrl.value = decision.url
+    savedIframeUrl = decision.saved
+    if (decision.currentPath) currentPath.value = decision.currentPath
+    console.log(`[SunshineFrame] route ${from} -> ${to}: iframe ${decision.kind}`)
+  }
+  if (decision?.kind === 'suspend' && pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  } else if (from !== 'home' && to === 'home' && !pollTimer && checkWindowStateFn) {
+    pollTimer = setInterval(checkWindowStateFn, POLL_INTERVAL)
   }
 }
 
@@ -236,11 +259,13 @@ const handleTauriFileDrop = async (paths) => {
 }
 
 // Message handling
+const frameLimiter = createReportLimiter({ perMinute: 30 })
 const createMessageHandler = () => {
   const getSunshineOrigin = () => {
     try {
       const url = new URL(sunshineUrl.value || sunshineIframe.value?.src || '', window.location.href)
-      return url.origin === 'null' ? `${url.protocol}//${url.host}` : url.origin
+      // only an http(s) address has an origin a message can be sent to (about:blank, a custom scheme: 'null')
+      return /^https?:$/.test(url.protocol) ? url.origin : ''
     } catch {
       return ''
     }
@@ -258,6 +283,8 @@ const createMessageHandler = () => {
   }
 
   const handlers = {
+    // a Web page in the frame asks for the panel's colours and scheme (composables/frameRoot.js)
+    'foundation-root-request': (_data, event) => replyToSunshine(event, rootFollow ? rootFollow.snapshot() : { type: 'foundation-root', props: {}, classes: [], theme: '' }),
     'native-navigation-context-request': (_data, event) => {
       replyToSunshine(event, {
         type: 'native-navigation-context',
@@ -280,6 +307,12 @@ const createMessageHandler = () => {
       beginLoading()
     },
     'webui-ready': finishLoading,
+    // errors, long frames and slow calls inside the page, written to the panel's log (frameReport.js); only the frame that is shown may say them
+    'panel-frame-report': (data, event) => {
+      if (!isTrustedSunshineEvent(event) || !frameLimiter.allow()) return
+      const line = normalizeFrameReport(data)
+      if (line) invoke('frontend_slow', line).catch(() => {})
+    },
     'restore-background': (data) => loadAndSetBackground(data.path),
     'show-message': (data) => {
       // 处理来自 Web UI 的消息显示请求
@@ -450,31 +483,33 @@ const handleLocaleChanged = () => {
 }
 
 // Lifecycle
+// the frame follows the panel's root element: a new wallpaper colour, light or dark, the picture on or off
+let rootFollow = null
+// the origin a message to the frame can be sent to: an http(s) address only ('' for about:blank and any custom scheme, whose origin is 'null': postMessage(message, 'null') throws a SyntaxError)
+const frameOrigin = () => { try { const url = new URL(sunshineUrl.value || sunshineIframe.value?.src || '', window.location.href); return /^https?:$/.test(url.protocol) ? url.origin : '' } catch { return '' } }
+
 onUnmounted(() => {
+  rootFollow?.stop()
   window.removeEventListener('navigate-frame', handleNavigateFrame)
   window.removeEventListener('locale-changed', handleLocaleChanged)
   if (messageHandler) window.removeEventListener('message', messageHandler)
   if (visibilityHandlerRef) document.removeEventListener('visibilitychange', visibilityHandlerRef)
   if (pollTimer) clearInterval(pollTimer)
   clearLoadedFrameReveal()
+  proxyGate.stop()
+  proxyBlock.blocked = false
   unlistenVddSettings?.()
   unlistenDragDrop?.()
 })
 
 onMounted(async () => {
+  rootFollow = followRoot(() => sunshineIframe.value, frameOrigin)
   window.addEventListener('navigate-frame', handleNavigateFrame)
   window.addEventListener('locale-changed', handleLocaleChanged)
 
   try {
-    const proxyBaseUrl = await invoke('wait_for_proxy_ready')
-    proxyBase = proxyBaseUrl
-
-    if (!await verifyLocalProxy()) {
-      proxyHealthFailed.value = true
-      sunshineUrl.value = 'about:blank'
-      await invoke('main_panel_ready').catch(() => {})
-      return
-    }
+    if (!await proxyGate.run()) return
+    const proxyBaseUrl = proxyBase
     localProxyVerified = true
     await refreshProxyTarget()
 
@@ -518,20 +553,21 @@ onMounted(async () => {
       sidebarMenuRef.value?.openVddSettings?.()
     })
 
+    // a page the toolbar or the tray asked for (panel_page.rs): taken on the ping, and once here after the listeners, so a window that
+    // was only being created still opens it, exactly once
+    const takePanelPage = () => deliverPendingPanelPage(invoke, (page) => sidebarMenuRef.value?.openPanelPage?.(page))
+    await currentWindow.listen('panel-page-pending', takePanelPage)
+
     await currentWindow.listen('open-web-stream', () => {
       sidebarMenuRef.value?.openWebStream?.()
     })
 
     await currentWindow.listen('open-welcome', openWelcome)
+    await takePanelPage()
     await invoke('main_panel_ready')
   } catch (error) {
     console.error('初始化失败:', error)
-    if (!localProxyVerified) {
-      proxyHealthFailed.value = true
-      sunshineUrl.value = 'about:blank'
-      await invoke('main_panel_ready').catch(() => {})
-      return
-    }
+    if (!localProxyVerified) return
     sunshineUrl.value = proxyBase + '/'
   }
 })
@@ -573,8 +609,6 @@ const onLoad = () => {
 </script>
 
 <style scoped lang="less">
-@import '../styles/theme.less';
-
 .iframe-container {
   width: 100%;
   height: 100%;
@@ -589,102 +623,6 @@ const onLoad = () => {
   transition: opacity 0.3s ease;
 }
 
-.loading-overlay {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, @morandi-dark-bg 0%, @morandi-mid-bg 100%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-  backdrop-filter: blur(10px);
-}
-
-.loading-container {
-  text-align: center;
-  padding: 20px;
-  max-width: 400px;
-}
-
-.loading-image {
-  width: 60%;
-  max-width: 180px;
-  opacity: 0.85;
-  margin-bottom: 24px;
-  animation: gura 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  position: relative;
-  left: -20%;
-  transform-style: preserve-3d;
-  filter: drop-shadow(0 4px 12px rgba(212, 165, 165, 0.3));
-}
-
-@keyframes gura {
-  0% {
-    transform: translateX(-100%) rotate(-5deg) translateY(-5px) scale(0.9);
-  }
-  40% {
-    transform: translateX(0%) rotate(0deg) translateY(2px) scale(1.1);
-  }
-  50% {
-    transform: translateX(10%) rotate(3deg) translateY(-10px) scale(0.95);
-  }
-  60% {
-    transform: translateX(20%) rotate(-3deg) translateY(5px) scale(1.05);
-  }
-  100% {
-    transform: translateX(100%) rotate(5deg) translateY(-5px) scale(0.9);
-  }
-}
-
-.loading-text {
-  color: @morandi-yellow;
-  font-size: 18px;
-  line-height: 1.6;
-  font-family: 'PixelMplus12', 'YouYuan', cursive, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.4);
-  letter-spacing: 0.5px;
-  font-weight: 500;
-  transform: skew(-3deg);
-
-  p {
-    margin: 12px 0;
-    animation: pulse 2s ease-in-out infinite;
-  }
-
-  .proxy-health-error {
-    animation: none;
-    color: #f2c8c8;
-    font-size: 15px;
-    transform: none;
-  }
-}
-
-.proxy-health-retry {
-  margin-top: 12px;
-  padding: 8px 18px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
-  border-radius: 6px;
-  color: inherit;
-  background: rgba(255, 255, 255, 0.08);
-  cursor: pointer;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.16);
-  }
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-  50% {
-    opacity: 0.7;
-    transform: translateY(-2px);
-  }
-}
-
 .fade-loading-enter-active,
 .fade-loading-leave-active {
   transition: opacity 0.3s ease;
@@ -695,22 +633,6 @@ const onLoad = () => {
   opacity: 0;
 }
 
-:global(html[data-bs-theme='light'] .loading-overlay) {
-  background: linear-gradient(135deg, @gura-bg-light 0%, @gura-bg-mid 100%);
-}
-
-:global(html[data-bs-theme='light'] .loading-image) {
-  filter: drop-shadow(0 4px 12px rgba(74, 158, 255, 0.3));
-}
-
-:global(html[data-bs-theme='light'] .loading-text) {
-  color: @gura-blue;
-  text-shadow: 1px 1px 3px rgba(74, 158, 255, 0.2);
-}
-
-:global(html[data-bs-theme='light'] .proxy-health-error) {
-  color: #8f3434;
-}
 </style>
 
 <style>

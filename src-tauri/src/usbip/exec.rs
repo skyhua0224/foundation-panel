@@ -99,7 +99,7 @@ where
 }
 
 fn command_text(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(bytes).trim().to_string()
+    crate::text_encoding::decode_console_bytes(bytes).trim().to_string()
 }
 
 #[derive(Clone, Copy)]

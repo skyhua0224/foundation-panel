@@ -20,9 +20,13 @@ export function getWebuiPage(path) {
   )
 }
 
+// A place in the stream settings: /config#tab=encoders&focus=hevc_mode, or of the display and audio pages: /config#tab=display&sub=hdr
+const CONFIG_PLACE = /^\/config#tab=[a-z]+(?:&sub=[\w-]+)?(?:&focus=[\w.-]+)?$/
+
 export function isWebuiNavigationPath(path) {
   return (
     WEBUI_PAGES.some((page) => page.path === path) ||
+    (typeof path === 'string' && CONFIG_PLACE.test(path)) ||
     path === '/password' ||
     path === '/password#logout' ||
     path === '/troubleshooting'

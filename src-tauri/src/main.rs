@@ -19,11 +19,15 @@ mod file_transfer;
 mod fs_utils;
 mod game_session;
 mod github_download;
+mod host_facts;
+mod host_facts_math;
 mod hwinfo;
 mod logger;
 mod moonlight_web;
 mod native_tools;
 mod power;
+mod device_probe;
+mod probe_cache;
 mod proxy_server;
 mod rtss;
 mod rtss_frame_rates;
@@ -31,10 +35,15 @@ mod perf;
 mod hdr_enhanced;
 mod native_components;
 mod nr_overlay;
+mod panel_page;
 #[cfg(target_os = "windows")]
 mod shell_context_menu;
+mod stall_watch;
 mod sunshine;
 mod system;
+mod system_load;
+mod system_load_core;
+mod text_encoding;
 #[cfg(target_os = "windows")]
 mod text_context;
 mod toolbar;
@@ -78,17 +87,24 @@ fn configure_loopback_proxy_bypass() {
     // This runs before any helper path or async worker can create an HTTP
     // client, so every GUI-owned loopback request gets the same direct route.
     unsafe {
-        // WebView2 uses Chromium's bypass syntax. Keep external requests on the
-        // user's configured proxy while forcing every loopback form to direct.
+        // A caller-provided value (for example --remote-debugging-port to trace
+        // a separately launched instance) stays in front of ours.
+        let mut browser_arguments = std::env::var("WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS")
+            .ok()
+            .filter(|value| !value.trim().is_empty())
+            .into_iter()
+            .collect::<Vec<_>>();
+        browser_arguments.extend([
+            // WebView2 uses Chromium's bypass syntax. Keep external requests on the
+            // user's configured proxy while forcing every loopback form to direct.
+            "--proxy-bypass-list=localhost;*.localhost;127.0.0.0/8;[::1]".to_owned(),
+            // UI 音效：手柄输入不属于「用户手势」，不解锁 AudioContext；
+            // 应用自身的导航反馈音不是网页自动播放媒体
+            "--autoplay-policy=no-user-gesture-required".to_owned(),
+        ]);
         std::env::set_var(
             "WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS",
-            [
-                "--proxy-bypass-list=localhost;*.localhost;127.0.0.0/8;[::1]",
-                // UI 音效：手柄输入不属于「用户手势」，不解锁 AudioContext；
-                // 应用自身的导航反馈音不是网页自动播放媒体
-                "--autoplay-policy=no-user-gesture-required",
-            ]
-            .join(" "),
+            browser_arguments.join(" "),
         );
 
         // reqwest follows NO_PROXY/no_proxy. Preserve the user's existing
@@ -126,11 +142,6 @@ fn main() {
 
     #[cfg(target_os = "windows")]
     utils::wait_for_elevated_restart_handoff();
-
-    #[cfg(target_os = "windows")]
-    if let Some(exit_code) = dualsense::try_handle_elevated_command() {
-        std::process::exit(exit_code);
-    }
 
     #[cfg(target_os = "windows")]
     if let Some(exit_code) = usbip::try_handle_elevated_command() {
@@ -176,6 +187,7 @@ fn main() {
             // 初始化日志系统（需要在 setup 中获取 app handle）
             logger::init_logger(app.handle().clone());
             client_fingerprint_rules::start();
+            stall_watch::start(app.handle().clone());
             info!("🚀 Sunshine Control Panel 启动中...");
 
             app::setup_application(app)
@@ -228,7 +240,9 @@ fn main() {
             system::get_monitors,
             system::get_system_info,
             system::get_process_memory_info,
+            system_load::system_load,
             system::get_sunshine_start_time,
+            host_facts::get_sunshine_host_facts,
             sunshine::get_sunshine_install_path,
             sunshine::get_sunshine_version,
             sunshine::parse_sunshine_config,
@@ -245,6 +259,7 @@ fn main() {
             sunshine::restart_sunshine_service,
             proxy_server::get_proxy_url_command,
             proxy_server::get_proxy_health_check,
+            proxy_server::probe_sunshine_host,
             proxy_server::refresh_sunshine_target,
             proxy_server::wait_for_proxy_ready,
             native_components::native_component_get_status,
@@ -267,16 +282,13 @@ fn main() {
             controller_hub::save_controller_hub_config,
             controller_hub::get_virtual_microphone_status,
             controller_hub::test_virtual_microphone,
+            controller_hub::save_microphone_backend,
             vigem::get_vigem_status,
             vigem::install_vigem_driver,
             vigem::uninstall_vigem_driver,
             dualsense::dualsense_get_status,
-            dualsense::dualsense_log_panel_opened,
-            dualsense::dualsense_install,
-            dualsense::dualsense_uninstall,
-            dualsense::dualsense_set_config,
-            dualsense::dualsense_set_haptics_tuning,
-            dualsense::dualsense_self_test,
+            dualsense::dualsense_get_tuning,
+            dualsense::dualsense_set_tuning,
             usbip::usbip_get_status,
             usbip::usbip_get_forwarding_config,
             usbip::usbip_save_forwarding_config,
@@ -296,6 +308,7 @@ fn main() {
             fs_utils::search_steam_covers,
             fs_utils::upload_steam_cover,
             fs_utils::save_text_file,
+            fs_utils::save_binary_file,
             update::check_for_updates,
             update::check_for_updates_for_channel,
             update::start_update_checker_when_ui_ready,
@@ -331,6 +344,13 @@ fn main() {
             file_mapping::uninstall_file_mapping_menu,
             file_transfer::send_file_to_client,
             windows::webview_heartbeat,
+            logger::frontend_slow,
+            windows::panel_content_ready,
+            windows::panel_set_surface,
+            windows::panel_dpi_settled,
+            windows::panel_activity,
+            windows::panel_first_paint,
+            windows::test_synthetic_dpi,
             windows::resize_about_window,
             windows::resize_tool_window,
             hdr_enhanced::nr_live_status,
@@ -364,6 +384,7 @@ fn main() {
             tray::get_tray_locale,
             tray::main_panel_loading,
             tray::main_panel_ready,
+            panel_page::take_pending_panel_page,
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application");

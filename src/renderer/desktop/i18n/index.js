@@ -1,4 +1,5 @@
 import { ref, computed, watch } from 'vue'
+import { LOCALE_SYSTEM, choiceOf, readLocalePref, resolveSystemLocale, watchSystemLanguage, writeLocalePref } from 'foundation-ui/locale/localePref.js'
 import { zh } from './zh.js'
 import { en } from './en.js'
 
@@ -11,7 +12,16 @@ function normalizeDesktopLocale(locale) {
   return locale?.toLowerCase().startsWith('zh') ? 'zh' : 'en'
 }
 
+const systemDesktopLocale = () => normalizeDesktopLocale(resolveSystemLocale(typeof navigator !== 'undefined' ? (navigator.languages?.length ? navigator.languages : [navigator.language]) : [], ['zh', 'en']))
+function storedExplicit() {
+  try { const saved = localStorage.getItem('language'); return saved === 'zh' || saved === 'en' ? saved : '' } catch { return '' }
+}
+
 function getDefaultLocale() {
+  // the stored choice first: 跟随系统 gives the language of the system, a code is that language
+  const pref = readLocalePref()
+  if (pref === LOCALE_SYSTEM) return systemDesktopLocale()
+  if (pref) return normalizeDesktopLocale(pref)
   try {
     const saved = localStorage.getItem('language')
     if (saved === 'zh' || saved === 'en') return saved
@@ -24,6 +34,8 @@ function getDefaultLocale() {
 }
 
 const currentLocale = ref(getDefaultLocale())
+// What the person chose: 跟随系统 (the default) or a language; `system` is stored as such and followed live
+const currentChoice = ref(choiceOf(readLocalePref(), storedExplicit(), systemDesktopLocale()))
 let localeRevision = 0
 
 function updateCurrentLocale(locale, persist = false) {
@@ -90,7 +102,7 @@ async function syncLocaleFromSunshine() {
   try {
     const { invoke } = await import('@tauri-apps/api/core')
     const config = await invoke('parse_sunshine_config')
-    if (!config?.locale || revision !== localeRevision) return
+    if (!config?.locale || revision !== localeRevision || currentChoice.value === LOCALE_SYSTEM) return
     // Sunshine 用 'zh'/'zh_TW' 等，桌面 GUI 只有 'zh'/'en'
     const guiLocale = normalizeDesktopLocale(config.locale)
     updateCurrentLocale(guiLocale, true)
@@ -121,6 +133,8 @@ async function listenTrayLocaleChanged() {
         if (latestRequestId && latestRequestId !== requestId) return
       } else if (source === 'tray') {
         clearLatestLocaleRequest()
+        // a language picked in the tray menu is an explicit choice of the person
+        currentChoice.value = normalizeDesktopLocale(eventLocale); writeLocalePref(currentChoice.value)
       }
 
       updateCurrentLocale(eventLocale, true)
@@ -162,17 +176,42 @@ function requestLocaleChange(value) {
   syncLocalePreferences(normalized, requestId)
 }
 
+/** The choice of the language: 'system' or 'zh' / 'en'. 'system' is stored as such; the language of the system is applied (the host and the tray follow it) and followed when it changes. */
+export function setLocaleChoice(choice) {
+  if (choice === LOCALE_SYSTEM) {
+    currentChoice.value = LOCALE_SYSTEM
+    writeLocalePref(LOCALE_SYSTEM)
+    requestLocaleChange(systemDesktopLocale())
+    return
+  }
+  const code = normalizeDesktopLocale(choice)
+  currentChoice.value = code
+  writeLocalePref(code)
+  requestLocaleChange(code)
+}
+
+// the operating system changes its language: a window that follows it changes with it
+watchSystemLanguage(() => { if (currentChoice.value === LOCALE_SYSTEM) requestLocaleChange(systemDesktopLocale()) })
+
 export function useI18n() {
   const t = computed(() => messages[currentLocale.value] || messages.en)
+  const choice = computed(() => currentChoice.value)
+  const systemLocale = computed(() => systemDesktopLocale())
   const locale = computed({
     get: () => currentLocale.value,
     set: (val) => {
-      requestLocaleChange(val)
+      setLocaleChoice(val)
     },
   })
   const toggleLocale = () => {
     const newLocale = locale.value === 'zh' ? 'en' : 'zh'
     locale.value = newLocale
   }
-  return { t, locale, toggleLocale }
+  return { t, locale, toggleLocale, choice, setChoice: setLocaleChoice, systemLocale }
+}
+
+if (currentChoice.value === LOCALE_SYSTEM) {
+  try {
+    if (localStorage.getItem('language') !== currentLocale.value) { localStorage.setItem('language', currentLocale.value); syncLocalePreferences(currentLocale.value, createLocaleRequestId()) }
+  } catch { /* storage unavailable */ }
 }

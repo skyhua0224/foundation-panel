@@ -1,92 +1,32 @@
 <template>
-  <section class="chub-panel">
-    <div class="chub-section">
-      <div class="chub-section-head">
-        <span class="chub-section-label">◈ {{ t.deviceHub.components.inputDrivers }}</span>
-        <span class="chub-section-rule"></span>
-        <el-button size="small" :loading="refreshing" @click="refreshAll">{{ t.deviceHub.refresh }}</el-button>
-      </div>
-
-      <div v-if="!initialized" class="chub-cards" aria-live="polite">
-        <article v-for="index in 2" :key="index" class="chub-card chub-card-placeholder">
-          <el-skeleton :rows="3" animated />
-        </article>
-      </div>
-      <div v-else class="chub-cards">
-        <!-- ViGEm -->
-        <article class="chub-card" v-loading="ops.vigem">
-          <div class="chub-card-head">
-            <strong>{{ t.controllersHub.peripherals.vigem.title }}</strong>
-            <el-tag
-              size="small"
-              :type="!probeFailed.vigem && vigemStatus.installed ? 'success' : 'info'"
-              effect="plain"
-            >{{ probeFailed.vigem ? t.deviceHub.probeUnavailable : (vigemStatus.installed
-              ? (vigemStatus.version ? `v${vigemStatus.version}` : t.controllersHub.peripherals.installed)
-              : t.controllersHub.peripherals.notInstalled) }}</el-tag>
-          </div>
-          <p class="chub-hint">{{ t.controllersHub.peripherals.vigem.hint }}</p>
-          <p v-if="vigemStatus.installed && vigemStatus.status_text">
-            {{ vigemStatus.status_text }}
-          </p>
-          <div class="chub-card-actions">
-            <el-button
-              size="small"
-              :type="vigemStatus.installed ? 'default' : 'primary'"
-              :loading="ops.vigem"
-              :disabled="refreshing || probeFailed.vigem"
-              @click="confirmToggle('vigem')"
-            >{{ vigemStatus.installed
-              ? t.controllersHub.peripherals.uninstall
-              : t.controllersHub.peripherals.install }}</el-button>
-          </div>
-        </article>
-
-        <!-- 虚拟鼠标 -->
-        <article class="chub-card" v-loading="ops.vmouse">
-          <div class="chub-card-head">
-            <strong>{{ t.controllersHub.peripherals.vmouse.title }}</strong>
-            <el-tag
-              size="small"
-              :type="!probeFailed.vmouse && vmouseStatus.installed ? 'success' : 'info'"
-              effect="plain"
-            >{{ probeFailed.vmouse ? t.deviceHub.probeUnavailable : (vmouseStatus.installed
-              ? t.controllersHub.peripherals.installed
-              : t.controllersHub.peripherals.notInstalled) }}</el-tag>
-          </div>
-          <p class="chub-hint">{{ t.controllersHub.peripherals.vmouse.hint }}</p>
-          <p role="status" class="chub-hint">{{ vmouseNotice || t.stream.vmouseToggleDesc }}</p>
-          <div class="chub-card-actions">
-            <span>{{ t.stream.vmouseToggle }}</span>
-            <el-button size="small" :type="vmouseEnabled ? 'primary' : 'default'"
-              :loading="vmouseConfigSaving" :disabled="refreshing || !vmouseStatusKnown"
-              @click="toggleVmouse"
-            >{{ !vmouseStatusKnown ? t.stream.vmouseUnknown : vmouseEnabled ? t.stream.vmouseOn : t.stream.vmouseOff }}</el-button>
-          </div>
-          <p v-if="vmouseStatus.installed && vmouseStatus.status_text">
-            {{ vmouseStatus.status_text }}
-          </p>
-          <div class="chub-card-actions">
-            <el-button
-              size="small"
-              :type="vmouseStatus.installed ? 'default' : 'primary'"
-              :loading="ops.vmouse"
-              :disabled="refreshing || probeFailed.vmouse"
-              @click="confirmToggle('vmouse')"
-            >{{ vmouseStatus.installed
-              ? t.controllersHub.peripherals.uninstall
-              : t.controllersHub.peripherals.install }}</el-button>
-          </div>
-        </article>
-
-      </div>
-    </div>
-  </section>
+  <MSection :title="t.deviceHub.components.inputDrivers">
+    <MSkeleton v-if="!initialized" :rows="2" />
+    <template v-else>
+      <MGroup>
+        <MItem icon="gamepad" :tone="!probeFailed.vigem && vigemStatus.installed ? 'success' : ''" :title="t.controllersHub.peripherals.vigem.title">
+          <template #trail>
+            <MChip :tone="!probeFailed.vigem && vigemStatus.installed ? 'ok' : 'neutral'">{{ probeFailed.vigem ? t.deviceHub.probeUnavailable : (vigemStatus.installed ? (vigemStatus.version ? 'v' + vigemStatus.version : t.controllersHub.peripherals.installed) : t.controllersHub.peripherals.notInstalled) }}</MChip>
+            <MButton size="sm" :variant="vigemStatus.installed ? 'tonal' : 'filled'" :loading="ops.vigem" :disabled="refreshing || probeFailed.vigem" @click="confirmToggle('vigem')">{{ vigemStatus.installed ? t.controllersHub.peripherals.uninstall : t.controllersHub.peripherals.install }}</MButton>
+          </template>
+        </MItem>
+        <MItem icon="mouse" :tone="!probeFailed.vmouse && vmouseStatus.installed ? 'success' : ''" :title="t.controllersHub.peripherals.vmouse.title" :text="vmouseNotice">
+          <template #trail>
+            <MChip :tone="!probeFailed.vmouse && vmouseStatus.installed ? 'ok' : 'neutral'">{{ probeFailed.vmouse ? t.deviceHub.probeUnavailable : (vmouseStatus.installed ? t.controllersHub.peripherals.installed : t.controllersHub.peripherals.notInstalled) }}</MChip>
+            <MButton size="sm" :variant="vmouseStatus.installed ? 'tonal' : 'filled'" :loading="ops.vmouse" :disabled="refreshing || probeFailed.vmouse" @click="confirmToggle('vmouse')">{{ vmouseStatus.installed ? t.controllersHub.peripherals.uninstall : t.controllersHub.peripherals.install }}</MButton>
+          </template>
+        </MItem>
+        <MItem icon="toggle_on" :title="t.stream.vmouseToggle">
+          <template #trail><MButton size="sm" :variant="vmouseEnabled ? 'filled' : 'outlined'" :loading="vmouseConfigSaving" :disabled="refreshing || !vmouseStatusKnown" @click="toggleVmouse">{{ !vmouseStatusKnown ? t.stream.vmouseUnknown : vmouseEnabled ? t.stream.vmouseOn : t.stream.vmouseOff }}</MButton></template>
+        </MItem>
+      </MGroup>
+    </template>
+  </MSection>
 </template>
 
 <script setup>
+import { MSection, MGroup, MItem, MChip, MButton, MSkeleton } from 'foundation-ui/vue'
 import { onMounted } from 'vue'
-import { ElMessageBox } from 'element-plus'
+import { ElMessageBox } from '../../composables/notifyMessage.js'
 import { useInputDrivers } from '../../composables/useInputDrivers.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
@@ -106,6 +46,8 @@ async function confirmToggle(tool) {
   try {
     await ElMessageBox.confirm(strings[action === 'install' ? 'confirmInstall' : 'confirmUninstall'], t.value.controllersHub.peripherals.confirmTitle, {
       type: action === 'uninstall' ? 'warning' : 'info',
+      // removing a driver is destructive: the error-colour button with the verb
+      ...(action === 'uninstall' ? { danger: true, confirmButtonText: t.value.systemTools.uninstall } : {}),
     })
   } catch {
     return

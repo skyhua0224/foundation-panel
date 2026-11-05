@@ -23,6 +23,9 @@
 
     .bg {
       width: 100%;
+      height: 100vh;
+      object-fit: contain;
+      object-position: center;
     }
 
     .btns {
@@ -65,7 +68,7 @@
 </head>
 
 <body>
-  <img class="bg" src="https://t.alcy.cc/pc/">
+  <img class="bg" src="../public/vivi/vivi-avatar-1024.webp" srcset="../public/vivi/vivi-avatar-256.webp 256w, ../public/vivi/vivi-avatar-1024.webp 1024w" sizes="100vw" alt="">
   <canvas id="canvas" width="500" height="500"></canvas>
   <div class="btns">
     <button id="btn-inc">+</button>

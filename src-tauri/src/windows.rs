@@ -2,12 +2,14 @@ use crate::proxy_server;
 use log::{debug, error, info, warn};
 use std::sync::LazyLock;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 use tauri::{
     AppHandle, Manager, PhysicalPosition, PhysicalSize, Runtime, WebviewWindow,
     webview::PageLoadEvent,
 };
 
 pub(crate) mod lifecycle;
+mod surface;
 
 #[derive(Default)]
 struct ToolWindowMoveSave {
@@ -186,6 +188,132 @@ pub fn disable_context_menu<R: Runtime>(window: &WebviewWindow<R>) {
 #[cfg(debug_assertions)]
 pub fn disable_context_menu<R: Runtime>(_window: &WebviewWindow<R>) {}
 
+/// The renderer mounted its first view: a window that waits to be shown is shown now.
+#[tauri::command]
+pub fn panel_content_ready(window: tauri::WebviewWindow) {
+    log::info!("[cold] content ready in {}", window.label());
+    lifecycle::content_ready(&window);
+}
+
+/// A measurement instance (SUNSHINE_GUI_TEST_OFFSCREEN = 1): its main window opens outside every monitor, is never activated and logs its WM_SIZE timing.
+/// Nothing of it shows on the desk of whoever uses the machine.
+pub(crate) fn test_offscreen() -> bool {
+    static ON: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *ON.get_or_init(|| std::env::var_os("SUNSHINE_GUI_TEST_OFFSCREEN").is_some_and(|value| value != "0"))
+}
+
+/// Whether the first show of the main window is cloaked (DWM) until the page has painted its first frame (SUNSHINE_GUI_COLD_CLOAK = on | off).
+const COLD_CLOAK_DEFAULT: bool = false;
+
+fn cold_cloak_wanted() -> bool {
+    match std::env::var("SUNSHINE_GUI_COLD_CLOAK").ok().as_deref() {
+        Some("on") => true,
+        Some("off") => false,
+        _ => COLD_CLOAK_DEFAULT,
+    }
+}
+
+/// The main window is cloaked and shown to WebView2 (it renders) but not to the person.
+static COLD_CLOAK: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+static COLD_CLOAK_SINCE: std::sync::OnceLock<Instant> = std::sync::OnceLock::new();
+/// How long the window stays cloaked after the page exists if its first paint does not come.
+const COLD_CLOAK_CAP: Duration = Duration::from_millis(600);
+
+#[cfg(target_os = "windows")]
+fn set_cloak<R: Runtime>(window: &WebviewWindow<R>, cloaked: bool) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Graphics::Dwm::{DWMWINDOWATTRIBUTE, DwmSetWindowAttribute};
+    use windows::core::BOOL;
+    if let Ok(hwnd) = window.hwnd() {
+        let value = BOOL::from(cloaked);
+        // DWMWA_CLOAK = 13
+        if let Err(error) = unsafe { DwmSetWindowAttribute(HWND(hwnd.0), DWMWINDOWATTRIBUTE(13), (&value as *const BOOL).cast(), size_of::<BOOL>() as u32) } {
+            warn!("DwmSetWindowAttribute(DWMWA_CLOAK, {cloaked}) failed: {error}");
+        }
+    }
+}
+
+/// Uncloaks the main window (once) and takes the focus as the first show would have.
+fn uncloak_cold<R: Runtime>(window: &WebviewWindow<R>, why: &str) {
+    if !COLD_CLOAK.swap(false, std::sync::atomic::Ordering::SeqCst) {
+        return;
+    }
+    #[cfg(target_os = "windows")]
+    set_cloak(window, false);
+    log::info!("[cold] uncloaked {} ms after the window was made ({why})", COLD_CLOAK_SINCE.get().map_or(0, |since| since.elapsed().as_millis()));
+    if !test_offscreen() {
+        let _ = window.set_focus();
+        #[cfg(target_os = "windows")]
+        force_activate_window_win32(window);
+    }
+}
+
+/// The page painted its first frame: the cloaked window shows it.
+#[tauri::command]
+pub fn panel_first_paint(window: tauri::WebviewWindow) {
+    uncloak_cold(&window, "first paint");
+}
+
+/// The page is being used (pointer, key, wheel): the warm snapshot of the cover waits for quiet.
+#[tauri::command]
+pub fn panel_activity() {
+    lifecycle::note_activity();
+}
+
+/// Measurement instances only: the message Windows sends when the scale of the window's monitor changes, with the size the window gets at the new scale.
+/// An off-screen window gets none from the system, and the display of whoever uses the machine stays as it is.
+#[tauri::command]
+pub fn test_synthetic_dpi(window: tauri::WebviewWindow, dpi: u32) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
+        use windows::Win32::UI::HiDpi::GetDpiForWindow;
+        use windows::Win32::UI::WindowsAndMessaging::{GetWindowRect, SendMessageW, WM_DPICHANGED};
+        if !test_offscreen() {
+            return Err("only a measurement instance takes a synthetic scale change".to_string());
+        }
+        let hwnd = HWND(window.hwnd().map_err(|e| e.to_string())?.0);
+        // the system's DPI of the window never changes here: the scale the last synthetic message set is the one this one changes from
+        static CURRENT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let known = CURRENT.swap(dpi, std::sync::atomic::Ordering::SeqCst);
+        let (mut rect, old) = (RECT::default(), if known == 0 { unsafe { GetDpiForWindow(hwnd) }.max(1) } else { known });
+        unsafe { GetWindowRect(hwnd, &mut rect) }.map_err(|e| e.to_string())?;
+        let size = |extent: i32| (i64::from(extent) * i64::from(dpi) / i64::from(old)) as i32;
+        let suggested = RECT { left: rect.left, top: rect.top, right: rect.left + size(rect.right - rect.left), bottom: rect.top + size(rect.bottom - rect.top) };
+        unsafe { SendMessageW(hwnd, WM_DPICHANGED, Some(WPARAM(((dpi << 16) | dpi) as usize)), Some(LPARAM(&suggested as *const RECT as isize))) };
+        Ok(())
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = (window, dpi);
+        Err("windows only".to_string())
+    }
+}
+
+/// The page's layout has matched the window for a while after a change of scale: the cover over it fades out.
+#[tauri::command]
+pub fn panel_dpi_settled(window: tauri::WebviewWindow, token: u64) {
+    lifecycle::dpi_settled(&window, token);
+}
+
+/// The renderer's theme surface colour: the colour the window and WebView2 show before a
+/// frame is painted (resize, restore, first start). Kept for the next start.
+#[tauri::command]
+pub fn panel_set_surface(window: tauri::WebviewWindow, r: u8, g: u8, b: u8) -> Result<(), String> {
+    window
+        .set_background_color(Some(tauri::window::Color(r, g, b, 255)))
+        .map_err(|e| e.to_string())?;
+    surface::store((r, g, b));
+    #[cfg(target_os = "windows")]
+    {
+        static LOGGED: std::sync::Mutex<Option<(u8, u8, u8)>> = std::sync::Mutex::new(None);
+        if test_offscreen() && LOGGED.lock().unwrap().replace((r, g, b)) != Some((r, g, b)) {
+            let _ = window.with_webview(move |webview| lifecycle::log_default_background(&webview.controller(), &format!("reported #{r:02x}{g:02x}{b:02x}")));
+        }
+    }
+    Ok(())
+}
+
 /// WebView 心跳命令：由前端 JS 定期调用，表明渲染进程仍然存活
 #[tauri::command]
 pub fn webview_heartbeat(webview: tauri::Webview, generation: u64) {
@@ -316,9 +444,20 @@ pub fn resize_tool_window(window: tauri::Window, width: f64, height: f64) -> Res
 
 /// 显示并激活窗口（解决权限隔离问题）
 pub fn show_and_activate_window<R: Runtime>(window: &WebviewWindow<R>) {
+    log::info!("[cold] window {} shown", window.label());
+    let cloaked = COLD_CLOAK.load(std::sync::atomic::Ordering::SeqCst) && window.label() == MAIN_WINDOW_ID;
     let _ = window.unminimize();
     let _ = window.show();
-    let _ = window.set_focus();
+    if cloaked {
+        // the person sees the window when the page has painted; if that does not come, after the cap
+        let capped = window.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(COLD_CLOAK_CAP).await;
+            uncloak_cold(&capped, "cap");
+        });
+    } else if !test_offscreen() {
+        let _ = window.set_focus();
+    }
 
     // 恢复 WebView 活跃状态（引擎级 + JS 级）
     lifecycle::presented(window);
@@ -327,7 +466,9 @@ pub fn show_and_activate_window<R: Runtime>(window: &WebviewWindow<R>) {
     proxy_server::reset_fast_fail();
 
     #[cfg(target_os = "windows")]
-    force_activate_window_win32(window);
+    if !test_offscreen() && !cloaked {
+        force_activate_window_win32(window);
+    }
 
     #[cfg(target_os = "windows")]
     if !matches!(window.label(), MAIN_WINDOW_ID | DESKTOP_WINDOW_ID) {
@@ -602,15 +743,17 @@ fn create_main_window_internal<R: Runtime>(
     crate::tray::mark_main_panel_loading();
     let panel = lifecycle::register(MAIN_WINDOW_ID, visible);
     let page_panel = panel.clone();
-    let window = tauri::WebviewWindowBuilder::new(
+    let builder = tauri::WebviewWindowBuilder::new(
         app,
         MAIN_WINDOW_ID,
         tauri::WebviewUrl::App("sunshine-frame.html".into()),
     )
     .title("Sunshine Control Panel")
     .inner_size(1280.0, 800.0)
-    .min_inner_size(1024.0, 600.0)
-    .center()
+    .min_inner_size(480.0, 560.0);
+    let builder = if test_offscreen() { builder.position(6000.0, 100.0) } else { builder.center() };
+    let window = builder
+    .background_color(surface::startup_color())
     .decorations(false)
     // DWM clips the native window to rounded corners. Keeping WebView2
     // opaque avoids stale transparent composition surfaces after restore.
@@ -639,6 +782,22 @@ fn create_main_window_internal<R: Runtime>(
     // 禁用自动填充和密码保存提示
     #[cfg(target_os = "windows")]
     configure_webview_security(&window);
+
+    // A window that is to be shown is shown at once, cloaked: WebView2 renders for a window that is shown, and the person sees it when the page has painted
+    // (panel_first_paint), not before, so the frames between are never the bare surface colour.
+    #[cfg(target_os = "windows")]
+    if visible && cold_cloak_wanted() {
+        COLD_CLOAK_SINCE.get_or_init(Instant::now);
+        COLD_CLOAK.store(true, std::sync::atomic::Ordering::SeqCst);
+        set_cloak(&window, true);
+        let _ = window.show();
+        info!("[cold] window main shown cloaked");
+        let safety = window.clone();
+        tauri::async_runtime::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            uncloak_cold(&safety, "safety");
+        });
+    }
 
     disable_context_menu(&window);
     info!("✅ {}主窗口创建成功", visibility_desc);

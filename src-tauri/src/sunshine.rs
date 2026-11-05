@@ -221,12 +221,34 @@ pub fn assets_dir() -> PathBuf {
     get_sunshine_path().join("assets")
 }
 
+/// `sunshine.exe --version` starts the host program (60 ms); the version of an installed program stays the same while the panel runs.
+static SUNSHINE_VERSION: crate::probe_cache::ProbeCache<String> =
+    crate::probe_cache::ProbeCache::new("sunshine version", std::time::Duration::from_secs(600));
+
 #[tauri::command]
 pub async fn get_sunshine_version() -> Result<String, String> {
+    SUNSHINE_VERSION
+        .get(|| async {
+            tokio::task::spawn_blocking(read_sunshine_version)
+                .await
+                .map_err(|e| e.to_string())?
+        })
+        .await
+}
+
+fn read_sunshine_version() -> Result<String, String> {
     let sunshine_exe = get_sunshine_path().join("sunshine.exe");
 
     if !sunshine_exe.exists() {
         return Ok("Unknown".to_string());
+    }
+
+    // The version resource of the executable says what `--version` prints (60 ms to start the program): no process is started for it.
+    #[cfg(target_os = "windows")]
+    if let Some(version) = crate::device_probe::file_version_string(&sunshine_exe)
+        .and_then(|text| crate::device_probe::plain_host_version(&text))
+    {
+        return Ok(version);
     }
 
     #[cfg(target_os = "windows")]
@@ -245,8 +267,7 @@ pub async fn get_sunshine_version() -> Result<String, String> {
         .output()
         .map_err(|e| e.to_string())?;
 
-    let stdout = String::from_utf8_lossy(&output.stdout);
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let (stdout, stderr) = crate::text_encoding::decode_output(&output);
     let combined = format!("{}{}", stdout, stderr);
 
     // 按优先级匹配版本号模式
@@ -830,6 +851,7 @@ pub async fn post_tray_action(
 }
 
 pub async fn post_tray_restart_action() -> Result<Option<TrayActionResponse>, String> {
+    crate::host_facts::expect_stop(180_000);
     match post_tray_action_request("restart", None, None, None).await {
         Ok(response) => Ok(Some(response)),
         Err(error) => handle_restart_action_error(error),
@@ -1310,7 +1332,7 @@ pub(crate) fn is_sunshine_running_in_user_mode_impl() -> Result<bool, String> {
             .creation_flags(CREATE_NO_WINDOW)
             .output()
         {
-            let output_str = String::from_utf8_lossy(&result.stdout).to_uppercase();
+            let output_str = crate::text_encoding::decode_console_bytes(&result.stdout).to_uppercase();
             if output_str.contains("RUNNING") {
                 return Ok(false); // 服务模式
             }
@@ -1322,7 +1344,7 @@ pub(crate) fn is_sunshine_running_in_user_mode_impl() -> Result<bool, String> {
             .creation_flags(CREATE_NO_WINDOW)
             .output()
         {
-            let output_str = String::from_utf8_lossy(&result.stdout).to_lowercase();
+            let output_str = crate::text_encoding::decode_console_bytes(&result.stdout).to_lowercase();
             if output_str.contains("sunshine.exe") {
                 return Ok(true); // 用户模式
             }
@@ -1374,6 +1396,7 @@ fn build_start_service_command(sunshine_path: &std::path::Path) -> String {
 /// 切换 Sunshine 运行模式（用户模式 ↔ 服务模式）
 #[tauri::command]
 pub async fn toggle_sunshine_mode() -> Result<String, String> {
+    crate::host_facts::expect_stop(180_000);
     #[cfg(target_os = "windows")]
     {
         let is_user_mode = tokio::task::spawn_blocking(is_sunshine_running_in_user_mode_impl)
@@ -1417,6 +1440,8 @@ pub async fn toggle_sunshine_mode() -> Result<String, String> {
 
 #[tauri::command]
 pub async fn restart_sunshine_service() -> Result<String, String> {
+    // the stop that follows is asked for: the panel must not call it a crash
+    crate::host_facts::expect_stop(180_000);
     #[cfg(target_os = "windows")]
     {
         info!("🔄 开始重启 Sunshine 服务...");
@@ -1496,4 +1521,27 @@ pub async fn set_sunshine_locale(locale: String) -> Result<String, String> {
         Ok("success".to_string())
     })
     .await
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod direct_read_tests {
+    use super::*;
+
+    /// Run on a machine with Sunshine installed: `cargo test --bin sunshine-gui -- --ignored direct_read_matches --nocapture`.
+    #[test]
+    #[ignore]
+    fn version_resource_direct_read_matches_the_version_flag() {
+        use std::os::windows::process::CommandExt;
+        let exe = get_sunshine_path().join("sunshine.exe");
+        let t = std::time::Instant::now();
+        let resource = crate::device_probe::file_version_string(&exe).and_then(|text| crate::device_probe::plain_host_version(&text));
+        let resource_ms = t.elapsed().as_secs_f64() * 1000.0;
+        let t = std::time::Instant::now();
+        let output = Command::new(&exe).arg("--version").creation_flags(0x08000000).output().unwrap();
+        let (stdout, stderr) = crate::text_encoding::decode_output(&output);
+        println!("version: resource {resource_ms:.1} ms {resource:?}; --version {:.1} ms {:?}", t.elapsed().as_secs_f64() * 1000.0, format!("{stdout}{stderr}").trim());
+        let printed = format!("{stdout}{stderr}");
+        let resource = resource.expect("the version resource is the plain form");
+        assert!(printed.contains(&resource), "--version prints {printed:?}, the resource says {resource}");
+    }
 }

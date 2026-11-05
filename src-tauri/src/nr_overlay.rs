@@ -49,6 +49,9 @@ struct OverlayState {
     owned: HashMap<u32, Shortcut>,
     target: Option<u64>,
     capture: Option<(String, std::time::Instant)>,
+    // DLSS NR installed and usable (the status the panel reads): only then are the NR and overlay shortcuts held. The stored
+    // bindings stay in `settings` either way, so they come back after a reinstall.
+    nr_ready: bool,
 }
 static STATE: LazyLock<Mutex<OverlayState>> = LazyLock::new(|| Mutex::new(OverlayState::default()));
 static VISIBLE: AtomicBool = AtomicBool::new(false);
@@ -163,6 +166,89 @@ trait Registrar {
     fn register(&self, key: Shortcut) -> Result<(), String>;
     fn unregister(&self, key: Shortcut) -> Result<(), String>;
 }
+/// Whether the NR toggle and overlay shortcuts may be held, with the reason: only for a DLSS NR component that is installed and
+/// usable (installed, the host bridge, an NVIDIA adapter), the status the panel reads (useDlssNrReady). Unknown holds them back:
+/// a global hotkey that does nothing for the user still takes the key from every other app.
+pub(crate) fn shortcuts_wanted(
+    status: Option<&crate::native_components::providers::EnhancementComponentStatus>,
+) -> (bool, &'static str) {
+    match status {
+        None => (false, "DLSS NR status unknown"),
+        Some(s) if !s.installed => (false, "DLSS NR not installed"),
+        Some(s) if !s.host_supported => (false, "the host has no DLSS NR bridge"),
+        Some(s) if !s.adapter_present => (false, "no NVIDIA adapter for DLSS NR"),
+        Some(_) => (true, "DLSS NR installed and usable"),
+    }
+}
+/// The bindings to hold now: none while DLSS NR is not ready or a shortcut is being recorded.
+fn desired_bindings(state: &OverlayState, settings: &Settings) -> Result<Vec<Shortcut>, String> {
+    let keys = bindings(settings)?;
+    Ok(if state.nr_ready && state.capture.is_none() { keys } else { Vec::new() })
+}
+/// One log line for every register and unregister, with the reason.
+struct Logged<'a, T: Registrar>(&'a T, &'a str);
+impl<T: Registrar> Registrar for Logged<'_, T> {
+    fn register(&self, key: Shortcut) -> Result<(), String> {
+        let result = self.0.register(key);
+        match &result {
+            Ok(()) => log::info!("NR shortcut {key} registered: {}", self.1),
+            Err(error) => log::warn!("NR shortcut {key} not registered ({error}): {}", self.1),
+        }
+        result
+    }
+    fn unregister(&self, key: Shortcut) -> Result<(), String> {
+        let result = self.0.unregister(key);
+        match &result {
+            Ok(()) => log::info!("NR shortcut {key} unregistered: {}", self.1),
+            Err(error) => log::warn!("NR shortcut {key} not unregistered ({error}): {}", self.1),
+        }
+        result
+    }
+}
+/// Hold or release the shortcuts for a new DLSS NR readiness, key by key (a key another app holds does not keep the other one back).
+fn set_ready(state: &mut OverlayState, ready: bool, registrar: &impl Registrar, reason: &str) -> bool {
+    if state.nr_ready == ready {
+        return false;
+    }
+    state.nr_ready = ready;
+    let desired = desired_bindings(state, &state.settings.clone()).unwrap_or_default();
+    let logged = Logged(registrar, reason);
+    for key in &desired {
+        if !state.owned.contains_key(&key.id()) && logged.register(*key).is_ok() {
+            state.owned.insert(key.id(), *key);
+        }
+    }
+    let removed: Vec<_> = state.owned.values().filter(|k| !desired.iter().any(|d| d.id() == k.id())).copied().collect();
+    for key in removed {
+        if logged.unregister(key).is_ok() {
+            state.owned.remove(&key.id());
+        }
+    }
+    true
+}
+/// A DLSS NR component status from startup or from a component command (status, install, uninstall, recover, select): the
+/// shortcuts follow it. A failed status read is not handed in, so it does not take the keys away.
+pub(crate) fn note_component_status<R: Runtime>(
+    app: &AppHandle<R>,
+    status: Option<&crate::native_components::providers::EnhancementComponentStatus>,
+    cause: &str,
+) {
+    let (ready, why) = shortcuts_wanted(status);
+    let reason = format!("{cause}: {why}");
+    let changed = {
+        let mut state = STATE.lock().unwrap();
+        let first = cause == "startup";
+        let changed = set_ready(&mut state, ready, &GlobalRegistrar(app), &reason);
+        if first && !ready {
+            log::info!("NR shortcuts not registered: {reason}");
+        }
+        changed.then(|| snapshot(&state))
+    };
+    if let Some(status) = changed {
+        gamepad::wake();
+        let _ = app.emit("nr-settings-changed", status);
+    }
+}
 struct GlobalRegistrar<'a, R: Runtime>(&'a AppHandle<R>);
 impl<R: Runtime> Registrar for GlobalRegistrar<'_, R> {
     fn register(&self, key: Shortcut) -> Result<(), String> {
@@ -218,6 +304,9 @@ impl<R: Runtime> Registrar for GlobalRegistrar<'_, R> {
     }
 }
 async fn run_action<R: Runtime>(app: &AppHandle<R>, action: u8) {
+    if !STATE.lock().unwrap().nr_ready {
+        return;
+    }
     let result = match action {
         1 => toggle_nr(app).await,
         2 => {
@@ -263,11 +352,9 @@ fn apply_settings(
     registrar: &impl Registrar,
     persist: impl FnOnce(&Settings) -> Result<(), String>,
 ) -> Result<(), String> {
-    let mut desired = bindings(&next)?;
-    if state.capture.is_some() {
-        desired.clear();
-    }
+    let desired = desired_bindings(state, &next)?;
     let previous: Vec<_> = state.owned.values().copied().collect();
+    let registrar = &Logged(registrar, "the shortcut setting changed");
     if let Err(error) =
         replace_bindings(registrar, &mut state.owned, &desired).and_then(|_| persist(&next))
     {
@@ -302,22 +389,24 @@ pub fn initialize<R: Runtime>(app: &AppHandle<R>) {
             }
         }
     }
-    for key in bindings(&state.settings).unwrap_or_default() {
-        match GlobalRegistrar(app).register(key) {
-            Ok(()) => {
-                state.owned.insert(key.id(), key);
-            }
-            Err(error) => log::warn!("NR shortcut unavailable at startup: {error}"),
-        }
-    }
     drop(state);
     gamepad::start(app);
+    // the keys wait for the DLSS NR status: registered only for an installed and usable component
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        let status = crate::native_components::providers::nvidia_dlssnr::component_get_status().await;
+        if let Err(error) = &status {
+            log::warn!("DLSS NR status at startup unavailable: {error}");
+        }
+        note_component_status(&app, status.as_ref().ok(), "startup");
+    });
 }
 // Restore from current settings, including edits made by another manager window.
 fn finish_capture(state: &mut OverlayState, registrar: &impl Registrar) -> Result<(), String> {
     state.capture = None;
     gamepad::wake();
-    replace_bindings(registrar, &mut state.owned, &bindings(&state.settings)?)
+    let desired = desired_bindings(state, &state.settings.clone())?;
+    replace_bindings(&Logged(registrar, "shortcut recording finished"), &mut state.owned, &desired)
 }
 #[tauri::command]
 pub async fn nr_overlay_capture_shortcut(
@@ -328,8 +417,9 @@ pub async fn nr_overlay_capture_shortcut(
     let mut state = STATE.lock().unwrap();
     if active {
         let previous: Vec<_> = state.owned.values().copied().collect();
-        if let Err(error) = replace_bindings(&GlobalRegistrar(&app), &mut state.owned, &[]) {
-            replace_bindings(&GlobalRegistrar(&app), &mut state.owned, &previous)
+        let recording = Logged(&GlobalRegistrar(&app), "recording a shortcut");
+        if let Err(error) = replace_bindings(&recording, &mut state.owned, &[]) {
+            replace_bindings(&recording, &mut state.owned, &previous)
                 .map_err(|_| "nr_shortcut_restore_failed")?;
             return Err(error);
         }
@@ -589,7 +679,7 @@ mod tests {
     }
     #[test]
     fn conflict_and_persistence_failure_keep_previous_bindings() {
-        let mut state = OverlayState::default();
+        let mut state = OverlayState { nr_ready: true, ..OverlayState::default() };
         let old = bindings(&state.settings).unwrap()[0];
         state.owned.insert(old.id(), old);
         let new: Shortcut = "Ctrl+Alt+KeyK".parse().unwrap();
@@ -624,7 +714,7 @@ mod tests {
     }
     #[test]
     fn capture_restores_latest_bindings() {
-        let mut state = OverlayState::default();
+        let mut state = OverlayState { nr_ready: true, ..OverlayState::default() };
         let fake = Fake {
             keys: RefCell::new(vec![]),
             conflict: None,
@@ -651,7 +741,7 @@ mod tests {
         let old: Settings =
             serde_json::from_str(r#"{"nrShortcut":"Ctrl+Alt+KeyN","opacity":62}"#).unwrap();
         assert_eq!(old, Settings::default());
-        let mut state = OverlayState::default();
+        let mut state = OverlayState { nr_ready: true, ..OverlayState::default() };
         let fake = Fake {
             keys: RefCell::new(vec![]),
             conflict: None,
@@ -674,6 +764,49 @@ mod tests {
         };
         assert!(apply_settings(&mut state, duplicate, &fake, |_| Ok(())).is_err());
         assert_eq!(state.settings.overlay_gamepad, "LB+RB+Y");
+    }
+    fn status(installed: bool, host_supported: bool, adapter_present: bool) -> crate::native_components::providers::EnhancementComponentStatus {
+        crate::native_components::providers::EnhancementComponentStatus { installed, host_supported, adapter_present, ..Default::default() }
+    }
+    #[test]
+    fn shortcuts_only_for_an_installed_and_usable_dlss_nr() {
+        assert_eq!(shortcuts_wanted(Some(&status(true, true, true))), (true, "DLSS NR installed and usable"));
+        assert!(!shortcuts_wanted(Some(&status(false, true, true))).0);
+        assert!(!shortcuts_wanted(Some(&status(true, false, true))).0);
+        assert!(!shortcuts_wanted(Some(&status(true, true, false))).0);
+        assert_eq!(shortcuts_wanted(None), (false, "DLSS NR status unknown"));
+    }
+    #[test]
+    fn readiness_registers_after_install_and_releases_on_uninstall_keeping_the_bindings() {
+        let mut state = OverlayState::default();
+        let fake = Fake { keys: RefCell::new(vec![]), conflict: None };
+        // not ready: a settings change is stored but holds no key
+        let next = Settings { overlay_shortcut: "Ctrl+Alt+KeyO".into(), ..Settings::default() };
+        apply_settings(&mut state, next.clone(), &fake, |_| Ok(())).unwrap();
+        assert!(fake.keys.borrow().is_empty());
+        assert_eq!(state.settings, next);
+        // installed: both stored keys are registered
+        assert!(set_ready(&mut state, true, &fake, "install: DLSS NR installed and usable"));
+        let both: Vec<u32> = bindings(&next).unwrap().iter().map(|k| k.id()).collect();
+        assert_eq!(fake.keys.borrow().len(), 2);
+        assert!(both.iter().all(|id| fake.keys.borrow().contains(id)));
+        assert!(!set_ready(&mut state, true, &fake, "status"));
+        // uninstalled: released, the bindings stay stored for a reinstall
+        assert!(set_ready(&mut state, false, &fake, "uninstall: DLSS NR not installed"));
+        assert!(fake.keys.borrow().is_empty() && state.owned.is_empty());
+        assert_eq!(state.settings, next);
+        assert!(set_ready(&mut state, true, &fake, "install"));
+        assert_eq!(fake.keys.borrow().len(), 2);
+    }
+    #[test]
+    fn a_key_held_by_another_app_does_not_keep_the_other_back() {
+        let mut state = OverlayState { settings: Settings { overlay_shortcut: "Ctrl+Alt+KeyO".into(), ..Settings::default() }, ..OverlayState::default() };
+        let taken: Shortcut = "Ctrl+Alt+KeyN".parse().unwrap();
+        let fake = Fake { keys: RefCell::new(vec![]), conflict: Some(taken.id()) };
+        set_ready(&mut state, true, &fake, "install");
+        let overlay: Shortcut = "Ctrl+Alt+KeyO".parse().unwrap();
+        assert_eq!(*fake.keys.borrow(), vec![overlay.id()]);
+        assert!(!state.owned.contains_key(&taken.id()));
     }
     #[test]
     fn hidden_shortcut_never_redirects_an_expired_target() {

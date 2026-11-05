@@ -18,11 +18,14 @@ use tauri::{AppHandle, Manager, Runtime, WebviewWindow, WindowEvent};
 
 #[cfg(target_os = "windows")]
 mod display;
+mod dpi_cover;
 const DISPLAY_DEBOUNCE: Duration = Duration::from_millis(300);
 
 const STARTUP_GRACE: Duration = Duration::from_secs(90);
 const HEARTBEAT_TIMEOUT: Duration = Duration::from_secs(30);
 const MAX_RECOVERIES: u8 = 3;
+/// Fallback delay between the page's load event and showing its window.
+const SHOW_AFTER_LOAD: Duration = Duration::from_millis(120);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Phase {
@@ -262,31 +265,78 @@ impl Panel {
             state.loaded()
         };
         if let Some(revision) = show_revision {
-            let panel = self.clone();
-            tauri::async_runtime::spawn(async move {
-                tokio::time::sleep(Duration::from_millis(120)).await;
-                let handle = window.clone();
-                let _ = window.run_on_main_thread(move || {
-                    let show = {
-                        let state = panel.state.lock().unwrap();
-                        state.phase != Phase::Closed && state.show_revision == revision
-                    };
-                    if show && !handle.is_minimized().unwrap_or(true) {
-                        super::show_and_activate_window(&handle);
-                    }
-                });
-            });
+            // Fallback only: the renderer normally shows its window itself, through
+            // `content_ready`, long before the load event of every frame inside it.
+            self.present_after(window, revision, SHOW_AFTER_LOAD);
         } else {
             // A reloaded page has a fresh JS realm even if native visibility
             // hasn't changed. Reapply its state, without requesting focus.
             reconcile(&window, self);
         }
     }
+
+    /// The renderer mounted its first view: show the window now. WebView2 paints
+    /// over the window's surface colour, so no frame of the page needs to exist yet.
+    pub(super) fn content_ready<R: Runtime>(&self, window: WebviewWindow<R>) {
+        let show_revision = {
+            let mut state = self.state.lock().unwrap();
+            if state.phase == Phase::Closed {
+                return;
+            }
+            state.loaded()
+        };
+        if let Some(revision) = show_revision {
+            self.present_after(window, revision, Duration::ZERO);
+        }
+    }
+
+    fn present_after<R: Runtime>(&self, window: WebviewWindow<R>, revision: u64, delay: Duration) {
+        let panel = self.clone();
+        tauri::async_runtime::spawn(async move {
+            if !delay.is_zero() {
+                tokio::time::sleep(delay).await;
+            }
+            let handle = window.clone();
+            let _ = window.run_on_main_thread(move || {
+                let show = {
+                    let state = panel.state.lock().unwrap();
+                    state.phase != Phase::Closed && state.show_revision == revision
+                };
+                if show && !handle.is_minimized().unwrap_or(true) {
+                    super::show_and_activate_window(&handle);
+                }
+            });
+        });
+    }
+}
+
+/// The page's layout matches the window again after a change of scale: the cover over it may go (`token` says which cover).
+#[cfg(target_os = "windows")]
+pub(super) fn dpi_settled<R: Runtime>(window: &WebviewWindow<R>, token: u64) {
+    display::post_settled(window, token);
+}
+
+#[cfg(target_os = "windows")]
+pub(super) use display::log_default_background;
+
+#[cfg(not(target_os = "windows"))]
+pub(super) fn dpi_settled<R: Runtime>(_window: &WebviewWindow<R>, _token: u64) {}
+
+/// The page is being used: a warm snapshot waits.
+pub(super) fn note_activity() {
+    #[cfg(target_os = "windows")]
+    display::note_activity();
 }
 
 pub(super) fn heartbeat(label: &str, generation: u64) {
     if let Some(panel) = get(label).filter(|panel| panel.generation == generation) {
         panel.state.lock().unwrap().heartbeat(Instant::now());
+    }
+}
+
+pub(super) fn content_ready<R: Runtime>(window: &WebviewWindow<R>) {
+    if let Some(panel) = get(window.label()) {
+        panel.content_ready(window.clone());
     }
 }
 
@@ -520,6 +570,17 @@ mod tests {
         assert!(!state.current(new));
         assert!(state.suspend_completed(latest));
         assert_eq!(state.phase, Phase::Background);
+    }
+
+    #[test]
+    fn the_first_of_content_ready_and_page_load_shows_the_window_once() {
+        let now = Instant::now();
+        let mut state = State::new(true, now);
+        assert_eq!(state.loaded(), Some(0)); // the renderer's first view
+        assert_eq!(state.phase, Phase::Active);
+        assert_eq!(state.loaded(), None); // the load event of its frames, later
+        let mut hidden = State::new(false, now);
+        assert_eq!(hidden.loaded(), None); // a window that starts hidden never shows itself
     }
 
     #[test]

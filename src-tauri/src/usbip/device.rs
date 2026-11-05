@@ -221,7 +221,7 @@ fn find_usbip_uninstall_string() -> Result<Option<String>, String> {
 /// the next install — but it is still reported so the user can retry.
 #[cfg(target_os = "windows")]
 pub(super) async fn cleanup_broken_transport() -> Result<(), String> {
-    crate::dualsense::ensure_no_active_session()
+    super::install::ensure_no_active_session()
         .await
         .map_err(|_| {
             "USBIP-CLEAN-001: finish the active Sunshine stream before cleaning up the transport"

@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from './notifyMessage.js'
 import { vdd } from '../tauri-adapter.js'
 
 const VALID_EDID_SIZES = [128, 256]
@@ -171,9 +171,10 @@ export function useVddEdid({ t, settings }) {
         t.value.vddSettings.deleteEdidConfirm,
         t.value.vddSettings.deleteEdidTitle,
         {
-          confirmButtonText: t.value.systemTools.confirm,
+          confirmButtonText: t.value.systemTools.delete,
           cancelButtonText: t.value.systemTools.cancel,
           type: 'warning',
+          danger: true,
         }
       )
 

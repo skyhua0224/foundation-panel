@@ -1,0 +1,8 @@
+/* Pressed feedback at pointerdown for the controls that had none (measured: tools/perf pressed audit on the Skyindows panel). The M3 pressed
+   state is a 10% layer of the content colour: it darkens on a light surface and lightens on a dark one. A filter reaches every control whatever
+   its own background, and nothing animates, so it lands on the first frame after the press. Controls with their own :active style are not listed. */
+:root { --panel-pressed-filter: brightness(0.9); }
+:root[data-bs-theme='dark'], :root.dark { --panel-pressed-filter: brightness(1.16); }
+:is(.m-caption-connect, .m-dcard, .m-dadd, .m-dcard__more, .m-dapps__app, .m-dquick__btn, .m-chipset__chip, .m-conn__link, .m-dpill, .m-item--action, .m-sprompt__btn, .m-sprompt__later):active:not(:disabled) {
+  filter: var(--panel-pressed-filter);
+}

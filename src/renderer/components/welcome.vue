@@ -1,602 +1,109 @@
 <template>
-  <div class="welcome-page">
-    <div class="language-selector">
-      <select v-model="currentLocale" @change="handleLocaleChange">
-        <option v-for="loc in supportedLocales" :key="loc.code" :value="loc.code">
-          {{ loc.name }}
-        </option>
-      </select>
-    </div>
-
-    <div class="container">
-      <div class="welcome-header">
-        <img src="../public/gura-pix.png" class="welcome-image" alt="Sunshine" />
-        <h1 class="welcome-title">{{ t('greeting') }}</h1>
-      </div>
-
-      <div class="welcome-card">
-        <p class="welcome-subtitle">{{ t('create_creds') }}</p>
-
-        <div class="alert-box">
-          <span class="alert-icon">⚠</span>
-          <span>{{ t('create_creds_alert') }}</span>
-        </div>
-
-        <form @submit.prevent="handleSubmit" class="welcome-form">
-          <div class="form-group">
-            <label for="usernameInput">{{ t('username') }}</label>
-            <input
-              id="usernameInput"
-              v-model="formData.username"
-              type="text"
-              autocomplete="username"
-              :placeholder="t('username')"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="passwordInput">{{ t('password') }}</label>
-            <input
-              id="passwordInput"
-              v-model="formData.password"
-              type="password"
-              autocomplete="new-password"
-              :placeholder="t('password')"
-              required
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="confirmPasswordInput">{{ t('confirm_password') }}</label>
-            <input
-              id="confirmPasswordInput"
-              v-model="formData.confirmPassword"
-              type="password"
-              :class="{ error: showPasswordError }"
-              autocomplete="new-password"
-              :placeholder="t('confirm_password')"
-              required
-            />
-            <transition name="fade">
-              <div v-if="showPasswordError" class="error-message">✗ {{ t('password_mismatch') }}</div>
-            </transition>
-            <transition name="fade">
-              <div v-if="showPasswordSuccess" class="success-message">✓ {{ t('password_match') }}</div>
-            </transition>
-          </div>
-
-          <button type="submit" class="btn" :class="{ 'btn-loading': loading }" :disabled="loading || !isFormValid">
-            <span v-if="!loading">{{ t('login') }}</span>
-          </button>
-
-          <transition name="fade">
-            <div v-if="errorMessage" class="message error">{{ errorMessage }}</div>
-          </transition>
-          <transition name="fade">
-            <div v-if="successMessage" class="message success">{{ successMessage }}</div>
-          </transition>
-        </form>
-      </div>
-    </div>
+  <MOnboardWindow :mode="onboardMode" :label="accountTexts?.title || ''" @close="closeGuide">
+  <div class="panel-guide">
+    <MLoading v-if="state.account.exists === null || consentShow === null" class="panel-guide__loading" />
+    <MGuideFlow
+      v-else
+      :steps="steps"
+      :state="flowState"
+      :callbacks="callbacks"
+      :locale="locale"
+      :texts="accountTexts"
+      :storage-key="GUIDE_STORAGE_KEY"
+      :qr="qrMatrix"
+      :required="state.account.exists ? [] : ['account']"
+      @close="closeGuide"
+      @finish="closeGuide"
+    >
+    </MGuideFlow>
   </div>
+  </MOnboardWindow>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
-import { supportedLocales, setLocale as setI18nLocale, getDefaultLocale, useWelcomeI18n } from '../../i18n/index.js'
-import { sunshine } from '../tauri-adapter.js'
+import { computed, onMounted, ref, watch } from 'vue'
+import QRCode from 'qrcode'
+import { invoke } from '@tauri-apps/api/core'
+import { MGuideFlow, MLoading, MOnboardWindow, buildGuideSteps, useTelemetryConsent } from 'foundation-ui/vue'
+import { supportedLocales, setLocaleChoice as setWelcomeChoice, localeChoice, systemLocale, useWelcomeI18n } from '../../i18n/index.js'
+import { useI18n as useDesktopI18n } from '../desktop/i18n/index.js'
+import { telemetryApi } from '../composables/telemetryApi.js'
+import { openExternalUrl, sunshine } from '../tauri-adapter.js'
+import { GUIDE_DISMISSED_KEY, GUIDE_STORAGE_KEY, createGuideData } from '../composables/guideData.js'
+import { useHostReach } from '../composables/useHostReach.js'
+import { useUpdateSource } from '../composables/useUpdateSource.js'
 
-const REDIRECT_DELAY = 2000
-
+// The guided first run of the panel. It opens by itself on a first run, when the host serves its account page (no account yet), and from
+// the help page. The account step is part of the flow only while the host has no account.
+const emit = defineEmits(['close', 'webui-navigate'])
 const { t, locale } = useWelcomeI18n()
 
-const currentLocale = ref(locale.value)
-const formData = ref({ username: 'sunshine', password: '', confirmPassword: '' })
-const loading = ref(false)
-const errorMessage = ref('')
-const successMessage = ref('')
+// The language is chosen on the first screen of the flow (跟随系统 by default) and applies at once, to the flow and to the shell; the usage-count question is the step after it, only where it was not answered before
+const desktop = useDesktopI18n()
+const telemetry = useTelemetryConsent({ api: telemetryApi })
+const consentShow = ref(null) // settled once the host has answered: it does not change while the person answers
 
-const passwordsMatch = computed(() => {
-  const { password, confirmPassword } = formData.value
-  return !password || !confirmPassword || password === confirmPassword
+const data = createGuideData({
+  proxyUrl: () => sunshine.getProxyUrl(),
+  vddStatus: () => invoke('get_vdd_status'),
+  activeSessions: () => sunshine.getActiveSessions(),
+  openUrl: (url) => openExternalUrl(url),
+  copy: (text) => navigator.clipboard.writeText(text),
+  reach: useHostReach(),
+  // The apps page of the Web UI takes the request from the address (#guide-scan, #guide-add, #guide-restore)
+  openApps: (mode) => emit('webui-navigate', `/apps#guide-${mode}`),
+})
+const { state, probeAccount } = data
+// the update method (the last step): the same source and CDK the 更新 page keeps; the CDK itself stays in the native side
+const updateSource = useUpdateSource()
+const flowState = computed(() => ({
+  ...state,
+  locale: { choice: localeChoice.value, resolved: systemLocale(), languages: supportedLocales },
+  consent: { value: telemetry.consent.value, show: consentShow.value === true },
+  update: { source: updateSource.source.value, available: updateSource.available.value, cdk: true, hasCdk: updateSource.hasCdk.value, status: updateSource.status.value, lastValid: updateSource.lastValid.value, busy: updateSource.busy.value },
+}))
+const callbacks = {
+  ...data.callbacks,
+  createAccount: data.createAccount(t),
+  setLocale: (choice) => { setWelcomeChoice(choice); desktop.setChoice(choice) },
+  setConsent: (value) => telemetry.answer(value),
+  loadUpdate: () => updateSource.refresh(),
+  setUpdateSource: (value) => updateSource.setSource(value),
+  saveCdk: async (cdk) => ({ ok: await updateSource.saveCdk(cdk) }),
+  clearCdk: () => updateSource.clearCdk(),
+}
+const steps = computed(() => buildGuideSteps({ skip: [...(state.account.exists ? ['account'] : []), ...(consentShow.value === false ? ['consent'] : [])] }))
+const qrMatrix = (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules
+
+// The credential form keeps the texts of the welcome page, in every language it has. The title and the lead of the step say it is the Web UI account (the shared
+// texts do that in Chinese and English); the other languages keep the welcome page's own words
+const accountTexts = computed(() => {
+  void locale.value
+  const shared = /^(zh|en)/i.test(String(locale.value))
+  return {
+    ...(shared ? {} : { titles: { account: t('greeting') }, leads: { account: t('create_creds') } }),
+    account: {
+      username: t('username'), password: t('password'), confirm: t('confirm_password'),
+      mismatch: t('password_mismatch'), match: t('password_match'),
+      ...(shared ? {} : { create: t('login'), note: t('create_creds_alert'), local: t('creds_local_only') }),
+    },
+  }
 })
 
-const showPasswordError = computed(() => !passwordsMatch.value && formData.value.confirmPassword)
-
-const showPasswordSuccess = computed(() => 
-  passwordsMatch.value && formData.value.confirmPassword && formData.value.password
-)
-
-const isFormValid = computed(() => {
-  const { username, password, confirmPassword } = formData.value
-  return username && password && confirmPassword && passwordsMatch.value
-})
-
-watch(locale, (val) => { currentLocale.value = val })
-
-watch(currentLocale, (val) => {
-  if (locale.value !== val) {
-    setI18nLocale(val)
-    locale.value = val
-  }
-})
-
-const handleLocaleChange = () => setI18nLocale(currentLocale.value)
-
-const handleSubmit = async () => {
-  errorMessage.value = ''
-  successMessage.value = ''
-
-  if (!passwordsMatch.value) {
-    errorMessage.value = t('password_mismatch')
-    return
-  }
-
-  const { username, password, confirmPassword } = formData.value
-  if (!username || !password || !confirmPassword) {
-    errorMessage.value = `${t('error')} ${t('create_creds')}`
-    return
-  }
-
-  loading.value = true
-
-  try {
-    const proxyUrl = await sunshine.getProxyUrl()
-    const response = await fetch(`${proxyUrl}/api/password`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        newUsername: username, 
-        newPassword: password, 
-        confirmNewPassword: confirmPassword 
-      }),
-    })
-
-    const result = await response.json()
-
-    if (result.status?.toString() === 'true') {
-      successMessage.value = `${t('success')} ${t('welcome_success')}`
-      setTimeout(() => {
-        window.location.href = `${proxyUrl}/`
-      }, REDIRECT_DELAY)
-    } else {
-      errorMessage.value = `${t('error')} ${result.error || t('server_error')}`
-    }
-  } catch (err) {
-    console.error('Failed to save password:', err)
-    errorMessage.value = `${t('error')} ${err.message || t('network_error')}`
-  } finally {
-    loading.value = false
-  }
+// the presentation of the first-run window: the floating dialog (default) or the bottom sheet; ?onboard=sheet previews the other
+const onboardMode = 'dialog'
+const closeGuide = () => {
+  try { window.sessionStorage.setItem(GUIDE_DISMISSED_KEY, '1') } catch { /* not remembered */ }
+  emit('close')
 }
 
-onMounted(() => {
-  const defaultLocale = getDefaultLocale()
-  currentLocale.value = defaultLocale
-  setI18nLocale(defaultLocale)
+onMounted(async () => {
+  await Promise.all([probeAccount(), telemetry.refresh().then(() => { consentShow.value = telemetry.consent.value === 'ask' })])
 })
 </script>
 
-<style lang="less" scoped>
-@font-face {
-  font-family: 'PixelMplus12';
-  src: url('../public/fonts/PixelMplus12-Bold.woff2') format('woff2');
-  font-weight: 700;
-}
-
-// Color Palette
-@gura-blue: #4a9eff;
-@gura-light-blue: #7ab8ff;
-@gura-pale-blue: #a2d2ff;
-@gura-bg-light: #f0f8ff;
-@gura-bg-mid: #e6f2ff;
-@gura-text: #3a7ed5;
-@error: #ff4444;
-@success: #44ff44;
-@shadow: rgba(74, 158, 255, 0.3);
-
-// Dark theme colors
-@dark-bg: #2d2628;
-@dark-bg-mid: #3d3235;
-@dark-card: rgba(45, 38, 40, 0.95);
-@dark-border: #8b6f5e;
-@dark-border-hover: #a68b7a;
-@dark-text: #e6d5b8;
-@dark-text-secondary: #d4c4b0;
-
-// Mixins
-.pixel-rendering() {
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
-}
-
-.pixel-font() {
-  font-family: 'PixelMplus12', 'YouYuan', monospace;
-}
-
-.welcome-page {
-  .pixel-font();
-  background: linear-gradient(135deg, @gura-bg-light 0%, @gura-bg-mid 50%, #d4e8ff 100%);
-  height: 100vh;
-  max-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0.5rem 1rem;
-  position: relative;
-  overflow: hidden;
-}
-
-.container {
-  max-width: 480px;
-  width: 100%;
-  text-align: center;
-  position: relative;
-  z-index: 1;
-}
-
-.welcome-header {
-  margin-bottom: 0.75rem;
-}
-
-.welcome-image {
-  width: 50%;
-  max-width: 120px;
-  opacity: 0.85;
-  margin-bottom: 0.5rem;
-  animation: gura-float 2s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  filter: drop-shadow(0 4px 12px @shadow);
-  .pixel-rendering();
-}
-
-@keyframes gura-float {
-  0%, 100% { transform: translateY(0) rotate(0deg); }
-  25% { transform: translateY(-10px) rotate(2deg); }
-  50% { transform: translateY(-5px) rotate(-2deg); }
-  75% { transform: translateY(-8px) rotate(1deg); }
-}
-
-.welcome-title {
-  .pixel-font();
-  font-size: 1.1rem;
-  color: @gura-blue;
-  margin: 0;
-  text-shadow: 1px 1px 3px fade(@gura-blue, 30%), 2px 2px 0 fade(@gura-blue, 20%);
-  letter-spacing: 1px;
-  transform: skew(-2deg);
-}
-
-.welcome-card {
-  background: rgba(255, 255, 255, 0.9);
-  border: 3px solid @gura-blue;
-  padding: 1rem 1.25rem;
-  box-shadow: 0 8px 16px fade(@gura-blue, 20%), inset 0 1px 0 rgba(255, 255, 255, 0.5);
-  .pixel-rendering();
-}
-
-.welcome-subtitle {
-  .pixel-font();
-  font-size: 0.85rem;
-  color: @gura-text;
-  margin: 0 0 0.75rem;
-  line-height: 1.4;
-  text-shadow: 1px 1px 2px fade(@gura-blue, 20%);
-  letter-spacing: 0.5px;
-}
-
-.alert-box {
-  background: fade(@gura-pale-blue, 30%);
-  border: 2px solid @gura-light-blue;
-  border-left: 4px solid @gura-blue;
-  padding: 0.5rem 0.75rem;
-  margin-bottom: 0.75rem;
-  .pixel-font();
-  font-size: 0.75rem;
-  color: @gura-text;
-  text-align: left;
-  display: flex;
-  align-items: flex-start;
-  gap: 0.4rem;
-  line-height: 1.3;
-  text-shadow: 1px 1px 2px fade(@gura-blue, 15%);
-
-  .alert-icon {
-    font-size: 1rem;
-    line-height: 1;
-    flex-shrink: 0;
-  }
-}
-
-.welcome-form {
-  text-align: left;
-}
-
-.form-group {
-  margin-bottom: 0.75rem;
-}
-
-label {
-  display: block;
-  margin-bottom: 0.3rem;
-  .pixel-font();
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: @gura-text;
-  letter-spacing: 0.5px;
-  text-shadow: 1px 1px 2px fade(@gura-blue, 20%);
-}
-
-input {
-  width: 100%;
-  padding: 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.95);
-  border: 3px solid @gura-light-blue;
-  color: @gura-text;
-  font-size: 0.8rem;
-  .pixel-font();
-  transition: border-color 0.2s, box-shadow 0.2s;
-  .pixel-rendering();
-
-  &::placeholder {
-    color: fade(@gura-text, 50%);
-  }
-
-  &:focus {
-    outline: none;
-    border-color: @gura-blue;
-    box-shadow: 0 0 0 4px fade(@gura-blue, 20%), inset 0 2px 4px rgba(0, 0, 0, 0.05);
-  }
-
-  &.error {
-    border-color: @error;
-    background: rgba(255, 240, 240, 0.95);
-    animation: shake 0.3s;
-  }
-}
-
-@keyframes shake {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-4px); }
-  75% { transform: translateX(4px); }
-}
-
-.error-message,
-.success-message {
-  margin-top: 0.3rem;
-  .pixel-font();
-  font-size: 0.7rem;
-  letter-spacing: 0.5px;
-}
-
-.error-message {
-  color: @error;
-  text-shadow: 1px 1px 2px fade(@error, 30%);
-}
-
-.success-message {
-  color: @success;
-  text-shadow: 1px 1px 2px fade(@success, 30%);
-}
-
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 0.3s;
-}
-
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
-}
-
-.btn {
-  width: 100%;
-  padding: 0.65rem 1rem;
-  background: @gura-blue;
-  color: #fff;
-  border: 3px solid darken(@gura-blue, 10%);
-  font-size: 0.85rem;
-  font-weight: 700;
-  .pixel-font();
-  letter-spacing: 1px;
-  cursor: pointer;
-  transition: all 0.2s;
-  position: relative;
-  box-shadow: 0 4px 0 darken(@gura-blue, 20%), 0 6px 12px @shadow;
-  text-shadow: 1px 1px 2px fade(#000, 30%);
-  .pixel-rendering();
-  margin-top: 0.5rem;
-
-  &:hover:not(:disabled) {
-    background: @gura-light-blue;
-    transform: translateY(-2px);
-    box-shadow: 0 6px 0 darken(@gura-blue, 20%), 0 8px 16px fade(@gura-blue, 40%);
-  }
-
-  &:active:not(:disabled) {
-    transform: translateY(2px);
-    box-shadow: 0 2px 0 darken(@gura-blue, 20%), 0 4px 8px fade(@gura-blue, 30%);
-  }
-
-  &:disabled {
-    opacity: 0.6;
-    cursor: not-allowed;
-  }
-
-  &-loading {
-    color: transparent;
-
-    &::after {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      width: 20px;
-      height: 20px;
-      margin: -10px 0 0 -10px;
-      border: 3px solid fade(#fff, 30%);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-  }
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.message {
-  margin-top: 0.75rem;
-  padding: 0.6rem 0.75rem;
-  text-align: center;
-  .pixel-font();
-  font-size: 0.75rem;
-  border: 2px solid;
-  letter-spacing: 0.5px;
-  text-shadow: 1px 1px 2px fade(#000, 20%);
-
-  &.error {
-    background: rgba(255, 240, 240, 0.9);
-    color: @error;
-    border-color: @error;
-  }
-
-  &.success {
-    background: rgba(240, 255, 240, 0.9);
-    color: @success;
-    border-color: @success;
-  }
-}
-
-.language-selector {
-  position: absolute;
-  top: 2rem;
-  right: 1rem;
-  z-index: 10;
-
-  select {
-    padding: 0.5rem 0.875rem;
-    background: rgba(255, 255, 255, 0.95);
-    border: 3px solid @gura-light-blue;
-    color: @gura-text;
-    font-size: 0.875rem;
-    .pixel-font();
-    font-weight: 700;
-    cursor: pointer;
-    transition: border-color 0.2s, box-shadow 0.2s;
-    box-shadow: 0 2px 4px fade(@gura-blue, 20%);
-    .pixel-rendering();
-
-    &:hover {
-      border-color: @gura-blue;
-      box-shadow: 0 4px 8px fade(@gura-blue, 30%);
-    }
-
-    &:focus {
-      outline: none;
-      border-color: @gura-blue;
-      box-shadow: 0 0 0 4px fade(@gura-blue, 20%);
-    }
-  }
-}
-
-// Dark theme
-[data-bs-theme='dark'] .welcome-page {
-  background: linear-gradient(135deg, @dark-bg 0%, @dark-bg-mid 50%, #4a3f42 100%);
-
-  .welcome-image {
-    filter: drop-shadow(0 4px 12px rgba(212, 165, 165, 0.3));
-  }
-
-  .welcome-title {
-    color: @dark-text;
-    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.4), 2px 2px 0 rgba(0, 0, 0, 0.3);
-  }
-
-  .welcome-card {
-    background: @dark-card;
-    border-color: @dark-border;
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-  }
-
-  .welcome-subtitle {
-    color: @dark-text-secondary;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-  }
-
-  .alert-box {
-    background: rgba(61, 50, 53, 0.6);
-    border-color: @dark-border;
-    border-left-color: @dark-border-hover;
-    color: @dark-text;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-  }
-
-  label {
-    color: @dark-text-secondary;
-    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
-  }
-
-  input {
-    background: @dark-card;
-    border-color: @dark-border;
-    color: @dark-text;
-
-    &::placeholder {
-      color: fade(@dark-text-secondary, 50%);
-    }
-
-    &:focus {
-      border-color: @dark-border-hover;
-      box-shadow: 0 0 0 4px fade(@dark-border-hover, 20%), inset 0 2px 4px rgba(0, 0, 0, 0.2);
-    }
-
-    &.error {
-      background: rgba(61, 38, 40, 0.95);
-      border-color: #ff6666;
-    }
-  }
-
-  .btn {
-    background: @dark-border;
-    border-color: #6b5548;
-    box-shadow: 0 4px 0 #5a463a, 0 6px 12px rgba(0, 0, 0, 0.4);
-
-    &:hover:not(:disabled) {
-      background: @dark-border-hover;
-      box-shadow: 0 6px 0 #6b5548, 0 8px 16px rgba(0, 0, 0, 0.5);
-    }
-  }
-
-  .message {
-    &.error {
-      background: rgba(61, 38, 40, 0.9);
-      color: #ff6666;
-      border-color: #ff6666;
-    }
-
-    &.success {
-      background: rgba(40, 61, 40, 0.9);
-      color: #66ff66;
-      border-color: #66ff66;
-    }
-  }
-
-  .language-selector select {
-    background: @dark-card;
-    border-color: @dark-border;
-    color: @dark-text;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-
-    &:hover {
-      border-color: @dark-border-hover;
-      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
-    }
-
-    &:focus {
-      border-color: @dark-border-hover;
-      box-shadow: 0 0 0 4px fade(@dark-border-hover, 20%);
-    }
-  }
-}
+<style>
+.panel-guide { min-height: 100dvh; }
+.panel-guide .m-guide { min-height: 100dvh; }
+.panel-guide__loading { margin: 120px auto; }
 </style>

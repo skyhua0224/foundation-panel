@@ -1,5 +1,5 @@
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from './notifyMessage.js'
 import { open } from '@tauri-apps/plugin-dialog'
 import { openExternalUrl, sunshine } from '../tauri-adapter.js'
 
@@ -15,12 +15,13 @@ const emptyStatus = () => ({
   runtime_present: false,
 })
 
-export function useEnhancementManager({ api, messages: text, runtimeName }) {
+export function useEnhancementManager({ api, messages: text, runtimeName, onStatus }) {
   const status = ref(emptyStatus())
   const statusKnown = ref(false)
   const applyStatus = (data) => {
     status.value = { ...emptyStatus(), ...data }
     statusKnown.value = true
+    onStatus?.(status.value)
   }
   const refreshing = ref(false)
   const operation = ref('')
@@ -113,6 +114,7 @@ export function useEnhancementManager({ api, messages: text, runtimeName }) {
     try {
       await ElMessageBox.confirm(text.value.uninstallConfirm, text.value.uninstallTitle, {
         type: 'warning',
+        danger: true,
         confirmButtonText: text.value.uninstall,
       })
     } catch {

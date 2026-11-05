@@ -1,5 +1,5 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage } from './notifyMessage.js'
 import { useRouter, ROUTES } from './useRouter.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { formatMessage } from '../shared/format-message.js'
@@ -107,7 +107,7 @@ export function useSidebarState() {
   const openWelcome = () => router.navigate(ROUTES.WELCOME)
   const openWebStream = () => router.navigate(ROUTES.WEB_STREAM)
   const openAiAssistant = () => router.navigate(ROUTES.AI_ASSISTANT)
-  const openControllers = () => router.navigate(ROUTES.CONTROLLERS)
+  const openControllers = () => router.navigate(ROUTES.GAMEPAD)
   // RTX HDR 的定向入口也进入公共 HDR 管理页；具体实现由页面内的组件卡片负责。
   const openRtxHdr = () => router.navigate(ROUTES.HDR_ENHANCED)
 

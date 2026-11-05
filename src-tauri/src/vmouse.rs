@@ -3,6 +3,10 @@ use log::{debug, info, warn};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+/// The probe starts PowerShell (1.7 s): once for the pages that ask together, kept a few seconds; every command that changes the device drops it.
+static VMOUSE_STATUS: crate::probe_cache::ProbeCache<VmouseStatus> =
+    crate::probe_cache::ProbeCache::new("vmouse status", std::time::Duration::from_secs(8));
+
 #[cfg(target_os = "windows")]
 use crate::bat_runner;
 
@@ -35,9 +39,76 @@ fn get_vmouse_scripts_path() -> PathBuf {
         .join("vmouse")
 }
 
+/// One ROOT\HIDCLASS device node, as the registry and the Configuration Manager show it.
+#[derive(Debug, Clone)]
+struct HidNode {
+    instance_id: String,
+    /// the hardware id of the virtual mouse driver
+    is_vmouse: bool,
+    /// its name or description says "Virtual Mouse" (the old query matched that too)
+    says_virtual_mouse: bool,
+    state: crate::device_probe::NodeState,
+    /// a child node served by mouhid that is started without a problem
+    has_running_mouse_child: bool,
+}
+
+/// What the PowerShell query below answers for the two cases that need no judgement: no node of the driver at all, and one node that is started with
+/// its mouse child running. Any other state (a problem code, a missing child, a node matched only by its name, several nodes) returns None, and the
+/// query that has always answered it answers it.
+fn vmouse_status_from_nodes(nodes: &[HidNode]) -> Option<(bool, bool, String)> {
+    use crate::device_probe::NodeState;
+    if nodes.iter().any(|node| !node.is_vmouse && node.says_virtual_mouse) {
+        return None;
+    }
+    let mut ours = nodes.iter().filter(|node| node.is_vmouse);
+    match (ours.next(), ours.next()) {
+        (None, _) => Some((false, false, "未安装".to_string())),
+        (Some(node), None) if node.state == NodeState::Ok && node.has_running_mouse_child => Some((
+            true,
+            true,
+            format!("Zako Virtual Mouse - 正常运行 ({})", node.instance_id),
+        )),
+        _ => None,
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn native_vmouse_status() -> Option<(bool, bool, String)> {
+    use crate::device_probe as probe;
+    let nodes: Vec<HidNode> = probe::enum_root_devices("HIDCLASS")
+        .ok()?
+        .into_iter()
+        .map(|device| {
+            let is_vmouse = device.hardware_ids.iter().any(|id| id.eq_ignore_ascii_case("Root\\ZakoVirtualMouse"));
+            let says_virtual_mouse = device.friendly_name.to_lowercase().contains("virtual mouse")
+                || device.device_desc.to_lowercase().contains("virtual mouse");
+            let (state, has_running_mouse_child) = if is_vmouse {
+                (
+                    probe::node_state(&device.instance_id),
+                    probe::child_nodes(&device.instance_id)
+                        .map(|children| children.iter().any(|child| child.service.eq_ignore_ascii_case("mouhid") && child.state == probe::NodeState::Ok))
+                        .unwrap_or(false),
+                )
+            } else {
+                (probe::NodeState::Missing, false)
+            };
+            HidNode { instance_id: device.instance_id, is_vmouse, says_virtual_mouse, state, has_running_mouse_child }
+        })
+        .collect();
+    vmouse_status_from_nodes(&nodes)
+}
+
 /// 检查 vmouse 设备节点是否存在
 #[cfg(target_os = "windows")]
 fn check_device_installed() -> (bool, bool, String) {
+    if let Some(answer) = native_vmouse_status() {
+        return answer;
+    }
+    check_device_installed_with_powershell()
+}
+
+#[cfg(target_os = "windows")]
+fn check_device_installed_with_powershell() -> (bool, bool, String) {
     use std::process::Command;
 
     // 使用 PowerShell 的 Get-PnpDevice 检查设备状态。
@@ -57,7 +128,7 @@ fn check_device_installed() -> (bool, bool, String) {
 
     match output {
         Ok(out) => {
-            let stdout = String::from_utf8_lossy(&out.stdout).trim().to_string();
+            let stdout = crate::text_encoding::decode_console_bytes(&out.stdout).trim().to_string();
             if stdout.is_empty() || stdout == "null" {
                 return (false, false, "未安装".to_string());
             }
@@ -96,7 +167,7 @@ fn check_device_installed() -> (bool, bool, String) {
                     .output();
                 let hid_present = hid_output
                     .ok()
-                    .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+                    .map(|out| crate::text_encoding::decode_console_bytes(&out.stdout).trim().to_string())
                     .filter(|stdout| !stdout.is_empty() && stdout != "null")
                     .and_then(|stdout| serde_json::from_str::<serde_json::Value>(&stdout).ok())
                     .map(|hid| {
@@ -175,22 +246,32 @@ fn read_vmouse_config() -> bool {
 /// 获取 vmouse 驱动状态
 #[tauri::command]
 pub async fn get_vmouse_status() -> Result<VmouseStatus, String> {
-    let (installed, running, status_text) = check_device_installed();
-    let driver_path = get_vmouse_tools_path().to_string_lossy().to_string();
-    let config_enabled = read_vmouse_config();
+    VMOUSE_STATUS
+        .get(|| async {
+            // PowerShell is waited for on the blocking pool, not on a worker of the async runtime
+            tokio::task::spawn_blocking(|| {
+                let (installed, running, status_text) = check_device_installed();
+                let driver_path = get_vmouse_tools_path().to_string_lossy().to_string();
+                let config_enabled = read_vmouse_config();
 
-    Ok(VmouseStatus {
-        installed,
-        running,
-        status_text,
-        driver_path,
-        config_enabled,
-    })
+                VmouseStatus {
+                    installed,
+                    running,
+                    status_text,
+                    driver_path,
+                    config_enabled,
+                }
+            })
+            .await
+            .map_err(|error| error.to_string())
+        })
+        .await
 }
 
 /// 安装 vmouse 驱动（复用 install-vmouse.bat）
 #[tauri::command]
 pub async fn install_vmouse_driver() -> Result<String, String> {
+    let _status_changes = VMOUSE_STATUS.invalidating();
     #[cfg(target_os = "windows")]
     {
         let scripts_dir = get_vmouse_scripts_path();
@@ -222,6 +303,7 @@ pub async fn install_vmouse_driver() -> Result<String, String> {
 /// 卸载 vmouse 驱动（复用 uninstall-vmouse.bat）
 #[tauri::command]
 pub async fn uninstall_vmouse_driver() -> Result<String, String> {
+    let _status_changes = VMOUSE_STATUS.invalidating();
     #[cfg(target_os = "windows")]
     {
         let scripts_dir = get_vmouse_scripts_path();
@@ -252,6 +334,7 @@ pub async fn uninstall_vmouse_driver() -> Result<String, String> {
 /// 设置 sunshine.conf 中的 virtual_mouse 配置
 #[tauri::command]
 pub async fn set_vmouse_config(enabled: bool) -> Result<String, String> {
+    let _status_changes = VMOUSE_STATUS.invalidating();
     // /api/config 是整表替换语义：读文件与 POST 之间必须与其他全表写者互斥，
     // 否则并发写者的字段会被旧快照覆盖丢失（见 controller_hub.rs 的锁约定）。
     let _config_guard = crate::device_config::DEVICE_CONFIG_LOCK.lock().await;
@@ -273,4 +356,46 @@ pub async fn set_vmouse_config(enabled: bool) -> Result<String, String> {
         "虚拟鼠标已{}",
         if enabled { "启用" } else { "禁用" }
     ))
+}
+
+#[cfg(test)]
+mod direct_read_tests {
+    use super::*;
+    use crate::device_probe::NodeState;
+
+    fn node(is_vmouse: bool, says: bool, state: NodeState, child: bool) -> HidNode {
+        HidNode { instance_id: r"ROOT\HIDCLASS\0001".to_string(), is_vmouse, says_virtual_mouse: says, state, has_running_mouse_child: child }
+    }
+
+    #[test]
+    fn no_node_of_the_driver_is_not_installed() {
+        let other = node(false, false, NodeState::Missing, false);
+        assert_eq!(vmouse_status_from_nodes(&[]), Some((false, false, "未安装".to_string())));
+        assert_eq!(vmouse_status_from_nodes(&[other]), Some((false, false, "未安装".to_string())));
+    }
+
+    #[test]
+    fn a_started_node_with_its_mouse_child_is_running() {
+        let (installed, running, text) = vmouse_status_from_nodes(&[node(true, true, NodeState::Ok, true)]).unwrap();
+        assert!(installed && running);
+        assert_eq!(text, r"Zako Virtual Mouse - 正常运行 (ROOT\HIDCLASS\0001)");
+    }
+
+    #[test]
+    fn every_other_state_is_left_to_the_powershell_query() {
+        assert_eq!(vmouse_status_from_nodes(&[node(true, true, NodeState::Ok, false)]), None);
+        assert_eq!(vmouse_status_from_nodes(&[node(true, true, NodeState::Error(21), true)]), None);
+        assert_eq!(vmouse_status_from_nodes(&[node(true, true, NodeState::Ok, true), node(true, true, NodeState::Ok, true)]), None);
+        // a node that only its name calls a virtual mouse: the old query would have taken it
+        assert_eq!(vmouse_status_from_nodes(&[node(false, true, NodeState::Missing, false)]), None);
+    }
+
+    /// Run on a machine with the driver installed: `cargo test --bin sunshine-gui -- --ignored vmouse_direct_read_matches_powershell`.
+    #[test]
+    #[ignore]
+    #[cfg(target_os = "windows")]
+    fn vmouse_direct_read_matches_powershell() {
+        let direct = native_vmouse_status().expect("the direct read answers for a running or absent driver");
+        assert_eq!(direct, check_device_installed_with_powershell());
+    }
 }

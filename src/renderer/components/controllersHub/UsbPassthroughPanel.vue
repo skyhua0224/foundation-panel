@@ -1,96 +1,41 @@
 <template>
-  <section class="chub-panel">
+  <div class="m-usb">
     <UsbForwardingSettings :transport-ready="status.ready && !statusProbeFailed" />
     <UsbTransportPanel :transport="transport" />
-    <details class="chub-section chub-disclosure chub-disclosure--section">
-      <summary>
-        <span class="chub-section-label">◈ {{ t.deviceHub.usb.manualTitle }}</span>
-        <span class="chub-section-rule"></span>
-        <span class="chub-disclosure-mark" aria-hidden="true">▸</span>
-      </summary>
-      <p class="chub-hint">{{ t.deviceHub.usb.exporterHint }}</p>
-      <form class="chub-usb-discovery" @submit.prevent="discover">
-        <el-input
-          v-model="remote"
-          :placeholder="t.deviceHub.usb.hostPlaceholder"
-          clearable
-          autocomplete="off"
-          :disabled="!status.ready || discovering"
-        />
-        <el-input-number
-          v-model="tcpPort"
-          :min="1024"
-          :max="65535"
-          :controls="false"
-          :disabled="!status.ready || discovering"
-          :aria-label="t.deviceHub.usb.tcpPortLabel"
-        />
-        <el-button native-type="submit" type="primary" :loading="discovering" :disabled="!canDiscover">
-          {{ t.deviceHub.usb.discover }}
-        </el-button>
+    <MSection>
+      <MGroup>
+        <MItem action icon="folder_open" :title="t.deviceHub.usb.manualTitle" @click="manualOpen = !manualOpen"><template #trail><MInfo :text="t.deviceHub.usb.exporterHint" /><MIcon :name="manualOpen ? 'keyboard_arrow_up' : 'keyboard_arrow_down'" /></template></MItem>
+      </MGroup>
+      <form v-if="manualOpen" class="m-usb__discover" @submit.prevent="discover">
+        <md-outlined-text-field class="m-usb__host" :label="t.deviceHub.usb.hostPlaceholder" :value="remote" autocomplete="off" :disabled="!status.ready || discovering" @input="remote = $event.target.value" />
+        <md-outlined-text-field class="m-port-field" type="number" min="1024" max="65535" :label="t.deviceHub.usb.tcpPortLabel" :value="tcpPort" :disabled="!status.ready || discovering" @input="tcpPort = Number($event.target.value)" />
+        <MButton type="submit" :loading="discovering" :disabled="!canDiscover">{{ t.deviceHub.usb.discover }}</MButton>
       </form>
-
-      <div v-if="discoveryDone" class="chub-usb-list" aria-live="polite">
-        <el-empty v-if="remoteDevices.length === 0" :description="t.deviceHub.usb.noRemoteDevices" :image-size="64" />
-        <article v-for="device in remoteDevices" :key="device.bus_id" class="chub-usb-device">
-          <div class="chub-usb-device-body">
-            <strong>{{ device.description || t.deviceHub.usb.unknownDevice }}</strong>
-            <span>{{ t.deviceHub.usb.busId }} · {{ device.bus_id }}</span>
-            <small v-if="device.details?.length">{{ device.details[0] }}</small>
-          </div>
-          <el-button
-            size="small"
-            type="primary"
-            plain
-            :loading="attachingBusId === device.bus_id"
-            :disabled="operationBusy || !status.ready"
-            @click="attachDevice(device)"
-          >{{ t.deviceHub.usb.attach }}</el-button>
-        </article>
-      </div>
-      <p class="chub-hint">{{ t.deviceHub.usb.securityHint }}</p>
-    </details>
-
-    <div class="chub-section">
-      <div class="chub-section-head">
-        <span class="chub-section-label">◈ {{ t.deviceHub.usb.attachedTitle }}</span>
-        <span class="chub-section-rule"></span>
-        <el-tag size="small" effect="plain" :type="attachedDevices.length ? 'success' : 'info'">
-          {{ attachedDevices.length }}
-        </el-tag>
-      </div>
-      <p class="chub-hint">{{ t.deviceHub.usb.attachedHint }}</p>
-      <el-empty v-if="statusLoaded && attachedDevices.length === 0" :description="t.deviceHub.usb.noAttachedDevices" :image-size="64" />
-      <div v-else class="chub-usb-list">
-        <article v-for="device in attachedDevices" :key="device.port" class="chub-usb-device is-attached">
-          <div class="chub-usb-port">{{ String(device.port).padStart(2, '0') }}</div>
-          <div class="chub-usb-device-body">
-            <strong>{{ device.description || t.deviceHub.usb.unknownDevice }}</strong>
-            <span>{{ device.remote_host }}:{{ device.remote_port }} · {{ device.remote_bus_id }}</span>
-            <small>{{ device.speed }}<template v-if="device.serial"> · {{ device.serial }}</template></small>
-          </div>
-          <el-button
-            size="small"
-            type="danger"
-            plain
-            :loading="detachingPort === device.port"
-            :disabled="operationBusy"
-            @click="detachDevice(device)"
-          >{{ t.deviceHub.usb.detach }}</el-button>
-        </article>
-      </div>
-    </div>
-
-    <div class="chub-context-note">
-      <strong>{{ t.deviceHub.usb.boundaryTitle }}</strong>
-      <span>{{ t.deviceHub.usb.boundaryHint }}</span>
-    </div>
-  </section>
+      <MGroup v-if="manualOpen && discoveryDone" aria-live="polite">
+        <MItem v-if="remoteDevices.length === 0" plain :title="t.deviceHub.usb.noRemoteDevices" />
+        <MItem v-for="device in remoteDevices" :key="device.bus_id" icon="usb" :title="device.description || t.deviceHub.usb.unknownDevice" :text="t.deviceHub.usb.busId + ' · ' + device.bus_id + (device.details?.length ? ' · ' + device.details[0] : '')">
+          <template #trail><MButton size="sm" variant="tonal" :loading="attachingBusId === device.bus_id" :disabled="operationBusy || !status.ready" @click="attachDevice(device)">{{ t.deviceHub.usb.attach }}</MButton></template>
+        </MItem>
+      </MGroup>
+    </MSection>
+    <MSection :title="t.deviceHub.usb.attachedTitle" :description="t.deviceHub.usb.attachedHint">
+      <MEmpty v-if="statusLoaded && attachedDevices.length === 0" icon="usb" :title="t.deviceHub.usb.noAttachedDevices" />
+      <MGroup v-else>
+        <MItem v-for="device in attachedDevices" :key="device.port" icon="usb" tone="success" :title="device.description || t.deviceHub.usb.unknownDevice" :text="device.remote_host + ':' + device.remote_port + ' · ' + device.remote_bus_id + ' · ' + device.speed + (device.serial ? ' · ' + device.serial : '')">
+          <template #trail>
+            <MChip>{{ String(device.port).padStart(2, '0') }}</MChip>
+            <MButton size="sm" variant="danger" :loading="detachingPort === device.port" :disabled="operationBusy" @click="detachDevice(device)">{{ t.deviceHub.usb.detach }}</MButton>
+          </template>
+        </MItem>
+      </MGroup>
+    </MSection>
+  </div>
 </template>
 
 <script setup>
+import { MSection, MGroup, MItem, MNotice, MButton, MIcon, MInfo, MChip, MEmpty } from 'foundation-ui/vue'
 import { computed, ref, watch } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox } from '../../composables/notifyMessage.js'
 import { usbip } from '../../tauri-adapter.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 import { useUsbTransport } from '../../composables/useUsbTransport.js'
@@ -99,6 +44,7 @@ import UsbForwardingSettings from './UsbForwardingSettings.vue'
 import UsbTransportPanel from './UsbTransportPanel.vue'
 
 const { t } = useI18n()
+const manualOpen = ref(false)
 const transport = useUsbTransport()
 const { status, statusLoaded, statusProbeFailed, attachedDevices, refreshStatus, friendlyError, transportBusy } = transport
 const discovering = ref(false)
@@ -159,7 +105,7 @@ async function detachDevice(device) {
     await ElMessageBox.confirm(
       t.value.deviceHub.usb.detachConfirm.replace('{device}', device.description || device.remote_bus_id),
       t.value.deviceHub.usb.detach,
-      { confirmButtonText: t.value.deviceHub.usb.detach, cancelButtonText: t.value.deviceHub.usb.cancel, type: 'warning' },
+      { confirmButtonText: t.value.deviceHub.usb.detach, cancelButtonText: t.value.deviceHub.usb.cancel, type: 'warning', danger: true },
     )
   } catch { return }
   detachingPort.value = device.port

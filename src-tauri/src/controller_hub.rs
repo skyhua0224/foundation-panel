@@ -70,6 +70,25 @@ pub async fn test_virtual_microphone() -> Result<MicrophoneTestResult, String> {
     read_device_api_response(response, "virtual microphone test").await
 }
 
+const MICROPHONE_BACKENDS: [&str; 4] = ["auto", "vb_cable", "usbip_experimental", "disabled"];
+
+/// 保存麦克风重定向后端（写入 sunshine.conf 的 microphone_redirect_backend）。
+#[tauri::command]
+pub async fn save_microphone_backend(backend: String) -> Result<(), String> {
+    if !MICROPHONE_BACKENDS.contains(&backend.as_str()) {
+        return Err(format!("Invalid microphone backend: {backend}"));
+    }
+    let _config_guard = DEVICE_CONFIG_LOCK.lock().await;
+    let mut config = crate::vdd::read_full_sunshine_config().await?;
+    config.insert(
+        "microphone_redirect_backend".to_string(),
+        serde_json::json!(backend),
+    );
+    sunshine::post_sunshine_config(&config).await?;
+    info!("麦克风重定向后端已保存: {backend}");
+    Ok(())
+}
+
 const GAMEPAD_MODES: [&str; 4] = ["auto", "x360", "ds4", "ds5"];
 
 /// 对齐 Sunshine 核心 to_bool 的接受列表（大小写不敏感）
@@ -204,4 +223,17 @@ pub async fn save_controller_hub_config(
     }
     info!("✅ 控制器中心配置已保存: {:?}", changed);
     Ok("saved".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::MICROPHONE_BACKENDS;
+
+    #[test]
+    fn microphone_backends_are_the_four_host_values() {
+        assert_eq!(
+            MICROPHONE_BACKENDS,
+            ["auto", "vb_cable", "usbip_experimental", "disabled"]
+        );
+    }
 }

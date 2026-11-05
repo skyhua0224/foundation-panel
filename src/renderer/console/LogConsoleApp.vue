@@ -129,6 +129,8 @@
         <span class="stat-value">{{ stats.info }}</span>
       </div>
     </div>
+    <MDialogHost :locale="locale" />
+    <MNotifyHost />
   </div>
 </template>
 
@@ -136,8 +138,8 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watchEffect } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { confirm as dialogConfirm, message as dialogMessage } from '@tauri-apps/plugin-dialog'
-import { ElMessage } from 'element-plus'
+import { MDialogHost, MNotifyHost, useDialogs } from 'foundation-ui/vue'
+import { ElMessage } from '../composables/notifyMessage.js'
 import { Document, RefreshRight, Delete, Search, Close, Download } from '@element-plus/icons-vue'
 import { useI18n } from '../desktop/i18n/index.js'
 
@@ -322,14 +324,16 @@ async function loadLogs() {
 
 // 清空日志
 async function clearLogs() {
-  if (await dialogConfirm(logText.value.confirmClear, { title: logText.value.clearLogsTitle, kind: 'warning' })) {
+  // clearing the log is destructive: the error-colour button with the verb
+  const confirmed = await useDialogs().confirm(logText.value.confirmClear, logText.value.clearLogsTitle, { type: 'warning', danger: true, confirmText: logText.value.clear }).then(() => true, () => false)
+  if (confirmed) {
     try {
       await invoke('clear_logs')
       allLogs.value = []
       ElMessage.success(logText.value.logsCleared)
     } catch (error) {
       console.error('清空日志失败:', error)
-      await dialogMessage(`${logText.value.clearFailed}: ${error}`, { title: logText.value.dialogError, kind: 'error' })
+      await useDialogs().alert(`${logText.value.clearFailed}: ${error}`, logText.value.dialogError, { type: 'error' })
     }
   }
 }
@@ -338,11 +342,11 @@ async function clearLogs() {
 async function exportLogs(format) {
   try {
     const result = await invoke('export_logs', { format })
-    await dialogMessage(result || logText.value.exportSuccess, { title: logText.value.exportComplete, kind: 'info' })
+    await useDialogs().alert(result || logText.value.exportSuccess, logText.value.exportComplete, { type: 'info' })
   } catch (error) {
     console.error('导出日志失败:', error)
     if (error && !String(error).includes('用户取消了保存') && !String(error).toLowerCase().includes('cancel')) {
-      await dialogMessage(`${logText.value.exportFailed}: ${error}`, { title: logText.value.dialogError, kind: 'error' })
+      await useDialogs().alert(`${logText.value.exportFailed}: ${error}`, logText.value.dialogError, { type: 'error' })
     }
   }
 }

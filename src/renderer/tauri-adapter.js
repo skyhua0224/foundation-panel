@@ -118,23 +118,13 @@ export const controllerHub = {
 export const virtualMicrophone = {
   getStatus: () => wrapResult('get_virtual_microphone_status'),
   test: () => wrapResult('test_virtual_microphone'),
+  saveBackend: (backend) => wrapResult('save_microphone_backend', { backend }),
 }
 
 export const dualsense = {
   getStatus: () => wrapResult('dualsense_get_status'),
-  logPanelOpened: () => wrapResult('dualsense_log_panel_opened'),
-  install: (packagePaths = []) => wrapResult('dualsense_install', { packagePaths }),
-  uninstall: () => wrapResult('dualsense_uninstall'),
-  setConfig: (audioHaptics, genshinCompatibility) => wrapResult('dualsense_set_config', {
-    audioHaptics: !!audioHaptics,
-    genshinCompatibility: !!genshinCompatibility,
-  }),
-  setHapticsTuning: (strength, curve, noiseGate) => wrapResult('dualsense_set_haptics_tuning', {
-    strength,
-    curve,
-    noiseGate,
-  }),
-  selfTest: (profile) => wrapResult('dualsense_self_test', { profile }),
+  getTuning: () => wrapResult('dualsense_get_tuning'),
+  setTuning: (values) => wrapResult('dualsense_set_tuning', { values }),
 }
 
 export const usbip = {
@@ -186,6 +176,8 @@ export const sunshine = {
   getProxyUrl: () => wrapDefault('get_proxy_url_command', 'http://localhost:48081'),
   waitForProxyReady: () => wrapResult('wait_for_proxy_ready'),
   refreshTarget: () => wrapDefault('refresh_sunshine_target', null),
+  // one probe of the host made by the panel's own process (the WebView's connections to the proxy may be busy): the HTTP status, or a rejection when nothing answered
+  probeHost: (timeoutMs = 2500) => invoke('probe_sunshine_host', { timeoutMs }),
   getActiveSessions: () => wrapDefault('get_active_sessions', []),
   getLocale: () => wrapDefault('get_sunshine_locale', 'en'),
   setLocale: (locale) => invoke('set_sunshine_locale', { locale }),
@@ -197,6 +189,8 @@ export const sunshine = {
 
 export const tools = {
   restartGraphicsDriver: () => invoke('restart_graphics_driver'),
+  // what the operating system says about the host (process, service, whether a stop was asked for): the 「Sunshine 意外停止」 surface is decided on it, not on a silence
+  getHostFacts: () => invoke('get_sunshine_host_facts'),
   restartSunshineService: () => invoke('restart_sunshine_service'),
   restartSunshineInUserMode: () => invoke('restart_sunshine_in_user_mode'),
   uninstallVddDriver: () => invoke('uninstall_vdd_driver'),

@@ -144,9 +144,6 @@ fn main() {
     .expect("valid component compatibility manifest");
     assert_eq!(compatibility["schema"], 1);
     for (name, value) in [
-        ("COMPONENT_VERSION", &compatibility["component_version"]),
-        ("HIDMAESTRO_VERSION", &compatibility["hidmaestro_version"]),
-        ("USBIP_POLICY", &compatibility["usbip"]["policy"]),
         ("USBIP_VERSION", &compatibility["usbip"]["version"]),
         ("USBIP_URL", &compatibility["usbip"]["installer_url"]),
         ("USBIP_SHA256", &compatibility["usbip"]["installer_sha256"]),

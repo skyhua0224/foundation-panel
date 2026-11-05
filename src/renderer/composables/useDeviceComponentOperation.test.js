@@ -4,11 +4,11 @@ import { nextTick } from 'vue'
 import { useDeviceComponentOperation } from './useDeviceComponentOperation.js'
 
 test('shared driver operations cannot overlap across managers or replacement tabs', async () => {
-  const sidecar = useDeviceComponentOperation()
+  const first = useDeviceComponentOperation()
   const transport = useDeviceComponentOperation()
   let release
   const blocked = new Promise(resolve => { release = resolve })
-  const install = sidecar.wrap(() => blocked)
+  const install = first.wrap(() => blocked)
   let cleaned = false
   const cleanup = transport.wrap(() => { cleaned = true })
   const pending = install()
