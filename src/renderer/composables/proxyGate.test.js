@@ -54,10 +54,13 @@ test('the frame uses the gate: no single check that blanks the session, and the 
   assert.doesNotMatch(src, /window\.location\.reload\(\)/, 'a retry does not reload the whole panel')
 })
 
-test('the state does not repeat its title in its line, and covers the page behind it', () => {
-  const zh = fs.readFileSync(new URL('../desktop/i18n/zh.js', import.meta.url), 'utf8')
-  const title = zh.match(/proxyTitle: '([^']+)'/)[1]
-  const line = zh.match(/proxyUnavailable: '([^']+)'/)[1]
-  assert.ok(!line.startsWith(title), 'the line restates the title')
-  assert.match(fs.readFileSync(new URL('../components/SunshineFrame.vue', import.meta.url), 'utf8'), /\.proxy-blocked-host \{[^}]*background: var\(--md-sys-color-surface\)/)
+test('the status page is one design for the three causes, in the shell, and the pages under it are inert', () => {
+  const shell = fs.readFileSync(new URL('../components/SidebarMenu.vue', import.meta.url), 'utf8')
+  assert.match(shell, /:status="offlineShown"/)
+  assert.match(shell, /<MHostOffline v-if="offlineShown" :cause="offlineCause"/)
+  assert.match(shell, /:can-restart="offlineCause !== 'proxy'"/, 'restarting Sunshine does not fix the proxy')
+  assert.match(shell, /class="panel-web-keep" :inert="offlineShown/, 'the frame stays mounted and cannot be reached')
+  assert.match(shell, /:disabled="hostUnusable"/, '连接设备 pairs through the host')
+  const frame = fs.readFileSync(new URL('../components/SunshineFrame.vue', import.meta.url), 'utf8')
+  assert.match(frame, /proxyBlock\.blocked = true/)
 })

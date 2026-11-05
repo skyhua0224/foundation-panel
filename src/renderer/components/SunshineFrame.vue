@@ -7,8 +7,6 @@
   >
     <div class="iframe-container">
       <!-- no loading page: a page switch shows the new shell at once and the page fills in (its own skeletons); only a proxy that does not answer says so -->
-      <ProxyBlocked v-if="proxyHealthFailed" class="proxy-blocked-host" :attempts="proxyAttempts" :checking="proxyChecking" @retry="proxyGate.retryNow()" />
-
       <iframe
         :key="frameKey"
         ref="sunshineIframe"
@@ -33,7 +31,7 @@ import { checkLocalProxyHealth } from '../utils/proxyHealth.js'
 import { isNativeControlPanelMessage, isTrustedNativeControlPanelMessage } from '../composables/nativeBridge.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import SidebarMenu from './SidebarMenu.vue'
-import ProxyBlocked from './ProxyBlocked.vue'
+import { proxyBlock } from '../composables/proxyBlock.js'
 import { createProxyGate } from '../composables/proxyGate.js'
 import { isWebuiNavigationPath } from '../composables/webuiNavigation.js'
 import { BLANK, routeChanged, webuiNavigated } from '../composables/frameRoute.js'
@@ -54,9 +52,6 @@ watch(sunshineUrl, () => { frameKey.value++ }, { flush: 'sync' })
 const currentPath = ref('/')
 const sunshineIframe = ref(null)
 const sidebarMenuRef = ref(null)
-const proxyHealthFailed = ref(false)
-const proxyAttempts = ref(0)
-const proxyChecking = ref(false)
 
 // State
 let pollTimer = null
@@ -155,20 +150,21 @@ const verifyLocalProxy = async () => {
 // background while it does (composables/proxyGate.js): a slow start never blanks the session.
 const proxyGate = createProxyGate({
   verify: async () => {
-    proxyChecking.value = true
+    proxyBlock.checking = true
     try {
       try { proxyBase = await invoke('wait_for_proxy_ready') } catch (error) { console.warn('[SunshineFrame] the local proxy is not ready:', error); return false }
       return await verifyLocalProxy()
-    } finally { proxyChecking.value = false }
+    } finally { proxyBlock.checking = false }
   },
-  onAttempt: (n) => { proxyAttempts.value = n },
+  onAttempt: (n) => { proxyBlock.attempts = n },
   onShown: () => {
-    proxyHealthFailed.value = true
+    proxyBlock.blocked = true
     sunshineUrl.value = 'about:blank'
     invoke('main_panel_ready').catch(() => {})
   },
-  onCleared: () => { proxyHealthFailed.value = false },
+  onCleared: () => { proxyBlock.blocked = false },
 })
+proxyBlock.retryNow = () => proxyGate.retryNow()
 
 // Navigation handler
 const handleNavigateFrame = (event) => {
@@ -500,6 +496,7 @@ onUnmounted(() => {
   if (pollTimer) clearInterval(pollTimer)
   clearLoadedFrameReveal()
   proxyGate.stop()
+  proxyBlock.blocked = false
   unlistenVddSettings?.()
   unlistenDragDrop?.()
 })
@@ -610,7 +607,7 @@ const onLoad = () => {
 }
 // tools/realshot shows the failure states of this window by asking for them with an event of the page itself (a real fault is not repeatable on a guarded instance: the window would be shown and the
 // guard ends the instance). The event comes from the page's own scripts only; it changes what the page draws and nothing else.
-const forceProxyState = (event) => { proxyAttempts.value = Number(event.detail?.attempts) || 4; proxyHealthFailed.value = event.detail?.on !== false }
+const forceProxyState = (event) => { proxyBlock.attempts = Number(event.detail?.attempts) || 4; proxyBlock.blocked = event.detail?.on !== false }
 window.addEventListener('panel-force-proxy-state', forceProxyState)
 onUnmounted(() => window.removeEventListener('panel-force-proxy-state', forceProxyState))
 </script>
@@ -628,14 +625,6 @@ onUnmounted(() => window.removeEventListener('panel-force-proxy-state', forcePro
   height: 100%;
   border: none;
   transition: opacity 0.3s ease;
-}
-
-.proxy-blocked-host {
-  position: absolute;
-  inset: 0;
-  z-index: 10;
-  overflow: auto;
-  background: var(--md-sys-color-surface); /* nothing of a page shows through it */
 }
 
 .fade-loading-enter-active,

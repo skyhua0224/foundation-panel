@@ -70,12 +70,6 @@ export const en = {
   },
   sunshineFrame: {
     preparing: 'Preparing {path} ...',
-    proxyUnavailable: 'A proxy or TUN service may be intercepting localhost, 127.0.0.0/8, or IPv6 loopback traffic. Exclude loopback traffic from the proxy and try again.',
-    proxyTitle: 'The local Sunshine Web UI could not be reached',
-    proxyChecking: 'Checking again…',
-    proxyWaiting: 'Trying again shortly',
-    proxyAttempts: 'Checked {n} times; it recovers by itself when it answers',
-    retry: 'Check again',
   },
 
   // === Navigation ===

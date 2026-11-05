@@ -32,18 +32,19 @@ test('the facts carry the process id of the service wrapper, so that a restart o
   assert.match(rust, /let \(service, service_pid\) = service_state\(\)/)
 })
 
-test('the offline state is drawn once: a web page has it in the overlay over the frame, the other pages in the detail pane', async () => {
+test('the status page is drawn once, over the whole content area: the overlay holds it for every page, the detail pane holds nothing while the host cannot be used', async () => {
   const fs = await import('node:fs')
   const src = fs.readFileSync(new URL('./SidebarMenu.vue', import.meta.url), 'utf8')
-  assert.match(src, /<template #detail=\"\{ entry \}\">\s*<MHostOffline v-if=\"offlineShown && !isWebPage\"/)
+  assert.match(src, /<template #detail=\"\{ entry \}\">[\s\S]*?<template v-if=\"offlineShown && !isWebPage\" \/>/)
   assert.match(src, /<template #overlay>[\s\S]*<MHostOffline v-if=\"offlineShown\"/)
-  assert.equal((src.match(/<MHostOffline/g) || []).length, 2)
+  assert.equal((src.match(/<MHostOffline/g) || []).length, 1)
+  assert.match(src, /:overlay=\"isWebPage \|\| offlineShown\" :status=\"offlineShown\"/)
 })
 
 test('the offline tips get the real port of the Web UI from the URL the panel talks to', async () => {
   const fs = await import('node:fs')
   const src = fs.readFileSync(new URL('./SidebarMenu.vue', import.meta.url), 'utf8')
-  assert.equal((src.match(/:port=\"hostPort\"/g) || []).length, 2)
+  assert.equal((src.match(/:port=\"hostPort\"/g) || []).length, 1)
   assert.match(src, /new URL\(String\(await sunshine\.getUrl\(\)\)\)\.port/)
 })
 

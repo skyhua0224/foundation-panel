@@ -70,12 +70,6 @@ export const zh = {
   },
   sunshineFrame: {
     preparing: '正在准备 {path} ...',
-    proxyUnavailable: '代理或 TUN 软件可能拦截了 localhost、127.0.0.0/8 或 IPv6 环回地址，请将本机环回流量设为直连后重试。',
-    proxyTitle: '无法连接本机 Sunshine WebUI',
-    proxyChecking: '正在重新检测…',
-    proxyWaiting: '稍后自动重试',
-    proxyAttempts: '已检测 {n} 次，通了会自动恢复',
-    retry: '重新检测',
   },
 
   // === 导航 ===

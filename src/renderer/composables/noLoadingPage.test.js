@@ -10,7 +10,9 @@ test("the frame host has no full-area loading screen and never hides the page wh
   assert.ok(!/v-show="!loading"/.test(frame), "the iframe is not hidden while loading")
   assert.ok(!/vivi-loading/.test(frame))
   assert.ok(!/t\.sunshineFrame\.preparing/.test(frame))
-  assert.ok(/v-if="proxyHealthFailed"/.test(frame), "only a proxy that does not answer is shown over the page")
+  assert.ok(!/proxyHealthFailed|loading-overlay/.test(frame), "the frame draws no state of its own: a proxy that does not answer is one cause of the shell's status page")
+  const shell = read("../components/SidebarMenu.vue")
+  assert.ok(/offlineCause = computed\(\(\) => \(proxyBlock\.blocked \? 'proxy'/.test(shell), "the proxy is one cause of the one status page")
 })
 
 test("the start of the panel shows no splash text", () => {
