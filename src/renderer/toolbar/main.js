@@ -1,4 +1,5 @@
 import { createApp, watchEffect } from 'vue';
+import 'foundation-ui/all.css';
 import { useI18n } from '../desktop/i18n/index.js';
 
 const { t } = useI18n();

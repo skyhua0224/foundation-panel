@@ -2386,4 +2386,43 @@ onUnmounted(() => {
     transform: translate3d(0, -5px, 0) scale(1.05);
   }
 }
+
+// The pet art and interaction stay the same; the chrome follows the shared
+// surface roles so the floating window remains legible in light, dark, and
+// high-contrast black schemes.
+#toolbar-container {
+  color-scheme: light dark;
+  --pet-surface: var(--md-sys-color-surface-container-high, rgba(30, 30, 36, 0.94));
+  --pet-on-surface: var(--md-sys-color-on-surface, #f5f2fa);
+  --pet-primary-container: var(--md-sys-color-primary-container, #4d415f);
+  --pet-on-primary-container: var(--md-sys-color-on-primary-container, #f4eaff);
+  --pet-error-container: var(--md-sys-color-error-container, #5f1b25);
+  --pet-on-error-container: var(--md-sys-color-on-error-container, #ffdad6);
+}
+
+.bubble-item {
+  background: var(--pet-primary-container);
+  color: var(--pet-on-primary-container);
+  border: 1px solid color-mix(in srgb, var(--pet-on-primary-container) 22%, transparent);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--md-sys-color-shadow, #000) 28%, transparent);
+  backdrop-filter: blur(18px) saturate(1.1);
+}
+
+.bubble-item.danger {
+  background: var(--pet-error-container);
+  color: var(--pet-on-error-container);
+  border-color: color-mix(in srgb, var(--pet-on-error-container) 22%, transparent);
+}
+
+.bubble-wrapper:nth-child(n) .bubble-item,
+.bubble-wrapper:nth-child(n) .bubble-item.danger {
+  background: var(--pet-primary-container);
+  box-shadow: 0 8px 24px color-mix(in srgb, var(--md-sys-color-shadow, #000) 28%, transparent);
+}
+
+.bubble-wrapper:nth-child(n) .bubble-item.danger { background: var(--pet-error-container); }
+.bubble-caption { color: var(--pet-on-surface); text-shadow: 0 1px 3px color-mix(in srgb, var(--md-sys-color-shadow, #000) 70%, transparent); }
+.bubble-caption.danger { color: var(--pet-on-error-container); }
+.speech-bubble { color: var(--pet-on-surface); background: var(--pet-surface); border: 1px solid var(--md-sys-color-outline-variant, rgba(255,255,255,.18)); box-shadow: 0 8px 28px color-mix(in srgb, var(--md-sys-color-shadow, #000) 30%, transparent); }
+.speech-bubble::after { border-top-color: var(--pet-surface); }
 </style>
