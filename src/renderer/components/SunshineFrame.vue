@@ -608,6 +608,8 @@ const onLoad = () => {
   // overlay for long when the signal is unavailable.
   scheduleLoadedFrameReveal()
 }
+// the realshot tool forces the state of the page through these (tools/realshot: a real fault of the proxy would not be repeatable on a guarded instance)
+defineExpose({ proxyHealthFailed, proxyAttempts })
 </script>
 
 <style scoped lang="less">

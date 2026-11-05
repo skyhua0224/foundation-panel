@@ -526,6 +526,7 @@ const openPanelPage = (page) => { const route = requestPanelPage(page); if (rout
 defineExpose({
   openVddSettings, openWelcome, openWebStream, openAiAssistant, openControllers, openRtxHdr, openPanelPage,
   goHome, checkForUpdates: handleCheckForUpdates, router,
+  hostConn, // the realshot tool forces the failure states of the host through its state (tools/realshot: the real faults would make the panel show its window)
 })
 </script>
 
