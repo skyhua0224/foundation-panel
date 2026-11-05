@@ -33,3 +33,9 @@ test('the settings entry of the bottom bar lists every page of the five categori
   assert.ok(hub.includes("emit('open', item)")); assert.ok(!/select/.test(hub), 'a row opens a page, not another list')
   assert.ok(menu.includes('<SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" :groups="settingsList.groups.value" :runtime="runtimeView" @open="onListNavigate" />'))
 })
+
+test('the list of a rail has its title at the top left where the list is a page of its own (the bottom bar of a narrow window), as 设置 has', () => {
+  const menu = read('../components/SidebarMenu.vue')
+  assert.ok(menu.includes('<template #list="{ entry, scene }">'))
+  assert.ok(menu.includes(':title="railLabel(entry.rail)"') && menu.includes(':titled="scene.kind === \'single\'"'))
+})
