@@ -78,7 +78,7 @@ onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); w
 </template>
 
 <style>
-.panel-web { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.panel-web { display: flex; flex-direction: column; height: 100%; min-height: 0; box-sizing: border-box; /* the frame ends above the bar of unsaved changes while it floats (notify/stack.js sets --m-bottom-reserve): the last row of the page scrolls clear of it */ padding-bottom: max(0px, calc(var(--m-bottom-reserve, 0px) - var(--m-content-b, 0px))); }
 .panel-web__bar { padding: 8px 12px 0; flex: none; }
 .panel-web__frame { position: relative; flex: 1; min-height: 0; }
 .panel-web__frame .iframe-container, .panel-web__frame .sunshine-iframe { height: 100%; width: 100%; }
