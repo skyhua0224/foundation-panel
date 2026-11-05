@@ -7,12 +7,7 @@ import { startSlowCallLog, installFaultLog } from './composables/slowCalls.js'
 import { followDpiCover } from './composables/dpiSettle.js'
 import { listen } from '@tauri-apps/api/event'
 import { configureInvokeTiming, invokePending } from './tauri-core-timed.js'
-import 'element-plus/theme-chalk/el-loading.css'
-import 'element-plus/theme-chalk/el-message.css'
-import 'element-plus/theme-chalk/el-overlay.css'
-import 'element-plus/theme-chalk/el-message-box.css'
-import 'element-plus/theme-chalk/el-notification.css'
-import 'foundation-ui/all.css'  // Material 3 Expressive tokens, components and the Element Plus skin
+import 'foundation-ui/all.css'  // Material 3 Expressive tokens and components
 import './styles/pressed.css'  // pressed state at pointerdown for the controls that had none
 import './styles/m3e-compat.less'  // restyles the pages that still use their own markup
 // 导入 Tauri polyfill

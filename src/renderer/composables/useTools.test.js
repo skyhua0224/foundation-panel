@@ -38,7 +38,7 @@ function harness(messages = en, options = {}) {
   const api = vm.runInNewContext(`${source}\nuseTools()`, {
     ref: (value) => ({ value }), useI18n: () => ({ t }), formatMessage,
     ElMessage, ElMessageBox, ElNotification: (config) => calls.dialogs.push(config),
-    ElLoading: { service: (config) => { calls.loads.push(config.text); return loading } },
+    showBusy: (text) => { calls.loads.push(text); return loading },
     openExternalUrl: async (url) => calls.urls.push(url), tools: {},
     console: { error() {}, warn() {}, log() {} },
     controllerMeta: {
@@ -78,6 +78,24 @@ test('English Gamepad Test prompt, download progress and launch use translated t
   assert.equal(calls.launches, 1)
   assert.equal(unlistened(), true)
   assert.doesNotMatch(JSON.stringify(calls), /\p{Script=Han}/u)
+})
+
+test('an update notice offers the update as its action, and a second run does not start while it downloads', async () => {
+  let again
+  const h = harness(en, { installed: true, duringDownload: () => { again = h.api.openGamepadTest() } })
+  await h.api.openGamepadTest()
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  const notice = h.calls.dialogs.find((dialog) => dialog.actionText)
+  assert.equal(notice.actionText, en.controllerMeta.updateAction)
+  assert.equal(notice.duration, 0)
+  await notice.onClick()
+  await again
+  assert.equal(h.calls.downloads.length, 1)
+  assert.equal(h.calls.launches, 2)
+  assert.equal(h.calls.messages.filter((message) => message === en.controllerMeta.preparing).length, 1)
+  assert.match(h.calls.loads.join('\n'), /Preparing the update/)
+  await h.api.openGamepadTest()
+  assert.equal(h.calls.messages.filter((message) => message === en.controllerMeta.preparing).length, 2)
 })
 
 test('web choice opens only the fallback; closing the prompt performs no action', async () => {

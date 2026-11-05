@@ -1,6 +1,5 @@
 import { ref } from 'vue'
-import { ElLoading } from 'element-plus'
-import { ElMessage, ElNotification, ElMessageBox } from './notifyMessage.js'
+import { ElMessage, ElNotification, ElMessageBox, showBusy } from './notifyMessage.js'
 import { openExternalUrl, tools, controllerMeta, sunshine } from '@/tauri-adapter.js'
 import { latencyClockTexts } from 'foundation-ui/vue'
 import { pickStreamMonitor, centredOn } from './streamMonitor.js'
@@ -11,6 +10,13 @@ import { formatMessage } from '../shared/format-message.js'
 const clipboardSyncEnabled = ref(false)
 let clipboardSyncInitialised = false
 let clipboardSyncPollTimer = null
+// The gamepad test tool downloads once at a time: the old full-window loading layer stopped a second click, the snackbar that replaces it does not.
+let gamepadTestBusy = false
+const startBusy = (text) => {
+  gamepadTestBusy = true
+  const busy = showBusy(text)
+  return { setText: busy.setText, close: () => { gamepadTestBusy = false; return busy.close() } }
+}
 
 /**
  * 工具操作 Composable
@@ -243,6 +249,7 @@ export function useTools() {
     const FALLBACK_WEB = 'https://hardwaretester.com/gamepad'
     const OFFICIAL_SITE = 'https://www.controllermeta.com/'
 
+    if (gamepadTestBusy) return
     ElMessage.info(t.value.controllerMeta.preparing)
 
     // 规范化版本号比较：忽略 v 前缀、按数字段比较
@@ -324,14 +331,18 @@ export function useTools() {
                 type: 'info',
                 duration: 0,
                 position: 'bottom-right',
-                dangerouslyUseHTMLString: false,
+                actionText: t.value.controllerMeta.updateAction,
                 onClick: async () => {
-                  const loading = ElLoading.service({
-                    lock: true,
-                    text: t.value.controllerMeta.preparingUpdate,
-                    background: 'rgba(0, 0, 0, 0.5)',
-                  })
-                  await downloadAndLaunch(release, loading)
+                  if (gamepadTestBusy) return
+                  const loading = startBusy(t.value.controllerMeta.preparingUpdate)
+                  try {
+                    await downloadAndLaunch(release, loading)
+                  } catch (err) {
+                    console.error('[ControllerMeta] update failed:', err)
+                    ElMessage.error(t.value.controllerMeta.downloadFailed)
+                  } finally {
+                    loading.close()
+                  }
                 },
               })
             }
@@ -364,16 +375,11 @@ export function useTools() {
         return
       }
 
-      // ElMessageBox 在当前 Element Plus 版本中 resolve 的是 action 字符串（如 'confirm'），
-      // 不是 { action: 'confirm' } 对象。旧判断会导致点击「下载并启动」后直接返回，
-      // loading 和下载进度监听都不会创建。
+      // 对话框 resolve 的是 action 字符串（如 'confirm'），不是 { action: 'confirm' } 对象。
+      // 旧判断会导致点击「下载并启动」后直接返回，进度提示和下载进度监听都不会创建。
       if (choice !== 'confirm') return
 
-      const loading = ElLoading.service({
-        lock: true,
-        text: t.value.controllerMeta.checkingRelease,
-        background: 'rgba(0, 0, 0, 0.5)',
-      })
+      const loading = startBusy(t.value.controllerMeta.checkingRelease)
 
       let release
       try {
@@ -393,7 +399,11 @@ export function useTools() {
         return
       }
 
-      await downloadAndLaunch(release, loading)
+      try {
+        await downloadAndLaunch(release, loading)
+      } finally {
+        loading.close()
+      }
     } catch (err) {
       console.error('[ControllerMeta] openGamepadTest failed:', err)
       ElMessage.error(t.value.controllerMeta.unavailable)
