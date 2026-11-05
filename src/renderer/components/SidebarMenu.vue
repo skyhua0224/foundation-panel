@@ -259,10 +259,12 @@ const hostConn = useHostConnection({
   onHung: ({ at, seconds }) => reportHostHung({ at, seconds }),
   onHungEnd: () => dismissHostHung(),
 })
-// tools/realshot shows the offline states with an event of the page itself (see SunshineFrame): the verdict and the numbers the card shows; the next real probe of a host that answers puts it back
+// tools/realshot and the QA harness show the failure states with events of the page itself (a real fault is not repeatable on a guarded instance, where the panel would show its window): the verdict and the numbers the card shows; the next real probe of a host that answers puts it back
 const forceHostState = (event) => { const d = event.detail || {}; Object.assign(hostConn.state, { verdict: d.verdict || 'down', status: 'offline', fails: d.fails ?? 3, round: 1, nextIn: d.nextIn ?? 12, probing: false }) }
+const forceProxyState = (event) => { proxyBlock.attempts = Number(event.detail?.attempts) || 4; proxyBlock.blocked = event.detail?.on !== false }
 window.addEventListener('panel-force-host-state', forceHostState)
-onBeforeUnmount(() => window.removeEventListener('panel-force-host-state', forceHostState))
+window.addEventListener('panel-force-proxy-state', forceProxyState)
+onBeforeUnmount(() => { window.removeEventListener('panel-force-host-state', forceHostState); window.removeEventListener('panel-force-proxy-state', forceProxyState) })
 const NEEDS_NO_HOST = new Set([ROUTES.PANEL_SETTINGS, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
 // The host cannot be used for one of three causes, and the content area is then ONE status page (MScene status): the host is down, it runs and does not answer, or the panel's own proxy does not answer the window.
 // The rail and the caption bar stay: the pages of the panel itself (NEEDS_NO_HOST) still work and open as always. What needs the host does not look live: the pages give way to the status page and are inert, the

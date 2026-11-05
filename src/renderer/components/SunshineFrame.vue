@@ -605,11 +605,6 @@ const onLoad = () => {
   // overlay for long when the signal is unavailable.
   scheduleLoadedFrameReveal()
 }
-// tools/realshot shows the failure states of this window by asking for them with an event of the page itself (a real fault is not repeatable on a guarded instance: the window would be shown and the
-// guard ends the instance). The event comes from the page's own scripts only; it changes what the page draws and nothing else.
-const forceProxyState = (event) => { proxyBlock.attempts = Number(event.detail?.attempts) || 4; proxyBlock.blocked = event.detail?.on !== false }
-window.addEventListener('panel-force-proxy-state', forceProxyState)
-onUnmounted(() => window.removeEventListener('panel-force-proxy-state', forceProxyState))
 </script>
 
 <style scoped lang="less">
