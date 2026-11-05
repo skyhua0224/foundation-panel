@@ -334,7 +334,7 @@ const currentRow = computed(() => {
   if (route === ROUTES.WEB_PASSWORD) return 'password'
   return route
 })
-// the settings of the display and audio rails are not under 串流设置: their path starts with the rail's own name (the category of the entry)
+// the settings of the display and audio rails are not under 主机设置: their path starts with the rail's own name (the category of the entry)
 const settingsPlace = (e) => (e.params?.tab === 'display' || e.params?.tab === 'audio' || e.params?.tab === 'input' ? '' : railLabel('config'))
 const searchItems = computed(() => [
   ...Object.keys(PAGES)

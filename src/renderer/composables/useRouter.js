@@ -15,7 +15,7 @@ export const ROUTES = {
   TOOLBOX: 'toolbox', // old name of DIAGNOSTICS
   LATENCY_CLOCK: 'latency-clock', // 延迟测试时钟, opened from the toolbox
   PANEL_SETTINGS: 'panel-settings',
-  SETTINGS_HUB: 'settings-hub', // the bottom bar's one entry for 串流设置, 输入与外设, 显示 and 系统: a list of those four
+  SETTINGS_HUB: 'settings-hub', // the bottom bar's one entry for 主机设置, 输入与外设, 显示 and 系统: a list of those four
   HELP: 'help',
   ABOUT: 'about',
   ANNOUNCEMENTS: 'announcements', // 公告: every announcement, opened from the bell of the caption bar

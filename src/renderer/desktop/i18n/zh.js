@@ -1054,7 +1054,7 @@ export const zh = {
     clientDownloads: '下载客户端',
     applications: '串流应用',
     clientPairing: '客户端配对',
-    streamSettings: '串流设置',
+    streamSettings: '主机设置',
     toolbox: '工具箱',
     panelSettings: '面板设置',
     helpAbout: '帮助与关于',
@@ -1119,7 +1119,7 @@ export const zh = {
     open: '管理画质增强',
   },
   m3e: {
-    nav: { overview: '概览', stream: '串流', config: '串流设置', input: '输入与外设', audio: '音频', display: '显示与视频', system: '系统', assistant: '米塔 AI', settings: '面板设置', help: '帮助与关于', main: '主导航', barSettings: '设置', barMore: '更多', moreTitle: '更多选项', expand: '展开导航', collapse: '收起导航' },
+    nav: { overview: '概览', stream: '串流', config: '主机设置', input: '输入与外设', audio: '音频', display: '显示与视频', system: '系统', assistant: '米塔 AI', settings: '面板设置', help: '帮助与关于', main: '主导航', barSettings: '设置', barMore: '更多', moreTitle: '更多选项', expand: '展开导航', collapse: '收起导航' },
     live: {
       title: '当前串流', refresh: '刷新', ok: '确定', cancel: '取消', noStream: '没有正在进行的串流', idle: '有 {count} 个会话，都没有在串流', loadFailed: '读取会话失败：{error}',
       bitrate: '码率', client: '客户端', current: '当前码率', target: '目标码率', presets: '常用码率', input: '输入码率', apply: '应用码率', applying: '调整中…', selectFirst: '先选择一个客户端',
@@ -1161,7 +1161,7 @@ export const zh = {
     stream: {
       title: '串流', lead: '客户端、应用与串流参数。',
       clients: ['客户端', '配对客户端，查看已配对的设备'], apps: ['串流应用', '管理可以串流的应用'],
-      settings: ['串流设置', '编码、网络、音频等主机配置'], downloads: ['下载客户端', '获取各平台的客户端'],
+      settings: ['主机设置', '常规、配置文件、网络、安全与登录'], downloads: ['下载客户端', '获取各平台的客户端'],
     },
     input: { summary: '{count} / {total} 项已就绪', title: '输入与外设', lead: '客户端带来的设备：手柄、键盘、鼠标与触控、USB 设备。', gamepad: '手柄', keyboard: '键盘', mouse: '鼠标与触控', microphone: '麦克风', usb: 'USB 转发', usbNote: 'USB/IP 传输与已挂载设备', gamepadNote: '手柄类型与 DualSense 调校', micNote: '把客户端麦克风传到这台主机' },
     audio: { title: '音频', lead: '串流的声音输出与客户端麦克风。', sound: '音频输出' },

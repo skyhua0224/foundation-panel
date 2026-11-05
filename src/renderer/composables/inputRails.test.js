@@ -46,3 +46,9 @@ test('更多 of the bottom bar lists 关于 (the update check is on that page): 
   assert.ok(sheet.includes('icon="info" :title="aboutTexts(locale).title"') && sheet.includes('router.navigate(ROUTES.ABOUT)'))
   assert.ok(sheet.indexOf('icon="info"') < sheet.indexOf('icon="help"'))
 })
+
+test('the rail of 常规, 配置文件, 网络 and 安全与登录 is 主机设置 in both languages, hub and rail alike', () => {
+  assert.ok(zh.includes("config: '主机设置', input:") && en.includes("config: 'Host settings', input:"))
+  assert.ok(zh.includes("settings: ['主机设置', '常规、配置文件、网络、安全与登录']") && en.includes("settings: ['Host settings', 'General, profiles, network, security and sign-in']"))
+  assert.ok(!/streamSettings: '串流设置'/.test(zh) && zh.includes("streamSettings: '主机设置'"))
+})
