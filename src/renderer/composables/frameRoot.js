@@ -12,9 +12,7 @@ export function rootSnapshot(root) {
   const props = {}
   for (const name of root.style) if (PROP.test(name) && !SKIP.test(name)) props[name] = root.style.getPropertyValue(name)
   const themeCss = root.ownerDocument?.getElementById('foundation-ui-theme')?.textContent || ''
-  // list: how the list pane meets the frame (个性化), so a page inside the frame draws its list the same way
-  const list = root.getAttribute('data-list') === 'one' ? 'one' : 'merged'
-  return { type: 'foundation-root', props, classes: CLASSES.filter((c) => root.classList.contains(c)), theme: root.getAttribute('data-bs-theme') || '', themeCss, list }
+  return { type: 'foundation-root', props, classes: CLASSES.filter((c) => root.classList.contains(c)), theme: root.getAttribute('data-bs-theme') || '', themeCss }
 }
 
 /**
@@ -35,7 +33,7 @@ export function followRoot(getFrame, getOrigin, root = document.documentElement)
     })
   }
   const observer = new MutationObserver(push)
-  observer.observe(root, { attributes: true, attributeFilter: ['style', 'class', 'data-bs-theme', 'data-list'] })
+  observer.observe(root, { attributes: true, attributeFilter: ['style', 'class', 'data-bs-theme'] })
   if (root.ownerDocument?.head) observer.observe(root.ownerDocument.head, { childList: true, subtree: true, characterData: true })
   return { snapshot: () => rootSnapshot(root), stop: () => observer.disconnect() }
 }
