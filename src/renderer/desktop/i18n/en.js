@@ -1122,6 +1122,8 @@ Output only one short sentence, no explanation. Reply in English.`,
     restartAsAdmin: 'Restart as Admin',
   },
 
+  timer: { scale: 'Scale', adjust: 'Adjust timer size', decrease: 'Decrease', increase: 'Increase', reset: 'Reset' },
+
   hdrEnhanced: {
     open: 'Manage image enhancement',
   },

@@ -1122,6 +1122,8 @@ export const zh = {
     restartAsAdmin: '以管理员重启',
   },
 
+  timer: { scale: '缩放', adjust: '调整计时器大小', decrease: '缩小', increase: '放大', reset: '重置' },
+
   hdrEnhanced: {
     open: '管理画质增强',
   },

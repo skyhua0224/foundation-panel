@@ -42,6 +42,7 @@
         <ComponentStatusPage v-else-if="entry.id === ROUTES.COMPONENT_STATUS" />
         <ToolboxPage v-else-if="entry.id === ROUTES.TOOLBOX" :tools="toolsMenuItems" />
         <LatencyClockPage v-else-if="entry.id === ROUTES.LATENCY_CLOCK" />
+        <StreamTimerPage v-else-if="entry.id === ROUTES.STREAM_TIMER" />
         <LiveSessionPage v-else-if="entry.id === ROUTES.LIVE_SESSION" @open-quality="router.navigate(ROUTES.HDR_ENHANCED)" />
         <RtssPage v-else-if="entry.id === ROUTES.RTSS" />
         <DiagnosticsPage
@@ -139,6 +140,7 @@ import ComponentStatusPage from './m3e/ComponentStatusPage.vue'
 import { useComponentStatus } from '../composables/useComponentStatus.js'
 import ToolboxPage from './m3e/ToolboxPage.vue'
 import LatencyClockPage from './m3e/LatencyClockPage.vue'
+import StreamTimerPage from './m3e/StreamTimerPage.vue'
 import LiveSessionPage from './m3e/LiveSessionPage.vue'
 import RtssPage from './m3e/RtssPage.vue'
 import DiagnosticsPage from './m3e/DiagnosticsPage.vue'
@@ -178,7 +180,7 @@ onMounted(() => { void useAppearance().init() })
 watch(() => router.currentRoute.value, (route) => useAppearance().setScope(route === ROUTES.HOME ? 'home' : 'other'), { immediate: true })
 const { onTouchWindowDragStart } = useTouchWindowDrag(isMaximized)
 const {
-  openTimer, openUrl, cleanupCovers, restartAsAdmin, checkForUpdates, openGamepadTest, openStylusInputProbe,
+  openUrl, cleanupCovers, restartAsAdmin, checkForUpdates, openGamepadTest, openStylusInputProbe,
   showClipboardSyncStatus, initClipboardSyncStatus, clipboardSyncEnabled,
 } = useTools()
 const { runtime, refresh: refreshRuntime } = useDeviceRuntime()
@@ -206,7 +208,7 @@ const handleCheckForUpdates = async (channel = null) => {
   return true
 }
 const toolsCtx = {
-  t, router, webuiPath: toRef(props, 'webuiPath'), openWebUi, openControllers, openTimer, openUrl, openGamepadTest,
+  t, router, webuiPath: toRef(props, 'webuiPath'), openWebUi, openControllers, openUrl, openGamepadTest,
   openStylusInputProbe, cleanupCovers, restartAsAdmin, showClipboardSyncStatus, handleCheckForUpdates,
 }
 const toolsMenuItems = computed(() => createUtilityTools(toolsCtx))

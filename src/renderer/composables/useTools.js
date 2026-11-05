@@ -19,17 +19,6 @@ export function useTools() {
   const { t, locale } = useI18n()
 
   /**
-   * 打开串流计时器
-   */
-  const openTimer = async () => {
-    await createWindow('/stop-clock-canvas/index.html', t.value.sidebar.streamTimer, {
-      prefix: 'timer',
-      width: 1080,
-      height: 600,
-    })
-  }
-
-  /**
    * 延迟测试时钟: full screen in a window of its own on the display the stream captures (Sunshine's output_name, streamMonitor.js).
    * The window is made centred on that monitor and then set full screen, so it fills that monitor; with no match it opens on the primary one and says so.
    */
@@ -239,45 +228,6 @@ export function useTools() {
       console.error('检查更新失败:', error)
       ElMessage.error(t.value.toolActions.checkUpdatesFailed)
       return null
-    }
-  }
-
-  /**
-   * 公共窗口创建函数
-   * @param {string} url - 窗口URL路径
-   * @param {string} title - 窗口标题
-   * @param {object} options - 窗口配置选项
-   */
-  const createWindow = async (url, title, options = {}) => {
-    try {
-      const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow')
-      const baseUrl = window.location.origin
-      const windowId = `${options.prefix || 'window'}_${Date.now()}`
-
-      const newWindow = new WebviewWindow(windowId, {
-        url: `${baseUrl}${url}`,
-        title,
-        width: options.width || 1080,
-        height: options.height || 800,
-        decorations: options.decorations !== false,
-        center: true,
-      })
-
-      // 等待窗口创建完成后显示
-      newWindow.once('tauri://created', async () => {
-        console.log(`✅ ${title}窗口已创建`)
-        await newWindow.show()
-        await newWindow.setFocus()
-        console.log(`✅ ${title}窗口已显示`)
-      })
-
-      newWindow.once('tauri://error', (e) => {
-        console.error(`❌ ${title}窗口创建失败:`, e)
-        ElMessage.error(formatMessage(t.value.toolActions.windowCreateFailed, { title }))
-      })
-    } catch (error) {
-      console.error(`❌ 打开${title}失败:`, error)
-      ElMessage.error(formatMessage(t.value.toolActions.windowOpenFailed, { title }))
     }
   }
 
@@ -507,7 +457,6 @@ export function useTools() {
   }
 
   return {
-    openTimer,
     openLatencyClockOnStream,
     openStylusInputProbe,
     openUrl,

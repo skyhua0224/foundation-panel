@@ -89,7 +89,7 @@ export function createUtilityTools(ctx) {
       icon: Timer,
       label: labels.streamTimer,
       description: labels.timerDescription,
-      action: ctx.openTimer,
+      action: () => ctx.router.navigate(ROUTES.STREAM_TIMER),
     },
     {
       id: 'latency-test',
