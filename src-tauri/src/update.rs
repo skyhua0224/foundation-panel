@@ -150,6 +150,10 @@ struct UpdaterAnimationFrame {
     bgra: Vec<u8>,
 }
 
+/// Resolved once when the window opens: the panel's theme from the helper state, else the WinRT colour query.
+#[cfg(target_os = "windows")]
+static UPDATER_DARK_THEME: OnceLock<bool> = OnceLock::new();
+
 #[cfg(target_os = "windows")]
 static UPDATER_PANEL_STATE: OnceLock<Arc<Mutex<UpdaterPanelState>>> = OnceLock::new();
 static UPDATE_CHECKER_STARTED: OnceLock<()> = OnceLock::new();
@@ -582,6 +586,7 @@ fn run_updater_panel(state: UpdaterHelperState) -> Result<(), String> {
         }
     }
 
+    let _ = UPDATER_DARK_THEME.set(state.dark_theme.unwrap_or_else(updater_dark_theme));
     let state_arc = Arc::new(Mutex::new(UpdaterPanelState {
         title: "准备更新".to_string(),
         subtitle: "正在启动更新助手...".to_string(),
@@ -793,7 +798,7 @@ fn draw_updater_panel_cutout(hwnd: windows::Win32::Foundation::HWND) {
         buffer.fill(0);
 
         draw_updater_animation_frame(buffer, width, height, &state);
-        let dark_theme = state.dark_theme.unwrap_or_else(updater_dark_theme);
+        let dark_theme = UPDATER_DARK_THEME.get().copied().unwrap_or(false);
         draw_updater_bottom_copy(buffer, width, height, dark_theme);
         let mem_hdc = CreateCompatibleDC(Some(screen_hdc));
         if mem_hdc.is_invalid() {
