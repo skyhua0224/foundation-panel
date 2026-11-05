@@ -106,6 +106,9 @@ const PLACE_ROUTE = {
 // a page inside the gamepad page (per game, a DualSense group) is 手柄 at that page
 export const routeOfPlace = (tab, sub) => PLACE_ROUTE[`${tab}:${sub || DEFAULT_PLACE[tab]}`] || PLACE_ROUTE[`${tab}:${parentPlace(tab, sub)}`] || null
 const PLACE_PATH = /^\/config(?:\.html)?#tab=(display|audio|input)(?:&sub=([\w-]+))?/
+// tabs that were pages of their own: an old address still reaches what moved
+const MOVED_TAB_PATH = /^\/config(?:\.html)?#tab=(advanced|encoders)(?:&|$)/
+const MOVED_TAB_ROUTE = { advanced: ROUTES.WEB_DISPLAY_VIDEO, encoders: ROUTES.WEB_DISPLAY_ENCODERS }
 const WEB_PATHS = [
   [/^\/(?:pin|clients)(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_CLIENTS],
   [/^\/apps(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_APPS],
@@ -120,6 +123,8 @@ export const routeForWebPath = (path) => {
   const p = String(path || '/')
   const place = PLACE_PATH.exec(p)
   if (place && routeOfPlace(place[1], place[2])) return routeOfPlace(place[1], place[2])
+  const moved = MOVED_TAB_PATH.exec(p)
+  if (moved) return MOVED_TAB_ROUTE[moved[1]]
   for (const [re, route] of WEB_PATHS) if (re.test(p)) return route
   return ROUTES.HOME
 }

@@ -52,3 +52,14 @@ test('the virtual display page is titled like its row', () => {
 test('the picture enhancement setting opens the panel quality place while its Web row stays in capture and video', () => {
   assert.match(sidebar, /params\.focus === 'hdr_enhanced'[\s\S]*ROUTES\.HDR_ENHANCED/)
 })
+
+test('old addresses of 高级 and 编码器 reach the pages that took them', () => {
+  assert.match(router, /MOVED_TAB_ROUTE = \{ advanced: ROUTES\.WEB_DISPLAY_VIDEO, encoders: ROUTES\.WEB_DISPLAY_ENCODERS \}/)
+  const source = /const MOVED_TAB_PATH = \/(.+)\/\n/.exec(router)[1]
+  const moved = new RegExp(source)
+  assert.equal(moved.exec('/config#tab=advanced')?.[1], 'advanced')
+  assert.equal(moved.exec('/config.html#tab=encoders&x=1')?.[1], 'encoders')
+  assert.equal(moved.exec('/config'), null)
+  assert.equal(moved.exec('/config#tab=display&sub=encoders'), null)
+  assert.ok(router.indexOf('MOVED_TAB_PATH.exec(p)') < router.indexOf('for (const [re, route] of WEB_PATHS)'), 'before the general /config rule')
+})
