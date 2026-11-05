@@ -13,12 +13,12 @@ const source = fs.readFileSync(new URL('./useTools.js', import.meta.url), 'utf8'
   .replace(/import\('(@tauri-apps\/api\/[^']+)'\)/g, 'loadTauri("$1")')
 
 function harness(messages = en, options = {}) {
-  const calls = { dialogs: [], messages: [], urls: [], loads: [], downloads: [], launches: 0 }
+  const calls = { dialogs: [], messages: [], urls: [], busy: [], downloads: [], launches: 0, statusCalls: 0, noticeCloses: 0, loadingCloses: 0 }
   let progressListener
   let unlistened = false
+  let api = null
   const t = { value: messages }
-  const loading = { setText: (text) => calls.loads.push(text), close() {} }
-  const ElMessage = (options) => { calls.messages.push(options.message); return loading }
+  const ElMessage = (options) => { calls.messages.push(options.message); return { close: () => { calls.loadingCloses += 1 } } }
   for (const type of ['info', 'success', 'error', 'warning']) {
     ElMessage[type] = (message) => calls.messages.push(message)
   }
@@ -35,31 +35,37 @@ function harness(messages = en, options = {}) {
     calls.dialogs.push({ message, title, ...config })
     return 'confirm'
   }
-  const api = vm.runInNewContext(`${source}\nuseTools()`, {
+  api = vm.runInNewContext(`${source}\nuseTools()`, {
     ref: (value) => ({ value }), useI18n: () => ({ t }), formatMessage,
-    ElMessage, ElMessageBox, ElNotification: (config) => calls.dialogs.push(config),
-    showBusy: (text) => { calls.loads.push(text); return loading },
+    ElMessage, ElMessageBox, ElNotification: (config) => { calls.dialogs.push(config); return { close: () => { calls.noticeCloses += 1 } } },
     openExternalUrl: async (url) => calls.urls.push(url), tools: {},
     console: { error() {}, warn() {}, log() {} },
     controllerMeta: {
-      getStatus: async () => ({ installed: options.installed || false, version: '1.0' }),
+      getStatus: async () => {
+        calls.statusCalls += 1
+        if (options.statusError) throw options.statusError
+        return { installed: options.installed || false, version: '1.0' }
+      },
       checkRelease: async () => {
         if (options.releaseError) throw options.releaseError
         return { download_url: 'https://example.com/tool.exe', version: '2.0', download_size: 1048576 }
       },
       download: async (...args) => {
         calls.downloads.push(args)
+        calls.busy.push(api?.controllerBusyText?.value)
         if (options.duringDownload) options.duringDownload(t)
         progressListener({ payload: { progress: 50, downloaded: 524288 } })
+        calls.busy.push(api?.controllerBusyText?.value)
         if (options.downloadError) throw options.downloadError
       },
       launch: async () => { calls.launches++; if (options.launchError) throw options.launchError },
     },
     loadTauri: async () => ({
       listen: async (_, listener) => { progressListener = listener; return () => { unlistened = true } },
-      invoke: async (command) => command === 'is_running_as_admin' ? true : {
-        success: true, deleted_count: options.deletedCount ?? 2, freed_space: 2048,
-        message: '成功删除无用文件',
+      invoke: async (command) => {
+        if (command === 'is_running_as_admin') return true
+        if (command === 'cleanup_unused_covers' && options.cleanupError) throw options.cleanupError
+        return { success: true, deleted_count: options.deletedCount ?? 2, freed_space: 2048, message: '成功删除无用文件' }
       },
     }),
   })
@@ -73,14 +79,14 @@ test('English Gamepad Test prompt, download progress and launch use translated t
   assert.equal(calls.dialogs[0].confirmButtonText, 'Download and Launch')
   assert.equal(calls.dialogs[0].cancelButtonText, 'Open Web Version')
   assert.equal(calls.dialogs[0].distinguishCancelAndClose, true)
-  assert.match(calls.loads.join('\n'), /0\.5\/1\.0 MB \(50%\)/)
+  assert.match(calls.busy.join('\n'), /0\.5\/1\.0 MB \(50%\)/)
   assert.equal(calls.downloads.length, 1)
   assert.equal(calls.launches, 1)
   assert.equal(unlistened(), true)
   assert.doesNotMatch(JSON.stringify(calls), /\p{Script=Han}/u)
 })
 
-test('an update notice offers the update as its action, and a second run does not start while it downloads', async () => {
+test('an update notice stands with its action and closes when the update lands; a second run does not start while it downloads', async () => {
   let again
   const h = harness(en, { installed: true, duringDownload: () => { again = h.api.openGamepadTest() } })
   await h.api.openGamepadTest()
@@ -88,14 +94,17 @@ test('an update notice offers the update as its action, and a second run does no
   const notice = h.calls.dialogs.find((dialog) => dialog.actionText)
   assert.equal(notice.actionText, en.controllerMeta.updateAction)
   assert.equal(notice.duration, 0)
+  assert.equal(notice.standing, 'controllermeta-update')
+  assert.equal(notice.revision, '2.0')
   await notice.onClick()
   await again
   assert.equal(h.calls.downloads.length, 1)
   assert.equal(h.calls.launches, 2)
-  assert.equal(h.calls.messages.filter((message) => message === en.controllerMeta.preparing).length, 1)
-  assert.match(h.calls.loads.join('\n'), /Preparing the update/)
+  assert.equal(h.calls.statusCalls, 1)
+  assert.equal(h.calls.noticeCloses, 1)
+  assert.equal(h.calls.messages.includes(en.controllerMeta.preparing), false)
   await h.api.openGamepadTest()
-  assert.equal(h.calls.messages.filter((message) => message === en.controllerMeta.preparing).length, 2)
+  assert.equal(h.calls.statusCalls, 2)
 })
 
 test('web choice opens only the fallback; closing the prompt performs no action', async () => {
@@ -109,11 +118,36 @@ test('web choice opens only the fallback; closing the prompt performs no action'
   }
 })
 
+test('the busy state is taken before the first await and given back after a throw', async () => {
+  const h = harness(en, { statusError: new Error('status query failed') })
+  const run = h.api.openGamepadTest()
+  assert.equal(h.api.controllerBusy.value, true)
+  assert.equal(h.api.controllerBusyText.value, '')
+  await run
+  assert.equal(h.api.controllerBusy.value, false)
+  assert.equal(h.api.controllerBusyText.value, '')
+  assert.equal(h.calls.messages.at(-1), en.controllerMeta.unavailable)
+  assert.deepEqual(h.calls.urls, ['https://hardwaretester.com/gamepad'])
+})
+
+test('the blocking layer carries the live progress and goes away on success and failure', async () => {
+  const done = harness(en)
+  await done.api.openGamepadTest()
+  assert.match(done.calls.busy.at(-1), /0\.5\/1\.0 MB \(50%\)/)
+  assert.equal(done.api.controllerBusyText.value, '')
+  assert.equal(done.api.controllerBusy.value, false)
+  const failed = harness(en, { downloadError: new Error('write failed') })
+  await failed.api.openGamepadTest()
+  assert.equal(failed.api.controllerBusyText.value, '')
+  assert.equal(failed.api.controllerBusy.value, false)
+  assert.equal(failed.calls.messages.at(-1), en.controllerMeta.downloadFailed)
+})
+
 test('Chinese prompt remains available and async progress follows the current locale', async () => {
   const { api, calls } = harness(zh, { duringDownload: (t) => { t.value = en } })
   await api.openGamepadTest()
   assert.equal(calls.dialogs[0].title, zh.controllerMeta.title)
-  assert.match(calls.loads.at(-1), /Downloading/)
+  assert.match(calls.busy.at(-1), /Downloading/)
   assert.match(calls.messages.at(-1), /installed/)
 })
 
@@ -139,6 +173,13 @@ test('cleanup formats counters locally instead of displaying backend Chinese tex
     if (deletedCount) assert.match(calls.dialogs.at(-1).message, /Deleted files: 2\nFreed space: 2\.00 KB/)
     else assert.equal(calls.messages.at(-1), en.toolActions.cleanupEmpty)
   }
+})
+
+test('the cleaning message ends on every path', async () => {
+  const h = harness(en, { cleanupError: new Error('disk full') })
+  await h.api.cleanupCovers()
+  assert.equal(h.calls.loadingCloses, 1)
+  assert.equal(h.calls.messages.at(-1), en.toolActions.cleanupFailed)
 })
 
 test('new translations have matching keys and placeholder names in both supported locales', () => {

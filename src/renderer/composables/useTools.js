@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { ElMessage, ElNotification, ElMessageBox, showBusy } from './notifyMessage.js'
+import { ElMessage, ElNotification, ElMessageBox } from './notifyMessage.js'
 import { openExternalUrl, tools, controllerMeta, sunshine } from '@/tauri-adapter.js'
 import { latencyClockTexts } from 'foundation-ui/vue'
 import { pickStreamMonitor, centredOn } from './streamMonitor.js'
@@ -10,12 +10,18 @@ import { formatMessage } from '../shared/format-message.js'
 const clipboardSyncEnabled = ref(false)
 let clipboardSyncInitialised = false
 let clipboardSyncPollTimer = null
-// The gamepad test tool downloads once at a time: the old full-window loading layer stopped a second click, the snackbar that replaces it does not.
-let gamepadTestBusy = false
+// The gamepad test tool downloads or writes files on disk: while that runs nothing else may interrupt it (a restart would corrupt the write). The flag covers
+// the whole action, from its first synchronous statement — before the first await, so a second click starts no second flow — to its end on every path; the text
+// drives the panel's full-window blocking layer (PanelBusyLayer), which shows the live progress of the work.
+const controllerBusy = ref(false)
+const controllerBusyText = ref('')
 const startBusy = (text) => {
-  gamepadTestBusy = true
-  const busy = showBusy(text)
-  return { setText: busy.setText, close: () => { gamepadTestBusy = false; return busy.close() } }
+  controllerBusy.value = true
+  controllerBusyText.value = text
+  return {
+    setText: (words) => { controllerBusyText.value = words },
+    close: () => { controllerBusy.value = false; controllerBusyText.value = '' },
+  }
 }
 
 /**
@@ -246,14 +252,11 @@ export function useTools() {
    * 流程：
    * 1. 已安装 → 直接启动
    * 2. 未安装 → 询问用户：下载并启动 / 打开网页版 / 取消
-   * 3. 下载过程中通过消息提示进度
+   * 3. 下载过程中全窗口阻塞层显示进度（PanelBusyLayer）
    */
-  const openGamepadTest = async () => {
+  const openGamepadTestFlow = async () => {
     const FALLBACK_WEB = 'https://hardwaretester.com/gamepad'
     const OFFICIAL_SITE = 'https://www.controllermeta.com/'
-
-    if (gamepadTestBusy) return
-    ElMessage.info(t.value.controllerMeta.preparing)
 
     // 规范化版本号比较：忽略 v 前缀、按数字段比较
     const normalizeVersion = (v) =>
@@ -299,12 +302,14 @@ export function useTools() {
           ElMessage.error(String(err).includes('ControllerMeta 未安装')
             ? t.value.controllerMeta.notInstalled : t.value.controllerMeta.launchFailed)
         }
+        return true
       } catch (err) {
         unlisten()
         loading.close()
         console.error('[ControllerMeta] download failed:', err)
         ElMessage.error(String(err).includes('无法覆盖已有版本')
           ? t.value.controllerMeta.closeBeforeUpdate : t.value.controllerMeta.downloadFailed)
+        return false
       }
     }
 
@@ -328,18 +333,20 @@ export function useTools() {
           try {
             const release = await controllerMeta.checkRelease()
             if (release?.download_url && status.version && compareVersion(release.version, status.version) > 0) {
-              ElNotification({
+              const notice = ElNotification({
                 title: t.value.controllerMeta.updateTitle,
                 message: formatMessage(t.value.controllerMeta.updateMessage, { current: status.version, latest: release.version }),
                 type: 'info',
                 duration: 0,
-                position: 'bottom-right',
                 actionText: t.value.controllerMeta.updateAction,
+                standing: 'controllermeta-update',
+                revision: release.version,
                 onClick: async () => {
-                  if (gamepadTestBusy) return
+                  if (controllerBusy.value) return
                   const loading = startBusy(t.value.controllerMeta.preparingUpdate)
                   try {
-                    await downloadAndLaunch(release, loading)
+                    const downloaded = await downloadAndLaunch(release, loading)
+                    if (downloaded) notice?.close?.()
                   } catch (err) {
                     console.error('[ControllerMeta] update failed:', err)
                     ElMessage.error(t.value.controllerMeta.downloadFailed)
@@ -414,6 +421,18 @@ export function useTools() {
     }
   }
 
+  // The busy state is taken before the first await, so a second click while the status is still in flight (or while a dialog is open) starts no second flow,
+  // and it is given back on every path; the blocking layer and its live text are owned by startBusy and its close.
+  const openGamepadTest = async () => {
+    if (controllerBusy.value) return
+    controllerBusy.value = true
+    try {
+      await openGamepadTestFlow()
+    } finally {
+      controllerBusy.value = false
+    }
+  }
+
   /**
    * Clipboard sync is enabled by default whenever the user-session agent is
    * alive. Panel settings show connection status; the action reports details.
@@ -480,5 +499,7 @@ export function useTools() {
     showClipboardSyncStatus,
     initClipboardSyncStatus,
     clipboardSyncEnabled,
+    controllerBusy,
+    controllerBusyText,
   }
 }
