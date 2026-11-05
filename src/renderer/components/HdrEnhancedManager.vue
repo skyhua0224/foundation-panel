@@ -106,7 +106,6 @@ import {
 } from '../composables/nrOverlayState.js'
 import { shortcutCapture } from '../composables/shortcutCapture.js'
 import { nrOverlayText } from '../composables/nrOverlayMessages.js'
-// Element Plus has no keyboard glyph; use its established input icon.
 const { locale } = useI18n()
 const text = computed(() => enhancementControlsText(locale.value)),
   overlayText = computed(() => nrOverlayText(locale.value))
