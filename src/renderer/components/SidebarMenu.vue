@@ -127,7 +127,7 @@ import { sunshine, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
-import { MButton, homeTexts, MContextProvider, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey } from 'foundation-ui/vue'
+import { MButton, homeTexts, MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey } from 'foundation-ui/vue'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelBusyLayer from './PanelBusyLayer.vue'
@@ -558,15 +558,32 @@ onMounted(() => { window.addEventListener('message', onFrameMessage); loadHostDa
 onBeforeUnmount(() => { window.removeEventListener('message', onFrameMessage); componentStatus.stop() })
 const contextMenu = ref(null)
 // the window's own context menu (SPEC-context-menu): what this product can do for it; an action that is not here is not an item
-const ctxCallbacks = { search: (text) => { uni.query.value = text; uni.show() }, connect: () => { connect.open.value = true }, notice: (m) => useNotify().snack(m), openExternal: (u) => openExternalUrl(u), restartHost: () => hostConn.restart('service') }
+// 运行体检 is 全部检查 of the components page; 打开 Web UI opens the host's address in the system browser (the dashboard card of the old panel did the same); the pet's entry is the 桌宠 sheet of 面板设置, the page
+// the floating toolbar's menu opens (openPanelPage)
+const ctxCallbacks = {
+  search: (text) => { uni.query.value = text; uni.show() }, connect: () => { connect.open.value = true }, notice: (m) => useNotify().snack(m), openExternal: (u) => openExternalUrl(u), restartHost: () => hostConn.restart('service'),
+  doctor: () => { componentStatus.openPage(); void componentStatus.checkAll() },
+  openWebUi: async () => { const base = String((await sunshine.getUrl()) || ''); if (base) await openExternalUrl(base) },
+  get pet() { return [{ id: 'pet-settings', label: contextTexts(locale.value).petSettings, icon: 'pets', run: () => openPanelPage('pet') }] },
+}
+// the rows that have a tile on the overview that opens them: 固定到概览 pins that tile (the same functions as the pin of the search results)
+const ROW_TILES = { [ROUTES.WEB_CLIENTS]: 'clients', [ROUTES.WEB_APPS]: 'apps', [ROUTES.WEB_DOWNLOADS]: 'downloads', [ROUTES.DIAGNOSTICS]: 'diagnostics' }
+const rowPinSpec = (item) => (ROW_TILES[item.id] ? pinSpecForPage(ROW_TILES[item.id], { title: item.label, icon: item.icon }) : null)
 const onRowContext = (event, item) => {
   const items = [{ id: 'open', label: t.value.m3e.ctx.open, icon: 'open_in_new' }]
   if (webPathOf(item.id)) items.push({ id: 'browser', label: t.value.m3e.ctx.browser, icon: 'public' })
+  const spec = rowPinSpec(item)
+  if (spec) items.push({ id: 'pin', label: isPinnedOnHome('panel-home', spec) ? pinTexts(locale.value).unpin : pinTexts(locale.value).pin, icon: 'keep' })
   contextMenu.value?.show(event, items, item)
 }
 const onContextSelect = (entry, item) => {
   if (entry.id === 'open') router.navigate(item.id)
   else if (entry.id === 'browser') actions_openUrl(item)
+  else if (entry.id === 'pin') {
+    const spec = rowPinSpec(item)
+    if (isPinnedOnHome('panel-home', spec)) unpinFromHome('panel-home', spec)
+    else if (pinToHome('panel-home', spec).ok) useNotify().snack(pinTexts(locale.value).pinned)
+  }
 }
 const actions_openUrl = async (item) => {
   const base = String((await sunshine.getUrl()) || '').replace(/\/$/, '')
