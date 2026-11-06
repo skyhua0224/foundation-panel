@@ -1,7 +1,7 @@
 <template>
   <Transition name="running-bar">
-    <div v-if="game" class="running-bar">
-      <span class="running-pulse"></span>
+    <div v-if="game" class="running-bar" role="status">
+      <span class="running-pulse" aria-hidden="true"></span>
 
       <div class="running-info">
         <span class="running-label">{{ t.gameSession.nowPlaying }}</span>
@@ -9,32 +9,20 @@
       </div>
 
       <div class="running-meta">
-        <span class="running-elapsed">{{ formatDuration(elapsed) }}</span>
-        <span v-if="totalLabel" class="running-total">{{ totalLabel }}</span>
-        <span v-if="game.adopted" class="running-adopted" :title="t.gameSession.adoptedHint">
+        <MChip class="running-elapsed" icon="schedule">{{ formatDuration(elapsed) }}</MChip>
+        <MChip v-if="totalLabel" class="running-total">{{ totalLabel }}</MChip>
+        <MChip v-if="game.adopted" class="running-adopted" tone="tertiary" :title="t.gameSession.adoptedHint">
           {{ t.gameSession.adopted }}
-        </span>
+        </MChip>
       </div>
 
       <div class="running-actions">
-        <button
-          type="button"
-          class="running-btn"
-          data-focusable
-          data-focus-key="running-resume"
-          @click="emit('resume')"
-        >
+        <MButton size="lg" icon="play_arrow" data-focusable data-focus-key="running-resume" @click="emit('resume')">
           {{ t.gameSession.backToGame }}
-        </button>
-        <button
-          type="button"
-          class="running-btn danger"
-          data-focusable
-          data-focus-key="running-stop"
-          @click="emit('stop')"
-        >
+        </MButton>
+        <MButton variant="danger" size="lg" icon="stop_circle" data-focusable data-focus-key="running-stop" @click="emit('stop')">
           {{ t.gameSession.stopRunning }}
-        </button>
+        </MButton>
       </div>
     </div>
   </Transition>
@@ -42,6 +30,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { MButton, MChip } from 'foundation-ui/vue'
 import { formatDuration } from '../composables/useGameSession.js'
 import { useI18n } from '../i18n/index.js'
 
@@ -63,38 +52,35 @@ const totalLabel = computed(() => {
   return t.value.gameSession.totalPlaytime.replace('{duration}', formatDuration(combined))
 })
 </script>
-
 <style lang="less" scoped>
+// 悬浮在底部的「正在运行」条：surface-container-high 的大圆角药丸，抬升 3
 .running-bar {
-  // 定位交给 DesktopApp 的 .desktop-footer-dock，这样它能和按键提示条堆叠而不是重叠
   display: flex;
   align-items: center;
-  gap: 18px;
-  max-width: 100%;
-  padding: 10px 18px;
-  border-radius: 14px;
-  background: rgba(var(--fd-bg-secondary-rgb, 26, 26, 46), 0.94);
-  border: 1px solid rgba(var(--fd-status-success-rgb, 0, 255, 136), 0.3);
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.5);
+  gap: 24px;
+  padding: 14px 16px 14px 28px;
+  border-radius: 9999px;
+  background: var(--md-sys-color-surface-container-high);
+  color: var(--md-sys-color-on-surface);
+  box-shadow: var(--d-shadow-3);
 }
 
 .running-pulse {
-  width: 9px;
-  height: 9px;
+  flex: none;
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
-  flex-shrink: 0;
-  background: var(--fd-status-success, #00ff88);
-  box-shadow: 0 0 12px rgba(var(--fd-status-success-rgb, 0, 255, 136), 0.8);
+  background: var(--md-sys-color-success, var(--md-sys-color-primary));
   animation: running-pulse 1.8s ease-in-out infinite;
 }
 
 @keyframes running-pulse {
   0%,
   100% {
-    opacity: 1;
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--md-sys-color-success, var(--md-sys-color-primary)) 50%, transparent);
   }
   50% {
-    opacity: 0.35;
+    box-shadow: 0 0 0 10px transparent;
   }
 }
 
@@ -102,99 +88,42 @@ const totalLabel = computed(() => {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  max-width: 320px;
 
   .running-label {
-    font-size: 11px;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.35);
+    font: 500 13px/18px var(--md-ref-typeface-brand, system-ui);
+    color: var(--md-sys-color-on-surface-variant);
   }
 
   .running-name {
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--fd-text-primary, #fff);
+    font: 700 20px/28px var(--md-ref-typeface-brand, system-ui);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: 320px;
   }
 }
 
 .running-meta {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-shrink: 0;
-
-  .running-elapsed {
-    font-size: 20px;
-    font-variant-numeric: tabular-nums;
-    color: var(--fd-status-success, #00ff88);
-  }
-
-  .running-total {
-    font-size: 12px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.35);
-  }
-
-  .running-adopted {
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 6px;
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.12);
-    color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.85);
-    cursor: help;
-  }
+  gap: 8px;
 }
 
 .running-actions {
   display: flex;
-  gap: 8px;
-  flex-shrink: 0;
+  gap: 10px;
 }
 
-.running-btn {
-  padding: 7px 16px;
-  border-radius: 8px;
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.25);
-  background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-  color: var(--fd-accent, #00fff5);
-  font-size: 13px;
-  cursor: pointer;
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease;
-
-  &:hover,
-  &:focus-visible {
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.18);
-    border-color: var(--fd-accent, #00fff5);
-  }
-
-  &.danger {
-    border-color: rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.35);
-    background: rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.1);
-    color: var(--fd-status-danger, #ff6b35);
-
-    &:hover,
-    &:focus-visible {
-      background: rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.2);
-      border-color: var(--fd-status-danger, #ff6b35);
-    }
-  }
+.running-bar-enter-active {
+  transition: opacity var(--m-spring-default-effects-duration, 250ms) var(--m-spring-default-effects, ease),
+    transform var(--m-spring-default-spatial-duration, 400ms) var(--m-spring-default-spatial, ease);
 }
-
-.running-bar-enter-active,
 .running-bar-leave-active {
-  transition:
-    opacity 0.25s ease,
-    transform 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity var(--m-spring-fast-effects-duration, 150ms) var(--m-spring-fast-effects, ease),
+    transform var(--m-spring-fast-spatial-duration, 200ms) var(--m-spring-fast-spatial, ease);
 }
-
 .running-bar-enter-from,
 .running-bar-leave-to {
   opacity: 0;
-  transform: translateY(16px);
+  transform: translateY(24px);
 }
 </style>

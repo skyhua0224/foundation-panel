@@ -1,150 +1,121 @@
 <template>
-  <Teleport to="body">
-    <Transition name="fade">
-      <div v-if="open" class="helper-overlay" @click="$emit('close')"></div>
-    </Transition>
+  <MSheet
+    ref="sheetRef"
+    class="helper-sheet"
+    wide
+    :model-value="open"
+    :title="t.launchHelper.title + (appName ? ' — ' + appName : '')"
+    :close-label="t.windowActions.close"
+    @update:model-value="onModel"
+  >
+    <p class="panel-desc">{{ t.launchHelper.description }}<span class="panel-hint">{{ t.launchHelper.orderHint }}</span></p>
 
-    <Transition name="slide">
-      <div v-if="open" ref="panelRef" class="helper-panel" @click.stop @keydown.escape="$emit('close')">
-        <div class="panel-header">
-          <h2>{{ t.launchHelper.title }}</h2>
-          <span class="app-name-tag">{{ appName }}</span>
-          <button class="close-btn" @click="$emit('close')">✕</button>
+    <MBanner v-if="saveError" tone="error" icon="error" role="alert">{{ saveError }}</MBanner>
+
+    <div
+      v-for="(helper, idx) in editingHelpers"
+      :key="helper.templateId"
+      class="helper-card"
+      :class="{ active: helper.enabled }"
+    >
+      <div class="helper-header">
+        <div class="order-buttons" :class="{ 'is-off': !helper.enabled }">
+          <MIconButton
+            icon="arrow_upward"
+            :label="t.launchHelper.moveUp"
+            :disabled="!helper.enabled || idx === 0"
+            data-focusable
+            @click.stop="moveHelper(idx, -1)"
+          />
+          <MIconButton
+            icon="arrow_downward"
+            :label="t.launchHelper.moveDown"
+            :disabled="!helper.enabled || idx === editingHelpers.length - 1"
+            data-focusable
+            @click.stop="moveHelper(idx, 1)"
+          />
         </div>
 
-        <div class="panel-body">
-          <p class="panel-desc">{{ t.launchHelper.description }}<br/>
-            <small>{{ t.launchHelper.orderHint }}</small>
-          </p>
-
-          <div
-            v-for="(helper, idx) in editingHelpers"
-            :key="helper.templateId"
-            class="helper-card"
-            :class="{ active: helper.enabled }"
-          >
-            <div class="helper-header">
-              <!-- 排序按钮（仅启用时显示） -->
-              <div v-if="helper.enabled" class="order-buttons">
-                <button
-                  class="order-btn"
-                  :disabled="idx === 0"
-                  @click.stop="moveHelper(idx, -1)"
-                  :title="t.launchHelper.moveUp"
-                  data-focusable
-                >▲</button>
-                <button
-                  class="order-btn"
-                  :disabled="idx === editingHelpers.length - 1"
-                  @click.stop="moveHelper(idx, 1)"
-                  :title="t.launchHelper.moveDown"
-                  data-focusable
-                >▼</button>
-              </div>
-              <div v-else class="order-placeholder"></div>
-
-              <LaunchHelperIcon
-                class="helper-icon"
-                :template-id="helper.templateId"
-                :size="20"
-                @click="toggleHelper(helper.templateId)"
-              />
-              <div class="helper-info" @click="toggleHelper(helper.templateId)">
-                <span class="helper-name">
-                  {{ getTemplate(helper.templateId)?.name }}
-                  <span v-if="getTemplate(helper.templateId)?.typeLabel" class="type-badge" :class="{ elevated: getTemplate(helper.templateId)?.elevated }" :title="getTemplate(helper.templateId)?.typeDesc">
-                    {{ getTemplate(helper.templateId)?.typeLabel }}
-                  </span>
-                </span>
-                <span class="helper-desc">{{ getTemplate(helper.templateId)?.description }}</span>
-              </div>
-              <div class="helper-switch" :class="{ on: helper.enabled }" @click="toggleHelper(helper.templateId)">
-                <div class="switch-thumb"></div>
-              </div>
-            </div>
-
-            <Transition name="expand">
-              <div v-if="helper.enabled" class="helper-config">
-                <div
-                  v-for="param in getTemplate(helper.templateId)?.params"
-                  :key="param.key"
-                  class="config-field"
-                >
-                  <label class="field-label">
-                    {{ param.label }}
-                    <span v-if="param.required" class="required">*</span>
-                  </label>
-                  <div class="field-input-row">
-                    <input
-                      type="text"
-                      class="field-input"
-                      :class="{
-                        'field-error': hasFieldError(helper.templateId, param.key),
-                        'field-warn': pathWarnings[`${helper.templateId}.${param.key}`]
-                      }"
-                      :placeholder="param.placeholder || ''"
-                      :value="getParamValue(helper.templateId, param.key)"
-                      @input="setParamValue(helper.templateId, param.key, $event.target.value)"
-                      data-focusable
-                    />
-                    <button
-                      v-if="param.key === 'path' && hasTauri"
-                      class="browse-btn"
-                      @click="browseFile(helper.templateId, param.key)"
-                      :title="t.launchHelper.browse"
-                      data-focusable
-                    ><MIcon name="folder_open" /></button>
-                  </div>
-                  <div v-if="hasFieldError(helper.templateId, param.key)" class="field-error-msg">
-                    ⚠ {{ getFieldError(helper.templateId, param.key) }}
-                  </div>
-                  <div v-else-if="pathWarnings[`${helper.templateId}.${param.key}`]" class="field-path-warn">
-                    ⚠ {{ pathWarnings[`${helper.templateId}.${param.key}`] }}
-                  </div>
-                  <div v-else-if="getGlobalHint(helper.templateId, param.key)" class="field-hint">
-                    {{ t.launchHelper.globalDefault }}{{ getGlobalHint(helper.templateId, param.key) }}
-                  </div>
-                </div>
-              </div>
-            </Transition>
-          </div>
-
-          <!-- 预览生成的命令 -->
-          <div v-if="hasAnyEnabled" class="preview-section">
-
-          <!-- 全局路径保存通知 -->
-          <Transition name="fade">
-            <div v-if="globalSaveNotice" class="global-save-notice">
-              ✓ {{ globalSaveNotice }}
-            </div>
-          </Transition>
-            <div class="preview-header" @click="showPreview = !showPreview">
-              <span>{{ t.launchHelper.preview }}</span>
-              <span class="preview-toggle">{{ showPreview ? '▼' : '▶' }}</span>
-            </div>
-            <div v-if="showPreview" class="preview-content">
-              <div v-for="(cmd, i) in previewCommands" :key="i" class="preview-cmd">
-                <div class="cmd-label">{{ cmd.label }}</div>
-                <code class="cmd-code">{{ cmd.value }}</code>
-              </div>
-            </div>
-          </div>
+        <LaunchHelperIcon
+          class="helper-icon"
+          :template-id="helper.templateId"
+          :size="24"
+          @click="toggleHelper(helper.templateId)"
+        />
+        <div class="helper-info" @click="toggleHelper(helper.templateId)">
+          <span class="helper-name">
+            {{ getTemplate(helper.templateId)?.name }}
+            <MChip
+              v-if="getTemplate(helper.templateId)?.typeLabel"
+              class="type-badge"
+              :tone="getTemplate(helper.templateId)?.elevated ? 'warn' : 'neutral'"
+              :title="getTemplate(helper.templateId)?.typeDesc"
+            >{{ getTemplate(helper.templateId)?.typeLabel }}</MChip>
+          </span>
+          <span class="helper-desc">{{ getTemplate(helper.templateId)?.description }}</span>
         </div>
+        <MSwitch
+          class="helper-switch"
+          :model-value="helper.enabled"
+          :label="getTemplate(helper.templateId)?.name"
+          data-focusable
+          @update:model-value="toggleHelper(helper.templateId)"
+        />
+      </div>
 
-        <div class="panel-footer">
-          <button class="btn-secondary" @click="$emit('close')">{{ t.launchHelper.cancel }}</button>
-          <button class="btn-primary" @click="handleSave" :disabled="saving">
-            {{ saving ? t.launchHelper.saving : t.launchHelper.save }}
-          </button>
+      <div v-if="helper.enabled" class="helper-config">
+        <div
+          v-for="param in getTemplate(helper.templateId)?.params"
+          :key="param.key"
+          class="config-field"
+        >
+          <div class="field-input-row">
+            <MField
+              class="field-input"
+              :label="param.label + (param.required ? ' *' : '')"
+              :placeholder="param.placeholder || ''"
+              :model-value="getParamValue(helper.templateId, param.key)"
+              :error="hasFieldError(helper.templateId, param.key) ? getFieldError(helper.templateId, param.key) : ''"
+              :supporting="fieldNote(helper.templateId, param.key)"
+              data-focusable
+              @update:model-value="setParamValue(helper.templateId, param.key, $event)"
+            />
+            <MIconButton
+              v-if="param.key === 'path' && hasTauri"
+              icon="folder_open"
+              :label="t.launchHelper.browse"
+              data-focusable
+              @click="browseFile(helper.templateId, param.key)"
+            />
+          </div>
         </div>
       </div>
-    </Transition>
-  </Teleport>
+    </div>
+
+    <div v-if="hasAnyEnabled" class="preview-section">
+      <MButton variant="text" :icon="showPreview ? 'keyboard_arrow_up' : 'chevron_right'" data-focusable @click="showPreview = !showPreview">
+        {{ t.launchHelper.preview }}
+      </MButton>
+      <div v-if="showPreview" class="preview-content">
+        <div v-for="(cmd, i) in previewCommands" :key="i" class="preview-cmd">
+          <div class="cmd-label">{{ cmd.label }}</div>
+          <code class="cmd-code">{{ cmd.value }}</code>
+        </div>
+      </div>
+    </div>
+
+    <template #actions>
+      <MButton variant="text" size="lg" data-focusable data-focus-key="helper-cancel" @click="$emit('close')">{{ t.launchHelper.cancel }}</MButton>
+      <MButton size="lg" icon="save" :loading="saving" data-focusable data-focus-key="helper-save" @click="handleSave">
+        {{ saving ? t.launchHelper.saving : t.launchHelper.save }}
+      </MButton>
+    </template>
+  </MSheet>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { MIcon } from 'foundation-ui/vue'
+import { ref, computed, watch, onMounted } from 'vue'
+import { MBanner, MButton, MChip, MField, MIconButton, MSheet, MSwitch, useNotify } from 'foundation-ui/vue'
 import { useLaunchHelpers } from '../composables/useLaunchHelpers.js'
 import { isTauriRuntime } from '../composables/useTauri.js'
 import { useModalFocusScope } from '../composables/useFocusNav.js'
@@ -161,8 +132,18 @@ const props = defineProps({
 const emit = defineEmits(['close', 'saved'])
 
 // 手柄导航只在栈顶作用域内移动，避免焦点跑到面板背后的卡片上
-const panelRef = ref(null)
+const sheetRef = ref(null)
+// MSheet 的根就是 <dialog>：手柄焦点栈以它为作用域
+const panelRef = computed(() => sheetRef.value?.$el || null)
 useModalFocusScope(panelRef, () => props.open)
+
+const notify = useNotify()
+const saveError = ref('')
+
+// Esc / 点遮罩 / 标题栏关闭 → 关闭
+function onModel(open) {
+  if (!open && props.open) emit('close')
+}
 
 const { t } = useI18n()
 const lhText = computed(() => t.value.launchHelper)
@@ -183,7 +164,6 @@ const saving = ref(false)
 const showPreview = ref(false)
 const validationErrors = ref([]) // { templateId, paramKey, message }[]
 const pathWarnings = ref({}) // { "templateId.paramKey": "message" }
-const globalSaveNotice = ref('') // 全局路径自动保存通知
 
 // 编辑中的助手列表（本地副本）
 const editingHelpers = ref([])
@@ -191,6 +171,7 @@ const editingHelpers = ref([])
 // 当面板打开/应用变化时，加载配置
 watch(() => [props.open, props.appName], ([isOpen]) => {
   if (isOpen && props.appName) {
+    saveError.value = ''
     const stored = getAppHelpers(props.appName)
     // 为每个模板创建一个条目
     editingHelpers.value = templates.value.map(tmpl => {
@@ -239,8 +220,7 @@ function setParamValue(templateId, paramKey, value) {
     if (paramKey === 'path' && value && !getGlobalPath(templateId, paramKey)) {
       setGlobalPath(templateId, paramKey, value)
       const tmpl = getTemplate(templateId)
-      globalSaveNotice.value = (lhText.value.globalSaved || '').replace('{name}', tmpl?.name || templateId)
-      setTimeout(() => { globalSaveNotice.value = '' }, 3000)
+      notify.snack((lhText.value.globalSaved || '').replace('{name}', tmpl?.name || templateId), { timeout: 3000 })
     }
     // 清除该字段的验证错误
     validationErrors.value = validationErrors.value.filter(
@@ -285,6 +265,14 @@ function getGlobalHint(templateId, paramKey) {
   return ''
 }
 
+/** 字段下方的说明：路径警告 > 全局默认提示；错误由 MField 的 error 显示。 */
+function fieldNote(templateId, paramKey) {
+  const warn = pathWarnings.value[`${templateId}.${paramKey}`]
+  if (warn) return warn
+  const hint = getGlobalHint(templateId, paramKey)
+  return hint ? `${lhText.value.globalDefault}${hint}` : ''
+}
+
 function hasFieldError(templateId, paramKey) {
   return validationErrors.value.some(e => e.templateId === templateId && e.paramKey === paramKey)
 }
@@ -325,6 +313,7 @@ async function handleSave() {
   }
 
   saving.value = true
+  saveError.value = ''
   try {
     // 1. 保存到本地
     setAppHelpers(props.appName, editingHelpers.value)
@@ -380,7 +369,7 @@ async function handleSave() {
     emit('close')
   } catch (e) {
     console.error('Failed to save launch helpers:', e)
-    alert(`${lhText.value.saveFailed || 'Save failed: '}${e.message}`)
+    saveError.value = `${lhText.value.saveFailed || 'Save failed: '}${e.message}`
   } finally {
     saving.value = false
   }
@@ -389,473 +378,131 @@ async function handleSave() {
 onMounted(async () => {
   hasTauri.value = await isTauriRuntime()
 })
-
-// Escape 键全局监听（面板打开时）
-function onKeydown(e) {
-  if (e.key === 'Escape' && props.open) {
-    emit('close')
-  }
-}
-watch(() => props.open, (open) => {
-  if (open) {
-    document.addEventListener('keydown', onKeydown)
-  } else {
-    document.removeEventListener('keydown', onKeydown)
-  }
-})
-onUnmounted(() => {
-  document.removeEventListener('keydown', onKeydown)
-})
 </script>
-
 <style lang="less" scoped>
-.helper-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 9998;
-}
-
-.helper-panel {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 400px;
-  max-width: 90vw;
-  background: rgba(var(--fd-bg-primary-rgb, 15, 15, 35), 0.97);
-  backdrop-filter: blur(20px);
-  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.5);
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  border-left: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-}
-
-.panel-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-
-  h2 {
-    font-size: 18px;
-    margin: 0;
-    color: var(--fd-text-primary, #fff);
-  }
-
-  .app-name-tag {
-    font-size: 12px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-    color: var(--fd-accent, #00fff5);
-    max-width: 150px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .close-btn {
-    margin-left: auto;
-    background: none;
-    border: none;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    cursor: pointer;
-    font-size: 18px;
-    padding: 4px 8px;
-    border-radius: 6px;
-    transition: all 0.2s;
-
-    &:hover {
-      background: rgba(255, 100, 100, 0.15);
-      color: #ff6b6b;
-    }
-  }
-}
-
-.panel-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px 24px;
-
-  &::-webkit-scrollbar { width: 6px; }
-  &::-webkit-scrollbar-thumb {
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-    border-radius: 3px;
-  }
+.helper-sheet {
+  --helper-sheet-width: min(720px, 100vw);
 }
 
 .panel-desc {
-  font-size: 13px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-  margin: 0 0 20px 0;
-  line-height: 1.5;
+  margin: 0 0 16px;
+  font: 400 17px/26px var(--md-ref-typeface-brand, system-ui);
+  color: var(--md-sys-color-on-surface-variant);
+
+  .panel-hint {
+    display: block;
+    font-size: 14px;
+    line-height: 20px;
+    opacity: 0.85;
+  }
 }
 
 .helper-card {
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-  border-radius: 12px;
-  margin-bottom: 12px;
-  overflow: hidden;
-  transition: all 0.2s ease;
+  margin-top: 14px;
+  padding: 16px 20px;
+  border-radius: 28px;
+  background: var(--md-sys-color-surface-container);
+  transition: background-color var(--m-spring-default-effects-duration, 200ms) var(--m-spring-default-effects, ease);
 
   &.active {
-    border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.25);
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.03);
-  }
-
-  &:hover {
-    border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
   }
 }
 
 .helper-header {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  cursor: pointer;
-  user-select: none;
+  gap: 14px;
+}
 
-  .order-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    flex-shrink: 0;
-  }
+.order-buttons {
+  display: flex;
+  flex-direction: column;
+  flex: none;
 
-  .order-btn {
-    width: 22px;
-    height: 18px;
-    border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-    border-radius: 4px;
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.05);
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    cursor: pointer;
-    font-size: 10px;
-    line-height: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.15s;
-    padding: 0;
-
-    &:hover:not(:disabled) {
-      background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-      color: var(--fd-accent, #00fff5);
-      border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-    }
-
-    &:disabled {
-      opacity: 0.2;
-      cursor: not-allowed;
-    }
-  }
-
-  .order-placeholder {
-    width: 22px;
-    flex-shrink: 0;
-  }
-
-  .helper-icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    color: var(--fd-accent, #00fff5);
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-  }
-
-  .helper-info {
-    flex: 1;
-    min-width: 0;
-
-    .helper-name {
-      display: block;
-      font-size: 14px;
-      font-weight: 600;
-      color: var(--fd-text-primary, #fff);
-    }
-
-    .type-badge {
-      display: inline-block;
-      font-size: 10px;
-      font-weight: 500;
-      padding: 1px 6px;
-      border-radius: 4px;
-      margin-left: 6px;
-      vertical-align: middle;
-      background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.12);
-      color: var(--fd-accent, #00fff5);
-      border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-
-      &.elevated {
-        background: rgba(251, 191, 36, 0.12);
-        color: #fbbf24;
-        border-color: rgba(251, 191, 36, 0.3);
-      }
-    }
-
-    .helper-desc {
-      display: block;
-      font-size: 11px;
-      color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.4);
-      margin-top: 2px;
-    }
+  &.is-off {
+    visibility: hidden;
   }
 }
 
-.helper-switch {
-  width: 40px;
-  height: 22px;
-  border-radius: 11px;
-  background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.15);
-  position: relative;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
+.helper-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 18px;
+  background: var(--md-sys-color-surface-container-highest);
+  cursor: pointer;
+}
 
-  .switch-thumb {
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    transition: all 0.2s ease;
+.helper-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  cursor: pointer;
+
+  .helper-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font: 600 19px/26px var(--md-ref-typeface-brand, system-ui);
   }
 
-  &.on {
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.4);
-
-    .switch-thumb {
-      left: 20px;
-      background: var(--fd-accent, #00fff5);
-      box-shadow: 0 0 8px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.5);
-    }
+  .helper-desc {
+    font: 400 14px/20px var(--md-ref-typeface-brand, system-ui);
+    opacity: 0.8;
   }
 }
 
 .helper-config {
-  padding: 0 16px 14px;
-}
-
-.config-field {
-  margin-bottom: 12px;
-
-  &:last-child { margin-bottom: 0; }
-}
-
-.field-label {
-  display: block;
-  font-size: 12px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-  margin-bottom: 6px;
-
-  .required {
-    color: #ff6b6b;
-    margin-left: 2px;
-  }
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 16px;
 }
 
 .field-input-row {
   display: flex;
-  gap: 6px;
-}
+  align-items: flex-start;
+  gap: 8px;
 
-.field-input {
-  flex: 1;
-  background: rgba(var(--fd-bg-primary-rgb, 15, 15, 35), 0.6);
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.12);
-  border-radius: 8px;
-  padding: 8px 12px;
-  font-size: 13px;
-  color: var(--fd-text-primary, #fff);
-  outline: none;
-  transition: border-color 0.2s;
-
-  &::placeholder {
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.25);
-  }
-
-  &:focus {
-    border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.4);
+  .field-input {
+    flex: 1;
   }
 }
 
-.browse-btn {
-  padding: 8px 10px;
-  background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: all 0.2s;
-
-  &:hover {
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-  }
-}
-
-.field-hint {
-  font-size: 11px;
-  color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.5);
-  margin-top: 4px;
-  font-style: italic;
-}
-
-.field-error-msg {
-  font-size: 11px;
-  color: #ff6b6b;
-  margin-top: 4px;
-}
-
-.field-input.field-error {
-  border-color: rgba(255, 107, 107, 0.6);
-  box-shadow: 0 0 0 2px rgba(255, 107, 107, 0.1);
-}
-
-.field-path-warn {
-  font-size: 11px;
-  color: #fbbf24;
-  margin-top: 4px;
-}
-
-.field-input.field-warn {
-  border-color: rgba(251, 191, 36, 0.5);
-}
-
-// 命令预览
 .preview-section {
   margin-top: 20px;
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-  border-radius: 10px;
-  overflow: hidden;
-}
-
-.global-save-notice {
-  padding: 8px 14px;
-  background: rgba(74, 222, 128, 0.12);
-  border: 1px solid rgba(74, 222, 128, 0.3);
-  border-radius: 8px;
-  font-size: 12px;
-  color: #4ade80;
-  margin-top: 12px;
-}
-
-.preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 10px 14px;
-  cursor: pointer;
-  font-size: 13px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-  user-select: none;
-
-  &:hover { color: var(--fd-accent, #00fff5); }
-
-  .preview-toggle { font-size: 10px; }
 }
 
 .preview-content {
-  padding: 0 14px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 8px;
 }
 
 .preview-cmd {
-  margin-bottom: 8px;
-
-  &:last-child { margin-bottom: 0; }
+  padding: 12px 16px;
+  border-radius: 20px;
+  background: var(--md-sys-color-surface-container-high);
 
   .cmd-label {
-    font-size: 11px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.4);
-    margin-bottom: 4px;
+    font: 500 13px/18px var(--md-ref-typeface-brand, system-ui);
+    color: var(--md-sys-color-on-surface-variant);
   }
 
   .cmd-code {
     display: block;
-    font-size: 12px;
-    font-family: 'Consolas', 'Monaco', monospace;
-    color: var(--fd-accent, #00fff5);
-    background: rgba(0, 0, 0, 0.3);
-    padding: 6px 10px;
-    border-radius: 6px;
+    margin-top: 4px;
+    font: 400 14px/20px ui-monospace, 'Cascadia Mono', monospace;
+    color: var(--md-sys-color-on-surface);
     word-break: break-all;
+    white-space: pre-wrap;
   }
-}
-
-// 面板底部
-.panel-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  padding: 16px 24px;
-  border-top: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-}
-
-.btn-secondary {
-  padding: 8px 20px;
-  border-radius: 8px;
-  background: transparent;
-  border: 1px solid rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.15);
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.7);
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s;
-
-  &:hover {
-    border-color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.3);
-    color: var(--fd-text-primary, #fff);
-  }
-}
-
-.btn-primary {
-  padding: 8px 20px;
-  border-radius: 8px;
-  background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-  color: var(--fd-accent, #00fff5);
-  cursor: pointer;
-  font-size: 13px;
-  font-weight: 500;
-  transition: all 0.2s;
-
-  &:hover:not(:disabled) {
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-    box-shadow: 0 0 16px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-  }
-
-  &:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-  }
-}
-
-// Transition
-.slide-enter-from, .slide-leave-to {
-  transform: translateX(100%);
-}
-.slide-enter-active, .slide-leave-active {
-  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-.fade-enter-active, .fade-leave-active { transition: opacity 0.2s ease; }
-
-.expand-enter-from, .expand-leave-to {
-  opacity: 0;
-  max-height: 0;
-  padding-top: 0;
-  padding-bottom: 0;
-}
-.expand-enter-active, .expand-leave-active {
-  transition: all 0.25s ease;
-  overflow: hidden;
-}
-.expand-enter-to, .expand-leave-from {
-  max-height: 300px;
-  opacity: 1;
 }
 </style>

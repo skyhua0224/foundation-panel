@@ -1976,17 +1976,17 @@ export const zh = {
 
   // === 启动助手 ===
   launchHelper: {
-    title: '⚡ 启动助手',
+    title: '启动助手',
     description: '为此应用配置自动启动的辅助工具，保存后将同步到服务器。',
     orderHint: '启用后可用 ▲▼ 调整执行顺序（启动时从上到下，退出时反序）',
     moveUp: '上移',
     moveDown: '下移',
     browse: '浏览...',
     globalDefault: '全局默认: ',
-    preview: '📋 预览生成的命令',
+    preview: '预览生成的命令',
     cancel: '取消',
     saving: '保存中...',
-    save: '💾 保存到服务器',
+    save: '保存到服务器',
     globalSaved: '已将路径设为 "{name}" 的全局默认',
     saveFailed: '保存失败: ',
     fileNotFound: '文件不存在',
