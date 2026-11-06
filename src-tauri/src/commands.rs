@@ -104,6 +104,35 @@ pub async fn toggle_dark_mode(_window: tauri::Window) -> Result<bool, String> {
     Ok(true)
 }
 
+/// The pages of the main panel that the big-screen window may ask for with a row "open in the panel". The same names as `PANEL_PAGES` in
+/// renderer/composables/panelParts.js (a test keeps the two lists equal); a name that is not here is refused before any window is touched.
+pub const PANEL_PAGES: &[&str] = &[
+    "about",
+    "pairing",
+    "logs",
+    "quality",
+    "rtss",
+    "vdd",
+    "desktop-scale",
+    "live-session",
+    "shortcuts",
+    "pet",
+    "tool-paths",
+    "file-sharing",
+    "panel-advanced",
+    "display-modes",
+    "input-drivers",
+];
+
+#[tauri::command]
+pub async fn open_panel_page(app: AppHandle, page: String) -> Result<(), String> {
+    if !PANEL_PAGES.contains(&page.as_str()) {
+        return Err(format!("Unknown panel page: {}", page));
+    }
+    info!("Opening panel page: {}", page);
+    windows::open_main_panel_page(&app, &page)
+}
+
 #[tauri::command]
 pub async fn open_tool_window(app: AppHandle, tool_name: String) -> Result<(), String> {
     info!("Opening tool window: {}", tool_name);

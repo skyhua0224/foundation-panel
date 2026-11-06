@@ -1,173 +1,126 @@
 <template>
-  <div class="desktop-window" :class="windowClass">
-    <div class="wallpaper-layer"></div>
+  <div ref="root" class="desktop-window m-app">
+    <div class="wallpaper-layer" aria-hidden="true"></div>
     <slot name="titlebar">
       <TitleBar v-if="showTitleBar" :title="title" :icon="icon" />
     </slot>
-    
+
     <div class="desktop-window-content" :class="{ 'has-sidebar': hasSidebar }">
       <slot name="sidebar"></slot>
-      
-      <main class="desktop-window-main">
-        <slot></slot>
-      </main>
+
+      <div class="desktop-window-column">
+        <main class="desktop-window-main">
+          <slot></slot>
+        </main>
+        <!-- the action bar of a page (DeskDock) lives here: a row of its own under the scrolling area, clear of the gamepad legend -->
+        <div id="dsk-dock" class="desktop-window-dock"></div>
+      </div>
     </div>
-    
+
     <slot name="footer"></slot>
   </div>
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import TitleBar from './TitleBar.vue'
 
-const props = defineProps({
-  title: {
-    type: String,
-    default: 'Desktop Application'
-  },
-  icon: {
-    type: String,
-    default: null
-  },
-  showTitleBar: {
-    type: Boolean,
-    default: true
-  },
-  hasSidebar: {
-    type: Boolean,
-    default: false
-  },
-  theme: {
-    type: String,
-    default: 'dark', // dark, light
-    validator: (value) => ['dark', 'light'].includes(value)
-  }
+// The footer (running game bar, gamepad legend) floats over the bottom edge; the dock keeps clear of it by its measured height.
+const root = ref(null)
+let observer = null
+onMounted(() => {
+  const foot = root.value?.querySelector('.desktop-footer-dock')
+  if (!foot || typeof ResizeObserver === 'undefined') return
+  const apply = () => root.value?.style.setProperty('--dsk-foot-h', `${foot.offsetHeight + 28}px`)
+  observer = new ResizeObserver(apply)
+  observer.observe(foot)
+  apply()
 })
+onBeforeUnmount(() => observer?.disconnect())
 
-const windowClass = computed(() => {
-  return {
-    [`theme-${props.theme}`]: true
-  }
+defineProps({
+  title: { type: String, default: 'Desktop Application' },
+  icon: { type: String, default: null },
+  showTitleBar: { type: Boolean, default: true },
+  hasSidebar: { type: Boolean, default: false },
 })
 </script>
 
 <style lang="less" scoped>
+// 窗口：surface 底，壁纸（主题编辑器设置的 --fd-wallpaper）压一层 scrim 让字永远读得出
 .desktop-window {
   width: 100vw;
   height: 100vh;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: linear-gradient(135deg, var(--fd-bg-primary, #0f0f23) 0%, var(--fd-bg-secondary, #1a1a2e) 50%, var(--fd-bg-tertiary, #16213e) 100%);
-  color: var(--fd-text-primary, #ffffff);
-  font-size: var(--fd-font-size, 14px);
   position: relative;
+  min-height: 0;
+  background: var(--md-sys-color-surface);
+  color: var(--md-sys-color-on-surface);
+}
 
-  // 壁纸层
-  .wallpaper-layer {
-    position: absolute;
-    inset: 0;
-    background-image: var(--fd-wallpaper, none);
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    z-index: 0;
-    transition: opacity 0.5s ease;
+.wallpaper-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background-image: var(--fd-wallpaper, none);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  transition: opacity var(--m-spring-slow-effects-duration, 500ms) var(--m-spring-slow-effects, ease);
 
-    &::after {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.45);
-    }
-  }
-
-  // 背景网格效果
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-image: 
-      linear-gradient(rgba(var(--fd-accent-rgb, 0, 255, 245), 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(var(--fd-accent-rgb, 0, 255, 245), 0.03) 1px, transparent 1px);
-    background-size: 50px 50px;
-    pointer-events: none;
-    z-index: 0;
-    opacity: var(--fd-grid-visible, 1);
-  }
-
-  // 扫描线效果
   &::after {
     content: '';
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 2px,
-      rgba(0, 0, 0, 0.03) 2px,
-      rgba(0, 0, 0, 0.03) 4px
-    );
-    pointer-events: none;
-    z-index: 1;
-    opacity: var(--fd-scanline-visible, 1);
-  }
-
-  .desktop-window-content {
-    flex: 1;
-    display: flex;
-    position: relative;
-    z-index: 2;
-    height: 100vh;
-    overflow: hidden;
-
-    &.has-sidebar {
-      height: 100vh;
-    }
-  }
-
-  .desktop-window-main {
-    flex: 1;
-    padding: 32px 40px;
-    overflow-y: auto;
-    overflow-x: hidden;
-    position: relative;
-    z-index: 2;
-
-    &::-webkit-scrollbar {
-      width: 8px;
-    }
-
-    &::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-      border-radius: 4px;
-
-      &:hover {
-        background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-      }
-    }
-  }
-
-  @media (max-width: 900px) {
-    .desktop-window-main {
-      padding: 24px 28px;
-    }
+    inset: 0;
+    background: color-mix(in srgb, var(--md-sys-color-surface) 72%, transparent);
   }
 }
 
-.theme-light {
-  background: linear-gradient(135deg, #f5f5f5 0%, #ffffff 50%, #fafafa 100%);
-  color: #1e293b;
+.desktop-window-content {
+  flex: 1;
+  display: flex;
+  position: relative;
+  z-index: 2;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.desktop-window-column {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.desktop-window-dock {
+  flex: none;
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 56px var(--dsk-foot-h, 28px);
+
+  &:empty {
+    display: none;
+  }
+}
+
+.desktop-window-main {
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  padding: 40px 56px 120px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  z-index: 2;
+
+  @media (max-width: 900px) {
+    padding: 28px 28px 120px;
+  }
 }
 </style>

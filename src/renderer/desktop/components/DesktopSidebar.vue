@@ -1,75 +1,78 @@
 <template>
-  <nav class="desktop-sidebar" :class="{ 'collapsed': collapsed }">
-    <div class="sidebar-content">
-      <div 
-        v-for="item in items" 
+  <nav class="desktop-sidebar" :class="{ collapsed }" :aria-label="label">
+    <div class="rail-group">
+      <div
+        v-for="item in items"
         :key="item.id"
         class="nav-item"
         :class="{ active: activeItem === item.id, disabled: item.disabled }"
-        tabindex="0"
-        @click="handleItemClick(item)"
-        @keydown.enter="handleItemClick(item)"
+        role="button"
+        :tabindex="item.disabled ? -1 : 0"
+        :aria-current="activeItem === item.id ? 'page' : undefined"
+        :aria-disabled="item.disabled || undefined"
+        :data-focus-key="'nav-' + item.id"
         :title="item.label"
-      >
-        <component v-if="item.icon" :is="item.icon" class="nav-icon" />
-        <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
-        <span v-if="item.badge && !collapsed" class="nav-badge">{{ item.badge }}</span>
-      </div>
-      
-      <div v-if="items.length > 0 && showDivider" class="nav-divider"></div>
-      
-      <div 
-        v-for="item in bottomItems" 
-        :key="item.id"
-        class="nav-item"
-        :class="{ active: activeItem === item.id, disabled: item.disabled }"
-        tabindex="0"
         @click="handleItemClick(item)"
-        @keydown.enter="handleItemClick(item)"
-        :title="item.label"
+        @keydown.enter.prevent="handleItemClick(item)"
+        @keydown.space.prevent="handleItemClick(item)"
       >
-        <component v-if="item.icon" :is="item.icon" class="nav-icon" />
+        <span class="nav-pill">
+          <MIcon v-if="typeof item.icon === 'string'" class="nav-icon" :name="item.icon" :fill="activeItem === item.id" />
+          <component :is="item.icon" v-else-if="item.icon" class="nav-icon" />
+          <MBadge v-if="item.badge && !collapsed" class="nav-badge" :value="item.badge" />
+        </span>
         <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
-        <span v-if="item.badge && !collapsed" class="nav-badge">{{ item.badge }}</span>
       </div>
     </div>
-    
-    <div v-if="collapsible" class="sidebar-toggle" @click="collapsed = !collapsed">
-      <svg :class="{ 'rotated': !collapsed }" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M9 18l6-6-6-6"/>
-      </svg>
+
+    <div class="rail-group rail-foot">
+      <div
+        v-for="item in bottomItems"
+        :key="item.id"
+        class="nav-item"
+        :class="{ active: activeItem === item.id, disabled: item.disabled }"
+        role="button"
+        :tabindex="item.disabled ? -1 : 0"
+        :aria-current="activeItem === item.id ? 'page' : undefined"
+        :aria-disabled="item.disabled || undefined"
+        :data-focus-key="'nav-' + item.id"
+        :title="item.label"
+        @click="handleItemClick(item)"
+        @keydown.enter.prevent="handleItemClick(item)"
+        @keydown.space.prevent="handleItemClick(item)"
+      >
+        <span class="nav-pill">
+          <MIcon v-if="typeof item.icon === 'string'" class="nav-icon" :name="item.icon" :fill="activeItem === item.id" />
+          <component :is="item.icon" v-else-if="item.icon" class="nav-icon" />
+        </span>
+        <span v-if="!collapsed" class="nav-label">{{ item.label }}</span>
+      </div>
+
+      <MIconButton
+        v-if="collapsible"
+        class="rail-toggle"
+        :icon="collapsed ? 'chevron_right' : 'chevron_left'"
+        :label="collapsed ? expandLabel : collapseLabel"
+        data-focusable
+        @click="$emit('update:collapsed', !collapsed)"
+      />
     </div>
   </nav>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { MBadge, MIcon, MIconButton } from 'foundation-ui/vue'
 
-const props = defineProps({
-  items: {
-    type: Array,
-    default: () => []
-  },
-  bottomItems: {
-    type: Array,
-    default: () => []
-  },
-  activeItem: {
-    type: String,
-    default: null
-  },
-  collapsed: {
-    type: Boolean,
-    default: false
-  },
-  collapsible: {
-    type: Boolean,
-    default: false
-  },
-  showDivider: {
-    type: Boolean,
-    default: true
-  }
+// items / bottomItems: [{ id, label, icon: 'material-name' | Component, disabled?, badge? }]
+defineProps({
+  items: { type: Array, default: () => [] },
+  bottomItems: { type: Array, default: () => [] },
+  activeItem: { type: String, default: null },
+  collapsed: { type: Boolean, default: false },
+  collapsible: { type: Boolean, default: false },
+  label: { type: String, default: 'Main' },
+  expandLabel: { type: String, default: 'Expand' },
+  collapseLabel: { type: String, default: 'Collapse' },
 })
 
 const emit = defineEmits(['item-click', 'update:collapsed', 'update:activeItem'])
@@ -82,142 +85,109 @@ function handleItemClick(item) {
 </script>
 
 <style lang="less" scoped>
+// M3 navigation rail，放大到 10 英尺：图标 32、指示胶囊 80×48、标签 14/20
 .desktop-sidebar {
-  width: 92px;
-  background: transparent;
-  border-right: none;
+  width: 120px;
+  flex: none;
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24px 0;
-  gap: 12px;
-  transition: width 0.3s ease;
+  justify-content: space-between;
+  padding: 32px 0 28px;
+  background: color-mix(in srgb, var(--md-sys-color-surface-container) 92%, transparent);
   position: relative;
+  z-index: 3;
+  transition: width var(--m-spring-default-spatial-duration, 300ms) var(--m-spring-default-spatial, ease);
 
   &.collapsed {
-    width: 72px;
-
-    .nav-label {
-      display: none;
-    }
-
-    .nav-badge {
-      display: none;
-    }
+    width: 88px;
   }
+}
 
-  .sidebar-content {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    width: 100%;
-  }
+.rail-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+}
 
-  .nav-item {
-    width: 60px;
-    min-height: 60px;
-    border-radius: 14px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: all 0.2s ease;
+.nav-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--md-sys-color-on-surface-variant);
+  outline: none;
+  border-radius: 24px;
+  -webkit-tap-highlight-color: transparent;
+
+  .nav-pill {
     position: relative;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.7);
-    padding: 10px;
-    gap: 6px;
+    display: grid;
+    place-items: center;
+    width: 80px;
+    height: 48px;
+    border-radius: 24px;
+    transition: background-color var(--m-spring-default-effects-duration, 200ms) var(--m-spring-default-effects, ease),
+      border-radius var(--m-spring-fast-spatial-duration, 200ms) var(--m-spring-fast-spatial, ease);
+  }
 
-    &:hover:not(.disabled) {
-      background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-      color: var(--fd-accent, #00fff5);
-    }
+  .nav-icon {
+    width: 30px;
+    height: 30px;
+  }
 
-    &.active {
-      background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-      color: var(--fd-accent, #00fff5);
-      box-shadow: 0 0 20px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3), 0 0 40px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
+  .nav-badge {
+    position: absolute;
+    top: 2px;
+    right: 8px;
+  }
 
-      &::before {
-        content: '';
-        position: absolute;
-        left: -16px;
-        width: 5px;
-        height: 32px;
-        background: var(--fd-accent, #00fff5);
-        border-radius: 0 4px 4px 0;
-        box-shadow: 0 0 20px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3), 0 0 40px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-      }
-    }
+  .nav-label {
+    font: 500 14px/20px var(--md-ref-typeface-brand, system-ui);
+    text-align: center;
+    max-width: 100%;
+    padding: 0 6px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 
-    &.disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
+  &:hover:not(.disabled) .nav-pill {
+    background: color-mix(in srgb, var(--md-sys-color-on-surface) 8%, transparent);
+  }
 
-    .nav-icon {
-      width: 24px;
-      height: 24px;
-      flex-shrink: 0;
+  &:active:not(.disabled) .nav-pill {
+    border-radius: 16px;
+  }
+
+  &.active {
+    color: var(--md-sys-color-on-surface);
+
+    .nav-pill {
+      background: var(--md-sys-color-secondary-container);
+      color: var(--md-sys-color-on-secondary-container);
     }
 
     .nav-label {
-      font-size: 12px;
-      font-weight: 500;
-      text-align: center;
-      line-height: 1.2;
-    }
-
-    .nav-badge {
-      position: absolute;
-      top: 6px;
-      right: 6px;
-      background: linear-gradient(135deg, var(--fd-accent, #00fff5) 0%, var(--fd-accent-secondary, #ff00ff) 100%);
-      color: var(--fd-bg-primary, #0f0f23);
-      font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 10px;
-      font-weight: 600;
-      min-width: 18px;
-      text-align: center;
+      font-weight: 700;
     }
   }
 
-  .nav-divider {
-    width: 40px;
-    height: 1px;
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-    margin: 12px 0;
+  &.disabled {
+    opacity: 0.38;
+    cursor: not-allowed;
   }
+}
 
-  .sidebar-toggle {
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    transition: all 0.2s ease;
+.rail-foot {
+  gap: 10px;
+}
 
-    &:hover {
-      background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-      color: var(--fd-accent, #00fff5);
-    }
-
-    svg {
-      width: 16px;
-      height: 16px;
-      transition: transform 0.3s ease;
-      transform: rotate(0deg);
-
-      &.rotated {
-        transform: rotate(180deg);
-      }
-    }
-  }
+.rail-toggle {
+  margin-top: 4px;
 }
 </style>

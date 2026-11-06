@@ -1,44 +1,42 @@
 <template>
-  <Teleport to="body">
+  <Transition name="ctx">
     <div
       v-if="visible"
       ref="menuRef"
       class="context-menu"
+      role="menu"
       :style="{ left: position.left + 'px', top: position.top + 'px' }"
       @click.stop
       @keydown.esc.prevent="$emit('close')"
     >
-      <button type="button" class="menu-item" data-focusable data-focus-key="ctx-launch" @click="$emit('launch')">
-        <span class="menu-icon"><MIcon name="play_circle" /></span> {{ t.appContext.launch }}
-      </button>
-      <button type="button" class="menu-item" data-focusable data-focus-key="ctx-favorite" @click="$emit('toggleFavorite')">
-        <span class="menu-icon">
-          <MIcon name="star" :fill="isFavorited" />
-        </span>
+      <MButton class="menu-item" variant="text" size="lg" icon="play_circle" data-focusable data-focus-key="ctx-launch" role="menuitem" @click="$emit('launch')">
+        {{ t.appContext.launch }}
+      </MButton>
+      <MButton class="menu-item" variant="text" size="lg" :icon="isFavorited ? 'star' : 'favorite'" data-focusable data-focus-key="ctx-favorite" role="menuitem" @click="$emit('toggleFavorite')">
         {{ isFavorited ? t.appContext.unfavorite : t.appContext.favorite }}
-      </button>
-      <div class="menu-divider"></div>
-      <button type="button" class="menu-item" data-focusable data-focus-key="ctx-cover" @click="$emit('updateCover')">
-        <span class="menu-icon"><MIcon name="image" /></span> {{ t.appContext.updateCover }}
-      </button>
-      <button type="button" class="menu-item" data-focusable data-focus-key="ctx-helpers" @click="$emit('configHelpers')">
-        <span class="menu-icon"><MIcon name="bolt" /></span> {{ t.appContext.launchHelper }}
-      </button>
-      <button type="button" class="menu-item" data-focusable data-focus-key="ctx-copy" v-if="hasCmd" @click="$emit('copyCmd')">
-        <span class="menu-icon"><MIcon name="content_copy" /></span> {{ t.appContext.copyCommand }}
-      </button>
-      <button type="button" class="menu-item" data-focusable data-focus-key="ctx-dir" v-if="hasWorkingDir" @click="$emit('openDir')">
-        <span class="menu-icon"><MIcon name="folder" /></span> {{ t.appContext.openDirectory }}
-      </button>
+      </MButton>
+      <div class="menu-divider" role="separator"></div>
+      <MButton class="menu-item" variant="text" size="lg" icon="image" data-focusable data-focus-key="ctx-cover" role="menuitem" @click="$emit('updateCover')">
+        {{ t.appContext.updateCover }}
+      </MButton>
+      <MButton class="menu-item" variant="text" size="lg" icon="bolt" data-focusable data-focus-key="ctx-helpers" role="menuitem" @click="$emit('configHelpers')">
+        {{ t.appContext.launchHelper }}
+      </MButton>
+      <MButton v-if="hasCmd" class="menu-item" variant="text" size="lg" icon="content_copy" data-focusable data-focus-key="ctx-copy" role="menuitem" @click="$emit('copyCmd')">
+        {{ t.appContext.copyCommand }}
+      </MButton>
+      <MButton v-if="hasWorkingDir" class="menu-item" variant="text" size="lg" icon="folder" data-focusable data-focus-key="ctx-dir" role="menuitem" @click="$emit('openDir')">
+        {{ t.appContext.openDirectory }}
+      </MButton>
     </div>
-  </Teleport>
+  </Transition>
 </template>
 
 <script setup>
 import { nextTick, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from '../i18n/index.js'
 import { popFocusScope, pushFocusScope } from '../composables/useFocusNav.js'
-import { MIcon } from 'foundation-ui/vue'
+import { MButton } from 'foundation-ui/vue'
 const { t } = useI18n()
 
 const props = defineProps({
@@ -95,57 +93,49 @@ onUnmounted(() => {
 </script>
 
 <style lang="less" scoped>
+// M3 菜单：surface-container 卡片，28 圆角，从点击处弹开
 .context-menu {
   position: fixed;
-  background: rgba(var(--fd-bg-primary-rgb, 20, 20, 40), 0.98);
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-  border-radius: 10px;
-  padding: 6px 0;
-  min-width: 180px;
-  z-index: 10000;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  z-index: 20000;
+  min-width: 360px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-radius: 28px;
+  background: var(--md-sys-color-surface-container);
+  box-shadow: var(--d-shadow-3);
+  transform-origin: top left;
 
   .menu-item {
+    justify-content: flex-start;
     width: 100%;
-    padding: 8px 16px;
-    font-size: 13px;
-    font-family: inherit;
-    text-align: left;
-    border: none;
-    background: transparent;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.8);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    transition: background 0.1s ease;
-
-    .menu-icon {
-      width: 18px;
-      height: 18px;
-      text-align: center;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      flex-shrink: 0;
-
-      :deep(svg) {
-        width: 15px;
-        height: 15px;
-      }
-    }
-
-    &:hover,
-    &:focus-visible {
-      background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-      color: var(--fd-accent, #00fff5);
-    }
+    height: 64px;
+    border-radius: 22px;
+    padding: 0 24px;
+    gap: 16px;
+    font: 500 20px/28px var(--md-ref-typeface-brand, system-ui);
   }
 
   .menu-divider {
     height: 1px;
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-    margin: 4px 12px;
+    margin: 6px 12px;
+    background: var(--md-sys-color-outline-variant);
   }
+}
+
+.ctx-enter-active {
+  transition: opacity var(--m-spring-fast-effects-duration, 150ms) var(--m-spring-fast-effects, ease),
+    transform var(--m-spring-fast-spatial-duration, 250ms) var(--m-spring-fast-spatial, ease);
+}
+.ctx-leave-active {
+  transition: opacity var(--m-spring-fast-effects-duration, 120ms) var(--m-spring-fast-effects, ease);
+}
+.ctx-enter-from,
+.ctx-leave-to {
+  opacity: 0;
+}
+.ctx-enter-from {
+  transform: scale(0.9);
 }
 </style>

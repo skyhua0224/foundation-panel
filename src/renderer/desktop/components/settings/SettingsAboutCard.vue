@@ -1,99 +1,40 @@
 <template>
-  <div class="desktop-card about-card fade-in">
-    <div class="about-content">
-      <div class="about-logo"><MIcon name="light_mode" /></div>
-      <div class="about-info">
-        <div class="about-name">Foundation Desktop</div>
-        <div class="about-version">{{ t.settings.version }} {{ appVersion }}</div>
-        <div class="about-links">
-          <a href="#" @click.prevent="emit('open-link', 'github')">GitHub</a>
-          <span>&middot;</span>
-          <a href="#" @click.prevent="emit('open-link', 'docs')">{{ t.settings.docs }}</a>
-          <span>&middot;</span>
-          <a href="#" @click.prevent="emit('open-link', 'discord')">Discord</a>
-        </div>
+  <section class="dsk-about">
+    <div class="dsk-about__logo"><MIcon name="light_mode" fill /></div>
+    <div class="dsk-about__info">
+      <div class="dsk-about__name">Foundation Desktop</div>
+      <div class="dsk-about__version">{{ t.settings.version }} {{ appVersion }}</div>
+      <div class="dsk-about__links">
+        <MButton variant="text" size="sm" icon="code" @click="emit('open-link', 'github')">GitHub</MButton>
+        <MButton variant="text" size="sm" icon="menu_book" @click="emit('open-link', 'docs')">{{ t.settings.docs }}</MButton>
+        <MButton variant="text" size="sm" icon="forum" @click="emit('open-link', 'discord')">Discord</MButton>
       </div>
     </div>
-    <button class="desktop-btn" :disabled="checking" @click="emit('check-update')">
+    <MButton variant="tonal" icon="update" :loading="checking" @click="emit('check-update')">
       {{ checking ? t.settings.checking : t.settings.checkUpdate }}
-    </button>
-  </div>
+    </MButton>
+  </section>
 </template>
 
 <script setup>
-import { MIcon } from 'foundation-ui/vue'
+import { MButton, MIcon } from 'foundation-ui/vue'
 import { useI18n } from '../../i18n/index.js'
 
 defineProps({
-  appVersion: {
-    type: String,
-    required: true,
-  },
-  checking: {
-    type: Boolean,
-    required: true,
-  },
+  appVersion: { type: String, required: true },
+  checking: { type: Boolean, required: true },
 })
 
 const emit = defineEmits(['open-link', 'check-update'])
 const { t } = useI18n()
 </script>
 
-<style lang="less" scoped>
-.about-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.about-content {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.about-logo {
-  width: 42px;
-  height: 42px;
-  color: var(--fd-accent, #00fff5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  svg {
-    width: 100%;
-    height: 100%;
-  }
-}
-
-.about-name {
-  font-size: 18px;
-  font-weight: 600;
-  color: var(--fd-text-primary, #fff);
-}
-
-.about-version {
-  font-size: 14px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-  margin-bottom: 4px;
-}
-
-.about-links {
-  font-size: 13px;
-  display: flex;
-  gap: 8px;
-
-  a {
-    color: var(--fd-accent, #00fff5);
-    text-decoration: none;
-
-    &:hover {
-      text-decoration: underline;
-    }
-  }
-
-  span {
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.3);
-  }
-}
+<style scoped>
+.dsk-about { display: flex; align-items: center; gap: 20px; padding: 20px 24px; border-radius: var(--md-sys-shape-corner-extra-large); background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+.dsk-about__logo { flex: none; width: 64px; height: 64px; border-radius: 22px; display: grid; place-items: center; font-size: 36px; background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); }
+.dsk-about__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.dsk-about__name { font: var(--m-title-large); }
+.dsk-about__version { font: var(--m-body-large); opacity: .8; }
+.dsk-about__links { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 0 -12px; }
+.dsk-about__links .m-btn--text { --m-btn-fg: var(--md-sys-color-on-primary-container); }
 </style>

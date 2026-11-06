@@ -1,54 +1,52 @@
 <template>
-  <Teleport to="body">
-    <Transition name="launch-overlay">
-      <div v-if="state" ref="overlayRef" class="launch-overlay" :class="'status-' + state.status">
-        <div class="launch-card">
-          <div class="launch-cover">
-            <img v-if="state.coverUrl" :src="state.coverUrl" :alt="state.appName" />
-            <span v-else class="launch-cover-letter">{{ state.appName?.[0] || '?' }}</span>
-            <div v-if="state.status === 'launching'" class="launch-cover-scan"></div>
-          </div>
-
-          <div class="launch-body">
-            <div class="launch-status">
-              <span v-if="state.status === 'launching'" class="launch-spinner"></span>
-              <span v-else class="launch-glyph" :class="'glyph-' + state.status">{{ glyph }}</span>
-              <span class="launch-headline">{{ headline }}</span>
-            </div>
-
-            <p class="launch-detail">{{ detail }}</p>
-
-            <div class="launch-actions">
-              <button
-                v-if="state.status === 'conflict'"
-                type="button"
-                class="launch-btn danger"
-                data-focusable
-                data-focus-key="launch-stop"
-                @click="emit('stop')"
-              >
-                {{ t.gameSession.stopRunning }}
-              </button>
-              <button
-                v-if="state.status !== 'launching'"
-                type="button"
-                class="launch-btn"
-                data-focusable
-                data-focus-key="launch-dismiss"
-                @click="emit('dismiss')"
-              >
-                {{ t.gameSession.dismiss }}
-              </button>
-            </div>
-          </div>
-        </div>
+  <MDialog
+    ref="dialogRef"
+    class="launch-dialog"
+    :model-value="!!state"
+    :title="headline"
+    :icon="dialogIcon"
+    :tone="dialogTone"
+    :persistent="persistent"
+    @update:model-value="onModel"
+  >
+    <div v-if="state" class="launch-card" :class="'status-' + state.status">
+      <div class="launch-cover">
+        <img v-if="state.coverUrl" :src="state.coverUrl" :alt="state.appName" />
+        <span v-else class="launch-cover-letter">{{ state.appName?.[0] || '?' }}</span>
+        <div v-if="state.status === 'launching'" class="launch-cover-busy"><MLoading size="56px" /></div>
       </div>
-    </Transition>
-  </Teleport>
+      <p class="launch-detail">{{ detail }}</p>
+    </div>
+
+    <template #actions>
+      <MButton
+        v-if="state?.status === 'conflict'"
+        variant="danger"
+        size="lg"
+        icon="stop_circle"
+        data-focusable
+        data-focus-key="launch-stop"
+        @click="emit('stop')"
+      >
+        {{ t.gameSession.stopRunning }}
+      </MButton>
+      <MButton
+        v-if="state && state.status !== 'launching'"
+        variant="tonal"
+        size="lg"
+        data-focusable
+        data-focus-key="launch-dismiss"
+        @click="emit('dismiss')"
+      >
+        {{ t.gameSession.dismiss }}
+      </MButton>
+    </template>
+  </MDialog>
 </template>
 
 <script setup>
 import { computed, nextTick, ref, watch } from 'vue'
+import { MButton, MDialog, MIcon, MLoading } from 'foundation-ui/vue'
 import { formatDuration } from '../composables/useGameSession.js'
 import { focusElement, useModalFocusScope } from '../composables/useFocusNav.js'
 import { useI18n } from '../i18n/index.js'
@@ -64,7 +62,9 @@ const emit = defineEmits(['dismiss', 'stop'])
 // 这是一层吞点击的全屏遮罩，必须和其他弹层一样压入焦点栈：否则手柄导航会继续在
 // 遮罩背后的应用网格里走，而 conflict 态自己的「结束游戏 / 关闭」按钮反而够不到
 // —— teleport 出去的节点不在 .desktop-window 里，收集不到。
-const overlayRef = ref(null)
+const dialogRef = ref(null)
+// MDialog 的根就是 <dialog>，覆盖层成为顶层模态；手柄焦点栈以它为作用域
+const overlayRef = computed(() => dialogRef.value?.$el || null)
 useModalFocusScope(overlayRef, () => !!props.state)
 
 // 状态在遮罩存续期间会变（launching -> error / conflict / untracked），而
@@ -90,19 +90,40 @@ watch(
   { immediate: true }
 )
 
-const glyph = computed(() => {
+const dialogIcon = computed(() => {
   switch (props.state?.status) {
     case 'started':
-      return '✓'
+      return 'check_circle'
     case 'exited':
-      return '⏻'
+      return 'power_settings_new'
     case 'untracked':
     case 'conflict':
-      return '!'
+      return 'warning'
+    case 'launching':
+      return ''
     default:
-      return '×'
+      return 'error'
   }
 })
+
+const dialogTone = computed(() => {
+  switch (props.state?.status) {
+    case 'started':
+    case 'exited':
+      return 'info'
+    case 'untracked':
+    case 'conflict':
+      return 'warning'
+    default:
+      return 'error'
+  }
+})
+
+// launching 是唯一不可取消的状态；其余状态 Esc / 点遮罩 = 关闭
+const persistent = computed(() => props.state?.status === 'launching')
+function onModel(open) {
+  if (!open && props.state && !persistent.value) emit('dismiss')
+}
 
 function text(key, replacements = {}) {
   let value = t.value.gameSession?.[key] || ''
@@ -149,42 +170,29 @@ const detail = computed(() => {
   }
 })
 </script>
-
 <style lang="less" scoped>
-.launch-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 19000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(var(--fd-bg-primary-rgb, 15, 15, 35), 0.88);
-  backdrop-filter: blur(10px);
+.launch-dialog {
+  max-width: 640px;
 }
 
 .launch-card {
   display: flex;
   align-items: center;
-  gap: 28px;
-  padding: 28px 36px;
-  border-radius: 20px;
-  background: rgba(var(--fd-bg-secondary-rgb, 26, 26, 46), 0.9);
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.22);
-  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.6);
-  max-width: min(760px, 88vw);
+  gap: 24px;
 }
 
 .launch-cover {
   position: relative;
-  width: 132px;
-  height: 176px;
-  flex-shrink: 0;
-  border-radius: 14px;
+  flex: none;
+  width: 120px;
+  aspect-ratio: 3 / 4;
+  border-radius: 24px;
   overflow: hidden;
-  background: rgba(var(--fd-bg-primary-rgb, 15, 15, 35), 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+  display: grid;
+  place-items: center;
+  box-shadow: var(--d-shadow-1);
 
   img {
     width: 100%;
@@ -193,151 +201,21 @@ const detail = computed(() => {
   }
 
   .launch-cover-letter {
-    font-size: 56px;
-    font-weight: 700;
-    color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-    text-transform: uppercase;
+    font: 800 56px/1 var(--md-ref-typeface-brand, system-ui);
   }
 
-  .launch-cover-scan {
+  .launch-cover-busy {
     position: absolute;
     inset: 0;
-    background: linear-gradient(
-      to bottom,
-      transparent 0%,
-      rgba(var(--fd-accent-rgb, 0, 255, 245), 0.35) 50%,
-      transparent 100%
-    );
-    animation: launch-scan 1.6s ease-in-out infinite;
-  }
-}
-
-@keyframes launch-scan {
-  0% {
-    transform: translateY(-100%);
-  }
-  100% {
-    transform: translateY(100%);
-  }
-}
-
-.launch-body {
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.launch-status {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.launch-headline {
-  font-size: 22px;
-  font-weight: 600;
-  color: var(--fd-text-primary, #fff);
-}
-
-.launch-spinner {
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-  border: 3px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-  border-top-color: var(--fd-accent, #00fff5);
-  border-radius: 50%;
-  animation: launch-spin 0.8s linear infinite;
-}
-
-@keyframes launch-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.launch-glyph {
-  width: 26px;
-  height: 26px;
-  flex-shrink: 0;
-  border-radius: 50%;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 15px;
-  font-weight: 700;
-
-  &.glyph-started,
-  &.glyph-exited {
-    background: rgba(var(--fd-status-success-rgb, 0, 255, 136), 0.16);
-    color: var(--fd-status-success, #00ff88);
-  }
-
-  &.glyph-untracked,
-  &.glyph-conflict {
-    background: rgba(var(--fd-status-warning-rgb, 255, 215, 0), 0.16);
-    color: var(--fd-status-warning, #ffd700);
-  }
-
-  &.glyph-error {
-    background: rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.16);
-    color: var(--fd-status-danger, #ff6b35);
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--md-sys-color-scrim, #000) 45%, transparent);
   }
 }
 
 .launch-detail {
   margin: 0;
-  font-size: 14px;
-  line-height: 1.6;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.55);
-  white-space: pre-line;
-  word-break: break-word;
-}
-
-.launch-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 4px;
-}
-
-.launch-btn {
-  padding: 8px 20px;
-  border-radius: 8px;
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-  background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-  color: var(--fd-accent, #00fff5);
-  font-size: 14px;
-  cursor: pointer;
-  transition:
-    background 0.2s ease,
-    border-color 0.2s ease;
-
-  &:hover,
-  &:focus-visible {
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-    border-color: var(--fd-accent, #00fff5);
-  }
-
-  &.danger {
-    border-color: rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.4);
-    background: rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.12);
-    color: var(--fd-status-danger, #ff6b35);
-
-    &:hover,
-    &:focus-visible {
-      background: rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.22);
-      border-color: var(--fd-status-danger, #ff6b35);
-    }
-  }
-}
-
-.launch-overlay-enter-active,
-.launch-overlay-leave-active {
-  transition: opacity 0.2s ease;
-}
-
-.launch-overlay-enter-from,
-.launch-overlay-leave-to {
-  opacity: 0;
+  font: 400 18px/28px var(--md-ref-typeface-brand, system-ui);
+  color: var(--md-sys-color-on-surface-variant);
 }
 </style>

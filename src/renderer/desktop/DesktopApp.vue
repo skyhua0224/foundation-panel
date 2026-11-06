@@ -1,93 +1,99 @@
 <template>
-  <DesktopWindow
-    :title="appTitle"
-    :icon="sunshineIcon"
-    :has-sidebar="true"
-    :show-title-bar="false"
-    :class="{ 'gamepad-active': gamepadActive, 'cursor-mode': cursorEnabled }"
-  >
-    <template #sidebar>
-      <DesktopSidebar
-        :items="navItems"
-        :bottom-items="bottomNavItems"
-        :active-item="activeNav"
-        @item-click="handleNavClick"
-        @update:active-item="activeNav = $event"
-      />
-    </template>
-
-    <template #default>
-      <component :is="currentView" @openThemeEditor="themeEditorOpen = true" />
-    </template>
-
-    <template #footer>
-      <!-- 两者都是底部居中的浮层，必须放在同一个 flex 列里堆叠。
-           各自绝对定位时会完全重叠，而运行条的 z-index 更高，会把按键提示整条盖掉
-           —— 而「游戏在跑 + 手柄模式」正是沙发场景下最常见的状态。 -->
-      <div class="desktop-footer-dock">
-        <RunningGameBar
-          :game="runningGame"
-          :elapsed="elapsedSeconds"
-          :stat="runningStat"
-          @resume="resumeGame"
-          @stop="confirmStopGame"
+  <!-- m-app：foundation-ui 的减少动态 / 动画偏好按 .m-app 后代生效，弹层、键盘、启动页都要在它里面 -->
+  <div class="m-app desktop-root">
+    <DesktopWindow
+      :title="appTitle"
+      :icon="sunshineIcon"
+      :has-sidebar="true"
+      :show-title-bar="false"
+      :class="{ 'gamepad-active': gamepadActive, 'cursor-mode': cursorEnabled }"
+    >
+      <template #sidebar>
+        <DesktopSidebar
+          :items="navItems"
+          :bottom-items="bottomNavItems"
+          :active-item="activeNav"
+          @item-click="handleNavClick"
+          @update:active-item="activeNav = $event"
         />
+      </template>
 
-        <GamepadLegend v-if="gamepadActive" :cursor-mode="cursorEnabled" />
-      </div>
-    </template>
-  </DesktopWindow>
+      <template #default>
+        <component :is="currentView" @openThemeEditor="themeEditorOpen = true" />
+      </template>
 
-  <ThemeEditor
-    :open="themeEditorOpen"
-    :vars="themeVars"
-    :activePreset="activePreset"
-    :presets="presets"
-    :wallpaper="wallpaper"
-    :wallpaperColors="wallpaperColors"
-    :wallpaperSeeds="wallpaperSeeds"
-    :activeWallpaperSeed="activeWallpaperSeed"
-    @close="themeEditorOpen = false"
-    @setVar="setVar"
-    @applyPreset="applyPreset"
-    @export="handleThemeExport"
-    @import="handleThemeImport"
-    @setWallpaper="setWallpaper"
-    @applySeed="applySeedColor"
-    @removeWallpaper="removeWallpaper"
-  />
+      <template #footer>
+        <!-- 两者都是底部居中的浮层，必须放在同一个 flex 列里堆叠。
+             各自绝对定位时会完全重叠，而运行条的 z-index 更高，会把按键提示整条盖掉
+             —— 而「游戏在跑 + 手柄模式」正是沙发场景下最常见的状态。 -->
+        <div class="desktop-footer-dock">
+          <RunningGameBar
+            :game="runningGame"
+            :elapsed="elapsedSeconds"
+            :stat="runningStat"
+            @resume="resumeGame"
+            @stop="confirmStopGame"
+          />
 
-  <OnScreenKeyboard />
+          <GamepadLegend v-if="gamepadActive" :cursor-mode="cursorEnabled" />
+        </div>
+      </template>
+    </DesktopWindow>
 
-  <BackHoldRing :progress="backHoldProgress" />
+    <ThemeEditor
+      :open="themeEditorOpen"
+      :vars="themeVars"
+      :activePreset="activePreset"
+      :presets="presets"
+      :wallpaper="wallpaper"
+      :wallpaperColors="wallpaperColors"
+      :wallpaperSeeds="wallpaperSeeds"
+      :activeWallpaperSeed="activeWallpaperSeed"
+      @close="themeEditorOpen = false"
+      @setVar="setVar"
+      @applyPreset="applyPreset"
+      @export="handleThemeExport"
+      @import="handleThemeImport"
+      @setWallpaper="setWallpaper"
+      @applySeed="applySeedColor"
+      @removeWallpaper="removeWallpaper"
+    />
 
-  <ConfirmDialog />
+    <OnScreenKeyboard />
 
-  <LaunchOverlay
-    :state="launchState"
-    @dismiss="dismissLaunchState"
-    @stop="confirmStopGame"
-  />
+    <BackHoldRing :progress="backHoldProgress" />
 
-  <div
-    v-if="cursorEnabled"
-    class="gamepad-cursor"
-    :style="{ transform: `translate(${cursorX}px, ${cursorY}px)` }"
-    aria-hidden="true"
-  >
-    <svg viewBox="0 0 24 24">
-      <path d="M5 2 L5 19 L10 14.5 L13 21.5 L16 20 L13 13.5 L19.5 13 Z" />
-    </svg>
+    <ConfirmDialog />
+
+    <LaunchOverlay
+      :state="launchState"
+      @dismiss="dismissLaunchState"
+      @stop="confirmStopGame"
+    />
+
+    <div
+      v-if="cursorEnabled"
+      class="gamepad-cursor"
+      :style="{ transform: `translate(${cursorX}px, ${cursorY}px)` }"
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 24 24">
+        <path d="M5 2 L5 19 L10 14.5 L13 21.5 L16 20 L13 13.5 L19.5 13 Z" />
+      </svg>
+    </div>
+
+    <SplashScreen
+      :visible="showSplash"
+      @done="showSplash = false"
+    />
+
+    <MNotifyHost />
   </div>
-
-  <SplashScreen
-    :visible="showSplash"
-    @done="showSplash = false"
-  />
 </template>
 
 <script setup>
 import { defineAsyncComponent, ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { MNotifyHost, registerModeHandler, useAppearance } from 'foundation-ui/vue'
 
 // 桌面 UI 组件
 import DesktopWindow from './components/DesktopWindow.vue'
@@ -155,17 +161,6 @@ import {
 } from './composables/useDesktopSettings.js'
 import { useI18n } from './i18n/index.js'
 
-// 图标组件
-import IconApps from './icons/IconApps.vue'
-import IconDashboard from './icons/IconDashboard.vue'
-import IconDevices from './icons/IconDevices.vue'
-import IconStream from './icons/IconStream.vue'
-import IconTools from './icons/IconTools.vue'
-import IconSettings from './icons/IconSettings.vue'
-import IconPower from './icons/IconPower.vue'
-import IconPalette from './icons/IconPalette.vue'
-import IconLang from './icons/IconLang.vue'
-
 // 视图组件
 const AppsView = defineAsyncComponent(() => import('./views/AppsView.vue'))
 const DashboardView = defineAsyncComponent(() => import('./views/DashboardView.vue'))
@@ -189,6 +184,21 @@ const themeEditorOpen = ref(false)
 const showSplash = ref(true)
 const { helperPanelOpen } = useLaunchHelpers(t)
 
+// 外观（浅色 / 深色 / 跟随系统、壁纸取色、动画）由 foundation-ui 统一管理，与控制面板同源。
+// 浅深色怎么落到页面由产品注册：大屏把它写到 <html data-bs-theme> 和 color-scheme。
+const systemDark = window.matchMedia?.('(prefers-color-scheme: dark)')
+let appearanceMode = 'system'
+function applyColourMode(mode = appearanceMode) {
+  appearanceMode = mode
+  const dark = mode === 'system' ? !!systemDark?.matches : mode === 'dark'
+  const root = document.documentElement
+  root.setAttribute('data-bs-theme', dark ? 'dark' : 'light')
+  root.setAttribute('data-theme', dark ? 'dark' : 'light')
+  root.style.colorScheme = dark ? 'dark' : 'light'
+}
+registerModeHandler(applyColourMode)
+const onSystemScheme = () => { if (appearanceMode === 'system') applyColourMode() }
+
 function handleThemeExport() {
   const json = exportTheme()
   navigator.clipboard.writeText(json).catch(() => {})
@@ -205,19 +215,19 @@ const activeNav = ref('apps')
 
 // 主导航项
 const navItems = computed(() => [
-  { id: 'apps', label: t.value.nav.apps, icon: IconApps, disabled: false },
-  { id: 'dashboard', label: t.value.nav.dashboard, icon: IconDashboard, disabled: false },
-  { id: 'devices', label: t.value.nav.devices, icon: IconDevices, disabled: false },
-  { id: 'stream', label: t.value.nav.stream, icon: IconStream, disabled: false },
-  { id: 'tools', label: t.value.nav.tools, icon: IconTools, disabled: false },
+  { id: 'apps', label: t.value.nav.apps, icon: 'apps', disabled: false },
+  { id: 'dashboard', label: t.value.nav.dashboard, icon: 'dashboard', disabled: false },
+  { id: 'devices', label: t.value.nav.devices, icon: 'devices', disabled: false },
+  { id: 'stream', label: t.value.nav.stream, icon: 'cast_connected', disabled: false },
+  { id: 'tools', label: t.value.nav.tools, icon: 'build', disabled: false },
 ])
 
 // 底部导航项
 const bottomNavItems = computed(() => [
-  { id: 'lang', label: locale.value === 'zh' ? 'EN' : '中文', icon: IconLang, disabled: false },
-  { id: 'theme', label: t.value.nav.theme, icon: IconPalette, disabled: false },
-  { id: 'settings', label: t.value.nav.settings, icon: IconSettings, disabled: false },
-  { id: 'exit', label: t.value.nav.exit, icon: IconPower, disabled: false },
+  { id: 'lang', label: locale.value === 'zh' ? 'EN' : '中文', icon: 'language', disabled: false },
+  { id: 'theme', label: t.value.nav.theme, icon: 'palette', disabled: false },
+  { id: 'settings', label: t.value.nav.settings, icon: 'settings', disabled: false },
+  { id: 'exit', label: t.value.nav.exit, icon: 'power_settings_new', disabled: false },
 ])
 
 // 视图映射
@@ -289,6 +299,8 @@ async function setupDesktopNavigationEvents() {
 }
 
 onMounted(async () => {
+  systemDark?.addEventListener?.('change', onSystemScheme)
+  void useAppearance().init()
   try {
     const tauri = await import('@tauri-apps/api/core')
     invoke.value = tauri.invoke
@@ -305,6 +317,7 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  systemDark?.removeEventListener?.('change', onSystemScheme)
   if (settingsListener) window.removeEventListener(DESKTOP_SETTINGS_UPDATED, settingsListener)
   if (updateUnlisten) updateUnlisten()
   if (desktopNavigateUnlisten) desktopNavigateUnlisten()
@@ -602,17 +615,21 @@ watch(
 </script>
 
 <style lang="less" scoped>
+.desktop-root {
+  display: contents;
+}
+
 .desktop-footer-dock {
   position: absolute;
   left: 50%;
-  bottom: 12px;
+  bottom: 20px;
   transform: translateX(-50%);
   z-index: 900;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  max-width: calc(100vw - 140px);
+  gap: 12px;
+  max-width: calc(100vw - 180px);
   // 空档区不能吃掉点击；子元素各自恢复
   pointer-events: none;
 
@@ -625,8 +642,8 @@ watch(
   position: fixed;
   top: 0;
   left: 0;
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   z-index: 30000;
   pointer-events: none;
   will-change: transform;
@@ -634,10 +651,10 @@ watch(
   svg {
     width: 100%;
     height: 100%;
-    fill: var(--fd-accent, #00fff5);
-    stroke: rgba(0, 0, 0, 0.85);
-    stroke-width: 1.4;
-    filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.7));
+    fill: var(--md-sys-color-primary);
+    stroke: var(--md-sys-color-surface);
+    stroke-width: 1.6;
+    filter: drop-shadow(0 2px 4px color-mix(in srgb, var(--md-sys-color-shadow, #000) 50%, transparent));
   }
 }
 </style>

@@ -87,7 +87,6 @@ export const zh = {
 
   // === 仪表盘 ===
   dashboard: {
-    subtitle: '高性能游戏串流解决方案',
     serviceStatus: '服务状态',
     pairedDevices: '已配对设备',
     activeSessions: '活动会话',
@@ -97,8 +96,8 @@ export const zh = {
     webConsoleDesc: '打开 Sunshine Web UI',
     restartService: '重启服务',
     restartServiceDesc: '重新启动 Sunshine 服务',
-    viewLogs: '查看日志',
-    viewLogsDesc: '打开日志控制台',
+    viewLogs: '诊断与日志',
+    viewLogsDesc: '日志、服务状态与故障排查',
     hostPerformance: '主机性能',
     hostPerformanceDesc: '打开实时性能监控',
     systemInfo: '系统信息',
@@ -274,7 +273,7 @@ export const zh = {
     devModeDesc: '显示调试信息和开发者工具',
     textContextEnabled: 'Windows 文本焦点与软键盘辅助',
     textContextEnabledDesc: '串流期间识别获得焦点的可编辑控件，用于软键盘自动弹出和光标定位。若影响系统性能，可以关闭；普通远程键盘输入不受影响。',
-    logLevel: 'Log Level',
+    logLevel: '日志级别',
     logLevelDesc: '设置日志记录的详细程度',
     logLevels: {
       error: 'ERROR only',
@@ -396,6 +395,8 @@ export const zh = {
 
   // === 工具 ===
   tools: {
+    inPanel: 'Panel 中的工具',
+    checksSummary: '{n} 项检查，{ok} 项正常',
     pageTitle: '实用工具',
     pageSubtitle: '系统诊断和优化工具集',
     bitrateAdjust: '实时码率调节',
@@ -437,7 +438,28 @@ export const zh = {
   },
 
   // === 设备 ===
+  // === 在 Panel 中打开: what a sofa does not need often lives in the main panel; each row names the page and what is on it ===
+  panel: {
+    open: '在 Panel 中打开',
+    openFailed: '无法打开 Panel',
+    more: '更多在 Panel 中',
+    links: {
+      toolPaths: { title: '启动助手工具路径', items: '手柄映射 · Locale Emulator · 翻译 · 修改器 · RTSS' },
+      fileSharing: { title: '文件共享', items: '共享文件夹 · 资源管理器菜单 · 访问策略' },
+      pet: { title: '桌宠', items: '桌面观察 · 观察间隔 · 戳一戳' },
+      advanced: { title: '高级', items: '开发者模式 · 文本上下文 · 日志级别' },
+      displayModes: { title: '显示器与分辨率', items: '输出显示器 · 分辨率 · 刷新率' },
+      vdd: { title: '虚拟显示器', items: '驱动安装 · 保持启用 · 无显示器时创建' },
+      vmouse: { title: '虚拟鼠标驱动', items: '安装 · 修复 · 卸载 · 启用' },
+      liveSession: { title: '当前串流：码率与主机性能', items: '码率 · 延迟 · 编码队列' },
+      dpi: { title: '桌面缩放（DPI）', items: '100% 到 300%' },
+      shortcuts: { title: '快捷键手册', items: '电脑 · Android · iOS / tvOS' },
+      logs: { title: '诊断与日志', items: '日志 · 错误 · 导出 · AI 诊断' },
+    },
+  },
+
   devices: {
+    pairedCount: '已配对 {n} 台设备',
     pageTitle: '设备管理',
     pageSubtitle: '配对 Moonlight Client 并管理已连接设备',
     qrCodePairing: '扫码配对',
@@ -548,7 +570,7 @@ export const zh = {
 
   // === 主机性能工具 ===
   performanceTool: {
-    title: 'Host Performance',
+    title: '主机性能',
     close: '关闭',
     expand: '展开详情',
     collapse: '收起详情',
@@ -574,18 +596,18 @@ export const zh = {
     totalSamples: 'Total',
     bitrate: 'Bitrate',
     uptime: 'Uptime',
-    encoderCapture: 'Encoder / Capture',
-    windowStats: 'Latency window',
+    encoderCapture: '编码器 / 采集',
+    windowStats: '延迟窗口',
     pipelineStats: 'Pipeline',
     sessionStats: 'Session',
-    hostLatency: 'Host processing latency',
-    captureWait: 'Cap wait',
+    hostLatency: '主机处理延迟',
+    captureWait: '采集等待',
     convert: 'Conv',
-    encodeQueue: 'Enc q',
+    encodeQueue: '编码队列',
     encode: 'Encode',
-    broadcastQueue: 'Bcast q',
+    broadcastQueue: '广播队列',
     totalPipeline: 'Total',
-    samples: '{count} samples',
+    samples: '{count} 个样本',
     stopAllSessions: '断开所有会话',
     confirmStopAll: '确认断开所有会话?',
     stopAllHint: '会终止全部串流会话(含其他客户端)',
@@ -1977,17 +1999,17 @@ export const zh = {
 
   // === 启动助手 ===
   launchHelper: {
-    title: '⚡ 启动助手',
+    title: '启动助手',
     description: '为此应用配置自动启动的辅助工具，保存后将同步到服务器。',
     orderHint: '启用后可用 ▲▼ 调整执行顺序（启动时从上到下，退出时反序）',
     moveUp: '上移',
     moveDown: '下移',
     browse: '浏览...',
     globalDefault: '全局默认: ',
-    preview: '📋 预览生成的命令',
+    preview: '预览生成的命令',
     cancel: '取消',
     saving: '保存中...',
-    save: '💾 保存到服务器',
+    save: '保存到服务器',
     globalSaved: '已将路径设为 "{name}" 的全局默认',
     saveFailed: '保存失败: ',
     fileNotFound: '文件不存在',

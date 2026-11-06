@@ -2,16 +2,16 @@
   <!-- the shortcut manual of the Moonlight client: the same shortcuts.md the 帮助与关于 sheet shows, drawn by the shared Markdown component -->
   <div class="m-tool" :class="{ 'is-embedded': embedded }">
     <header v-if="!embedded" class="m-tool__head"><h2>{{ t.shortcutsTool.title }}</h2><MIconButton icon="close" :label="t.toolWindow.close" @click="$emit('close')" /></header>
-    <div class="m-tool__body"><MMarkdown :source="shortcutsMd" /></div>
+    <div class="m-tool__body"><MMarkdown :source="shortcutsSource(locale)" /></div>
   </div>
 </template>
 
 <script setup>
 import { MIconButton, MMarkdown } from 'foundation-ui/vue'
-import shortcutsMd from './shortcuts.md?raw'
+import { shortcutsSource } from './shortcutsSource.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 defineProps({ embedded: { type: Boolean, default: false } })
 defineEmits(['close'])
 </script>

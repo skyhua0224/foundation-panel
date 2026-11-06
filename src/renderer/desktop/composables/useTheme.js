@@ -5,6 +5,7 @@ import {
   imageDataToArgb,
   m3ThemeFromSeed,
 } from './useDynamicColor.js'
+import { applyMaterialBridge, clearMaterialBridge, snapshotMaterialBridge, watchMaterialBridge, withBridgedColours } from './materialBridge.js'
 
 const STORAGE_KEY = 'foundation-desktop-theme'
 const WALLPAPER_KEY = 'foundation-desktop-wallpaper'
@@ -53,6 +54,16 @@ async function idbDelete(key) {
 
 // 预设主题
 const presets = {
+  // 默认：颜色不写死，由 materialBridge 从 foundation-ui 的 --md-sys-color-* 推出来
+  material: {
+    label: 'Material',
+    vars: {
+      '--fd-card-radius': '28px',
+      '--fd-font-size': '16px',
+      '--fd-grid-visible': '0',
+      '--fd-scanline-visible': '0',
+    },
+  },
   cyberpunk: {
     label: '赛博朋克',
     vars: {
@@ -185,7 +196,7 @@ const presets = {
   },
 }
 
-const defaultPreset = 'cyberpunk'
+const defaultPreset = 'material'
 
 // 获取默认变量
 function getDefaultVars() {
@@ -238,6 +249,22 @@ async function analyzeWallpaper(file) {
   return { dataUrl, seed, seeds: candidates, colors: candidatesToSwatches(candidates) }
 }
 
+/**
+ * 读存档。旧默认主题（赛博朋克）随 Material 重做换成新默认，旧存档重置一次；之后重新选它则照旧保留。
+ * 迁移标记无论有没有存档都要写：全新安装不写的话，用户之后选了赛博朋克，下次启动会被当成旧存档重置。
+ */
+export function readSavedTheme(storage, key) {
+  const migrated = storage.getItem(key + '-m3') === '1'
+  storage.setItem(key + '-m3', '1')
+  const saved = storage.getItem(key)
+  if (!saved) return null
+  let data
+  try { data = JSON.parse(saved) } catch { return null }
+  if (!data || typeof data !== 'object') return null
+  if (data.preset === 'cyberpunk' && !migrated) data = { ...data, vars: null }
+  return data
+}
+
 export function useTheme() {
   const themeVars = ref(getDefaultVars())
   const activePreset = ref(defaultPreset)
@@ -248,8 +275,19 @@ export function useTheme() {
   const activeWallpaperSeed = ref(null) // 当前生效的种子 ARGB
 
   // 应用 CSS 变量到 document
+  let stopBridge = null
   function applyTheme(vars) {
     const el = document.documentElement
+    // material 预设：颜色跟 foundation-ui 走；其余预设和自定义主题照旧写死
+    if (activePreset.value === 'material') {
+      clearMaterialBridge(el)
+      if (stopBridge) applyMaterialBridge(el)
+      else stopBridge = watchMaterialBridge(el)
+    } else if (stopBridge) {
+      stopBridge()
+      stopBridge = null
+      clearMaterialBridge(el)
+    }
     for (const [key, value] of Object.entries(vars)) {
       el.style.setProperty(key, value)
       // 自动为 hex 颜色生成 -rgb 变体（跳过已有的 -rgb 键）
@@ -261,6 +299,10 @@ export function useTheme() {
 
   // 设置单个变量
   function setVar(key, value) {
+    // material 预设的颜色在桥里：离开预设之前把当前颜色并进 vars，改一个键不会让其余颜色变成未定义
+    if (activePreset.value === 'material') {
+      themeVars.value = withBridgedColours(themeVars.value, snapshotMaterialBridge(document.documentElement))
+    }
     themeVars.value[key] = value
     // 自动为 hex 颜色同步设置 -rgb 变体
     if (typeof value === 'string' && value.startsWith('#') && !key.endsWith('-rgb')) {
@@ -287,8 +329,10 @@ export function useTheme() {
     try {
       const data = JSON.parse(json)
       if (data.vars) {
-        themeVars.value = { ...getDefaultVars(), ...data.vars }
-        activePreset.value = data.preset || 'custom'
+        const preset = data.preset || 'custom'
+        const vars = { ...getDefaultVars(), ...data.vars }
+        themeVars.value = preset === 'material' ? vars : withBridgedColours(vars, snapshotMaterialBridge(document.documentElement))
+        activePreset.value = preset
       }
     } catch (e) {
       console.error('Invalid theme JSON:', e)
@@ -372,10 +416,9 @@ export function useTheme() {
 
   // 初始化：读取持久化数据
   onMounted(() => {
-    const saved = localStorage.getItem(STORAGE_KEY)
-    if (saved) {
+    const data = readSavedTheme(localStorage, STORAGE_KEY)
+    if (data) {
       try {
-        const data = JSON.parse(saved)
         if (data.vars) {
           themeVars.value = { ...getDefaultVars(), ...data.vars }
           activePreset.value = data.preset || 'custom'

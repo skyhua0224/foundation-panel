@@ -1,57 +1,63 @@
 <template>
-  <Teleport to="body">
-    <Transition name="cover-modal">
-      <div v-if="open" class="cover-modal-mask" @click.self="$emit('close')">
-        <div ref="modalRef" class="cover-modal">
-          <div class="modal-header">
-            <h3><MIcon name="image" /> {{ t.coverPicker.title }} — {{ appName }}</h3>
-            <button class="modal-close" @click="$emit('close')">✕</button>
-          </div>
+  <MDialog
+    ref="dialogRef"
+    class="cover-dialog"
+    :model-value="open"
+    :title="t.coverPicker.title + (appName ? ' — ' + appName : '')"
+    icon="image"
+    tone="info"
+    @update:model-value="onModel"
+  >
+    <div class="search-bar">
+      <MField
+        v-model="searchQuery"
+        class="search-input"
+        :label="t.coverPicker.searchPlaceholder"
+        data-focusable
+        data-focus-key="cover-search"
+        @keyup.enter="doSearch"
+      />
+      <MButton size="lg" icon="search" :loading="searching" data-focusable data-focus-key="cover-search-btn" @click="doSearch">
+        {{ searching ? t.coverPicker.searching : t.coverPicker.search }}
+      </MButton>
+    </div>
 
-          <!-- 搜索栏 -->
-          <div class="search-bar">
-            <input
-              v-model="searchQuery"
-              class="search-input"
-              :placeholder="t.coverPicker.searchPlaceholder"
-              @keyup.enter="doSearch"
-            />
-            <button class="search-btn" @click="doSearch" :disabled="searching">
-              {{ searching ? t.coverPicker.searching : t.coverPicker.search }}
-            </button>
-          </div>
+    <MBanner v-if="error" tone="error" icon="error" role="alert">{{ error }}</MBanner>
 
-          <!-- 搜索结果 -->
-          <div v-if="error" class="search-error">{{ error }}</div>
+    <div v-if="searching && candidates.length === 0" class="cover-busy" role="status"><MLoading size="56px" /></div>
 
-          <div v-if="candidates.length > 0" class="candidates-grid">
-            <div
-              v-for="c in candidates"
-              :key="c.steam_id"
-              class="candidate-card"
-              :class="{ selected: selected?.steam_id === c.steam_id, uploading: uploadingId === c.steam_id }"
-              @click="selectAndUpload(c)"
-            >
-              <img :src="c.header_url" class="candidate-img" loading="lazy" />
-              <div class="candidate-name">{{ c.name }}</div>
-              <div v-if="uploadingId === c.steam_id" class="uploading-overlay">
-                <div class="upload-spinner"></div>
-              </div>
-            </div>
-          </div>
-
-          <div v-else-if="!searching && !error && searched" class="no-results">
-            {{ t.coverPicker.noResults }}
-          </div>
-        </div>
+    <div v-if="candidates.length > 0" class="candidates-grid">
+      <div
+        v-for="c in candidates"
+        :key="c.steam_id"
+        class="candidate-card"
+        :class="{ selected: selected?.steam_id === c.steam_id, uploading: uploadingId === c.steam_id }"
+        role="button"
+        tabindex="0"
+        :aria-label="c.name"
+        :aria-busy="uploadingId === c.steam_id || undefined"
+        data-focusable
+        :data-focus-key="'cover-' + c.steam_id"
+        @click="selectAndUpload(c)"
+        @keydown.enter.prevent="selectAndUpload(c)"
+      >
+        <img :src="c.header_url" :alt="c.name" class="candidate-img" loading="lazy" />
+        <div class="candidate-name">{{ c.name }}</div>
+        <div v-if="uploadingId === c.steam_id" class="uploading-overlay"><MLoading size="48px" /></div>
       </div>
-    </Transition>
-  </Teleport>
+    </div>
+
+    <p v-else-if="!searching && !error && searched" class="no-results">{{ t.coverPicker.noResults }}</p>
+
+    <template #actions>
+      <MButton variant="text" size="lg" data-focusable data-focus-key="cover-close" @click="$emit('close')">{{ t.windowActions.close }}</MButton>
+    </template>
+  </MDialog>
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
-import { MIcon } from 'foundation-ui/vue'
+import { computed, ref, watch } from 'vue'
+import { MBanner, MButton, MDialog, MField, MLoading } from 'foundation-ui/vue'
 import { useI18n } from '../i18n/index.js'
 
 const { t } = useI18n()
@@ -66,8 +72,15 @@ const props = defineProps({
 
 const emit = defineEmits(['close', 'updated'])
 
-const modalRef = ref(null)
+const dialogRef = ref(null)
+// MDialog 的根就是 <dialog>：手柄焦点栈以它为作用域
+const modalRef = computed(() => dialogRef.value?.$el || null)
 useModalFocusScope(modalRef, () => props.open)
+
+// Esc / 点遮罩 → 关闭
+function onModel(open) {
+  if (!open && props.open) emit('close')
+}
 
 const searchQuery = ref('')
 const candidates = ref([])
@@ -133,177 +146,89 @@ async function selectAndUpload(candidate) {
   }
 }
 </script>
-
 <style lang="less" scoped>
-.cover-modal-mask {
-  position: fixed;
-  inset: 0;
-  z-index: 10000;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  backdrop-filter: blur(4px);
-}
-
-.cover-modal {
-  background: rgba(var(--fd-bg-primary-rgb, 20, 20, 40), 0.98);
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-  border-radius: 16px;
-  width: 680px;
-  max-width: 90vw;
-  max-height: 80vh;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5);
-}
-
-.modal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-
-  h3 {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 600;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.9);
-  }
-
-  .modal-close {
-    background: none;
-    border: none;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    font-size: 18px;
-    cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 6px;
-    &:hover { color: #fff; background: rgba(255, 255, 255, 0.1); }
-  }
+.cover-dialog {
+  max-width: min(980px, calc(100vw - 64px));
 }
 
 .search-bar {
   display: flex;
-  gap: 8px;
-  padding: 12px 20px;
+  align-items: center;
+  gap: 16px;
 
   .search-input {
     flex: 1;
-    background: rgba(var(--fd-bg-secondary-rgb, 30, 30, 50), 0.8);
-    border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.12);
-    border-radius: 8px;
-    padding: 8px 12px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.9);
-    font-size: 14px;
-    outline: none;
-    &:focus { border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3); }
-  }
-
-  .search-btn {
-    padding: 8px 16px;
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-    border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-    border-radius: 8px;
-    color: var(--fd-accent, #00fff5);
-    font-size: 13px;
-    cursor: pointer;
-    white-space: nowrap;
-    &:hover { background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.25); }
-    &:disabled { opacity: 0.5; cursor: default; }
   }
 }
 
-.search-error {
-  padding: 8px 20px;
-  color: #ff6b6b;
-  font-size: 13px;
+.cover-busy {
+  display: grid;
+  place-items: center;
+  padding: 40px 0;
 }
 
 .candidates-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-  padding: 8px 20px 20px;
-  overflow-y: auto;
-  max-height: 50vh;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  padding: 6px;
+  margin: -6px;
 }
 
 .candidate-card {
   position: relative;
-  border-radius: 10px;
+  border-radius: 24px;
   overflow: hidden;
+  background: var(--md-sys-color-surface-container-high);
   cursor: pointer;
-  border: 2px solid transparent;
-  transition: border-color 0.15s, transform 0.15s;
+  outline: none;
+  transition: transform var(--m-spring-fast-spatial-duration, 200ms) var(--m-spring-fast-spatial, ease),
+    box-shadow var(--m-spring-default-effects-duration, 200ms) var(--m-spring-default-effects, ease);
 
   &:hover {
-    border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-    transform: scale(1.02);
+    transform: translateY(-3px);
+    box-shadow: var(--d-shadow-3);
   }
 
+  &:focus-visible,
   &.selected {
-    border-color: var(--fd-accent, #00fff5);
+    box-shadow: 0 0 0 3px var(--md-sys-color-primary);
   }
 
   &.uploading {
     pointer-events: none;
-    opacity: 0.7;
   }
 
   .candidate-img {
+    display: block;
     width: 100%;
     aspect-ratio: 460 / 215;
     object-fit: cover;
-    display: block;
   }
 
   .candidate-name {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    padding: 6px 10px;
-    background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-    color: #fff;
-    font-size: 12px;
-    font-weight: 500;
+    padding: 12px 16px 14px;
+    font: 500 15px/20px var(--md-ref-typeface-brand, system-ui);
+    color: var(--md-sys-color-on-surface);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .uploading-overlay {
     position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
-  .upload-spinner {
-    width: 32px;
-    height: 32px;
-    border: 3px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-    border-top-color: var(--fd-accent, #00fff5);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
+    display: grid;
+    place-items: center;
+    background: color-mix(in srgb, var(--md-sys-color-scrim, #000) 50%, transparent);
   }
 }
-
-@keyframes spin { to { transform: rotate(360deg); } }
 
 .no-results {
+  margin: 0;
+  padding: 24px 0;
   text-align: center;
-  padding: 40px 20px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.35);
-  font-size: 14px;
+  font: 400 18px/28px var(--md-ref-typeface-brand, system-ui);
+  color: var(--md-sys-color-on-surface-variant);
 }
-
-// 弹窗动画
-.cover-modal-enter-active { transition: opacity 0.2s ease; }
-.cover-modal-leave-active { transition: opacity 0.15s ease; }
-.cover-modal-enter-from, .cover-modal-leave-to { opacity: 0; }
-.cover-modal-enter-active .cover-modal { transition: transform 0.2s ease; }
-.cover-modal-enter-from .cover-modal { transform: scale(0.95); }
 </style>

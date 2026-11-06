@@ -204,7 +204,12 @@ export function navigateFocus(direction, root = activeScopeRoot()) {
     return focusFirst(root)
   }
 
-  const target = bestCandidate(direction, current, focusables)
+  // A control inside the scrolling page area moves to what the page holds first, rows scrolled out of view included; only when the page has nothing
+  // that way does the focus leave it (the rail, the docked action bar). Otherwise the docked bar, always on screen, is the nearest thing below the
+  // last visible row and the rows under it can never be reached.
+  // The rail's RIGHT goes into the page the same way: the page's own controls, not the docked bar that happens to sit at the height of the rail's last items.
+  const page = current.closest('.desktop-window-main') || (direction === 'right' && current.closest('.desktop-sidebar') ? document.querySelector('.desktop-window-main') : null)
+  const target = (page && bestCandidate(direction, current, focusables.filter((element) => page.contains(element)))) || bestCandidate(direction, current, focusables)
   if (target) return focusElement(target, { direction })
 
   // 行末/列尾按左右时按阅读顺序换行，避免「卡住不动」

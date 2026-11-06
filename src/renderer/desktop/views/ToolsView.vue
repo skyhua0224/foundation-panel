@@ -1,169 +1,43 @@
 <template>
-  <div class="tools-view">
-    <div class="page-header fade-in">
-      <h1 class="page-title">{{ t.tools.pageTitle }}</h1>
-      <p class="page-subtitle">{{ t.tools.pageSubtitle }}</p>
-    </div>
-
-    <!-- 工具网格 - 平铺所有工具 -->
-    <DesktopGrid class="tools-grid" :cols="2" gap="lg" :responsive="true">
-      <!-- 码率调节器 -->
-      <DesktopCard variant="success" hoverable class="tool-panel-card bitrate-card">
-        <template #title>
-          <span class="title-icon"><MIcon name="monitoring" /></span>
-          {{ t.tools.bitrateAdjust }}
-        </template>
-
-        <div class="tool-panel-content">
-          <BitrateTool :embedded="true" />
-        </div>
-      </DesktopCard>
-
-      <!-- Host performance panel -->
-      <DesktopCard variant="primary" hoverable class="tool-panel-card host-performance-card">
-        <template #title>
-          <span class="title-icon"><MIcon name="monitor" /></span>
-          {{ t.tools.hostPerformance }}
-        </template>
-
-        <div class="tool-panel-content">
-          <HostPerformanceTool :embedded="true" />
-        </div>
-      </DesktopCard>
-
-      <!-- DPI adjuster -->
-      <DesktopCard variant="secondary" hoverable class="tool-panel-card dpi-card">
-        <template #title>
-          <span class="title-icon"><MIcon name="search" /></span>
-          {{ t.tools.dpiScaling }}
-        </template>
-
-        <div class="tool-panel-content">
-          <DpiAdjusterTool :embedded="true" />
-        </div>
-      </DesktopCard>
-
-      <!-- 快捷键管理 -->
-      <DesktopCard variant="warning" hoverable class="tool-panel-card shortcuts-card">
-        <template #title>
-          <span class="title-icon"><MIcon name="key" /></span>
-          {{ t.tools.shortcutGuide }}
-        </template>
-
-        <div class="tool-panel-content">
-          <ShortcutsTool :embedded="true" />
-        </div>
-      </DesktopCard>
-    </DesktopGrid>
-
-    <!-- 系统诊断 -->
-    <div class="section-title fade-in">
-      <span class="title-icon"><MIcon name="search" /></span>
-      {{ t.tools.diagnostics }}
-    </div>
-
-    <DesktopCard class="diagnostics-card fade-in">
-      <template #title>
-        <span class="title-icon"><MIcon name="monitor" /></span>
-        {{ t.tools.systemStatus }}
-      </template>
-
-      <div class="diagnostics-grid">
-        <div class="diagnostic-item">
-          <div class="diagnostic-icon" :class="diagnostics.gpu.status">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <rect x="2" y="6" width="20" height="12" rx="2" />
-              <path d="M6 10h.01M10 10h.01M14 10h.01" />
-            </svg>
+  <DeskPage :title="t.tools.pageTitle" icon="build" :text="heroText" wide>
+    <!-- the system check: what the host and this machine can do, in four tiles that turn green or amber -->
+    <section class="dsk-diag">
+      <div class="dsk-diag__grid">
+        <div v-for="row in DIAGNOSTIC_ROWS" :key="row.key" class="dsk-diag__tile" :class="`is-${diagnostics[row.key].status}`">
+          <span class="dsk-diag__icon">
+            <span class="dsk-diag__shape" />
+            <MLoading v-if="diagnostics[row.key].status === 'connecting'" size="30px" />
+            <MIcon v-else :name="row.icon" fill />
+          </span>
+          <div class="dsk-diag__info">
+            <div class="dsk-diag__name">{{ t.tools[row.key] }}</div>
+            <div class="dsk-diag__value">{{ diagnostics[row.key].value }}</div>
           </div>
-          <div class="diagnostic-info">
-            <div class="diagnostic-name">{{ t.tools.gpu }}</div>
-            <div class="diagnostic-value">{{ diagnostics.gpu.value }}</div>
-          </div>
-          <div class="diagnostic-status" :class="diagnostics.gpu.status">
-            {{ diagnostics.gpu.statusText }}
-          </div>
-        </div>
-
-        <div class="diagnostic-item">
-          <div class="diagnostic-icon" :class="diagnostics.encoder.status">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polygon points="23 7 16 12 23 17 23 7" />
-              <rect x="1" y="5" width="15" height="14" rx="2" />
-            </svg>
-          </div>
-          <div class="diagnostic-info">
-            <div class="diagnostic-name">{{ t.tools.encoder }}</div>
-            <div class="diagnostic-value">{{ diagnostics.encoder.value }}</div>
-          </div>
-          <div class="diagnostic-status" :class="diagnostics.encoder.status">
-            {{ diagnostics.encoder.statusText }}
-          </div>
-        </div>
-
-        <div class="diagnostic-item">
-          <div class="diagnostic-icon" :class="diagnostics.network.status">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M5 12.55a11 11 0 0 1 14.08 0" />
-              <path d="M1.42 9a16 16 0 0 1 21.16 0" />
-              <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
-              <line x1="12" y1="20" x2="12.01" y2="20" />
-            </svg>
-          </div>
-          <div class="diagnostic-info">
-            <div class="diagnostic-name">{{ t.tools.network }}</div>
-            <div class="diagnostic-value">{{ diagnostics.network.value }}</div>
-          </div>
-          <div class="diagnostic-status" :class="diagnostics.network.status">
-            {{ diagnostics.network.statusText }}
-          </div>
-        </div>
-
-        <div class="diagnostic-item">
-          <div class="diagnostic-icon" :class="diagnostics.firewall.status">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-          </div>
-          <div class="diagnostic-info">
-            <div class="diagnostic-name">{{ t.tools.firewall }}</div>
-            <div class="diagnostic-value">{{ diagnostics.firewall.value }}</div>
-          </div>
-          <div class="diagnostic-status" :class="diagnostics.firewall.status">
-            {{ diagnostics.firewall.statusText }}
-          </div>
+          <MChip :tone="STATUS_TONES[diagnostics[row.key].status] || 'neutral'">{{ diagnostics[row.key].statusText }}</MChip>
         </div>
       </div>
 
-      <template #footer>
-        <button class="desktop-btn" @click="restartGraphicsDriver">
-          <MIcon name="refresh" />
-          {{ t.tools.restartGraphicsDriver }}
-        </button>
-        <button class="desktop-btn" :disabled="diagnosing" @click="runDiagnostics">
-          <MIcon name="refresh" />
-          {{ t.tools.rediagnose }}
-        </button>
-      </template>
-    </DesktopCard>
-  </div>
+      <MNotice v-if="actionError" tone="error">{{ actionError }}</MNotice>
+
+      <div class="dsk-diag__actions">
+        <MButton variant="tonal" size="lg" icon="restart_alt" @click="restartGraphicsDriver">{{ t.tools.restartGraphicsDriver }}</MButton>
+        <MButton size="lg" icon="refresh" :loading="diagnosing" @click="runDiagnostics">{{ t.tools.rediagnose }}</MButton>
+      </div>
+    </section>
+
+    <!-- the tools of the toolbox are pages of the panel -->
+    <PanelLinkSection :heading="t.tools.inPanel" :links="['liveSession', 'dpi', 'shortcuts', 'logs']" />
+  </DeskPage>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { probeSystemDiagnostics } from '../../composables/systemDiagnostics.js'
-import { MIcon } from 'foundation-ui/vue'
+import { MButton, MChip, MIcon, MLoading, MNotice } from 'foundation-ui/vue'
+import { requestConfirm } from '../composables/useConfirm.js'
 import { useI18n } from '../i18n/index.js'
-
-// 桌面 UI 组件
-import DesktopCard from '../components/DesktopCard.vue'
-import DesktopGrid from '../components/DesktopGrid.vue'
-
-// 工具组件 - 复用工具栏的工具
-import BitrateTool from '../../tool-window/tools/BitrateTool.vue'
-import DpiAdjusterTool from '../../tool-window/tools/DpiAdjusterTool.vue'
-import HostPerformanceTool from '../../tool-window/tools/HostPerformanceTool.vue'
-import ShortcutsTool from '../../tool-window/tools/ShortcutsTool.vue'
+import DeskPage from '../components/DeskPage.vue'
+import PanelLinkSection from '../components/PanelLinkSection.vue'
 
 const { t } = useI18n()
 
@@ -178,17 +52,41 @@ const diagnostics = ref({
   firewall: { value: t.value.tools.status.detectingEllipsis, status: 'connecting', statusText: t.value.tools.status.detecting },
 })
 
+const actionError = ref('')
+
+// The window's own confirm dialog: a native one cannot be answered with a pad.
 async function restartGraphicsDriver() {
-  if (confirm(t.value.tools.confirmRestartGraphics)) {
-    if (invoke.value) {
-      try {
-        await invoke.value('restart_graphics_driver')
-      } catch (e) {
-        console.error('Failed to restart graphics driver:', e)
-      }
-    }
+  const confirmed = await requestConfirm({
+    title: t.value.tools.restartGraphicsDriver,
+    message: t.value.tools.confirmRestartGraphics,
+    confirmLabel: t.value.tools.restartGraphicsDriver,
+    danger: true,
+  })
+  if (!confirmed || !invoke.value) return
+  actionError.value = ''
+  try {
+    await invoke.value('restart_graphics_driver')
+  } catch (e) {
+    console.error('Failed to restart graphics driver:', e)
+    actionError.value = e?.message || String(e)
   }
 }
+
+// The tone of a diagnostic, and the glyph of what it checks.
+// the hero's fact: how many of the four checks pass
+const heroText = computed(() => {
+  const rows = Object.values(diagnostics.value)
+  if (rows.some((row) => row.status === 'connecting')) return t.value.tools.status.detecting
+  return t.value.tools.checksSummary.replace('{ok}', rows.filter((row) => row.status === 'good').length).replace('{n}', rows.length)
+})
+
+const STATUS_TONES = { good: 'ok', warning: 'warn', error: 'error', connecting: 'info' }
+const DIAGNOSTIC_ROWS = [
+  { key: 'gpu', icon: 'memory' },
+  { key: 'encoder', icon: 'videocam' },
+  { key: 'network', icon: 'network_check' },
+  { key: 'firewall', icon: 'shield' },
+]
 
 async function runDiagnostics() {
   if (diagnosing.value) return
@@ -219,241 +117,28 @@ onMounted(async () => {
 })
 </script>
 
-<style lang="less" scoped>
-.tools-view {
-  max-width: 1600px;
-  margin: 0 auto;
-  padding-bottom: 32px;
-}
+<style scoped>
+.dsk-diag { display: flex; flex-direction: column; gap: 18px; }
+.dsk-diag__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.dsk-diag__tile { display: flex; align-items: center; gap: 18px; min-width: 0; padding: 20px 22px; border-radius: var(--md-sys-shape-corner-extra-large); background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); transition: background-color var(--m-spring-default-effects-duration, 200ms) var(--m-spring-default-effects, ease); }
+.dsk-diag__icon { position: relative; flex: none; width: 72px; height: 72px; display: grid; place-items: center; font-size: 34px; color: var(--md-sys-color-on-secondary-container); }
+.dsk-diag__shape { position: absolute; inset: 0; background: var(--md-sys-color-secondary-container); clip-path: var(--m-shape-cookie); animation: m-turn 44s linear infinite; }
+.dsk-diag__icon :deep(.m-icon), .dsk-diag__icon :deep(.m-loading) { position: relative; }
+.dsk-diag__tile.is-good { background: var(--md-sys-color-success-container); color: var(--md-sys-color-on-success-container); }
+.dsk-diag__tile.is-good .dsk-diag__shape { background: var(--md-sys-color-success); }
+.dsk-diag__tile.is-good .dsk-diag__icon { color: var(--md-sys-color-on-success); }
+.dsk-diag__tile.is-warning { background: var(--md-sys-color-warning-container); color: var(--md-sys-color-on-warning-container); }
+.dsk-diag__tile.is-warning .dsk-diag__shape { background: var(--md-sys-color-warning); }
+.dsk-diag__tile.is-warning .dsk-diag__icon { color: var(--md-sys-color-on-warning); }
+.dsk-diag__tile.is-error { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
+.dsk-diag__tile.is-error .dsk-diag__shape { background: var(--md-sys-color-error); }
+.dsk-diag__tile.is-error .dsk-diag__icon { color: var(--md-sys-color-on-error); }
+.dsk-diag__info { flex: 1; min-width: 0; }
+.dsk-diag__name { font: var(--m-label-large); opacity: .85; }
+.dsk-diag__value { font: var(--m-title-large); overflow-wrap: anywhere; }
+.dsk-diag__actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; }
 
-.page-header {
-  margin-bottom: 34px;
-
-  .page-title {
-    font-size: 40px;
-    font-weight: 700;
-    color: var(--fd-text-primary, #fff);
-    margin: 0 0 10px 0;
-  }
-
-  .page-subtitle {
-    font-size: 18px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    margin: 0;
-  }
-}
-
-.tool-panel-card {
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-
-  :deep(.card-header) {
-    margin-bottom: 18px;
-  }
-
-  :deep(.card-title) {
-    min-width: 0;
-    flex-wrap: wrap;
-    line-height: 1.25;
-  }
-
-  :deep(.card-content) {
-    flex: 1;
-    min-height: 0;
-  }
-
-  .tool-panel-content {
-    min-height: 0;
-    overflow: visible;
-
-    &::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    &::-webkit-scrollbar-thumb {
-      background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-      border-radius: 3px;
-
-      &:hover {
-        background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-      }
-    }
-
-    // 隐藏嵌入组件的标题栏
-    :deep(.tool-header) {
-      display: none;
-    }
-  }
-
-  .title-icon {
-    font-size: 20px;
-    margin-right: 8px;
-  }
-}
-
-.bitrate-card,
-.host-performance-card,
-.dpi-card {
-  min-height: 320px;
-}
-
-.shortcuts-card {
-  grid-column: ~"1 / -1";
-
-  .tool-panel-content {
-    overflow: visible;
-  }
-}
-
-.section-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--fd-text-primary, #fff);
-  margin: 36px 0 16px 0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-
-  .title-icon {
-    font-size: 24px;
-  }
-}
-
-.diagnostics-card {
-  .diagnostics-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 24px;
-    margin-bottom: 24px;
-
-    @media (max-width: 800px) {
-      grid-template-columns: 1fr;
-    }
-  }
-
-  .diagnostic-item {
-    display: flex;
-    align-items: center;
-    text-align: left;
-    gap: 12px;
-    min-width: 0;
-    padding: 16px;
-    border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-    border-radius: 12px;
-    background: rgba(var(--fd-bg-primary-rgb, 15, 15, 35), 0.22);
-  }
-
-  .diagnostic-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 14px;
-    flex: 0 0 48px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    &.good {
-      background: rgba(var(--fd-status-success-rgb, 0, 255, 136), 0.1);
-      color: var(--fd-status-success, #00ff88);
-    }
-
-    &.warning {
-      background: rgba(var(--fd-status-warning-rgb, 255, 215, 0), 0.1);
-      color: var(--fd-status-warning, #ffd700);
-    }
-
-    &.error {
-      background: rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.1);
-      color: var(--fd-status-danger, #ff6b35);
-    }
-
-    svg {
-      width: 26px;
-      height: 26px;
-    }
-  }
-
-  .diagnostic-info {
-    min-width: 0;
-    flex: 1;
-
-    .diagnostic-name {
-      font-size: 14px;
-      color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-      margin-bottom: 4px;
-    }
-
-    .diagnostic-value {
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--fd-text-primary, #fff);
-      overflow-wrap: anywhere;
-      line-height: 1.5;
-    }
-  }
-
-  .diagnostic-status {
-    font-size: 12px;
-    padding: 4px 12px;
-    border-radius: 12px;
-    flex-shrink: 0;
-
-    &.good {
-      background: rgba(var(--fd-status-success-rgb, 0, 255, 136), 0.1);
-      color: var(--fd-status-success, #00ff88);
-    }
-
-    &.warning {
-      background: rgba(var(--fd-status-warning-rgb, 255, 215, 0), 0.1);
-      color: var(--fd-status-warning, #ffd700);
-    }
-
-    &.error {
-      background: rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.1);
-      color: var(--fd-status-danger, #ff6b35);
-    }
-  }
-
-  :deep(.card-footer) {
-    flex-wrap: wrap;
-
-    .desktop-btn {
-      min-width: 132px;
-      justify-content: center;
-      white-space: nowrap;
-    }
-
-    .desktop-btn svg {
-      width: 18px;
-      height: 18px;
-      flex-shrink: 0;
-    }
-  }
-}
-
-@media (max-width: 800px) {
-  .tools-view {
-    padding-bottom: 20px;
-  }
-
-  .page-header {
-    margin-bottom: 24px;
-
-    .page-title {
-      font-size: 32px;
-    }
-  }
-
-  .shortcuts-card {
-    grid-column: auto;
-  }
-
-  .diagnostics-card {
-    .diagnostic-item {
-      align-items: flex-start;
-    }
-  }
+@media (max-width: 1300px) {
+  .dsk-diag__grid { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

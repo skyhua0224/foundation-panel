@@ -87,7 +87,6 @@ export const en = {
 
   // === Dashboard ===
   dashboard: {
-    subtitle: 'High-performance game streaming solution',
     serviceStatus: 'Service Status',
     pairedDevices: 'Paired Devices',
     activeSessions: 'Active Sessions',
@@ -97,8 +96,8 @@ export const en = {
     webConsoleDesc: 'Open Sunshine Web management interface',
     restartService: 'Restart Service',
     restartServiceDesc: 'Restart Sunshine service',
-    viewLogs: 'View Logs',
-    viewLogsDesc: 'Open Log Console',
+    viewLogs: 'Diagnostics and logs',
+    viewLogsDesc: 'Logs, service status and troubleshooting',
     hostPerformance: 'Host Performance',
     hostPerformanceDesc: 'Open the live performance monitor',
     systemInfo: 'System Information',
@@ -396,6 +395,8 @@ export const en = {
 
   // === Tools ===
   tools: {
+    inPanel: 'Tools in the Panel',
+    checksSummary: '{ok} of {n} checks passed',
     pageTitle: 'Utility Tools',
     pageSubtitle: 'System diagnostics and optimization toolkit',
     bitrateAdjust: 'Real-time Bitrate Adjustment',
@@ -437,7 +438,28 @@ export const en = {
   },
 
   // === Devices ===
+  // === 在 Panel 中打开: what a sofa does not need often lives in the main panel; each row names the page and what is on it ===
+  panel: {
+    open: 'Open in Panel',
+    openFailed: 'The Panel could not be opened',
+    more: 'More in the Panel',
+    links: {
+      toolPaths: { title: 'Launch assistant paths', items: 'Controller mapper · Locale Emulator · Translator · Trainer · RTSS' },
+      fileSharing: { title: 'File sharing', items: 'Shared folders · Explorer menu · Access policy' },
+      pet: { title: 'Desktop pet', items: 'Desk observation · Interval · Poke' },
+      advanced: { title: 'Advanced', items: 'Developer mode · Text context · Log level' },
+      displayModes: { title: 'Display and resolution', items: 'Output display · Resolution · Refresh rate' },
+      vdd: { title: 'Virtual display', items: 'Driver install · Keep enabled · Headless' },
+      vmouse: { title: 'Virtual mouse driver', items: 'Install · Repair · Uninstall · Enable' },
+      liveSession: { title: 'Live bitrate and host performance', items: 'Bitrate · Latency · Encoder queues' },
+      dpi: { title: 'Desktop scale (DPI)', items: '100% to 300%' },
+      shortcuts: { title: 'Shortcut manual', items: 'PC · Android · iOS / tvOS' },
+      logs: { title: 'Diagnostics and logs', items: 'Logs · Errors · Export · AI diagnosis' },
+    },
+  },
+
   devices: {
+    pairedCount: '{n} paired devices',
     pageTitle: 'Device Management',
     pageSubtitle: 'Pair Moonlight clients and manage connected devices',
     qrCodePairing: 'QR Code Pairing',
@@ -1977,17 +1999,17 @@ Output only one short sentence, no explanation. Reply in English.`,
 
   // === Launch Helper ===
   launchHelper: {
-    title: '⚡ Launch Helper',
+    title: 'Launch Helper',
     description: 'Configure auto-launch companion tools for this app. Settings will be synced to server.',
     orderHint: 'Use ▲▼ to reorder (top-down on launch, reversed on exit)',
     moveUp: 'Move up',
     moveDown: 'Move down',
     browse: 'Browse...',
     globalDefault: 'Global default: ',
-    preview: '📋 Preview Commands',
+    preview: 'Preview Commands',
     cancel: 'Cancel',
     saving: 'Saving...',
-    save: '💾 Save to Server',
+    save: 'Save to Server',
     globalSaved: 'Path set as global default for "{name}"',
     saveFailed: 'Save failed: ',
     fileNotFound: 'File not found',

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
@@ -6,14 +6,18 @@
     <title>Foundation Desktop</title>
     <meta name="description" content="Foundation Desktop 桌面控制面板">
     <link rel="icon" type="image/png" href="/src/assets/sunshine.ico">
-    <meta name="theme-color" content="#0f0f23">
+    <meta name="theme-color" content="#141218" media="(prefers-color-scheme: dark)">
+    <meta name="theme-color" content="#fef7ff" media="(prefers-color-scheme: light)">
     <style>
-      /* 防止加载时闪烁 */
+      /* 防止加载时闪烁：先按系统浅/深色给一个中性底，外观加载后由 foundation-ui 接管 */
       html, body {
         margin: 0;
         padding: 0;
-        background: #0f0f23;
+        background: #fef7ff;
         overflow: hidden;
+      }
+      @media (prefers-color-scheme: dark) {
+        html, body { background: #141218; }
       }
     </style>
   </head>

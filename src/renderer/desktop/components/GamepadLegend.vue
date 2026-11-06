@@ -69,49 +69,49 @@ const hints = computed(() => {
 </script>
 
 <style lang="less" scoped>
+// 按键提示条：药丸，surface-container-high，字号放大到沙发距离可读
 .gamepad-legend {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 8px 18px;
   flex-wrap: wrap;
   justify-content: center;
-  padding: 6px 14px;
-  border-radius: 10px;
-  background: rgba(var(--fd-bg-primary-rgb, 15, 15, 35), 0.72);
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
+  padding: 10px 24px;
+  border-radius: 9999px;
+  background: var(--md-sys-color-surface-container-high);
+  box-shadow: var(--d-shadow-1);
   pointer-events: none;
 }
 
 .legend-item {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 10px;
 }
 
 .legend-button {
-  min-width: 20px;
-  height: 20px;
-  padding: 0 5px;
-  border-radius: 10px;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 9px;
+  border-radius: 16px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.12);
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.8);
+  font: 700 16px/1 var(--md-ref-typeface-brand, system-ui);
+  background: var(--md-sys-color-surface-container-highest);
+  color: var(--md-sys-color-on-surface);
 
   // Xbox 与 PS 布局共用四个色位，语义是「按钮家族色」：
-  // 绿=确认系、红=返回系、蓝/黄(粉)=功能键（PS 的 ✕蓝 ○红 △绿 □粉）
-  &.btn-a { background: rgba(0, 200, 100, 0.28); color: #7dffb0; }
-  &.btn-b { background: rgba(220, 60, 60, 0.28); color: #ff9b9b; }
-  &.btn-x { background: rgba(60, 120, 230, 0.28); color: #a3c4ff; }
-  &.btn-y { background: rgba(220, 190, 40, 0.28); color: #ffe57d; }
+  // 绿=确认系、红=返回系、蓝=功能键、黄=功能键
+  &.btn-a { background: var(--md-sys-color-success-container, var(--md-sys-color-secondary-container)); color: var(--md-sys-color-on-success-container, var(--md-sys-color-on-secondary-container)); }
+  &.btn-b { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
+  &.btn-x { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
+  &.btn-y { background: var(--md-sys-color-warning-container, var(--md-sys-color-tertiary-container)); color: var(--md-sys-color-on-warning-container, var(--md-sys-color-on-tertiary-container)); }
 }
 
 .legend-label {
-  font-size: 11px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.45);
+  font: 500 15px/22px var(--md-ref-typeface-brand, system-ui);
+  color: var(--md-sys-color-on-surface-variant);
   white-space: nowrap;
 }
 </style>

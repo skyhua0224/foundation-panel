@@ -1,164 +1,126 @@
 <template>
-  <div class="devices-view">
-    <div class="page-header fade-in">
-      <h1 class="page-title">{{ t.devices.pageTitle }}</h1>
-      <p class="page-subtitle">{{ t.devices.pageSubtitle }}</p>
-    </div>
+  <DeskPage class="devices-view" :title="t.devices.pageTitle" icon="devices" :text="heroText" wide>
+    <template v-if="qrActive" #chips>
+      <MChip :tone="qrRemaining <= 30 ? 'warn' : 'info'" icon="timer">{{ qrRemaining }}s</MChip>
+    </template>
 
-    <!-- 配对区域 - 双列布局 -->
-    <div class="pairing-section fade-in">
-      <div class="desktop-grid cols-2">
-        <!-- 二维码配对 -->
-        <div class="desktop-card pairing-card">
-          <div class="card-header">
-            <div class="card-title">
-              <span class="title-icon"><MIcon name="mobile" /></span>
-              {{ t.devices.qrCodePairing }}
+    <!-- pairing: a code to scan, or a PIN to type -->
+    <div class="dsk-pair">
+      <section class="dsk-tile dsk-tile--qr" :class="{ 'is-live': qrActive }">
+        <header class="dsk-tile__head">
+          <span class="dsk-tile__icon"><MIcon name="qr_code_2" fill /></span>
+          <h2 class="dsk-tile__title">{{ t.devices.qrCodePairing }}</h2>
+        </header>
+
+        <div v-if="qrActive" class="dsk-qr">
+          <div class="dsk-qr__frame"><div class="dsk-qr__code"><img :src="qrDataUrl" alt="QR Code" /></div></div>
+          <div class="dsk-qr__meta">
+            <div class="dsk-qr__pin">
+              <span class="dsk-qr__pin-label">PIN</span>
+              <span class="dsk-qr__pin-value">{{ qrPin }}</span>
             </div>
-          </div>
-          <div class="card-content">
-            <div v-if="qrActive" class="qr-display">
-              <div class="qr-image-wrapper">
-                <img :src="qrDataUrl" alt="QR Code" class="qr-image" />
-              </div>
-              <div class="qr-meta">
-                <div class="qr-pin">
-                  <span class="qr-pin-label">PIN</span>
-                  <span class="qr-pin-value">{{ qrPin }}</span>
-                </div>
-                <div class="qr-timer" :class="{ warning: qrRemaining <= 30 }">
-                  ⏱ {{ qrRemaining }}s
-                </div>
-                <div class="qr-actions">
-                  <button class="desktop-btn" @click="generateQrCode">{{ t.devices.qrRefresh }}</button>
-                  <button class="desktop-btn" @click="cancelQrCode">{{ t.devices.qrCancel }}</button>
-                </div>
-              </div>
-            </div>
-
-            <div v-else-if="qrError" class="qr-error">{{ qrError }}</div>
-
-            <div v-else class="qr-idle">
-              <p>{{ t.devices.qrDesc }}</p>
-              <button
-                class="desktop-btn primary"
-                :disabled="qrLoading"
-                @click="generateQrCode"
-              >
-                {{ qrLoading ? t.devices.qrGenerating : t.devices.generateQrCode }}
-              </button>
+            <div class="dsk-qr__actions">
+              <MButton variant="tonal" icon="refresh" @click="generateQrCode">{{ t.devices.qrRefresh }}</MButton>
+              <MButton variant="text" @click="cancelQrCode">{{ t.devices.qrCancel }}</MButton>
             </div>
           </div>
         </div>
 
-        <!-- 手动 PIN 配对 -->
-        <div class="desktop-card pairing-card">
-          <div class="card-header">
-            <div class="card-title">
-              <span class="title-icon"><MIcon name="link" /></span>
-              {{ t.devices.pinPairing }}
+        <MNotice v-else-if="qrError" tone="error">{{ qrError }}</MNotice>
+
+        <div v-else class="dsk-idle">
+          <MScallop :size="132" :busy="qrLoading"><MIcon name="qr_code_2" fill class="dsk-idle__glyph" /></MScallop>
+          <p>{{ t.devices.qrDesc }}</p>
+          <MButton size="lg" icon="qr_code_2" :loading="qrLoading" @click="generateQrCode">
+            {{ qrLoading ? t.devices.qrGenerating : t.devices.generateQrCode }}
+          </MButton>
+        </div>
+      </section>
+
+      <section class="dsk-tile dsk-tile--pin">
+        <header class="dsk-tile__head">
+          <span class="dsk-tile__icon"><MIcon name="pin" fill /></span>
+          <h2 class="dsk-tile__title">{{ t.devices.pinPairing }}</h2>
+        </header>
+
+        <div class="dsk-pin">
+          <MPinPad v-model="pinInput" :length="4" :label="t.devices.pinInput" :disabled="pinSubmitting" data-focus-key="devices-pin" />
+          <MField
+            v-model="deviceNameInput"
+            :label="t.devices.deviceName"
+            :placeholder="t.devices.deviceNamePlaceholder"
+            data-focusable
+            data-focus-key="devices-name"
+          />
+          <MButton
+            size="lg"
+            icon="link"
+            :loading="pinSubmitting"
+            :disabled="pinInput.length < 4 || !deviceNameInput"
+            @click="submitPin"
+          >{{ pinSubmitting ? t.devices.pairing : t.devices.pairBtn }}</MButton>
+          <MNotice v-if="pinStatus" :tone="pinStatus.type === 'success' ? 'info' : 'error'" :icon="pinStatus.type === 'success' ? 'check_circle' : 'error'">{{ pinStatus.message }}</MNotice>
+        </div>
+      </section>
+    </div>
+
+    <!-- paired devices -->
+    <section class="dsk-devices">
+      <div class="dsk-devices__head">
+        <h2 class="dsk-devices__title">{{ t.devices.pairedDevicesTitle }}</h2>
+        <MChip tone="info">{{ devices.length }}</MChip>
+      </div>
+
+      <div v-if="devices.length" class="dsk-devices__grid">
+        <article v-for="(device, index) in devices" :key="device.uuid" class="dsk-device" :class="`is-${SHAPES[index % SHAPES.length]}`">
+          <span class="dsk-device__avatar"><span class="dsk-device__shape" :class="`m-shape--${SHAPES[index % SHAPES.length]}`" /><MIcon name="mobile" fill /></span>
+          <div class="dsk-device__body">
+            <template v-if="editingUuid !== device.uuid">
+              <h3 class="dsk-device__name">{{ device.name || t.devices.unnamedDevice }}</h3>
+              <span class="dsk-devices__uuid">{{ device.uuid }}</span>
+            </template>
+            <div v-else class="dsk-devices__rename">
+              <MField
+                v-model="editName"
+                class="name-input"
+                :label="t.devices.renameBtn"
+                data-focusable
+                @keyup.enter="saveRename(device)"
+                @keyup.escape="cancelRename"
+              />
             </div>
           </div>
-          <div class="card-content">
-            <div class="pin-form">
-              <div class="form-row">
-                <label class="form-label">{{ t.devices.pinInput }}</label>
-                <input
-                  v-model="pinInput"
-                  class="form-input"
-                  type="text"
-                  pattern="\d*"
-                  maxlength="4"
-                  :placeholder="t.devices.pinPlaceholder"
-                />
-              </div>
-              <div class="form-row">
-                <label class="form-label">{{ t.devices.deviceName }}</label>
-                <input
-                  v-model="deviceNameInput"
-                  class="form-input"
-                  type="text"
-                  :placeholder="t.devices.deviceNamePlaceholder"
-                />
-              </div>
-              <button
-                class="desktop-btn primary full-width"
-                :disabled="pinSubmitting || !pinInput || !deviceNameInput"
-                @click="submitPin"
-              >
-                {{ pinSubmitting ? t.devices.pairing : t.devices.pairBtn }}
-              </button>
-              <div v-if="pinStatus" class="pin-status" :class="pinStatus.type">
-                {{ pinStatus.message }}
-              </div>
-            </div>
+          <div class="dsk-device__actions">
+            <template v-if="editingUuid !== device.uuid">
+              <MIconButton icon="edit" tonal :label="t.devices.renameBtn" @click="startRename(device)" />
+              <MIconButton icon="link_off" class="is-danger" :label="t.devices.unpairBtn" @click="unpairDevice(device)" />
+            </template>
+            <template v-else>
+              <MIconButton icon="check" tonal :label="t.devices.saveBtn" @click="saveRename(device)" />
+              <MIconButton icon="close" :label="t.devices.cancelBtn" @click="cancelRename" />
+            </template>
           </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 已配对设备 -->
-    <div class="section-header fade-in">
-      <h2 class="section-title">{{ t.devices.pairedDevicesTitle }}</h2>
-      <span class="section-count">{{ devices.length }}</span>
-    </div>
-
-    <div class="devices-list">
-      <div
-        v-for="(device, index) in devices"
-        :key="device.uuid"
-        class="desktop-card device-card fade-in"
-        :style="{ animationDelay: `${index * 0.1}s` }"
-      >
-        <div class="device-icon"><MIcon name="mobile" /></div>
-        <div class="device-info">
-          <template v-if="editingUuid === device.uuid">
-            <input
-              v-model="editName"
-              class="name-input"
-              @keyup.enter="saveRename(device)"
-              @keyup.escape="cancelRename"
-              ref="nameInputRef"
-            />
-          </template>
-          <template v-else>
-            <div class="device-name">{{ device.name || t.devices.unnamedDevice }}</div>
-          </template>
-          <div class="device-meta">
-            <span class="device-uuid">{{ device.uuid }}</span>
-          </div>
-        </div>
-        <div class="device-actions">
-          <template v-if="editingUuid === device.uuid">
-            <button class="desktop-btn" @click="saveRename(device)">{{ t.devices.saveBtn }}</button>
-            <button class="desktop-btn" @click="cancelRename">{{ t.devices.cancelBtn }}</button>
-          </template>
-          <template v-else>
-            <button class="desktop-btn" @click="startRename(device)">{{ t.devices.renameBtn }}</button>
-            <button class="desktop-btn danger" @click="unpairDevice(device)">{{ t.devices.unpairBtn }}</button>
-          </template>
-        </div>
+        </article>
       </div>
 
-      <div v-if="!loading && devices.length === 0" class="empty-state fade-in">
-        <div class="empty-icon"><MIcon name="mobile" /></div>
-        <p>{{ t.devices.emptyState }}</p>
-      </div>
-
-      <div v-if="loading" class="empty-state fade-in">
-        <p>{{ t.devices.loading }}</p>
-      </div>
-    </div>
-  </div>
+      <div v-else-if="loading" class="dsk-devices__wait"><MLoading size="32px" :label="t.devices.loading" /><span>{{ t.devices.loading }}</span></div>
+      <MEmpty v-else icon="mobile" :title="t.devices.emptyState" />
+    </section>
+  </DeskPage>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { MIcon } from 'foundation-ui/vue'
+import { MButton, MChip, MEmpty, MField, MIcon, MIconButton, MLoading, MNotice, MPinPad, MScallop } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
+import { requestConfirm } from '../composables/useConfirm.js'
 import { useI18n } from '../i18n/index.js'
+import DeskPage from '../components/DeskPage.vue'
 
 const { t } = useI18n()
+
+// the shapes the device avatars turn in (foundation-ui shape vocabulary), in turn
+const SHAPES = ['cookie', 'clover', 'sunny']
 
 // === Tauri invoke ===
 const invoke = ref(null)
@@ -183,6 +145,7 @@ async function apiFetch(path, options = {}) {
 // === 设备列表 ===
 const devices = ref([])
 const loading = ref(false)
+const heroText = computed(() => t.value.devices.pairedCount.replace('{n}', devices.value.length))
 
 async function loadDevices() {
   loading.value = true
@@ -238,7 +201,14 @@ async function saveRename(device) {
 // === 取消配对 ===
 async function unpairDevice(device) {
   const name = device.name || device.uuid
-  if (!confirm(t.value.devices.unpairConfirm.replace('{name}', name))) return
+  // The window's own confirm dialog: a native one cannot be answered with a pad.
+  const confirmed = await requestConfirm({
+    title: t.value.devices.unpairBtn,
+    message: t.value.devices.unpairConfirm.replace('{name}', name),
+    confirmLabel: t.value.devices.unpairBtn,
+    danger: true,
+  })
+  if (!confirmed) return
   try {
     const data = await apiFetch('/api/clients/unpair', {
       method: 'POST',
@@ -363,296 +333,58 @@ onUnmounted(() => {
 })
 </script>
 
-<style lang="less" scoped>
-.devices-view {
-  max-width: 1000px;
-  margin: 0 auto;
-}
+<style scoped>
+/* The pairing tiles: a tonal block each, a rotating Material shape behind the icon, big forms (QR, PIN dots, circular keys). */
+.dsk-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: stretch; margin-bottom: 32px; }
+.dsk-tile { position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; gap: 18px; min-width: 0; padding: 26px 28px 28px; border-radius: var(--md-sys-shape-corner-extra-extra-large); color: var(--md-sys-color-on-surface); }
+.dsk-tile::after { content: ''; position: absolute; z-index: -1; right: -60px; top: -70px; width: 240px; height: 240px; background: currentColor; opacity: .07; clip-path: var(--m-shape-cookie); animation: m-turn 48s linear infinite; }
+.dsk-tile--qr { background: var(--dsk-tert-bg); color: var(--dsk-tert-fg); }
+.dsk-tile--pin { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
+.dsk-tile__head { display: flex; align-items: center; gap: 14px; }
+.dsk-tile__icon { flex: none; width: 52px; height: 52px; display: grid; place-items: center; font-size: 28px; background: currentColor; clip-path: var(--m-shape-squircle); position: relative; }
+.dsk-tile__icon :deep(.m-icon) { color: var(--md-sys-color-surface); }
+.dsk-tile--qr .dsk-tile__icon { background: var(--md-sys-color-tertiary); }
+.dsk-tile--pin .dsk-tile__icon { background: var(--md-sys-color-secondary); }
+.dsk-tile--qr .dsk-tile__icon :deep(.m-icon) { color: var(--md-sys-color-on-tertiary); }
+.dsk-tile--pin .dsk-tile__icon :deep(.m-icon) { color: var(--md-sys-color-on-secondary); }
+.dsk-tile__title { margin: 0; font: var(--m-headline-small-emphasized); letter-spacing: 0; }
 
-.page-header {
-  margin-bottom: 32px;
+.dsk-idle { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; text-align: center; padding: 8px 0; }
+.dsk-idle p { margin: 0; max-width: 28ch; font: var(--m-title-medium); opacity: .9; }
+.dsk-idle__glyph { font-size: 56px; }
+.dsk-qr { flex: 1; display: flex; align-items: center; gap: 28px; }
+.dsk-qr__frame { flex: none; padding: 14px; border-radius: var(--md-sys-shape-corner-extra-large); background: color-mix(in srgb, var(--md-sys-color-surface) 55%, transparent); }
+.dsk-qr__code { padding: 12px; border-radius: var(--md-sys-shape-corner-large); background: #fff; }
+.dsk-qr__code img { display: block; width: 200px; height: 200px; }
+.dsk-qr__meta { display: flex; flex-direction: column; align-items: flex-start; gap: 16px; min-width: 0; }
+.dsk-qr__pin { display: flex; flex-direction: column; }
+.dsk-qr__pin-label { font: var(--m-label-large); opacity: .8; }
+.dsk-qr__pin-value { font: var(--m-display-medium); letter-spacing: .14em; }
+.dsk-qr__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.dsk-pin { display: flex; flex-direction: column; align-items: stretch; gap: 16px; }
+.dsk-pin > :first-child { align-self: center; }
 
-  .page-title {
-    font-size: 32px;
-    font-weight: 700;
-    color: var(--fd-text-primary, #fff);
-    margin: 0 0 8px 0;
-  }
+.dsk-devices__head { display: flex; align-items: center; gap: 14px; margin: 0 0 16px 4px; }
+.dsk-devices__title { margin: 0; font: var(--m-headline-small-emphasized); color: var(--md-sys-color-on-surface); letter-spacing: 0; }
+.dsk-devices__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.dsk-device { display: flex; align-items: center; gap: 18px; min-width: 0; padding: 18px 20px; border-radius: var(--md-sys-shape-corner-extra-large); background: var(--md-sys-color-surface-container-high); transition: border-radius var(--m-spring-default-spatial-duration, 300ms) var(--m-spring-default-spatial, ease), background-color var(--m-spring-default-effects-duration, 200ms) var(--m-spring-default-effects, ease); }
+.dsk-device:hover, .dsk-device:focus-within { border-radius: var(--md-sys-shape-corner-extra-extra-large); background: var(--md-sys-color-surface-container-highest); }
+.dsk-device__avatar { position: relative; flex: none; width: 76px; height: 76px; display: grid; place-items: center; font-size: 36px; color: var(--md-sys-color-on-primary-container); }
+.dsk-device__shape { position: absolute; inset: 0; background: var(--md-sys-color-primary-container); animation: m-turn 60s linear infinite; }
+.dsk-device__avatar :deep(.m-icon) { position: relative; }
+.dsk-device.is-clover .dsk-device__shape { background: var(--dsk-tert-bg); }
+.dsk-device.is-clover .dsk-device__avatar { color: var(--dsk-tert-fg); }
+.dsk-device.is-sunny .dsk-device__shape { background: var(--md-sys-color-secondary-container); }
+.dsk-device.is-sunny .dsk-device__avatar { color: var(--md-sys-color-on-secondary-container); }
+.dsk-device__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.dsk-device__name { margin: 0; font: var(--m-title-large); color: var(--md-sys-color-on-surface); overflow-wrap: anywhere; }
+.dsk-devices__uuid { font: var(--m-label-large); color: var(--md-sys-color-on-surface-variant); font-family: var(--m-font-mono, ui-monospace, 'Consolas', monospace); overflow-wrap: anywhere; }
+.dsk-device__actions { flex: none; display: flex; gap: 6px; }
+.dsk-device__actions .is-danger { --m-icon-btn-fg: var(--md-sys-color-error); color: var(--md-sys-color-error); }
+.dsk-devices__rename { display: flex; align-items: center; width: 100%; }
+.dsk-devices__wait { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 24px; font: var(--m-body-large); color: var(--md-sys-color-on-surface-variant); }
 
-  .page-subtitle {
-    font-size: 16px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    margin: 0;
-  }
-}
-
-// 配对区域
-.pairing-section {
-  margin-bottom: 40px;
-}
-
-.pairing-card {
-  display: flex;
-  flex-direction: column;
-}
-
-.qr-idle {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 24px 0;
-  text-align: center;
-
-  p {
-    margin: 0;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.4);
-    font-size: 14px;
-  }
-}
-
-.qr-display {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-
-  .qr-image-wrapper {
-    padding: 10px;
-    background: #fff;
-    border-radius: 12px;
-  }
-
-  .qr-image {
-    width: 180px;
-    height: 180px;
-    border-radius: 4px;
-    display: block;
-  }
-
-  .qr-meta {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    flex-wrap: wrap;
-    justify-content: center;
-  }
-
-  .qr-pin {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-
-    .qr-pin-label {
-      font-size: 13px;
-      color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    }
-
-    .qr-pin-value {
-      font-size: 24px;
-      font-weight: 700;
-      font-family: monospace;
-      letter-spacing: 6px;
-      background: linear-gradient(135deg, var(--fd-accent, #00fff5), var(--fd-accent-secondary, #ff00ff));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-  }
-
-  .qr-timer {
-    font-size: 13px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-    padding: 4px 10px;
-    border-radius: 6px;
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-
-    &.warning {
-      background: rgba(var(--fd-status-warning-rgb, 255, 215, 0), 0.15);
-      color: var(--fd-status-warning, #ffd700);
-    }
-  }
-
-  .qr-actions {
-    display: flex;
-    gap: 8px;
-  }
-}
-
-.qr-error {
-  color: var(--fd-status-danger, #ff6b35);
-  padding: 12px;
-  background: rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.1);
-  border-radius: 8px;
-}
-
-// PIN 表单
-.pin-form {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.form-row {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.form-label {
-  font-size: 13px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-  font-weight: 500;
-}
-
-.form-input {
-  background: rgba(0, 0, 0, 0.3);
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-  border-radius: 8px;
-  padding: 10px 14px;
-  color: var(--fd-text-primary, #fff);
-  font-size: 14px;
-  outline: none;
-  transition: border-color 0.2s;
-
-  &:focus {
-    border-color: var(--fd-accent, #00fff5);
-    box-shadow: 0 0 8px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-  }
-
-  &::placeholder {
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.25);
-  }
-}
-
-.full-width {
-  width: 100%;
-}
-
-.pin-status {
-  padding: 10px 14px;
-  border-radius: 8px;
-  font-size: 14px;
-
-  &.success {
-    background: rgba(var(--fd-status-success-rgb, 0, 255, 136), 0.1);
-    color: var(--fd-status-success, #00ff88);
-    border: 1px solid rgba(var(--fd-status-success-rgb, 0, 255, 136), 0.3);
-  }
-
-  &.error {
-    background: rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.1);
-    color: var(--fd-status-danger, #ff6b35);
-    border: 1px solid rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.3);
-  }
-}
-
-// 段落标题
-.section-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 16px;
-}
-
-.section-title {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--fd-text-primary, #fff);
-  margin: 0;
-}
-
-.section-count {
-  font-size: 13px;
-  padding: 2px 10px;
-  border-radius: 10px;
-  background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.12);
-  color: var(--fd-accent, #00fff5);
-}
-
-// 设备列表
-.devices-list {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.device-card {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-
-  .device-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-    flex-shrink: 0;
-  }
-
-  .device-info {
-    flex: 1;
-    min-width: 0;
-
-    .device-name {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--fd-text-primary, #fff);
-      margin-bottom: 2px;
-    }
-
-    .name-input {
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--fd-text-primary, #fff);
-      background: rgba(0, 0, 0, 0.3);
-      border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.5);
-      border-radius: 6px;
-      padding: 4px 10px;
-      outline: none;
-      margin-bottom: 2px;
-
-      &:focus {
-        border-color: var(--fd-accent, #00fff5);
-        box-shadow: 0 0 8px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-      }
-    }
-
-    .device-meta {
-      font-size: 12px;
-      color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.3);
-      font-family: monospace;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-  }
-
-  .device-actions {
-    display: flex;
-    gap: 8px;
-    flex-shrink: 0;
-  }
-}
-
-.empty-state {
-  text-align: center;
-  padding: 40px 20px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.4);
-
-  .empty-icon {
-    font-size: 48px;
-    margin-bottom: 12px;
-  }
-
-  p {
-    margin: 0;
-    font-size: 14px;
-  }
+@media (max-width: 1300px) {
+  .dsk-pair, .dsk-devices__grid { grid-template-columns: minmax(0, 1fr); }
 }
 </style>
-

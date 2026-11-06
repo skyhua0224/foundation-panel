@@ -1,37 +1,27 @@
 <template>
-  <Teleport to="body">
-    <Transition name="splash" @after-leave="$emit('done')">
-      <div v-if="visible" class="splash-screen">
-        <!-- 粒子背景 -->
-        <canvas ref="canvasRef" class="splash-particles"></canvas>
-
-        <!-- 渐变叠加层 -->
-        <div class="splash-overlay"></div>
-
-        <!-- 中心内容 -->
-        <div class="splash-content" :class="{ 'reveal': phase >= 1, 'expand': phase >= 2 }">
-          <!-- Logo -->
-          <div class="splash-logo">
-            <div class="logo-glow"></div>
-            <span class="logo-icon">☀️</span>
-          </div>
-
-          <!-- 标题 -->
-          <div class="splash-title">
-            <span class="title-main">Foundation</span>
-            <span class="title-sub">SUNSHINE</span>
-          </div>
-
-          <!-- 底部扫光线 -->
-          <div class="splash-line"></div>
+  <Transition name="splash" @after-leave="$emit('done')">
+    <div v-if="visible" class="splash-screen m-app" role="status" aria-live="polite" aria-label="Foundation Sunshine">
+      <div class="splash-content" :class="{ reveal: phase >= 1, expand: phase >= 2 }">
+        <div class="splash-logo">
+          <span class="logo-shape" aria-hidden="true"></span>
+          <img class="logo-icon" :src="sunshineIcon" alt="" />
         </div>
+
+        <div class="splash-title">
+          <span class="title-main">Foundation</span>
+          <span class="title-sub">Sunshine</span>
+        </div>
+
+        <MProgress class="splash-progress" :value="phase >= 3 ? 1 : phase >= 2 ? 0.7 : phase >= 1 ? 0.35 : 0.08" flat label="" />
       </div>
-    </Transition>
-  </Teleport>
+    </div>
+  </Transition>
 </template>
 
 <script setup>
-import { ref, watch, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, watch, onMounted, onUnmounted } from 'vue'
+import { MProgress } from 'foundation-ui/vue'
+import sunshineIcon from '../../../assets/sunshine.ico'
 
 const props = defineProps({
   visible: { type: Boolean, default: true },
@@ -39,9 +29,7 @@ const props = defineProps({
 
 const emit = defineEmits(['done'])
 
-const canvasRef = ref(null)
 const phase = ref(0)
-let animFrame = null
 let timers = []
 
 // ===== 手柄振动 =====
@@ -258,82 +246,8 @@ function playSoundFinish() {
   hum.stop(now + 0.8)
 }
 
-// 粒子系统
-function initParticles(canvas) {
-  const ctx = canvas.getContext('2d')
-  const dpr = window.devicePixelRatio || 1
-  let w, h
-  const particles = []
-  const PARTICLE_COUNT = 60
-
-  // 从主题读取强调色 RGB
-  const accentRgb = getComputedStyle(document.documentElement)
-    .getPropertyValue('--fd-accent-rgb').trim() || '0, 255, 245'
-
-  function resize() {
-    w = window.innerWidth
-    h = window.innerHeight
-    canvas.width = w * dpr
-    canvas.height = h * dpr
-    ctx.scale(dpr, dpr)
-  }
-
-  resize()
-
-  for (let i = 0; i < PARTICLE_COUNT; i++) {
-    particles.push({
-      x: Math.random() * w,
-      y: Math.random() * h,
-      radius: Math.random() * 2 + 0.5,
-      vx: (Math.random() - 0.5) * 0.4,
-      vy: -(Math.random() * 0.6 + 0.2),
-      alpha: Math.random() * 0.5 + 0.1,
-      fadeSpeed: Math.random() * 0.003 + 0.001,
-    })
-  }
-
-  function draw() {
-    ctx.clearRect(0, 0, w, h)
-
-    for (const p of particles) {
-      p.x += p.vx
-      p.y += p.vy
-      p.alpha += p.fadeSpeed
-
-      if (p.alpha > 0.6) p.fadeSpeed = -Math.abs(p.fadeSpeed)
-      if (p.alpha < 0.05) {
-        p.alpha = 0.05
-        p.fadeSpeed = Math.abs(p.fadeSpeed)
-        p.x = Math.random() * w
-        p.y = h + 10
-      }
-
-      if (p.y < -10) {
-        p.y = h + 10
-        p.x = Math.random() * w
-      }
-
-      ctx.beginPath()
-      ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2)
-      ctx.fillStyle = `rgba(${accentRgb}, ${p.alpha})`
-      ctx.fill()
-    }
-
-    animFrame = requestAnimationFrame(draw)
-  }
-
-  draw()
-}
-
 function startAnimation() {
   phase.value = 0
-
-  // 初始化粒子（延迟确保 canvas 已挂载）
-  nextTick(() => {
-    if (canvasRef.value) {
-      initParticles(canvasRef.value)
-    }
-  })
 
   // Phase 1: Logo 出现 + 轻弹振动 + 音乐盒 "叮~"
   timers.push(setTimeout(() => {
@@ -353,6 +267,7 @@ function startAnimation() {
 
   // Phase 3: 完成 + 欢快双振 + 确认 "叮叮♪"
   timers.push(setTimeout(() => {
+    phase.value = 3
     vibrateGamepad(0.25, 0.5, 100)
     setTimeout(() => vibrateGamepad(0.35, 0.6, 120), 110)
     playSoundFinish()
@@ -387,8 +302,6 @@ watch(() => props.visible, (val) => {
 })
 
 function cleanup() {
-  if (animFrame) cancelAnimationFrame(animFrame)
-  animFrame = null
   timers.forEach(clearTimeout)
   timers = []
 }
@@ -404,188 +317,103 @@ onUnmounted(() => {
   }
 })
 </script>
-
 <style lang="less" scoped>
+// 启动页：surface 底，一枚缓慢旋转的 primary-container 形状托着图标，标题随弹簧进场，下方进度条按阶段前进
 .splash-screen {
   position: fixed;
   inset: 0;
-  z-index: 99999;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--fd-bg-primary, #0f0f23);
-  overflow: hidden;
+  z-index: 40000;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  // .m-app 给了页面底色变量（壁纸时透明）：启动页必须不透明
+  background: var(--md-sys-color-surface) !important;
+  color: var(--md-sys-color-on-surface);
 }
 
-.splash-particles {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-}
-
-.splash-overlay {
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(
-    circle at 50% 50%,
-    transparent 0%,
-    color-mix(in srgb, var(--fd-bg-primary, #0f0f23) 40%, transparent) 50%,
-    color-mix(in srgb, var(--fd-bg-primary, #0f0f23) 90%, transparent) 100%
-  );
-}
-
-// ===== 中心内容 =====
 .splash-content {
-  position: relative;
-  z-index: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 24px;
-  opacity: 0;
-  transform: scale(0.8);
-  transition: all 0.8s cubic-bezier(0.16, 1, 0.3, 1);
-
-  &.reveal {
-    opacity: 1;
-    transform: scale(1);
-  }
-
-  &.expand {
-    .splash-title {
-      opacity: 1;
-      transform: translateY(0);
-    }
-    .splash-line {
-      transform: scaleX(1);
-      opacity: 1;
-    }
-  }
+  gap: 32px;
+  width: min(420px, 70vw);
 }
 
-// Logo
 .splash-logo {
   position: relative;
-  width: 120px;
-  height: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
+  width: 200px;
+  height: 200px;
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity var(--m-spring-default-effects-duration, 300ms) var(--m-spring-default-effects, ease),
+    transform var(--m-spring-slow-spatial-duration, 600ms) var(--m-spring-slow-spatial, ease);
 
-  .logo-glow {
+  .logo-shape {
     position: absolute;
-    width: 160px;
-    height: 160px;
-    border-radius: 50%;
-    background: radial-gradient(
-      circle,
-      rgba(var(--fd-accent-rgb, 0, 255, 245), 0.25) 0%,
-      rgba(var(--fd-accent-rgb, 0, 255, 245), 0.05) 50%,
-      transparent 70%
-    );
-    animation: glow-pulse 2s ease-in-out infinite;
+    inset: 0;
+    background: var(--md-sys-color-primary-container);
+    clip-path: polygon(50% 0%, 61% 8%, 75% 6%, 82% 18%, 94% 25%, 92% 39%, 100% 50%, 92% 61%, 94% 75%, 82% 82%, 75% 94%, 61% 92%, 50% 100%, 39% 92%, 25% 94%, 18% 82%, 6% 75%, 8% 61%, 0% 50%, 8% 39%, 6% 25%, 18% 18%, 25% 6%, 39% 8%);
+    animation: splash-turn 14s linear infinite;
   }
 
   .logo-icon {
-    font-size: 72px;
-    filter: drop-shadow(0 0 30px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.6));
-    animation: logo-spin 1.5s ease-out;
+    position: relative;
+    width: 96px;
+    height: 96px;
+    object-fit: contain;
   }
 }
 
-// 标题
+@keyframes splash-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .splash-title {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 4px;
   opacity: 0;
-  transform: translateY(20px);
-  transition: all 0.6s 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  transform: translateY(16px);
+  transition: opacity var(--m-spring-default-effects-duration, 300ms) var(--m-spring-default-effects, ease),
+    transform var(--m-spring-default-spatial-duration, 500ms) var(--m-spring-default-spatial, ease);
 
   .title-main {
-    font-size: 14px;
-    font-weight: 600;
-    letter-spacing: 12px;
-    text-indent: 12px;
-    text-transform: uppercase;
-    color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.7);
+    font: 700 56px/64px var(--md-ref-typeface-brand, system-ui);
+    letter-spacing: -1px;
   }
 
   .title-sub {
-    font-size: 52px;
-    font-weight: 800;
-    letter-spacing: 8px;
-    text-indent: 8px;
-    background: linear-gradient(
-      135deg,
-      var(--fd-text-primary, #fff) 0%,
-      var(--fd-accent, #00fff5) 50%,
-      rgba(var(--fd-accent-secondary-rgb, 255, 0, 255), 0.8) 100%
-    );
-    background-clip: text;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    text-shadow: none;
-    filter: drop-shadow(0 0 40px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3));
+    font: 600 18px/24px var(--md-ref-typeface-brand, system-ui);
+    letter-spacing: 6px;
+    text-transform: uppercase;
+    color: var(--md-sys-color-primary);
   }
 }
 
-// 扫光线
-.splash-line {
-  width: 400px;
-  height: 2px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(var(--fd-accent-rgb, 0, 255, 245), 0.8),
-    rgba(var(--fd-accent-secondary-rgb, 255, 0, 255), 0.4),
-    transparent
-  );
-  transform: scaleX(0);
+.splash-progress {
+  width: 100%;
   opacity: 0;
-  transition: all 0.8s 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: opacity var(--m-spring-default-effects-duration, 300ms) var(--m-spring-default-effects, ease);
 }
 
-// ===== 动画 =====
-@keyframes glow-pulse {
-  0%, 100% { transform: scale(1); opacity: 0.6; }
-  50% { transform: scale(1.15); opacity: 1; }
+.reveal .splash-logo {
+  opacity: 1;
+  transform: scale(1);
 }
 
-@keyframes logo-spin {
-  0% {
-    transform: rotate(-180deg) scale(0);
-    opacity: 0;
-  }
-  60% {
-    transform: rotate(15deg) scale(1.1);
-    opacity: 1;
-  }
-  100% {
-    transform: rotate(0deg) scale(1);
-    opacity: 1;
-  }
-}
-
-// ===== 过渡 =====
-.splash-enter-active {
-  transition: opacity 0.3s ease;
+.expand .splash-title,
+.expand .splash-progress {
+  opacity: 1;
+  transform: none;
 }
 
 .splash-leave-active {
-  transition: opacity 0.6s ease;
-
-  .splash-content {
-    transition: all 0.5s cubic-bezier(0.7, 0, 0.84, 0);
-    transform: scale(1.1);
-    opacity: 0;
-  }
-}
-
-.splash-enter-from {
-  opacity: 0;
+  transition: opacity var(--m-spring-default-effects-duration, 400ms) var(--m-spring-default-effects, ease);
 }
 
 .splash-leave-to {

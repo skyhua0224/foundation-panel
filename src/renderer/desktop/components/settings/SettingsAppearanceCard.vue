@@ -1,17 +1,13 @@
 <template>
   <SettingsCard :title="t.settings.appearance" icon="palette">
-    <SettingsRow
-      :name="t.settings.themeEditorName"
-      :description="t.settings.appearanceDesc"
-    >
-      <button class="desktop-btn" @click="emit('open-theme-editor')">
-        {{ t.settings.themeEditor }}
-      </button>
+    <SettingsRow :name="t.settings.themeEditorName" :description="t.settings.appearanceDesc">
+      <MButton variant="tonal" icon="palette" @click="emit('open-theme-editor')">{{ t.settings.themeEditor }}</MButton>
     </SettingsRow>
   </SettingsCard>
 </template>
 
 <script setup>
+import { MButton } from 'foundation-ui/vue'
 import { useI18n } from '../../i18n/index.js'
 import SettingsCard from './SettingsCard.vue'
 import SettingsRow from './SettingsRow.vue'
