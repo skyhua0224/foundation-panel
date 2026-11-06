@@ -647,4 +647,7 @@ defineExpose({
 .panel-body { position: absolute; inset: 0; min-height: 0; overflow: clip; }
 .panel-web-keep { height: 100%; min-height: 0; }
 .panel-body > .m-scene { position: absolute; inset: 0; height: auto; }
+/* a framed page has no scrollbar (inject-styles.css); a page of the panel has none either, or a page that scrolls would sit its title 5 px left of the same title in the frame */
+.panel-body .m-scene__pane--detail { scrollbar-width: none; }
+.panel-body .m-scene__pane--detail::-webkit-scrollbar { display: none; }
 </style>
