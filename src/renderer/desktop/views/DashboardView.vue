@@ -1,145 +1,44 @@
 <template>
   <div class="dashboard-view">
-    <!-- 欢迎横幅 -->
-    <div class="welcome-banner fade-in">
-      <div class="banner-content">
-        <h1 class="banner-title">
-          <span class="gradient-text">Foundation</span> Desktop
-        </h1>
-        <p class="banner-subtitle">{{ t.dashboard.subtitle }}</p>
-      </div>
-      <div class="banner-decoration">
-        <div class="decoration-circle"></div>
-        <div class="decoration-circle delay"></div>
-      </div>
-    </div>
+    <header class="dash-hero fade-in">
+      <h1 class="hero-title">Foundation <span>Desktop</span></h1>
+      <p class="hero-sub">{{ t.dashboard.subtitle }}</p>
+    </header>
 
-    <!-- 状态卡片 -->
-    <div class="desktop-grid cols-4">
-      <div class="desktop-card stat-card fade-in delay-1">
-        <div class="stat-icon online">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
-          </svg>
-        </div>
-        <div class="stat-info">
-          <span class="stat-label">{{ t.dashboard.serviceStatus }}</span>
-          <span class="stat-value-text" :class="serviceStatus.class">{{ serviceStatus.text }}</span>
-        </div>
-      </div>
-
-      <div class="desktop-card stat-card fade-in delay-2">
-        <div class="stat-icon cyan">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect x="2" y="3" width="20" height="14" rx="2"/>
-            <line x1="8" y1="21" x2="16" y2="21"/>
-            <line x1="12" y1="17" x2="12" y2="21"/>
-          </svg>
-        </div>
-        <div class="stat-info">
-          <span class="stat-label">{{ t.dashboard.pairedDevices }}</span>
-          <span class="stat-value">{{ pairedDevices }}</span>
-        </div>
-      </div>
-
-      <div class="desktop-card stat-card fade-in delay-3">
-        <div class="stat-icon magenta">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <polygon points="5 3 19 12 5 21 5 3"/>
-          </svg>
-        </div>
-        <div class="stat-info">
-          <span class="stat-label">{{ t.dashboard.activeSessions }}</span>
-          <span class="stat-value">{{ activeSessions }}</span>
-        </div>
-      </div>
-
-      <div class="desktop-card stat-card fade-in delay-4">
-        <div class="stat-icon yellow">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <polyline points="12 6 12 12 16 14"/>
-          </svg>
-        </div>
-        <div class="stat-info">
-          <span class="stat-label">{{ t.dashboard.uptime }}</span>
-          <span class="stat-value-text">{{ uptime }}</span>
-        </div>
-      </div>
+    <!-- 状态 -->
+    <div class="desktop-grid cols-4 stat-row">
+      <MStat class="fade-in delay-1" icon="sensors" :label="t.dashboard.serviceStatus" :value="serviceStatus.text || '…'" :tone="statusTone" />
+      <MStat class="fade-in delay-2" icon="devices" :label="t.dashboard.pairedDevices" :value="pairedDevices" />
+      <MStat class="fade-in delay-3" icon="cast_connected" :label="t.dashboard.activeSessions" :value="activeSessions" />
+      <MStat class="fade-in delay-4" icon="schedule" :label="t.dashboard.uptime" :value="uptime" />
     </div>
 
     <!-- 快捷操作 -->
-    <div class="section-title fade-in">
-      <span class="title-icon"><MIcon name="bolt" /></span>
-      {{ t.dashboard.quickActions }}
-    </div>
+    <h2 class="section-title fade-in"><MIcon name="bolt" />{{ t.dashboard.quickActions }}</h2>
 
     <div class="desktop-grid cols-4">
-      <div class="desktop-card action-card fade-in" tabindex="0" @click="openWebUI" @keydown.enter="openWebUI">
-        <div class="action-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="2" y1="12" x2="22" y2="12"/>
-            <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
-          </svg>
-        </div>
-        <div class="action-info">
-          <span class="action-title">{{ t.dashboard.webConsole }}</span>
-          <span class="action-desc">{{ t.dashboard.webConsoleDesc }}</span>
-        </div>
-        <div class="action-arrow">→</div>
-      </div>
-
-      <div class="desktop-card action-card fade-in" tabindex="0" @click="restartService" @keydown.enter="restartService">
-        <div class="action-icon warning">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21.5 2v6h-6M2.5 22v-6h6M2 11.5a10 10 0 0 1 18.8-4.3M22 12.5a10 10 0 0 1-18.8 4.2"/>
-          </svg>
-        </div>
-        <div class="action-info">
-          <span class="action-title">{{ t.dashboard.restartService }}</span>
-          <span class="action-desc">{{ t.dashboard.restartServiceDesc }}</span>
-        </div>
-        <div class="action-arrow">→</div>
-      </div>
-
-      <div class="desktop-card action-card fade-in" tabindex="0" @click="openHostPerformance" @keydown.enter="openHostPerformance">
-        <div class="action-icon performance">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M3 12h4l3-7 4 14 3-7h4"/>
-            <path d="M4 20h16"/>
-          </svg>
-        </div>
-        <div class="action-info">
-          <span class="action-title">{{ t.dashboard.hostPerformance }}</span>
-          <span class="action-desc">{{ t.dashboard.hostPerformanceDesc }}</span>
-        </div>
-        <div class="action-arrow">→</div>
-      </div>
-
-      <div class="desktop-card action-card fade-in" tabindex="0" @click="openLogs" @keydown.enter="openLogs">
-        <div class="action-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-            <polyline points="14 2 14 8 20 8"/>
-            <line x1="16" y1="13" x2="8" y2="13"/>
-            <line x1="16" y1="17" x2="8" y2="17"/>
-            <polyline points="10 9 9 9 8 9"/>
-          </svg>
-        </div>
-        <div class="action-info">
-          <span class="action-title">{{ t.dashboard.viewLogs }}</span>
-          <span class="action-desc">{{ t.dashboard.viewLogsDesc }}</span>
-        </div>
-        <div class="action-arrow">→</div>
+      <div
+        v-for="action in actions"
+        :key="action.id"
+        class="desktop-card action-card fade-in"
+        :class="action.tone"
+        role="button"
+        tabindex="0"
+        :data-focus-key="'dash-' + action.id"
+        @click="action.run()"
+        @keydown.enter="action.run()"
+      >
+        <span class="action-icon"><MIcon :name="action.icon" /></span>
+        <span class="action-info">
+          <span class="action-title">{{ action.title }}</span>
+          <span class="action-desc">{{ action.desc }}</span>
+        </span>
+        <MIcon class="action-arrow" name="arrow_forward" />
       </div>
     </div>
 
     <!-- 系统信息 -->
-    <div class="section-title fade-in">
-      <span class="title-icon"><MIcon name="monitor" /></span>
-      {{ t.dashboard.systemInfo }}
-    </div>
+    <h2 class="section-title fade-in"><MIcon name="monitor" />{{ t.dashboard.systemInfo }}</h2>
 
     <div class="desktop-card system-info-card fade-in">
       <div class="info-grid">
@@ -163,13 +62,9 @@
     </div>
 
     <!-- 内存监控 -->
-    <div class="section-title fade-in">
-      <span class="title-icon"><MIcon name="monitoring" /></span>
-      {{ t.dashboard.memoryMonitor }}
-    </div>
+    <h2 class="section-title fade-in"><MIcon name="monitoring" />{{ t.dashboard.memoryMonitor }}</h2>
 
     <div class="desktop-card memory-monitor-card fade-in">
-      <!-- 总览条 -->
       <div class="memory-overview">
         <div class="memory-stat">
           <span class="memory-stat-label">{{ t.dashboard.totalWorkingSet }}</span>
@@ -185,9 +80,8 @@
         </div>
       </div>
 
-      <!-- 内存使用进度条 -->
       <div class="memory-bar-container" v-if="memoryInfo.system_total_memory > 0">
-        <div class="memory-bar">
+        <div class="memory-bar" role="img" :aria-label="`Sunshine ${sunshineMemPercent}%, ${t.dashboard.systemUsed} ${systemUsedPercent}%, ${t.dashboard.free} ${freeMemPercent}%`">
           <div class="memory-bar-fill sunshine-fill" :style="{ width: sunshineMemPercent + '%' }"></div>
           <div class="memory-bar-fill system-fill" :style="{ width: systemUsedPercent + '%', left: sunshineMemPercent + '%' }"></div>
         </div>
@@ -198,7 +92,6 @@
         </div>
       </div>
 
-      <!-- 进程列表 -->
       <div class="process-list" v-if="memoryInfo.processes.length > 0">
         <div class="process-row header">
           <span class="process-name">{{ t.dashboard.processName }}</span>
@@ -215,26 +108,18 @@
           <span class="process-mem">{{ formatBytes(proc.private_working_set) }}</span>
         </div>
       </div>
-      <div class="no-process" v-else-if="memoryInfo.error">
-        ⚠️ {{ memoryInfo.error }}
-      </div>
-      <div class="no-process" v-else>
-        {{ t.dashboard.noSunshineProcess }}
-      </div>
+      <MBanner v-else-if="memoryInfo.error" tone="error" icon="warning">{{ memoryInfo.error }}</MBanner>
+      <div class="no-process" v-else>{{ t.dashboard.noSunshineProcess }}</div>
 
-      <!-- 内存趋势图 -->
       <div class="memory-trend" v-if="memoryHistory.length > 1">
         <div class="trend-title">{{ t.dashboard.memoryTrend }}</div>
         <div class="trend-chart">
-          <svg :viewBox="'0 0 ' + trendWidth + ' ' + trendHeight" class="trend-svg">
-            <!-- 网格线 -->
+          <svg :viewBox="'0 0 ' + trendWidth + ' ' + trendHeight" class="trend-svg" role="img" :aria-label="t.dashboard.memoryTrend">
             <line v-for="i in 4" :key="'grid-' + i"
                   :x1="0" :y1="trendHeight * i / 4"
                   :x2="trendWidth" :y2="trendHeight * i / 4"
                   class="grid-line"/>
-            <!-- 工作集曲线 -->
             <polyline :points="trendPolyline" class="trend-line working-set" fill="none"/>
-            <!-- 私有工作集曲线 -->
             <polyline :points="trendPrivatePolyline" class="trend-line private-ws" fill="none"/>
           </svg>
           <div class="trend-legend">
@@ -249,7 +134,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { MIcon } from 'foundation-ui/vue'
+import { MBanner, MIcon, MStat } from 'foundation-ui/vue'
 import { useI18n } from '../i18n/index.js'
 
 const { t } = useI18n()
@@ -260,6 +145,7 @@ const proxyUrl = ref('http://localhost:48081')
 
 // 状态数据
 const serviceStatus = ref({ text: '', class: 'connecting' })
+const statusTone = computed(() => ({ online: 'ok', offline: 'error', connecting: 'warn' }[serviceStatus.value.class] || ''))
 const pairedDevices = ref(0)
 const activeSessions = ref(0)
 const uptime = ref('--:--:--')
@@ -461,6 +347,14 @@ async function openHostPerformance() {
   }
 }
 
+// 快捷操作：一个数据表驱动四张卡
+const actions = computed(() => [
+  { id: 'web', icon: 'public', title: t.value.dashboard.webConsole, desc: t.value.dashboard.webConsoleDesc, run: openWebUI },
+  { id: 'restart', icon: 'restart_alt', title: t.value.dashboard.restartService, desc: t.value.dashboard.restartServiceDesc, run: restartService, tone: 'warning' },
+  { id: 'perf', icon: 'speed', title: t.value.dashboard.hostPerformance, desc: t.value.dashboard.hostPerformanceDesc, run: openHostPerformance },
+  { id: 'logs', icon: 'description', title: t.value.dashboard.viewLogs, desc: t.value.dashboard.viewLogsDesc, run: openLogs },
+])
+
 async function loadMemoryInfo() {
   if (!invoke.value) return
   try {
@@ -512,445 +406,301 @@ onUnmounted(() => {
   }
 })
 </script>
-
 <style lang="less" scoped>
 .dashboard-view {
-  max-width: 1600px;
+  max-width: 1500px;
   margin: 0 auto;
 }
 
-.welcome-banner {
-  background: linear-gradient(135deg, rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1) 0%, rgba(255, 0, 255, 0.1) 100%);
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-  border-radius: 24px;
-  padding: 56px;
-  margin-bottom: 40px;
-  position: relative;
-  overflow: hidden;
+.dash-hero {
+  margin-bottom: 32px;
 
-  .banner-content {
-    position: relative;
-    z-index: 1;
-  }
-
-  .banner-title {
-    font-size: 56px;
-    font-weight: 700;
-    margin: 0 0 12px 0;
-    color: var(--fd-text-primary, #fff);
-
-    .gradient-text {
-      background: linear-gradient(135deg, var(--fd-accent, #00fff5) 0%, var(--fd-accent-secondary, #ff00ff) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-  }
-
-  .banner-subtitle {
-    font-size: 22px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.7);
+  .hero-title {
     margin: 0;
-  }
+    font: 700 48px/56px var(--md-ref-typeface-brand, system-ui);
+    letter-spacing: -0.5px;
 
-  .banner-decoration {
-    position: absolute;
-    right: 40px;
-    top: 50%;
-    transform: translateY(-50%);
-
-    .decoration-circle {
-      width: 200px;
-      height: 200px;
-      border: 2px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-      border-radius: 50%;
-      position: absolute;
-      right: 0;
-      animation: pulse-ring 3s infinite;
-
-      &.delay {
-        animation-delay: 1.5s;
-      }
-    }
-  }
-}
-
-@keyframes pulse-ring {
-  0% {
-    transform: scale(0.8);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1.5);
-    opacity: 0;
-  }
-}
-
-.stat-card {
-  display: flex;
-  align-items: center;
-  gap: 20px;
-
-  .stat-icon {
-    width: 64px;
-    height: 64px;
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(var(--fd-status-success-rgb, 0, 255, 136), 0.1);
-    color: var(--fd-status-success, #00ff88);
-
-    &.online { background: rgba(var(--fd-status-success-rgb, 0, 255, 136), 0.1); color: var(--fd-status-success, #00ff88); }
-    &.cyan { background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1); color: var(--fd-accent, #00fff5); }
-    &.magenta { background: rgba(var(--fd-accent-secondary-rgb, 255, 0, 255), 0.1); color: var(--fd-accent-secondary, #ff00ff); }
-    &.yellow { background: rgba(var(--fd-status-warning-rgb, 255, 215, 0), 0.1); color: var(--fd-status-warning, #ffd700); }
-
-    svg {
-      width: 32px;
-      height: 32px;
+    span {
+      color: var(--md-sys-color-primary);
     }
   }
 
-  .stat-info {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
+  .hero-sub {
+    margin: 6px 0 0;
+    font: 400 20px/28px var(--md-ref-typeface-brand, system-ui);
+    color: var(--md-sys-color-on-surface-variant);
   }
+}
 
-  .stat-label {
-    font-size: 15px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-  }
-
-  .stat-value {
-    font-size: 42px;
-    font-weight: 700;
-    background: linear-gradient(135deg, var(--fd-accent, #00fff5) 0%, var(--fd-accent-secondary, #ff00ff) 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-  }
-
-  .stat-value-text {
-    font-size: 20px;
-    font-weight: 600;
-
-    &.online { color: var(--fd-status-success, #00ff88); }
-    &.offline { color: var(--fd-status-danger, #ff6b35); }
-    &.connecting { color: var(--fd-status-warning, #ffd700); }
-  }
+.stat-row {
+  margin-bottom: 8px;
 }
 
 .section-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: var(--fd-text-primary, #fff);
-  margin: 40px 0 20px 0;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  margin: 44px 0 20px;
+  font: 600 24px/32px var(--md-ref-typeface-brand, system-ui);
+  color: var(--md-sys-color-on-surface);
 
-  .title-icon {
-    font-size: 28px;
+  .m-icon {
+    width: 28px;
+    height: 28px;
+    color: var(--md-sys-color-primary);
   }
 }
 
+// === 快捷操作：tonal 大卡 ===
 .action-card {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 18px;
+  padding: 22px 24px;
+  min-height: 112px;
   cursor: pointer;
-  transition: all 0.3s ease;
+  outline: none;
+  background: var(--md-sys-color-secondary-container);
+  color: var(--md-sys-color-on-secondary-container);
+  border: 0;
 
   &:hover {
-    transform: translateY(-2px);
+    box-shadow: var(--d-shadow-3);
+    transform: translateY(-3px);
+  }
 
-    .action-arrow {
-      transform: translateX(6px);
-      color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-    }
+  &:active {
+    transform: scale(0.98);
   }
 
   .action-icon {
-    width: 60px;
-    height: 60px;
-    border-radius: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-    color: var(--fd-accent, #00fff5);
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 22px;
+    background: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
 
-    &.warning {
-      background: rgba(var(--fd-status-warning-rgb, 255, 215, 0), 0.1);
-      color: var(--fd-status-warning, #ffd700);
-    }
+    .m-icon { width: 34px; height: 34px; }
+  }
 
-    &.performance {
-      background: rgba(var(--fd-status-success-rgb, 0, 255, 136), 0.12);
-      color: var(--fd-status-success, #00ff88);
-    }
-
-    svg {
-      width: 28px;
-      height: 28px;
-    }
+  &.warning .action-icon {
+    background: var(--md-sys-color-tertiary);
+    color: var(--md-sys-color-on-tertiary);
   }
 
   .action-info {
     flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    gap: 4px;
+    gap: 2px;
   }
 
   .action-title {
-    font-size: 20px;
-    font-weight: 600;
-    color: var(--fd-text-primary, #fff);
+    font: 700 20px/28px var(--md-ref-typeface-brand, system-ui);
   }
 
   .action-desc {
-    font-size: 15px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
+    font: 400 15px/22px var(--md-ref-typeface-brand, system-ui);
+    opacity: 0.8;
   }
 
   .action-arrow {
-    font-size: 24px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.3);
-    transition: all 0.3s ease;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    opacity: 0.7;
   }
 }
 
-.system-info-card {
-  .info-grid {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 32px;
+// === 系统信息 ===
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px 32px;
+}
 
-    @media (max-width: 1000px) {
-      grid-template-columns: repeat(2, 1fr);
-    }
-  }
-
-  .info-item {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-  }
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
 
   .info-label {
-    font-size: 14px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font: 500 14px/20px var(--md-ref-typeface-brand, system-ui);
+    color: var(--md-sys-color-on-surface-variant);
   }
 
   .info-value {
-    font-size: 18px;
-    color: var(--fd-text-primary, #fff);
-    font-weight: 500;
+    font: 600 20px/28px var(--md-ref-typeface-brand, system-ui);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 }
 
-// === 内存监控样式 ===
-.memory-monitor-card {
-  .memory-overview {
-    display: flex;
-    gap: 40px;
-    margin-bottom: 20px;
-    flex-wrap: wrap;
-  }
+// === 内存监控 ===
+.memory-overview {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 24px;
+  margin-bottom: 24px;
+}
 
-  .memory-stat {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
+.memory-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 
   .memory-stat-label {
-    font-size: 13px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font: 500 14px/20px var(--md-ref-typeface-brand, system-ui);
+    color: var(--md-sys-color-on-surface-variant);
   }
 
   .memory-stat-value {
-    font-size: 22px;
-    font-weight: 600;
-    color: var(--fd-text-primary, #fff);
+    font: 700 28px/36px var(--md-ref-typeface-brand, system-ui);
 
     &.highlight {
-      background: linear-gradient(135deg, var(--fd-accent, #00fff5) 0%, var(--fd-accent-secondary, #ff00ff) 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      color: var(--md-sys-color-primary);
     }
   }
+}
 
-  .memory-bar-container {
-    margin-bottom: 24px;
-  }
+.memory-bar-container {
+  margin-bottom: 24px;
+}
 
-  .memory-bar {
-    height: 12px;
-    background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.1);
-    border-radius: 6px;
-    position: relative;
-    overflow: hidden;
-  }
+.memory-bar {
+  position: relative;
+  height: 16px;
+  border-radius: 8px;
+  background: var(--md-sys-color-surface-container-highest);
+  overflow: hidden;
 
   .memory-bar-fill {
     position: absolute;
     top: 0;
-    height: 100%;
-    transition: width 0.5s ease;
-
-    &.sunshine-fill {
-      left: 0;
-      background: linear-gradient(90deg, var(--fd-accent, #00fff5), var(--fd-accent-secondary, #ff00ff));
-      border-radius: 6px 0 0 6px;
-    }
-
-    &.system-fill {
-      background: rgba(var(--fd-status-warning-rgb, 255, 215, 0), 0.6);
-    }
+    bottom: 0;
+    transition: width var(--m-spring-default-spatial-duration, 400ms) var(--m-spring-default-spatial, ease);
   }
 
-  .memory-bar-legend {
-    display: flex;
-    gap: 20px;
-    margin-top: 8px;
-
-    .legend-item {
-      font-size: 12px;
-      color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .legend-dot {
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-
-      &.sunshine { background: var(--fd-accent, #00fff5); }
-      &.system { background: rgba(var(--fd-status-warning-rgb, 255, 215, 0), 0.6); }
-      &.free { background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.1); }
-    }
+  .sunshine-fill {
+    left: 0;
+    background: var(--md-sys-color-primary);
+    z-index: 1;
   }
 
-  .process-list {
-    margin-bottom: 20px;
+  .system-fill {
+    background: var(--md-sys-color-tertiary);
+  }
+}
+
+.memory-bar-legend,
+.trend-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  margin-top: 12px;
+  font: 500 15px/22px var(--md-ref-typeface-brand, system-ui);
+  color: var(--md-sys-color-on-surface-variant);
+
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
   }
 
-  .process-row {
-    display: grid;
-    grid-template-columns: 2fr 1fr 1.2fr 1.2fr 1.2fr;
-    gap: 12px;
-    padding: 8px 0;
-    border-bottom: 1px solid rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.06);
+  .legend-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
 
-    &.header {
-      font-size: 12px;
-      color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.4);
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      border-bottom: 1px solid rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.12);
-      padding-bottom: 10px;
-      margin-bottom: 4px;
-    }
+    &.sunshine { background: var(--md-sys-color-primary); }
+    &.system { background: var(--md-sys-color-tertiary); }
+    &.free { background: var(--md-sys-color-surface-container-highest); border: 1px solid var(--md-sys-color-outline-variant); }
+  }
+
+  .legend-line {
+    width: 24px;
+    height: 4px;
+    border-radius: 2px;
+
+    &.ws { background: var(--md-sys-color-primary); }
+    &.pws { background: var(--md-sys-color-tertiary); }
+  }
+}
+
+.process-list {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 24px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--md-sys-color-surface-container-low);
+}
+
+.process-row {
+  display: grid;
+  grid-template-columns: 2fr 0.8fr 1fr 1fr 1fr;
+  gap: 12px;
+  padding: 14px 20px;
+  font: 400 16px/24px var(--md-ref-typeface-brand, system-ui);
+
+  &:not(.header):nth-child(even) {
+    background: color-mix(in srgb, var(--md-sys-color-surface-container-highest) 50%, transparent);
+  }
+
+  &.header {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--md-sys-color-on-surface-variant);
+    background: var(--md-sys-color-surface-container-high);
   }
 
   .process-name {
-    font-weight: 500;
-    color: var(--fd-text-primary, #fff);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
-  .process-pid {
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    font-family: monospace;
+  .process-mem.peak {
+    color: var(--md-sys-color-on-surface-variant);
   }
+}
 
-  .process-mem {
-    font-family: monospace;
-    color: var(--fd-text-primary, #fff);
+.no-process {
+  padding: 20px 0 28px;
+  font: 400 17px/26px var(--md-ref-typeface-brand, system-ui);
+  color: var(--md-sys-color-on-surface-variant);
+}
 
-    &.peak {
-      color: var(--fd-status-warning, #ffd700);
-    }
-  }
+.trend-title {
+  margin-bottom: 12px;
+  font: 600 18px/26px var(--md-ref-typeface-brand, system-ui);
+}
 
-  .no-process {
-    text-align: center;
-    padding: 20px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.4);
-    font-size: 14px;
-  }
-
-  .memory-trend {
-    margin-top: 16px;
-  }
-
-  .trend-title {
-    font-size: 14px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    margin-bottom: 8px;
-  }
-
-  .trend-svg {
-    width: 100%;
-    height: 120px;
-  }
+.trend-svg {
+  width: 100%;
+  height: 160px;
+  border-radius: 20px;
+  background: var(--md-sys-color-surface-container-low);
 
   .grid-line {
-    stroke: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.06);
+    stroke: var(--md-sys-color-outline-variant);
     stroke-width: 1;
   }
 
   .trend-line {
-    stroke-width: 2;
+    stroke-width: 3;
     stroke-linecap: round;
     stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
 
-    &.working-set {
-      stroke: var(--fd-accent, #00fff5);
-    }
-
-    &.private-ws {
-      stroke: var(--fd-accent-secondary, #ff00ff);
-      stroke-dasharray: 4 2;
-    }
-  }
-
-  .trend-legend {
-    display: flex;
-    gap: 20px;
-    margin-top: 8px;
-
-    .legend-item {
-      font-size: 12px;
-      color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .legend-line {
-      width: 16px;
-      height: 2px;
-
-      &.ws { background: var(--fd-accent, #00fff5); }
-      &.pws {
-        background: var(--fd-accent-secondary, #ff00ff);
-        background-image: repeating-linear-gradient(90deg,
-          var(--fd-accent-secondary, #ff00ff) 0, var(--fd-accent-secondary, #ff00ff) 4px,
-          transparent 4px, transparent 6px);
-      }
-    }
+    &.working-set { stroke: var(--md-sys-color-primary); }
+    &.private-ws { stroke: var(--md-sys-color-tertiary); }
   }
 }
 </style>
-
