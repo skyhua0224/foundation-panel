@@ -1,5 +1,9 @@
 <template>
-  <DeskPage class="settings-view" :title="t.settings.pageTitle" wide>
+  <DeskPage class="settings-view" :title="t.settings.pageTitle" icon="settings" :text="heroText" wide>
+    <template #chips>
+      <MChip v-for="chip in heroChips" :key="chip.label" :tone="chip.on === chip.total ? 'ok' : 'neutral'">{{ chip.label }} {{ chip.on }}/{{ chip.total }}</MChip>
+    </template>
+
     <div class="dsk-settings">
       <div class="dsk-settings__col">
         <SettingsAppearanceCard @open-theme-editor="emit('openThemeEditor')" />
@@ -11,7 +15,9 @@
           :values="settings"
           @update-value="setSettingValue"
         />
+      </div>
 
+      <div class="dsk-settings__col">
         <SettingsToggleSection
           :title="t.settings.bigScreen"
           icon="tv_gen"
@@ -27,19 +33,6 @@
           :values="settings"
           @update-value="setSettingValue"
         />
-
-        <SettingsAdvancedCard
-          :values="settings"
-          @update-value="setSettingValue"
-        />
-      </div>
-
-      <div class="dsk-settings__col">
-        <SettingsLaunchAssistantCard :has-tauri="hasTauri" />
-
-        <SettingsFileSharingCard />
-
-        <SettingsPetCard />
       </div>
     </div>
 
@@ -50,6 +43,9 @@
       @check-update="checkUpdate"
     />
 
+    <!-- what a sofa does not need often: tool paths, file sharing, the pet, the advanced switches -->
+    <PanelLinkSection :links="['toolPaths', 'fileSharing', 'pet', 'advanced']" />
+
     <DeskDock>
       <SettingsNotice :notice="statusNotice" />
       <SettingsActions @reset="resetSettings" @save="saveSettings" />
@@ -59,19 +55,17 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
+import { MChip } from 'foundation-ui/vue'
 import { useSettingsState } from '../composables/useSettingsState'
 import { bigScreenSettings, setBigScreenSetting } from '../composables/useBigScreenSettings.js'
 import { useI18n } from '../i18n/index.js'
 import DeskPage from '../components/DeskPage.vue'
 import DeskDock from '../components/DeskDock.vue'
+import PanelLinkSection from '../components/PanelLinkSection.vue'
 import SettingsActions from '../components/settings/SettingsActions.vue'
 import SettingsAboutCard from '../components/settings/SettingsAboutCard.vue'
-import SettingsAdvancedCard from '../components/settings/SettingsAdvancedCard.vue'
 import SettingsAppearanceCard from '../components/settings/SettingsAppearanceCard.vue'
-import SettingsFileSharingCard from '../components/settings/SettingsFileSharingCard.vue'
-import SettingsLaunchAssistantCard from '../components/settings/SettingsLaunchAssistantCard.vue'
 import SettingsNotice from '../components/settings/SettingsNotice.vue'
-import SettingsPetCard from '../components/settings/SettingsPetCard.vue'
 import SettingsToggleSection from '../components/settings/SettingsToggleSection.vue'
 
 const { t } = useI18n()
@@ -79,7 +73,6 @@ const { t } = useI18n()
 const {
   appVersion,
   checking,
-  hasTauri,
   settings,
   statusNotice,
   checkUpdate,
@@ -159,6 +152,15 @@ function setSettingValue(key, value) {
 
 const emit = defineEmits(['openThemeEditor'])
 
+// the hero: the version, and how much of each group is on
+const onCount = (items, values) => items.filter((item) => Boolean(values[item.key])).length
+const heroText = computed(() => `${t.value.settings.version} ${appVersion.value}`)
+const heroChips = computed(() => [
+  { label: t.value.settings.startup, on: onCount(startupSettings.value, settings.value), total: startupSettings.value.length },
+  { label: t.value.settings.bigScreen, on: onCount(bigScreenItems.value, bigScreenSettings.value), total: bigScreenItems.value.length },
+  { label: t.value.settings.notifications, on: onCount(notificationSettings.value, settings.value), total: notificationSettings.value.length },
+])
+
 onMounted(async () => {
   await initializeSettingsState()
 })
@@ -169,8 +171,8 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.dsk-settings { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; margin-bottom: 24px; }
-.dsk-settings__col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+.dsk-settings { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; margin-bottom: 20px; }
+.dsk-settings__col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 @media (min-width: 1500px) {
   .dsk-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 }

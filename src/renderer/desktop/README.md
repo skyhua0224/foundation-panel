@@ -9,6 +9,7 @@ desktop/
 ├── DesktopApp.vue         # 外壳：导航栏、页面切换、弹层、手柄路由、浅色/深色/跟随系统
 ├── main.js / index.html   # 入口
 ├── desktop.less           # 全局：10-foot 尺度、手柄焦点环、共用块
+├── panelLinks.js          # 「在 Panel 中打开」的表和 openInPanel()
 ├── components/            # 外壳与应用库的组件（见 components/README.md）
 │   └── settings/          # 设置页的卡片与行
 ├── composables/           # 手柄、焦点、屏幕键盘、主题、应用库、游戏会话
@@ -23,14 +24,21 @@ desktop/
 |---|---|---|
 | `apps` | `views/AppsView.vue` | 应用库：筛选、搜索、排序、网格/列表、最近、右键菜单、封面、启动助手 |
 | `dashboard` | `views/DashboardView.vue` | 状态、快捷操作（网页控制台、重启服务、主机性能、诊断与日志）、系统信息、内存监控 |
-| `devices` | `views/DevicesView.vue` | 配对（PIN、二维码）、已配对设备、重命名、取消配对 |
-| `stream` | `views/StreamView.vue` | 编解码器、码率、HDR、显示与采集、启动方式、虚拟显示器、虚拟鼠标 |
-| `tools` | `views/ToolsView.vue` | 嵌入工具、GPU/编码器/网络/防火墙诊断、重启显卡驱动 |
-| `settings` | `views/SettingsView.vue` | 外观、启动、大屏、启动助手、文件共享、通知、高级、桌宠、关于 |
+| `devices` | `views/DevicesView.vue` | 配对（二维码；PIN 用 `MPinPad`）、已配对设备、重命名、取消配对 |
+| `stream` | `views/StreamView.vue` | 码率（大数字）、编解码器、HDR、自动启动大屏；改一项存一项（`saveSettingKey`），并写明何时生效 |
+| `tools` | `views/ToolsView.vue` | 系统检查（GPU、编码器、网络、防火墙）、重启显卡驱动；工具箱各项是 Panel 的页面 |
+| `settings` | `views/SettingsView.vue` | 外观、启动、大屏、通知、关于；其余是 Panel 的页面 |
 
 底部导航：语言（EN/中文）、主题编辑器、设置、退出。`desktop-navigate` 事件、托盘 `open_desktop`、`--desktop`/`-d` 仍然进入这里。
 
-页面（设备、串流、工具、设置）都放在 `components/DeskPage.vue` 里：一个标题加内容，按 `useDeskScale` 放大 1.25 倍（再随主题编辑器的字号）。
+页面（设备、串流、工具、设置）都放在 `components/DeskPage.vue` 里：一条 hero（有形状的图标、页面名、一条真实的事实、标签）加内容，按 `useDeskScale` 放大 1.25 倍（再随主题编辑器的字号）。页面的操作条（保存、重置）用 `components/DeskDock.vue`，停在页面下面独立一行，不浮在内容上。
+
+## 在 Panel 中打开
+
+沙发上不常用的东西留在主 Panel：每项是一块磁贴（`components/PanelLink.vue`），手柄按下就通过宿主命令 `open_panel_page` 打开 Panel 的对应页面（`windows::open_main_panel_page`）。
+表在 `panelLinks.js`；页面名是 `composables/panelParts.js` 的 `PANEL_PAGES`，宿主允许表在 `src-tauri/src/commands.rs`，`panelLinks.test.js` 让两份和这张表保持一致。
+哪些功能搬到了哪一页，见 `/var/tmp/dispatch/md-desk3-panel-map.md` 一表（每项都对过 Panel 的代码；Panel 没有对应页面的，例如系统检查和重启显卡驱动，留在大屏）。
+留在大屏的设置和 Panel 走同一份保存代码：`useDesktopSettings.js`、`useBigScreenSettings.js`、串流项用 `saveSettingKey`。
 
 ## 外观与颜色
 

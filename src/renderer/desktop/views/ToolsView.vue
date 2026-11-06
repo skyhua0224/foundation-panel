@@ -1,29 +1,12 @@
 <template>
-  <DeskPage :title="t.tools.pageTitle" wide>
-    <!-- the tools of the toolbar, side by side -->
-    <div class="dsk-tools">
-      <section v-for="tool in tools" :key="tool.id" class="dsk-tool" :class="`dsk-tool--${tool.id}`">
-        <header class="dsk-tool__head">
-          <span class="dsk-tool__icon"><MIcon :name="tool.icon" fill /></span>
-          <h2 class="dsk-tool__title">{{ tool.title }}</h2>
-        </header>
-        <div class="dsk-tool__body">
-          <component :is="tool.component" :embedded="true" />
-        </div>
-      </section>
-    </div>
-
-    <!-- diagnostics -->
+  <DeskPage :title="t.tools.pageTitle" icon="build" :text="heroText" wide>
+    <!-- the system check: what the host and this machine can do, in four tiles that turn green or amber -->
     <section class="dsk-diag">
-      <header class="dsk-tool__head">
-        <span class="dsk-tool__icon"><MIcon name="stethoscope" fill /></span>
-        <h2 class="dsk-tool__title">{{ t.tools.diagnostics }}</h2>
-      </header>
-
       <div class="dsk-diag__grid">
         <div v-for="row in DIAGNOSTIC_ROWS" :key="row.key" class="dsk-diag__tile" :class="`is-${diagnostics[row.key].status}`">
           <span class="dsk-diag__icon">
-            <MLoading v-if="diagnostics[row.key].status === 'connecting'" size="28px" />
+            <span class="dsk-diag__shape" />
+            <MLoading v-if="diagnostics[row.key].status === 'connecting'" size="30px" />
             <MIcon v-else :name="row.icon" fill />
           </span>
           <div class="dsk-diag__info">
@@ -37,10 +20,13 @@
       <MNotice v-if="actionError" tone="error">{{ actionError }}</MNotice>
 
       <div class="dsk-diag__actions">
-        <MButton variant="tonal" icon="restart_alt" @click="restartGraphicsDriver">{{ t.tools.restartGraphicsDriver }}</MButton>
-        <MButton icon="refresh" :loading="diagnosing" @click="runDiagnostics">{{ t.tools.rediagnose }}</MButton>
+        <MButton variant="tonal" size="lg" icon="restart_alt" @click="restartGraphicsDriver">{{ t.tools.restartGraphicsDriver }}</MButton>
+        <MButton size="lg" icon="refresh" :loading="diagnosing" @click="runDiagnostics">{{ t.tools.rediagnose }}</MButton>
       </div>
     </section>
+
+    <!-- the tools of the toolbox are pages of the panel -->
+    <PanelLinkSection :heading="t.tools.inPanel" :links="['liveSession', 'dpi', 'shortcuts', 'logs']" />
   </DeskPage>
 </template>
 
@@ -51,25 +37,13 @@ import { MButton, MChip, MIcon, MLoading, MNotice } from 'foundation-ui/vue'
 import { requestConfirm } from '../composables/useConfirm.js'
 import { useI18n } from '../i18n/index.js'
 import DeskPage from '../components/DeskPage.vue'
-
-// 工具组件 - 复用工具栏的工具
-import BitrateTool from '../../tool-window/tools/BitrateTool.vue'
-import DpiAdjusterTool from '../../tool-window/tools/DpiAdjusterTool.vue'
-import HostPerformanceTool from '../../tool-window/tools/HostPerformanceTool.vue'
-import ShortcutsTool from '../../tool-window/tools/ShortcutsTool.vue'
+import PanelLinkSection from '../components/PanelLinkSection.vue'
 
 const { t } = useI18n()
 
 // Tauri 命令
 const invoke = ref(null)
 const diagnosing = ref(false)
-
-const tools = computed(() => [
-  { id: 'bitrate', icon: 'monitoring', title: t.value.tools.bitrateAdjust, component: BitrateTool },
-  { id: 'host', icon: 'monitor_heart', title: t.value.tools.hostPerformance, component: HostPerformanceTool },
-  { id: 'dpi', icon: 'aspect_ratio', title: t.value.tools.dpiScaling, component: DpiAdjusterTool },
-  { id: 'shortcuts', icon: 'keyboard', title: t.value.tools.shortcutGuide, component: ShortcutsTool },
-])
 
 const diagnostics = ref({
   gpu: { value: t.value.tools.status.detectingEllipsis, status: 'connecting', statusText: t.value.tools.status.detecting },
@@ -99,6 +73,13 @@ async function restartGraphicsDriver() {
 }
 
 // The tone of a diagnostic, and the glyph of what it checks.
+// the hero's fact: how many of the four checks pass
+const heroText = computed(() => {
+  const rows = Object.values(diagnostics.value)
+  if (rows.some((row) => row.status === 'connecting')) return t.value.tools.status.detecting
+  return t.value.tools.checksSummary.replace('{ok}', rows.filter((row) => row.status === 'good').length).replace('{n}', rows.length)
+})
+
 const STATUS_TONES = { good: 'ok', warning: 'warn', error: 'error', connecting: 'info' }
 const DIAGNOSTIC_ROWS = [
   { key: 'gpu', icon: 'memory' },
@@ -137,29 +118,27 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.dsk-tools { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: start; margin-bottom: 28px; }
-.dsk-tool--shortcuts { grid-column: 1 / -1; }
-.dsk-tool, .dsk-diag { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 20px; border-radius: var(--md-sys-shape-corner-extra-large); background: var(--m-card); color: var(--md-sys-color-on-surface); }
-.dsk-tool__head { display: flex; align-items: center; gap: 12px; }
-.dsk-tool__icon { flex: none; width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; font-size: 24px; background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
-.dsk-tool__title { margin: 0; min-width: 0; color: var(--md-sys-color-on-surface); font: var(--m-title-large); letter-spacing: 0; }
-/* The tools are drawn for the panel (14 px body text). On the sofa they get a step more, and the links in the shortcut manual a 10-foot target. */
-.dsk-tool__body { min-height: 0; zoom: 1.2; }
-.dsk-tool__body :deep(a) { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 18px; }
-.dsk-tool__body :deep(.tool-header) { display: none; }
-
-.dsk-diag__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-.dsk-diag__tile { display: flex; align-items: center; gap: 14px; min-width: 0; padding: 16px; border-radius: var(--md-sys-shape-corner-large); background: var(--md-sys-color-surface-container-high); }
-.dsk-diag__icon { flex: none; width: 52px; height: 52px; border-radius: 18px; display: grid; place-items: center; font-size: 28px; background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
-.dsk-diag__tile.is-good .dsk-diag__icon { background: var(--md-sys-color-success-container); color: var(--md-sys-color-on-success-container); }
-.dsk-diag__tile.is-warning .dsk-diag__icon { background: var(--md-sys-color-warning-container); color: var(--md-sys-color-on-warning-container); }
-.dsk-diag__tile.is-error .dsk-diag__icon { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
+.dsk-diag { display: flex; flex-direction: column; gap: 18px; }
+.dsk-diag__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.dsk-diag__tile { display: flex; align-items: center; gap: 18px; min-width: 0; padding: 20px 22px; border-radius: var(--md-sys-shape-corner-extra-large); background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); transition: background-color var(--m-spring-default-effects-duration, 200ms) var(--m-spring-default-effects, ease); }
+.dsk-diag__icon { position: relative; flex: none; width: 72px; height: 72px; display: grid; place-items: center; font-size: 34px; color: var(--md-sys-color-on-secondary-container); }
+.dsk-diag__shape { position: absolute; inset: 0; background: var(--md-sys-color-secondary-container); clip-path: var(--m-shape-cookie); animation: m-turn 44s linear infinite; }
+.dsk-diag__icon :deep(.m-icon), .dsk-diag__icon :deep(.m-loading) { position: relative; }
+.dsk-diag__tile.is-good { background: var(--md-sys-color-success-container); color: var(--md-sys-color-on-success-container); }
+.dsk-diag__tile.is-good .dsk-diag__shape { background: var(--md-sys-color-success); }
+.dsk-diag__tile.is-good .dsk-diag__icon { color: var(--md-sys-color-on-success); }
+.dsk-diag__tile.is-warning { background: var(--md-sys-color-warning-container); color: var(--md-sys-color-on-warning-container); }
+.dsk-diag__tile.is-warning .dsk-diag__shape { background: var(--md-sys-color-warning); }
+.dsk-diag__tile.is-warning .dsk-diag__icon { color: var(--md-sys-color-on-warning); }
+.dsk-diag__tile.is-error { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
+.dsk-diag__tile.is-error .dsk-diag__shape { background: var(--md-sys-color-error); }
+.dsk-diag__tile.is-error .dsk-diag__icon { color: var(--md-sys-color-on-error); }
 .dsk-diag__info { flex: 1; min-width: 0; }
-.dsk-diag__name { font: var(--m-label-large); color: var(--md-sys-color-on-surface-variant); }
-.dsk-diag__value { font: var(--m-title-medium); overflow-wrap: anywhere; }
+.dsk-diag__name { font: var(--m-label-large); opacity: .85; }
+.dsk-diag__value { font: var(--m-title-large); overflow-wrap: anywhere; }
 .dsk-diag__actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; }
 
-@media (max-width: 1100px) {
-  .dsk-tools, .dsk-diag__grid { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 1300px) {
+  .dsk-diag__grid { grid-template-columns: minmax(0, 1fr); }
 }
 </style>

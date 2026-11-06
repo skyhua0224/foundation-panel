@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
@@ -22,9 +22,9 @@ test('F-1 a pad can type into a Material text field: A opens the keyboard and th
   assert.ok(read('DesktopApp.vue').includes('isTextEntryElement(focused)'), 'A on a focused field goes to the keyboard, not to a click')
 })
 
-test('F-2 the snackbar host is mounted in the big-screen window, so the driver messages of the stream page show', () => {
+test('F-2 the snackbar host is mounted in the big-screen window, so a result said in a snackbar (a refused panel page, as the driver messages were) shows', () => {
   assert.ok(read('DesktopApp.vue').includes('<MNotifyHost />'))
-  assert.ok(read('views/StreamView.vue').includes('useNotify().snack('))
+  assert.ok(read('components/PanelLink.vue').includes('useNotify().snack('), 'what says its result in a snackbar is read')
 })
 
 test('F-3 unpair posts JSON and goes by the boolean status Sunshine returns', () => {
@@ -35,11 +35,12 @@ test('F-3 unpair posts JSON and goes by the boolean status Sunshine returns', ()
   assert.ok(!unpair.includes("'ok'"))
 })
 
-test('F-4 the pet observation switch goes back off until consent is given, and only a yes starts it', () => {
-  const src = read('components/settings/SettingsPetCard.vue')
-  const toggle = src.slice(src.indexOf('async function onPetToggle'), src.indexOf('function onPetIntervalChange'))
-  assert.ok(toggle.indexOf('petEnabled.value = false') < toggle.indexOf('await requestConfirm('))
-  assert.ok(toggle.includes('if (accepted) startObserving()'))
+test('F-4 the pet switch no longer lives in the big screen (a row opens the panel); in the panel the switch stays off until consent is given', () => {
+  assert.ok(!existsSync(join(root, 'components/settings/SettingsPetCard.vue')))
+  assert.ok(read('panelLinks.js').includes("pet: { page: 'pet'"))
+  const panel = readFileSync(join(root, '../components/m3e/PanelOptions.vue'), 'utf8')
+  assert.ok(panel.includes('const togglePet = (on) => { if (!on) stopObserving(); else consent.value = true }'), 'switching on asks first')
+  assert.ok(panel.includes('const acceptPet = () => { consent.value = false; startObserving() }'), 'only a yes starts it')
 })
 
 test('F-5 nothing in the Chinese texts is left in English, except names (codec, driver, controller, key names)', () => {

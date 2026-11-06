@@ -395,6 +395,8 @@ export const en = {
 
   // === Tools ===
   tools: {
+    inPanel: 'Tools in the Panel',
+    checksSummary: '{ok} of {n} checks passed',
     pageTitle: 'Utility Tools',
     pageSubtitle: 'System diagnostics and optimization toolkit',
     bitrateAdjust: 'Real-time Bitrate Adjustment',
@@ -436,7 +438,28 @@ export const en = {
   },
 
   // === Devices ===
+  // === 在 Panel 中打开: what a sofa does not need often lives in the main panel; each row names the page and what is on it ===
+  panel: {
+    open: 'Open in Panel',
+    openFailed: 'The Panel could not be opened',
+    more: 'More in the Panel',
+    links: {
+      toolPaths: { title: 'Launch assistant paths', items: 'Controller mapper · Locale Emulator · Translator · Trainer · RTSS' },
+      fileSharing: { title: 'File sharing', items: 'Shared folders · Explorer menu · Access policy' },
+      pet: { title: 'Desktop pet', items: 'Desk observation · Interval · Poke' },
+      advanced: { title: 'Advanced', items: 'Developer mode · Text context · Log level' },
+      displayModes: { title: 'Display and resolution', items: 'Output display · Resolution · Refresh rate' },
+      vdd: { title: 'Virtual display', items: 'Driver install · Keep enabled · Headless' },
+      vmouse: { title: 'Virtual mouse driver', items: 'Install · Repair · Uninstall · Enable' },
+      liveSession: { title: 'Live bitrate and host performance', items: 'Bitrate · Latency · Encoder queues' },
+      dpi: { title: 'Desktop scale (DPI)', items: '100% to 300%' },
+      shortcuts: { title: 'Shortcut manual', items: 'PC · Android · iOS / tvOS' },
+      logs: { title: 'Diagnostics and logs', items: 'Logs · Errors · Export · AI diagnosis' },
+    },
+  },
+
   devices: {
+    pairedCount: '{n} paired devices',
     pageTitle: 'Device Management',
     pageSubtitle: 'Pair Moonlight clients and manage connected devices',
     qrCodePairing: 'QR Code Pairing',

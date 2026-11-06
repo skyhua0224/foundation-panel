@@ -33,7 +33,13 @@ import { useWindowControls } from './composables'
 `DesktopCard`：标题、图标、`variant`(`default|primary|secondary|success|warning|danger`)、`hoverable`、`clickable`、`showHeader`、`noPadding`，事件 `click`。`DesktopGrid`：`cols`(1-6)、`gap`(`xs..xl`)、`responsive`。当前页面直接用全局类 `.desktop-card`、`.desktop-grid`（`desktop.less`），这两个组件是同样样式的封装。
 
 ### DeskPage
-设备、串流、工具、设置页的外框：`title` + 内容，`wide` 放宽，`actions` 插槽放标题右侧的按钮。按 `useDeskScale` 放大到沙发尺度（基数 1.25，再随主题编辑器的字号）。
+设备、串流、工具、设置页的外框：`icon`、`title`、`text`（一条真实的事实，如「已配对 3 台设备」「HEVC · 50 Mbps · HDR」，不写页面说明）、`tone`、`chips` 插槽、`wide`。用 foundation-ui 的 `MHero`（爆裂形图标、慢转的曲奇形背景）。没有 `icon` 时退回到一个标题。按 `useDeskScale` 放大到沙发尺度（基数 1.25，再随主题编辑器的字号）。
+
+### DeskDock
+页面的操作条（保存、重置）：用 `Teleport` 把内容送到窗口里的 `#dsk-dock`（`DesktopWindow` 在滚动区下面留的一行，避开手柄提示条的高度），所以不会盖住任何控件。
+
+### PanelLink / PanelLinkSection
+「在 Panel 中打开」：一块磁贴（形状图标、页面名、里面有什么、跳出图标），聚焦时圆角变大、形状转动；按下调用 `openInPanel(page)`（`panelLinks.js`），被拒绝时用 snackbar 说。`PanelLinkSection` 是标题加一组磁贴，`links` 是 `PANEL_LINKS` 的键。
 
 ## 应用库
 
@@ -60,7 +66,7 @@ import { useWindowControls } from './composables'
 | `SplashScreen` | 启动页，`done` 事件结束 |
 
 ## 设置页卡片（`settings/`）
-`SettingsCard`(`MSection`+`MGroup`)、`SettingsRow`(`MItem`)、`SettingsSwitch`、`SettingsSelect`(`MSeg`)、`SettingsToggleSection`、`SettingsToolPathRow`(`MField` + 浏览)、`SettingsNotice`、`SettingsActions`，以及按功能分的卡片：外观、启动助手、文件共享、桌宠、高级、关于。
+`SettingsCard`（一块 tonal 磁贴：形状图标、名字、连成一组的行）、`SettingsRow`（`MItem`）、`SettingsSwitch`、`SettingsSelect`（`MSeg`）、`SettingsToggleSection`、`SettingsNotice`、`SettingsActions`，以及外观、关于两张卡片。文件共享、桌宠、启动助手路径、高级这几项在 Panel 里，大屏上是 `PanelLink` 磁贴。
 
 ## Composables
 

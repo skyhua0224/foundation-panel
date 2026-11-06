@@ -395,6 +395,8 @@ export const zh = {
 
   // === 工具 ===
   tools: {
+    inPanel: 'Panel 中的工具',
+    checksSummary: '{n} 项检查，{ok} 项正常',
     pageTitle: '实用工具',
     pageSubtitle: '系统诊断和优化工具集',
     bitrateAdjust: '实时码率调节',
@@ -436,7 +438,28 @@ export const zh = {
   },
 
   // === 设备 ===
+  // === 在 Panel 中打开: what a sofa does not need often lives in the main panel; each row names the page and what is on it ===
+  panel: {
+    open: '在 Panel 中打开',
+    openFailed: '无法打开 Panel',
+    more: '更多在 Panel 中',
+    links: {
+      toolPaths: { title: '启动助手工具路径', items: '手柄映射 · Locale Emulator · 翻译 · 修改器 · RTSS' },
+      fileSharing: { title: '文件共享', items: '共享文件夹 · 资源管理器菜单 · 访问策略' },
+      pet: { title: '桌宠', items: '桌面观察 · 观察间隔 · 戳一戳' },
+      advanced: { title: '高级', items: '开发者模式 · 文本上下文 · 日志级别' },
+      displayModes: { title: '显示器与分辨率', items: '输出显示器 · 分辨率 · 刷新率' },
+      vdd: { title: '虚拟显示器', items: '驱动安装 · 保持启用 · 无显示器时创建' },
+      vmouse: { title: '虚拟鼠标驱动', items: '安装 · 修复 · 卸载 · 启用' },
+      liveSession: { title: '当前串流：码率与主机性能', items: '码率 · 延迟 · 编码队列' },
+      dpi: { title: '桌面缩放（DPI）', items: '100% 到 300%' },
+      shortcuts: { title: '快捷键手册', items: '电脑 · Android · iOS / tvOS' },
+      logs: { title: '诊断与日志', items: '日志 · 错误 · 导出 · AI 诊断' },
+    },
+  },
+
   devices: {
+    pairedCount: '已配对 {n} 台设备',
     pageTitle: '设备管理',
     pageSubtitle: '配对 Moonlight Client 并管理已连接设备',
     qrCodePairing: '扫码配对',
