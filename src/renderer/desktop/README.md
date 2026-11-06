@@ -30,6 +30,12 @@ desktop/
 
 底部导航：语言（EN/中文）、主题编辑器、设置、退出。`desktop-navigate` 事件、托盘 `open_desktop`、`--desktop`/`-d` 仍然进入这里。
 
+## 入口
+
+- 主机的应用列表里有「大屏 / Big Screen」（新装默认有，旧版本升级后一次性补上，删了不再回来）：启动它 = 桌面串流 + `sunshine-gui.exe --desktop`（已经开着就把窗口带到前台，不开第二个），串流结束时 `sunshine-gui.exe --close-desktop` 关掉大屏。大屏自己的应用库不列这个条目（`composables/bigScreenEntry.js` 按命令认，不按名字）。
+- 面板里：概览的「打开大屏」磁贴（默认不在智能列表里，可固定）、搜索「大屏」、帮助里的一行、面板设置里的一行，都走 `open_desktop` 命令，与托盘「打开桌面 UI」是同一条路。
+- Web UI 在主机本机（Windows）上有同样的磁贴和搜索动作，经 `/api/tray/action` 的 `open_desktop`；别处没有，不是置灰。
+
 页面（设备、串流、工具、设置）都放在 `components/DeskPage.vue` 里：一个标题加内容，按 `useDeskScale` 放大 1.25 倍（再随主题编辑器的字号）。
 
 ## 外观与颜色
@@ -46,6 +52,22 @@ desktop/
 - B 键按层退出：屏幕键盘 > 确认框 > 启动覆盖 > 主题编辑器 > 启动助手 > 页面内弹层 > 光标模式 > 回到应用库 > 退出确认。
 - 文本框（`md-outlined-text-field` / `md-filled-text-field`，由 `isMaterialTextField` 识别）按 A 打开屏幕键盘 `OnScreenKeyboard`，不是点击。
 - `useGamepadCursor` 用左摇杆驱动指针，覆盖方向键到不了的密集表单。
+
+## 按键提示与手柄类型
+
+提示条、屏幕键盘、确认框和设置里带按键的句子，都按手里那台手柄印着的符号显示，换手柄即时跟着变：
+
+| 类型 | 面键（下 右 左 上） | 肩键 / 扳机 |
+|---|---|---|
+| `xbox` | A B X Y | LB RB / LT RT |
+| `ps`（DualSense 与 DualShock 4 一样） | ✕ ○ □ △ | L1 R1 / L2 R2 |
+| `nintendo` | B A Y X | L R / ZL ZR |
+| `generic`（认不出且映射不标准的手柄） | 用位置说话（下 右 左 上） | L1 R1 / L2 R2 |
+
+- `composables/padType.js` 决定类型：Gamepad API 的 `id` 与 `mapping`；串流时（Moonlight 连着这台主机）大屏看到的是主机的虚拟手柄，所以 `useHostPadType` 每 5 秒读 `/api/runtime/sessions` 的 `gamepad_type`（`x360` → xbox，`ds4`/`ds5` → ps），有报告就以它为准，没有就回到本机手柄。
+- `composables/padGlyphs.js` 是唯一的映射：动作（`confirm` `back` `favorite` `search` `menu` `pages` `scroll` `cursor`）→ 哪几颗键 → 这类手柄上印着什么。确认永远是下方那颗面键，返回永远是右边那颗，只变「印着什么」，不变行为（`useGamepad` 仍按标准映射的按钮号）。
+- `components/PadGlyph.vue` 用简单形状和 `--md-sys-color-*` 画键（Xbox 画字，PlayStation 画 ✕ ○ □ △ 的形状，generic 画位置），不用任何品牌图；`PadHint.vue` 把句子里的 `{confirm}` `{back}` 记号画成图标。文案里不写键名，写记号。
+- 只能放字的地方（`title`、`aria-label`、设置说明）用 `fillHint(text, padType.value)`。
 
 ## 开发规则
 
