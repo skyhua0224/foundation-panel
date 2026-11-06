@@ -24,3 +24,10 @@ test('the skeleton has nothing to focus, so a pad keeps its place while the view
   assert.match(sk, /data-motion='reduced'/)
   assert.doesNotMatch(sk, /#[0-9a-fA-F]{3,8}\b/, 'colours are tokens')
 })
+
+test('the big-screen dashboard draws the memory card as bars until the first reading, not 「no process」', () => {
+  const dash = read('views/DashboardView.vue')
+  assert.match(dash, /<div v-if="!memoryLoaded" class="mem-skel"/)
+  assert.match(dash, /class="no-process" v-else-if="memoryLoaded"/)
+  assert.match(dash, /\} finally \{\n    memoryLoaded\.value = true/)
+})
