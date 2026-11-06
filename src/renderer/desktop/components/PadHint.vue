@@ -23,6 +23,8 @@ const parts = computed(() => splitHint(props.text))
 <style lang="less" scoped>
 .pad-hint {
   // 图标与文字同一行，句子的行高不被撑开
-  :deep(.pad-glyph) { margin: -0.2em 0.12em; }
+  :deep(.pad-glyph) { margin: -0.1em 0.14em; }
+  // a key in a sentence is a little smaller than the line, so its disc is never cut by the line box
+  :deep(.pad-glyph.size-sm) { --pg: 1.4em; }
 }
 </style>
