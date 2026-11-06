@@ -296,7 +296,10 @@ const telemetry = useTelemetryConsent({ api: telemetryApi })
 const consentOpen = ref(false)
 const errorBack = () => { if (nav.canPop.value) nav.pop(); else router.navigate(ROUTES.HOME) }
 const osName = () => (typeof navigator === 'undefined' ? '' : String(navigator.userAgentData?.platform || navigator.platform || ''))
-const errorContext = () => ({ product: 'panel', version: currentVersion.value || '', os: osName(), page: String(router.currentRoute.value || ''), locale: String(locale.value), logs: '', components: `panel=${currentVersion.value || '?'}` })
+// the last host log lines go along with a report (scrubbed by buildReport): read once at start, as the Web UI does
+const recentLogText = ref('')
+const refreshLogs = async () => { try { const r = await fetch(`${String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')}/api/logs`); if (r.ok) recentLogText.value = (await r.text()).split('\n').slice(-60).join('\n') } catch { /* a report without log lines */ } }
+const errorContext = () => ({ product: 'panel', version: currentVersion.value || '', os: osName(), page: String(router.currentRoute.value || ''), locale: String(locale.value), logs: String(recentLogText.value || '').split('\n').slice(-40).join('\n'), components: `panel=${currentVersion.value || '?'}` })
 setErrorContext(errorContext)
 let removeErrorHandlers = null
 const shellApp = getCurrentInstance()?.appContext.app
@@ -425,7 +428,7 @@ onMounted(async () => {
   try { const { listen } = await import('@tauri-apps/api/event'); unlistenConnect = await listen('open-connect', (event) => connect.show(event.payload?.tab === 'install' ? 'install' : 'pair')) } catch { /* not in the app window */ }
 })
 onBeforeUnmount(() => { pairing.stop(); window.removeEventListener('message', onFramePin); if (unlistenConnect) unlistenConnect(); removeErrorHandlers?.() })
-onMounted(async () => { removeErrorHandlers = installErrorHandlers({ app: shellApp }); startAutoReport({ context: errorContext }); await telemetry.refresh(); telemetry.askWhenQuiet(consentOpen) })
+onMounted(async () => { removeErrorHandlers = installErrorHandlers({ app: shellApp }); startAutoReport({ context: errorContext }); void refreshLogs(); await telemetry.refresh(); telemetry.askWhenQuiet(consentOpen) })
 const actionHandlers = {
   restart: () => tools.restartSunshineService(),
   userMode: () => tools.restartSunshineInUserMode(),
