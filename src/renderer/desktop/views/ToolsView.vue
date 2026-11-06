@@ -143,7 +143,9 @@ onMounted(async () => {
 .dsk-tool__head { display: flex; align-items: center; gap: 12px; }
 .dsk-tool__icon { flex: none; width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; font-size: 24px; background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
 .dsk-tool__title { margin: 0; min-width: 0; color: var(--md-sys-color-on-surface); font: var(--m-title-large); letter-spacing: 0; }
-.dsk-tool__body { min-height: 0; }
+/* The tools are drawn for the panel (14 px body text). On the sofa they get a step more, and the links in the shortcut manual a 10-foot target. */
+.dsk-tool__body { min-height: 0; zoom: 1.2; }
+.dsk-tool__body :deep(a) { display: inline-flex; align-items: center; min-height: 36px; padding: 0 14px; border-radius: 18px; }
 .dsk-tool__body :deep(.tool-header) { display: none; }
 
 .dsk-diag__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
