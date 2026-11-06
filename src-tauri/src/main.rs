@@ -206,6 +206,7 @@ fn main() {
             native_tools::open_native_tool,
             commands::open_tool_window,
             commands::open_panel_page,
+            commands::open_desktop,
             game_session::launch_game,
             game_session::get_running_game,
             game_session::stop_running_game,

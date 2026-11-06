@@ -30,6 +30,16 @@ test('Xbox 与未知设备落到 xbox 布局（标准映射索引即 Xbox 约定
   }
 })
 
+test('认不出的手柄：标准映射按 xbox，非标准映射是 generic（按键位置不可信，不假装印着什么）', () => {
+  assert.equal(detectLayout('Generic USB Joystick (STANDARD GAMEPAD Vendor: 0079 Product: 0006)'), 'xbox')
+  assert.equal(detectLayout('USB Gamepad  (Vendor: 0810 Product: e501)'), 'generic')
+})
+
+test('Nintendo 手柄识别为 nintendo', () => {
+  assert.equal(detectLayout('Pro Controller (STANDARD GAMEPAD Vendor: 057e Product: 2009)'), 'nintendo')
+  assert.equal(detectLayout('Joy-Con (L) (Vendor: 057e Product: 2006)'), 'nintendo')
+})
+
 test('空 id 与无手柄状态落到 xbox 布局', () => {
   assert.equal(detectLayout(''), 'xbox')
   assert.equal(detectLayout(null), 'xbox')

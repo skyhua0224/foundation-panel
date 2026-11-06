@@ -1,9 +1,11 @@
 <template>
-  <span class="gamepad-legend" aria-hidden="true">
-    <span v-for="hint in hints" :key="hint.id" class="legend-item">
-      <span class="legend-button" :class="'btn-' + hint.tone">{{ hint.glyph }}</span>
-      <span class="legend-label">{{ hint.label }}</span>
-    </span>
+  <span class="gamepad-legend" :data-pad-type="padType" aria-hidden="true">
+    <TransitionGroup name="legend-item" tag="span" class="legend-items">
+      <span v-for="hint in hints" :key="hint.id" class="legend-item" :class="{ 'is-primary': hint.primary }" :data-hint="hint.id">
+        <PadGlyph :action="hint.action" size="md" />
+        <span class="legend-label">{{ hint.label }}</span>
+      </span>
+    </TransitionGroup>
   </span>
 </template>
 
@@ -11,8 +13,9 @@
 import { computed } from 'vue'
 import { viewActions } from '../composables/useGamepadActions.js'
 import { bigScreenSettings } from '../composables/useBigScreenSettings.js'
-import { chipFor } from '../composables/useGamepadLayout.js'
+import { padType } from '../composables/padType.js'
 import { useI18n } from '../i18n/index.js'
+import PadGlyph from './PadGlyph.vue'
 
 const { t } = useI18n()
 
@@ -20,7 +23,7 @@ const props = defineProps({
   cursorMode: { type: Boolean, default: false },
 })
 
-/** 动作 id → 文案。按键符号（A/B/X/Y 还是 ✕○□△）由 useGamepadLayout 按手柄布局给出。 */
+/** 动作 id → 文案。键的图标（A/B/X/Y 还是 ✕○□△，LB 还是 L1）由 padGlyphs 按手柄类型给出，文案里不写键名。 */
 const LABELS = () => {
   const legend = t.value.gamepadLegend
   return {
@@ -41,16 +44,17 @@ const LABELS = () => {
  * 只显示当前上下文真的会响应的按键：
  * 全局动作（确认/返回/换页/滚动/光标）始终在，视图级动作（搜索/收藏/菜单）
  * 由各视图通过 useGamepadActions 声明——没声明的页面就不显示，不撒谎。
- * 按键符号跟随当前活跃手柄的布局，换手柄即时切换。
+ * 图标跟随当前手柄类型（padType：串流时主机报告的虚拟手柄优先，否则本机手柄的 id 与 mapping），换手柄即时切换。
  */
 const hints = computed(() => {
   const labels = LABELS()
   if (props.cursorMode) {
-    return ['confirm', 'menu', 'back', 'scroll'].map((id) => {
-      const { glyph, tone } = chipFor(id)
-      const labelId = id === 'confirm' ? 'click' : id === 'back' ? 'exitCursor' : id
-      return { id, glyph, tone, label: labels[labelId] }
-    })
+    return [
+      { id: 'click', action: 'click', label: labels.click, primary: true },
+      { id: 'menu', action: 'menu', label: labels.menu },
+      { id: 'exitCursor', action: 'exitCursor', label: labels.exitCursor, primary: true },
+      { id: 'scroll', action: 'scroll', label: labels.scroll },
+    ]
   }
 
   const actions = ['confirm', 'back']
@@ -61,57 +65,71 @@ const hints = computed(() => {
   // 设置里关掉光标模式时 L3 不会响应，提示条不能显示无效按键
   if (bigScreenSettings.value.gamepadCursorEnabled) actions.push('cursor')
 
-  return actions.map((id) => {
-    const { glyph, tone } = chipFor(id)
-    return { id, glyph, tone, label: labels[id] }
-  })
+  return actions.map((id) => ({ id, action: id, label: labels[id], primary: id === 'confirm' || id === 'back' }))
 })
 </script>
 
 <style lang="less" scoped>
-// 按键提示条：药丸，surface-container-high，字号放大到沙发距离可读
+// 按键提示条：底部居中的大圆角药丸（与「正在运行」条同一套语言），图标 44px、字 18px，沙发十英尺能读。
+// 确认与返回是主操作：字重与颜色更重，其余退一档。
 .gamepad-legend {
+  display: inline-flex;
+  align-items: center;
+  max-width: min(100%, 1800px);
+  padding: 12px 30px 12px 22px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--md-sys-color-surface-container-high) 88%, transparent);
+  box-shadow: var(--d-shadow-3), inset 0 0 0 1px color-mix(in srgb, var(--md-sys-color-outline-variant) 70%, transparent);
+  backdrop-filter: blur(18px) saturate(1.2);
+  pointer-events: none;
+}
+
+.legend-items {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 8px 18px;
   flex-wrap: wrap;
   justify-content: center;
-  padding: 10px 24px;
-  border-radius: 9999px;
-  background: var(--md-sys-color-surface-container-high);
-  box-shadow: var(--d-shadow-1);
-  pointer-events: none;
+  gap: 8px 26px;
 }
 
 .legend-item {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-}
-
-.legend-button {
-  min-width: 32px;
-  height: 32px;
-  padding: 0 9px;
-  border-radius: 16px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font: 700 16px/1 var(--md-ref-typeface-brand, system-ui);
-  background: var(--md-sys-color-surface-container-highest);
-  color: var(--md-sys-color-on-surface);
-
-  // Xbox 与 PS 布局共用四个色位，语义是「按钮家族色」：
-  // 绿=确认系、红=返回系、蓝=功能键、黄=功能键
-  &.btn-a { background: var(--md-sys-color-success-container, var(--md-sys-color-secondary-container)); color: var(--md-sys-color-on-success-container, var(--md-sys-color-on-secondary-container)); }
-  &.btn-b { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
-  &.btn-x { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
-  &.btn-y { background: var(--md-sys-color-warning-container, var(--md-sys-color-tertiary-container)); color: var(--md-sys-color-on-warning-container, var(--md-sys-color-on-tertiary-container)); }
+  gap: 12px;
 }
 
 .legend-label {
-  font: 500 15px/22px var(--md-ref-typeface-brand, system-ui);
+  font: 600 18px/24px var(--md-ref-typeface-brand, system-ui);
   color: var(--md-sys-color-on-surface-variant);
   white-space: nowrap;
 }
+.legend-item.is-primary .legend-label {
+  font-weight: 750;
+  color: var(--md-sys-color-on-surface);
+}
+
+// 动作增减、手柄类型更换时：弹簧进出，位置平滑移动
+.legend-item-enter-active,
+.legend-item-leave-active {
+  transition: opacity var(--m-spring-fast-effects-duration, 160ms) var(--m-spring-fast-effects, ease),
+    transform var(--m-spring-fast-spatial-duration, 240ms) var(--m-spring-fast-spatial, ease);
+}
+.legend-item-move {
+  transition: transform var(--m-spring-default-spatial-duration, 320ms) var(--m-spring-default-spatial, ease);
+}
+.legend-item-leave-active { position: absolute; }
+.legend-item-enter-from,
+.legend-item-leave-to {
+  opacity: 0;
+  transform: translateY(10px) scale(0.92);
+}
+@media (prefers-reduced-motion: reduce) {
+  :global(html:not([data-motion='full'])) .legend-item-enter-active,
+  :global(html:not([data-motion='full'])) .legend-item-leave-active,
+  :global(html:not([data-motion='full'])) .legend-item-move { transition: none; }
+}
+:global(html[data-motion='reduced']) .legend-item-enter-active,
+:global(html[data-motion='reduced']) .legend-item-leave-active,
+:global(html[data-motion='reduced']) .legend-item-move { transition: none; }
 </style>

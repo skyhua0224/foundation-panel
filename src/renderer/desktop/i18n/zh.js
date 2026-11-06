@@ -250,9 +250,9 @@ export const zh = {
     autoYield: '启动游戏后让位',
     autoYieldDesc: '启动游戏时最小化本面板，游戏退出后自动回到这里',
     gamepadCursor: '手柄光标模式',
-    gamepadCursorDesc: '按左摇杆键用左摇杆驱动虚拟指针，覆盖尚未适配空间导航的页面',
+    gamepadCursorDesc: '按左摇杆键（{cursor}）用左摇杆驱动虚拟指针，覆盖尚未适配空间导航的页面',
     oskAutoOpen: '自动弹出屏幕键盘',
-    oskAutoOpenDesc: '焦点在文本框上按 A 时打开屏幕键盘',
+    oskAutoOpenDesc: '焦点在文本框上按 {confirm} 时打开屏幕键盘',
 
     navSounds: '手柄导航音效',
     navSoundsDesc: '焦点移动和确认/返回时的轻微提示音',
@@ -1084,6 +1084,9 @@ export const zh = {
     sectionAssist: '工具与助手',
     overview: '概览',
     clientDownloads: '下载客户端',
+    openBigScreen: '打开大屏',
+    openBigScreenHelp: '用手柄在沙发上操作的全屏界面。可以在这里、托盘菜单、搜索里打开，也可以在 Moonlight 的应用列表里启动「大屏」。',
+    openBigScreenFailed: '无法打开大屏',
     applications: '串流应用',
     clientPairing: '客户端配对',
     streamSettings: '主机设置',
@@ -2100,7 +2103,7 @@ export const zh = {
     clear: '清空',
     cancel: '取消',
     confirm: '确定',
-    hint: '方向键移动 · A 输入 · B 取消 · 也可直接用键盘',
+    hint: '方向键移动 · {confirm} 输入 · {back} 取消 · 也可直接用键盘',
   },
 
   // === 游戏会话 ===

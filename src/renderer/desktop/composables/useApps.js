@@ -3,6 +3,7 @@ import { tauriInvoke } from './useTauri'
 import { useI18n } from '../i18n/index.js'
 import { bigScreenSettings } from './useBigScreenSettings.js'
 import { gameStats, launchTrackedGame, runningGame } from './useGameSession.js'
+import { libraryApps } from './bigScreenEntry.js'
 
 const STORAGE_KEY = 'foundation-desktop-apps'
 const APP_LIST_REQUEST_TIMEOUT_MS = 10000
@@ -230,7 +231,8 @@ export function useApps() {
       const appList = Array.isArray(data) ? data : data?.apps
       if (!Array.isArray(appList)) throw new Error('Invalid apps response: expected an array')
 
-      apps.value = appList
+      // the host's Big Screen entry opens this window: it is for the clients, not for the library
+      apps.value = libraryApps(appList)
     } catch (e) {
       if (requestId !== loadRequestId) return
 

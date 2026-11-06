@@ -63,6 +63,8 @@ import { useWindowControls } from './composables'
 | `ThemeEditor` | 主题与壁纸：壁纸、取色种子、预设、颜色、圆角、字号、背景网格/扫描线、导出/导入 |
 | `GamepadLegend` | 按键提示条，只显示当前页面真的会响应的键 |
 | `BackHoldRing` | 长按 B 的进度环 |
+| `PadGlyph` | 一个动作在当前手柄类型上的按键图标（Xbox 字、PlayStation 形状、Nintendo 字、generic 位置），尺寸 md / sm / lg |
+| `PadHint` | 带 `{confirm}` `{back}` 记号的一句话，记号画成 `PadGlyph` |
 | `SplashScreen` | 启动页，`done` 事件结束 |
 
 ## 设置页卡片（`settings/`）
