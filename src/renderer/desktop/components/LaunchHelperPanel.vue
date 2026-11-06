@@ -381,7 +381,12 @@ onMounted(async () => {
 </script>
 <style lang="less" scoped>
 .helper-sheet {
-  --helper-sheet-width: min(720px, 100vw);
+  color: var(--md-sys-color-on-surface);
+
+  // 标题栏的字色：顶层 <dialog> 不继承窗口的文字色，深色下会掉成暗蓝
+  :deep(.m-sheet__head h2) {
+    color: var(--md-sys-color-on-surface);
+  }
 }
 
 .panel-desc {
