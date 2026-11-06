@@ -74,8 +74,8 @@ onMounted(() => {
 </script>
 
 <style>
-.m-rtss { display: grid; gap: 16px; width: 100%; color: var(--md-sys-color-on-surface); }
+.m-rtss { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; width: 100%; color: var(--md-sys-color-on-surface); }
 .m-rtss__head { display: flex; align-items: center; justify-content: space-between; } .m-rtss__head h2 { margin: 0; font: var(--m-title-large); }
-.m-rtss__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 24px 16px; align-items: start; }
+.m-rtss__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: 24px 16px; align-items: start; }
 .m-rtss__actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 </style>

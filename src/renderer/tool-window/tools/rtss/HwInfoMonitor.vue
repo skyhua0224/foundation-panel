@@ -5,7 +5,7 @@
     <div v-else-if="loading" class="m-hw__wait"><MLoading size="28px" /><span>{{ t.hwinfo.loading }}</span></div>
     <template v-else>
       <MGroup>
-        <MSwitchItem :model-value="injecting" icon="monitor" :title="t.hwinfo.title" :text="t.hwinfo.selectedCount.replace('{count}', selectedIds.size)" :disabled="!available" @update:model-value="toggleInject" />
+        <MSwitchItem :model-value="injecting" icon="monitor" :title="t.hwinfo.selectedCount.replace('{count}', selectedIds.size)" :disabled="!available" @update:model-value="toggleInject" />
       </MGroup>
       <MField v-model="searchQuery" :label="t.hwinfo.searchPlaceholder" />
       <MEmpty v-if="filteredGroups.length === 0" icon="search" :title="t.hwinfo.noMatch" />

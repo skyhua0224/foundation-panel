@@ -16,13 +16,12 @@
     <template v-else-if="selectedClient">
       <div class="m-tool__hero" role="status">
         <b class="m-tool__big">{{ formatBitrate(bitrateValue) }}</b>
-        <span>{{ t.bitrateTool.targetBitrate }}</span>
         <MChip v-if="currentBitrate" tone="info" icon="monitoring">{{ t.bitrateTool.currentBitrate }} {{ formatBitrate(currentBitrate) }}</MChip>
       </div>
       <MGroup>
         <MSliderItem v-model="bitrateValue" icon="speed" :title="t.bitrateTool.targetBitrate" :min="BITRATE_LIMITS.MIN" :max="BITRATE_LIMITS.MAX" :step="BITRATE_LIMITS.STEP" :decimals="0" size="m" :readout-text="formatBitrate(bitrateValue)" :disabled="applying" />
-        <MItem stack :title="t.bitrateTool.targetBitrate"><template #control><MChipSet v-model="bitrateValue" :label="t.bitrateTool.targetBitrate" :options="BITRATE_PRESETS.map((v) => ({ value: v, label: formatBitrate(v) }))" :disabled="applying" /></template></MItem>
-        <MItem stack icon="edit" :title="t.bitrateTool.inputPlaceholder"><template #control><MField v-model.number="bitrateValue" type="number" :label="t.bitrateTool.inputPlaceholder" suffix="Kbps" :error="inRange ? '' : rangeText" :disabled="applying" /></template></MItem>
+        <MItem stack title=""><template #control><MChipSet v-model="bitrateValue" :label="t.bitrateTool.targetBitrate" :options="BITRATE_PRESETS.map((v) => ({ value: v, label: formatBitrate(v) }))" :disabled="applying" /></template></MItem>
+        <MItem stack icon="edit" title=""><template #control><MField v-model.number="bitrateValue" type="number" :label="t.bitrateTool.inputPlaceholder" suffix="Kbps" :error="inRange ? '' : rangeText" :disabled="applying" /></template></MItem>
       </MGroup>
       <div class="m-tool__actions"><MButton icon="check" :loading="applying" :disabled="applying || !selectedClient || !inRange" @click="applyBitrate">{{ applying ? t.bitrateTool.applying : t.bitrateTool.apply }}</MButton></div>
     </template>
@@ -182,9 +181,10 @@ onMounted(loadSessions)
 </script>
 
 <style scoped>
-.m-tool { display: grid; gap: 16px; width: 100%; padding: 4px 0; color: var(--md-sys-color-on-surface); }
+.m-tool { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; width: 100%; padding: 4px 0; color: var(--md-sys-color-on-surface); }
 .m-tool__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; } .m-tool__head h2 { margin: 0; font: var(--m-title-large); }
 .m-tool__wait { display: grid; justify-items: center; gap: 12px; padding: 32px; color: var(--md-sys-color-on-surface-variant); font: var(--m-body-large); }
+.m-tool__hero span { font: var(--m-title-medium); }
 .m-tool__hero { display: grid; justify-items: start; gap: 8px; padding: 24px; border-radius: var(--md-sys-shape-corner-extra-large); background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
 .m-tool__big { font: var(--m-display-medium); font-variant-numeric: tabular-nums; letter-spacing: 0; }
 .m-tool__actions { display: flex; justify-content: flex-end; }

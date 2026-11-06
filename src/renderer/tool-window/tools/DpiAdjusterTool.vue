@@ -17,6 +17,6 @@ defineEmits(['close'])
 </script>
 
 <style scoped>
-.m-tool { display: grid; gap: 16px; width: 100%; padding: 4px 0; color: var(--md-sys-color-on-surface); }
+.m-tool { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; width: 100%; padding: 4px 0; color: var(--md-sys-color-on-surface); }
 .m-tool__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; } .m-tool__head h2 { margin: 0; font: var(--m-title-large); }
 </style>

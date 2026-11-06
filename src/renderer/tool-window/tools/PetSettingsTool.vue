@@ -14,7 +14,7 @@
           <MSwitchItem v-model="masterEnabled" icon="forum" :title="t.petTool.master" :text="t.petTool.masterDesc" />
         </MGroup>
 
-        <MSection :title="t.petTool.random">
+        <MSection>
           <MGroup>
             <MSwitchItem v-model="randomEnabled" icon="forum" :title="t.petTool.random" :text="t.petTool.randomDesc" :disabled="!masterEnabled" />
             <template v-if="masterEnabled && randomEnabled">
@@ -22,7 +22,7 @@
                 <template #control>
                   <div class="m-pet__set">
                     <MChipSet v-model="randomIntervalSec" :label="t.petTool.speechInterval" :options="INTERVAL_PRESETS.map((v) => ({ value: v, label: formatSec(v) }))" />
-                    <MField v-model.number="randomIntervalSec" type="number" :label="t.petTool.speechInterval" :suffix="t.petTool.unitSec" :error="outside(randomIntervalSec, MIN_INTERVAL_SEC, MAX_INTERVAL_SEC) ? rangeText(MIN_INTERVAL_SEC, MAX_INTERVAL_SEC) : ''" />
+                    <MField v-model.number="randomIntervalSec" type="number" :label="t.petTool.unitSec" :error="outside(randomIntervalSec, MIN_INTERVAL_SEC, MAX_INTERVAL_SEC) ? rangeText(MIN_INTERVAL_SEC, MAX_INTERVAL_SEC) : ''" />
                   </div>
                 </template>
               </MItem>
@@ -30,7 +30,7 @@
                 <template #control>
                   <div class="m-pet__set">
                     <MChipSet v-model="jitterPercent" :label="t.petTool.jitter" :options="JITTER_PRESETS.map((v) => ({ value: v, label: `${v}%` }))" />
-                    <MField v-model.number="jitterPercent" type="number" :label="t.petTool.jitter" suffix="%" :error="outside(jitterPercent, 0, MAX_JITTER_PERCENT) ? rangeText(0, MAX_JITTER_PERCENT) : ''" />
+                    <MField v-model.number="jitterPercent" type="number" label="%" :error="outside(jitterPercent, 0, MAX_JITTER_PERCENT) ? rangeText(0, MAX_JITTER_PERCENT) : ''" />
                   </div>
                 </template>
               </MItem>
@@ -38,7 +38,7 @@
           </MGroup>
         </MSection>
 
-        <MSection :title="t.petTool.vision">
+        <MSection>
           <MBanner v-if="masterEnabled && !aiConfigReady" tone="warn" icon="key">{{ t.petTool.aiKeyMissing }}. {{ t.petTool.aiKeyMissingDesc }}</MBanner>
           <MGroup>
             <MSwitchItem :model-value="visionEnabled" icon="visibility" :title="t.petTool.vision" :text="t.petTool.visionDesc" :info="t.petTool.visionHelp" :disabled="visionToggleDisabled || visionConfirmPending" @update:model-value="onVisionToggle" />
@@ -47,7 +47,7 @@
                 <template #control>
                   <div class="m-pet__set">
                     <MChipSet v-model="visionIntervalSec" :label="t.petTool.visionInterval" :options="VISION_INTERVAL_PRESETS.map((v) => ({ value: v, label: formatSec(v) }))" />
-                    <MField v-model.number="visionIntervalSec" type="number" :label="t.petTool.visionInterval" :suffix="t.petTool.unitSec" :error="outside(visionIntervalSec, MIN_INTERVAL_SEC, MAX_INTERVAL_SEC) ? rangeText(MIN_INTERVAL_SEC, MAX_INTERVAL_SEC) : ''" />
+                    <MField v-model.number="visionIntervalSec" type="number" :label="t.petTool.unitSec" :error="outside(visionIntervalSec, MIN_INTERVAL_SEC, MAX_INTERVAL_SEC) ? rangeText(MIN_INTERVAL_SEC, MAX_INTERVAL_SEC) : ''" />
                     <MNotice v-if="visionIntervalSec < 60" tone="warn">{{ t.petTool.visionCostHint }}</MNotice>
                   </div>
                 </template>
@@ -519,10 +519,10 @@ onUnmounted(() => window.removeEventListener('storage', syncSettingFromStorage))
 </script>
 
 <style scoped>
-.m-pet { display: grid; gap: 12px; align-content: start; width: min(720px, calc(100vw - 32px)); max-height: min(640px, calc(100vh - 32px)); box-sizing: border-box; padding: 16px; overflow-y: auto; color: var(--md-sys-color-on-surface); }
+.m-pet { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-content: start; width: min(720px, calc(100vw - 32px)); max-height: min(640px, calc(100vh - 32px)); box-sizing: border-box; padding: 16px; overflow-y: auto; color: var(--md-sys-color-on-surface); }
 .m-pet__head { display: flex; align-items: center; gap: 8px; } .m-pet__head h2 { margin: 0; margin-inline-end: auto; font: var(--m-title-large); }
-.m-pet__content { display: grid; gap: 16px; }
-.m-pet__set { display: grid; gap: 12px; }
+.m-pet__content { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.m-pet__set { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .m-pet__row { display: flex; justify-content: flex-end; }
 .m-pet__act { font: var(--m-label-large); color: var(--md-sys-color-primary-text, var(--md-sys-color-primary)); }
 </style>

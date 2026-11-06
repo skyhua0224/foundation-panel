@@ -1,7 +1,7 @@
 <template>
   <div class="m-rcolor" role="group" :aria-label="label">
     <MSwatches :model-value="hex" :colors="PALETTE" :label="label" @update:model-value="pick" />
-    <MField :model-value="draft" :label="label" :error="valid ? '' : hint" :supporting="valid ? '' : undefined" suffix="#" @update:model-value="typed" />
+    <MField :model-value="draft" :label="hint" :error="valid ? '' : hint" :supporting="valid ? '' : undefined" suffix="#" @update:model-value="typed" />
   </div>
 </template>
 

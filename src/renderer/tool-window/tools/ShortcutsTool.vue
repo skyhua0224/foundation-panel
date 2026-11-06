@@ -17,7 +17,7 @@ defineEmits(['close'])
 </script>
 
 <style scoped>
-.m-tool { display: grid; gap: 12px; width: 100%; color: var(--md-sys-color-on-surface); }
+.m-tool { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; width: 100%; color: var(--md-sys-color-on-surface); }
 .m-tool__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; } .m-tool__head h2 { margin: 0; font: var(--m-title-large); }
 .m-tool__body { max-height: 85vh; overflow-y: auto; padding: 0 4px 8px; } .is-embedded .m-tool__body { max-height: min(52vh, 520px); }
 .m-tool__body :deep(code) { padding: 1px 6px; border-radius: 6px; background: var(--md-sys-color-surface-container-highest); font-family: var(--m-font-mono); font-size: 0.92em; }

@@ -1,9 +1,9 @@
 <template>
-  <MSection :title="t.rtssTool.fpsLimiter">
+  <MSection>
     <MGroup>
       <MSwitchItem :model-value="limiterEnabled" icon="speed" :title="t.rtssTool.fpsLimiter" :disabled="applying" @update:model-value="onToggleLimiter" />
-      <MSliderItem v-model="fpsValue" icon="speed" :title="t.rtssTool.fpsLimiter" :min="15" :max="360" :step="1" :decimals="0" unit=" FPS" size="m" :disabled="applying" />
-      <MItem stack :title="t.rtssTool.fpsLimiter"><template #control><MChipSet v-model="fpsValue" :label="t.rtssTool.fpsLimiter" :options="presets.map((v) => ({ value: v, label: String(v) }))" :disabled="applying" /></template></MItem>
+      <MSliderItem v-model="fpsValue" icon="tune" title="FPS" :min="15" :max="360" :step="1" :decimals="0" unit=" FPS" size="m" :disabled="applying" />
+      <MItem stack title=""><template #control><MChipSet v-model="fpsValue" :label="t.rtssTool.fpsLimiter" :options="presets.map((v) => ({ value: v, label: String(v) }))" :disabled="applying" /></template></MItem>
     </MGroup>
     <div class="m-rtss__actions">
       <MButton variant="text" icon="close" :disabled="applying" @click="removeLimit">{{ t.rtssTool.removeFps }}</MButton>

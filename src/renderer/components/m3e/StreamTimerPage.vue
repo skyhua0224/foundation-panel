@@ -10,7 +10,7 @@
       </div>
     </div>
     <MGroup>
-      <MSliderItem v-model="percent" icon="aspect_ratio" :title="text.scale" :min="MIN_PERCENT" :max="MAX_PERCENT" :step="STEP_PERCENT" :decimals="0" unit="%" size="m" icon-start="remove" icon-end="add" />
+      <MSliderItem v-model="percent" icon="aspect_ratio" :title="text.scale" :min="MIN_PERCENT" :max="MAX_PERCENT" :step="STEP_PERCENT" :decimals="0" unit="%" size="m" />
       <MItem action icon="restart_alt" :title="text.reset" :disabled="percent === 100" @click="percent = 100" />
     </MGroup>
   </MPage>

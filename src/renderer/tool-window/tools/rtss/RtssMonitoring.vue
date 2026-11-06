@@ -1,5 +1,5 @@
 <template>
-  <MSection :title="t.rtssTool.monitoring">
+  <MSection>
     <MGroup>
       <MSwitchItem :model-value="active" icon="monitoring" :title="t.rtssTool.monitoring" @update:model-value="toggleMonitoring" />
       <MItem v-for="group in metricGroups" :key="group.id" stack :title="group.label">

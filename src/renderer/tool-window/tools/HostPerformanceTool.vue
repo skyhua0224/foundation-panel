@@ -365,7 +365,7 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.m-perf { display: grid; gap: 12px; width: 100%; box-sizing: border-box; padding: 12px; color: var(--md-sys-color-on-surface); background: var(--md-sys-color-surface-container); border-radius: var(--md-sys-shape-corner-extra-large); }
+.m-perf { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; width: 100%; box-sizing: border-box; padding: 12px; color: var(--md-sys-color-on-surface); background: var(--md-sys-color-surface-container); border-radius: var(--md-sys-shape-corner-extra-large); }
 .m-perf:not(.is-embedded) { width: 100vw; }
 .m-perf.is-embedded { padding: 0; background: none; }
 .m-perf__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -381,7 +381,7 @@ onUnmounted(() => {
 .m-perf__chart svg { display: block; width: 100%; height: 74px; } .m-perf__chart.is-compact svg { height: 52px; }
 .m-perf__grid { stroke: var(--md-sys-color-outline-variant); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
 .m-perf__line { fill: none; stroke: var(--md-sys-color-primary); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
-.m-perf__details { display: grid; gap: 12px; }
+.m-perf__details { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
 .m-perf__grid-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; margin: 0; } .m-perf__grid-list div { display: grid; padding: 8px 12px; border-radius: var(--md-sys-shape-corner-medium); background: var(--md-sys-color-surface-container-high); } .m-perf__grid-list dt { font: var(--m-label-small); color: var(--md-sys-color-on-surface-variant); } .m-perf__grid-list dd { margin: 0; font: var(--m-title-small); font-variant-numeric: tabular-nums; }
 .m-perf__stop { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; } .m-perf__note { font: var(--m-body-medium); color: var(--md-sys-color-on-surface-variant); }
 @media (max-width: 380px) { .m-perf__hud { grid-template-columns: 1fr 1fr; } .m-perf__metric.is-primary { grid-column: 1 / -1; } }
