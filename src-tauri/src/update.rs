@@ -797,9 +797,9 @@ fn draw_updater_panel_cutout(hwnd: windows::Win32::Foundation::HWND) {
         let buffer = std::slice::from_raw_parts_mut(bits as *mut u8, buffer_len);
         buffer.fill(0);
 
-        draw_updater_animation_frame(buffer, width, height, &state);
         let dark_theme = UPDATER_DARK_THEME.get().copied().unwrap_or(false);
-        draw_updater_bottom_copy(buffer, width, height, dark_theme);
+        draw_updater_animation_frame(buffer, width, height, &state);
+        draw_updater_bottom_copy(buffer, width, height, &state, dark_theme);
         let mem_hdc = CreateCompatibleDC(Some(screen_hdc));
         if mem_hdc.is_invalid() {
             let _ = DeleteObject(bitmap.into());
@@ -814,9 +814,9 @@ fn draw_updater_panel_cutout(hwnd: windows::Win32::Foundation::HWND) {
             mem_hdc,
             &status_line,
             82,
-            186,
+            180,
             486,
-            210,
+            208,
             DT_LEFT | DT_WORDBREAK,
             13,
             500,
@@ -826,7 +826,7 @@ fn draw_updater_panel_cutout(hwnd: windows::Win32::Foundation::HWND) {
                 windows::Win32::Foundation::COLORREF(0x00342D30)
             },
         );
-        restore_gdi_text_alpha(buffer, width, height, 82, 186, 486, 210);
+        restore_gdi_text_alpha(buffer, width, height, 82, 180, 486, 208);
 
         let mut window_rect = RECT::default();
         let _ = GetWindowRect(hwnd, &mut window_rect);
@@ -894,17 +894,17 @@ fn draw_updater_animation_frame(
     }
 }
 
-#[cfg(target_os = "windows")]
-fn draw_updater_bottom_copy(buffer: &mut [u8], width: i32, height: i32, dark_theme: bool) {
-    let (shadow, surface, primary) = if dark_theme {
-        ((10, 9, 12, 220), (34, 32, 40, 255), (166, 216, 255, 255))
-    } else {
-        ((62, 58, 68, 180), (249, 247, 252, 255), (0, 92, 122, 255))
-    };
-    fill_bgra_rect(buffer, width, height, 72, 186, 512, 224, shadow);
-    fill_bgra_rect(buffer, width, height, 64, 178, 504, 216, surface);
-    fill_bgra_rect(buffer, width, height, 82, 172, 132, 184, primary);
-    fill_bgra_rect(buffer, width, height, 438, 210, 488, 222, primary);
+#[cfg(target_os = "windows")] #[rustfmt::skip]
+fn draw_updater_bottom_copy(
+    buffer: &mut [u8],
+    width: i32,
+    height: i32,
+    state: &UpdaterPanelState,
+    dark_theme: bool,
+) {
+    let (shadow, surface, primary, error) = if dark_theme { ((10, 9, 12, 220), (34, 32, 40, 255), (166, 216, 255, 255), (255, 180, 171, 255)) } else { ((62, 58, 68, 180), (249, 247, 252, 255), (0, 92, 122, 255), (186, 26, 26, 255)) };
+    fill_bgra_rect(buffer, width, height, 72, 186, 512, 224, shadow); fill_bgra_rect(buffer, width, height, 64, 178, 504, 216, surface); fill_bgra_rect(buffer, width, height, 104, 210, 484, 220, (120, 120, 128, 100));
+    let progress_right = 104 + 380 * state.step.min(3) as i32 / 3; if progress_right > 104 { fill_bgra_rect(buffer, width, height, 104, 210, progress_right, 220, if state.failed { error } else { primary }); } fill_bgra_rect(buffer, width, height, 82, 172, 132, 184, if state.failed { error } else { primary });
 }
 
 #[cfg(target_os = "windows")]
@@ -1038,8 +1038,8 @@ unsafe fn draw_text_styled(
     color: windows::Win32::Foundation::COLORREF,
 ) {
     use windows::Win32::Graphics::Gdi::{
-        CLIP_DEFAULT_PRECIS, CreateFontW, DEFAULT_CHARSET, DEFAULT_PITCH, DeleteObject,
-        FF_DONTCARE, NONANTIALIASED_QUALITY, OUT_DEFAULT_PRECIS, SelectObject,
+        ANTIALIASED_QUALITY, CLIP_DEFAULT_PRECIS, CreateFontW, DEFAULT_CHARSET, DEFAULT_PITCH,
+        DeleteObject, FF_DONTCARE, OUT_DEFAULT_PRECIS, SelectObject,
     };
     use windows::core::PCWSTR;
 
@@ -1061,7 +1061,7 @@ unsafe fn draw_text_styled(
             DEFAULT_CHARSET,
             OUT_DEFAULT_PRECIS,
             CLIP_DEFAULT_PRECIS,
-            NONANTIALIASED_QUALITY,
+            ANTIALIASED_QUALITY,
             DEFAULT_PITCH.0 as u32 | FF_DONTCARE.0 as u32,
             PCWSTR(face.as_ptr()),
         )
