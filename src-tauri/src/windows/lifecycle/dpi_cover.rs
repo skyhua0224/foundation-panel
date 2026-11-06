@@ -47,7 +47,9 @@ pub(super) fn mode_of(value: Option<&str>) -> Mode {
 }
 
 pub(super) fn mode() -> Mode {
-    mode_of(std::env::var("SUNSHINE_GUI_WEBVIEW_DPI_COVER").ok().as_deref())
+    // the choice made on the developer page, then the variable
+    let chosen = crate::dev_tools::cover_override().or_else(|| std::env::var("SUNSHINE_GUI_WEBVIEW_DPI_COVER").ok());
+    mode_of(chosen.as_deref())
 }
 
 /// The longest a cover stays (the wrong layout ended 0.26 to 0.45 s after the change of scale in every measured run).

@@ -76,6 +76,7 @@
         <MGroup>
           <MItem action icon="download" :title="t.sidebar.clientDownloads" @click="emit('webui-navigate', '/downloads')" />
           <MItem action icon="keyboard" :title="t.toolbar.shortcutGuide" @click="shortcutsOpen = true" />
+          <MItem action icon="health_and_safety" :title="doctorTexts(locale).start" @click="emit('open-doctor')" />
           <MItem action icon="bug_report" :title="t.m3e.system.troubleshooting" @click="emit('webui-navigate', '/troubleshooting')" />
           <MItem action icon="public" :title="t.sidebar.officialWebsite" @click="actions.openUrl('https://www.alkaidlab.com/')"><template #trail><MIcon name="open_in_new" /></template></MItem>
           <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="sponsorOpen = true" />
@@ -89,7 +90,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFieldItem, MBanner, MSupportSheet, useNotify, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFieldItem, MBanner, MSupportSheet, useNotify, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard, doctorTexts } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import ShortcutsSheet from './m3e/ShortcutsSheet.vue'
 import { usePanelPart } from '../composables/panelParts.js'
@@ -115,7 +116,7 @@ const props = defineProps({
   isAdmin: Boolean,
   actions: { type: Object, required: true },
 })
-const emit = defineEmits(['theme-change', 'locale-change', 'channel-change', 'webui-navigate', 'open-guide', 'open-remote', 'open-about'])
+const emit = defineEmits(['theme-change', 'locale-change', 'channel-change', 'webui-navigate', 'open-guide', 'open-remote', 'open-about', 'open-doctor'])
 const { t } = useI18n()
 const notify = useNotify()
 const openDesktop = () => openBigScreenWithNotice((m) => notify.snack(m), t.value.sidebar.openBigScreenFailed)

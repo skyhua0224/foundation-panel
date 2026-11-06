@@ -236,6 +236,56 @@ pub async fn get_sunshine_version() -> Result<String, String> {
         .await
 }
 
+/// The build identity of sunshine.exe (crate::build_identity): the VERSIONINFO keys first (no process), then
+/// `sunshine.exe --version --json`; `None` for a host that predates both. Cached like the version.
+static SUNSHINE_BUILD: crate::probe_cache::ProbeCache<Option<crate::build_identity::BuildIdentity>> =
+    crate::probe_cache::ProbeCache::new("sunshine build identity", std::time::Duration::from_secs(600));
+
+#[tauri::command]
+pub async fn get_sunshine_build_info() -> Result<Option<crate::build_identity::BuildIdentity>, String> {
+    SUNSHINE_BUILD
+        .get(|| async {
+            tokio::task::spawn_blocking(read_sunshine_build_info)
+                .await
+                .map_err(|e| e.to_string())
+        })
+        .await
+}
+
+fn read_sunshine_build_info() -> Option<crate::build_identity::BuildIdentity> {
+    let install_dir = get_sunshine_path();
+    let sunshine_exe = install_dir.join("sunshine.exe");
+    if !sunshine_exe.exists() {
+        return None;
+    }
+    let has_uninstaller = std::fs::read_dir(&install_dir)
+        .map(|entries| {
+            entries
+                .flatten()
+                .any(|entry| crate::build_identity::is_inno_uninstaller(&entry.file_name().to_string_lossy()))
+        })
+        .unwrap_or(false);
+
+    #[cfg(target_os = "windows")]
+    if let Some(info) = crate::device_probe::file_version_strings(&sunshine_exe, &crate::build_identity::VERSIONINFO_KEYS)
+        .and_then(|strings| crate::build_identity::from_versioninfo(&strings, has_uninstaller))
+    {
+        return Some(info);
+    }
+    let _ = has_uninstaller;
+
+    let mut command = Command::new(&sunshine_exe);
+    command.args(["--version", "--json"]);
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    let output = command.output().ok()?;
+    let (stdout, _) = crate::text_encoding::decode_output(&output);
+    crate::build_identity::from_version_json(&stdout)
+}
+
 fn read_sunshine_version() -> Result<String, String> {
     let sunshine_exe = get_sunshine_path().join("sunshine.exe");
 
@@ -1318,45 +1368,10 @@ pub async fn change_bitrate(client_name: String, bitrate: u32) -> Result<String,
 }
 
 /// 检查 Sunshine 是否以用户模式运行（非服务模式）
-/// 内部实现：执行 sc / tasklist 等阻塞系统调用，必须在 spawn_blocking 中调用
+/// Reads the SCM and a process snapshot (sunshine_service), not `sc query` / `tasklist` text. Blocking: call
+/// it in spawn_blocking.
 pub(crate) fn is_sunshine_running_in_user_mode_impl() -> Result<bool, String> {
-    #[cfg(target_os = "windows")]
-    {
-        use std::os::windows::process::CommandExt;
-        use std::process::Command;
-        const CREATE_NO_WINDOW: u32 = 0x08000000;
-
-        // 检查服务是否正在运行（服务名不区分大小写，只需检查一次）
-        if let Ok(result) = Command::new("sc")
-            .args(["query", "SunshineService"])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-        {
-            let output_str = crate::text_encoding::decode_console_bytes(&result.stdout).to_uppercase();
-            if output_str.contains("RUNNING") {
-                return Ok(false); // 服务模式
-            }
-        }
-
-        // 服务未运行，检查 sunshine.exe 进程是否存在
-        if let Ok(result) = Command::new("tasklist")
-            .args(["/FI", "IMAGENAME eq sunshine.exe", "/FO", "CSV", "/NH"])
-            .creation_flags(CREATE_NO_WINDOW)
-            .output()
-        {
-            let output_str = crate::text_encoding::decode_console_bytes(&result.stdout).to_lowercase();
-            if output_str.contains("sunshine.exe") {
-                return Ok(true); // 用户模式
-            }
-        }
-
-        Ok(false)
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Ok(false)
-    }
+    Ok(crate::sunshine_service::running_in_user_mode())
 }
 
 /// 检查 Sunshine 是否以用户模式运行（Tauri 命令，在后台线程执行阻塞逻辑，避免卡住 WebView）
@@ -1368,106 +1383,33 @@ pub async fn is_sunshine_running_in_user_mode() -> Result<bool, String> {
     }
 }
 
-/// 构建停止 Sunshine 的命令片段
-#[cfg(target_os = "windows")]
-fn build_stop_sunshine_command() -> String {
-    "net stop SunshineService 2>$null; \
-     net stop sunshineservice 2>$null; \
-     taskkill /IM sunshine.exe /F 2>$null; \
-     Start-Sleep -Seconds 1"
-        .to_string()
-}
-
-/// 构建启动服务模式的命令片段
-#[cfg(target_os = "windows")]
-fn build_start_service_command(sunshine_path: &std::path::Path) -> String {
-    format!(
-        "$serviceExists = Get-Service -Name 'SunshineService' -ErrorAction SilentlyContinue; \
-         if ($serviceExists) {{ \
-             net start SunshineService \
-         }} else {{ \
-             Set-Location '{}'; \
-             Start-Process -FilePath '.\\sunshine.exe' -WindowStyle Hidden \
-         }}",
-        sunshine_path.display()
-    )
-}
-
-/// 切换 Sunshine 运行模式（用户模式 ↔ 服务模式）
+/// 切换 Sunshine 运行模式（用户模式 ↔ 服务模式）through the hardened elevated helper (sunshine_service): no
+/// PowerShell, no `net stop` / `taskkill`. With live streams `acknowledge_live_stream` must be true
+/// (SVC-CONFIRM-002); the callers ask first.
 #[tauri::command]
-pub async fn toggle_sunshine_mode() -> Result<String, String> {
+pub async fn toggle_sunshine_mode(acknowledge_live_stream: Option<bool>) -> Result<String, String> {
     crate::host_facts::expect_stop(180_000);
-    #[cfg(target_os = "windows")]
-    {
-        let is_user_mode = tokio::task::spawn_blocking(is_sunshine_running_in_user_mode_impl)
-            .await
-            .ok()
-            .and_then(|r| r.ok())
-            .unwrap_or(false);
-        let sunshine_path = get_sunshine_path();
-        let sunshine_exe = sunshine_path.join("sunshine.exe");
-
-        if !sunshine_exe.exists() {
-            return Err(format!("找不到 sunshine.exe: {}", sunshine_exe.display()));
-        }
-
-        let stop_cmd = build_stop_sunshine_command();
-
-        let (mode_name, command) = if is_user_mode {
-            info!("🔄 切换 Sunshine 模式：用户模式 → 服务模式");
-            let start_cmd = build_start_service_command(&sunshine_path);
-            ("服务模式", format!("{}; {}", stop_cmd, start_cmd))
-        } else {
-            info!("🔄 切换 Sunshine 模式：服务模式 → 用户模式");
-            let start_cmd = format!(
-                "Set-Location '{}'; Start-Process -FilePath '.\\sunshine.exe' -Verb RunAs -WindowStyle Hidden",
-                sunshine_path.display()
-            );
-            ("用户模式", format!("{}; {}", stop_cmd, start_cmd))
-        };
-
-        crate::utils::execute_powershell_command(&command, &format!("切换到{}失败", mode_name))?;
-
-        info!("✅ 切换到{}命令已启动，正在后台执行...", mode_name);
-        Ok(format!("正在切换到{}", mode_name))
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Err("此功能仅支持 Windows".to_string())
-    }
+    let mode = crate::sunshine_service::toggle_host_mode(acknowledge_live_stream.unwrap_or(false)).await?;
+    let mode_name = if mode == "user" { "用户模式" } else { "服务模式" };
+    info!("✅ 已切换到{}", mode_name);
+    Ok(format!("已切换到{}", mode_name))
 }
 
+/// 重启 Sunshine through the hardened elevated helper (or, without the service, as the current user); see
+/// sunshine_service::restart_host.
 #[tauri::command]
-pub async fn restart_sunshine_service() -> Result<String, String> {
+pub async fn restart_sunshine_service(acknowledge_live_stream: Option<bool>) -> Result<String, String> {
     // the stop that follows is asked for: the panel must not call it a crash
     crate::host_facts::expect_stop(180_000);
-    #[cfg(target_os = "windows")]
-    {
-        info!("🔄 开始重启 Sunshine 服务...");
-
-        let sunshine_path = get_sunshine_path();
-        let stop_cmd = build_stop_sunshine_command();
-        let start_cmd = build_start_service_command(&sunshine_path);
-        let command = format!("{}; {}", stop_cmd, start_cmd);
-
-        crate::utils::execute_powershell_command(&command, "启动重启命令失败")?;
-
-        info!("✅ 重启命令已启动，正在后台执行...");
-        Ok("success".to_string())
-    }
-
-    #[cfg(not(target_os = "windows"))]
-    {
-        Err("此功能仅支持 Windows".to_string())
-    }
+    info!("🔄 开始重启 Sunshine 服务...");
+    crate::sunshine_service::restart_host(acknowledge_live_stream.unwrap_or(false)).await
 }
 
 /// 以用户模式重启 Sunshine（非服务模式，但需要管理员权限）
 /// @deprecated 使用 sunshine::toggle_sunshine_mode 代替
 #[tauri::command]
-pub async fn restart_sunshine_in_user_mode() -> Result<String, String> {
-    toggle_sunshine_mode().await
+pub async fn restart_sunshine_in_user_mode(acknowledge_live_stream: Option<bool>) -> Result<String, String> {
+    toggle_sunshine_mode(acknowledge_live_stream).await
 }
 
 /// 获取 Sunshine 配置中的 locale 设置（通过 API 获取实时值）

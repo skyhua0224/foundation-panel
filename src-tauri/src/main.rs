@@ -3,6 +3,7 @@
 
 mod app;
 mod bat_runner;
+mod build_identity;
 mod client_fingerprint_rules;
 mod clipboard;
 mod commands;
@@ -10,7 +11,9 @@ mod controller_hub;
 mod controller_input;
 mod controllermeta;
 mod desktop_settings;
+mod dev_tools;
 mod device_config;
+mod doctor_local;
 mod dualsense;
 #[cfg(target_os = "windows")]
 mod elevation;
@@ -40,6 +43,7 @@ mod panel_page;
 mod shell_context_menu;
 mod stall_watch;
 mod sunshine;
+mod sunshine_service;
 mod system;
 mod system_load;
 mod system_load_core;
@@ -140,6 +144,12 @@ fn main() {
         std::process::exit(exit_code);
     }
 
+    // Elevated SunshineService helper: one fixed verb, allowlisted operations.
+    #[cfg(target_os = "windows")]
+    if let Some(exit_code) = sunshine_service::try_handle_elevated_command() {
+        std::process::exit(exit_code);
+    }
+
     #[cfg(target_os = "windows")]
     utils::wait_for_elevated_restart_handoff();
 
@@ -223,6 +233,7 @@ fn main() {
             desktop_settings::set_toolbar_shortcut_enabled,
             vdd::get_vdd_status,
             vdd::install_vdd_driver,
+            doctor_local::doctor_local,
             vdd::set_vdd_keep_enabled,
             vdd::set_vdd_headless_create_enabled,
             vdd::get_vdd_tools_dir_path,
@@ -247,6 +258,7 @@ fn main() {
             host_facts::get_sunshine_host_facts,
             sunshine::get_sunshine_install_path,
             sunshine::get_sunshine_version,
+            sunshine::get_sunshine_build_info,
             sunshine::parse_sunshine_config,
             sunshine::get_sunshine_url,
             sunshine::get_command_line_url,
@@ -259,6 +271,9 @@ fn main() {
             sunshine::is_sunshine_running_in_user_mode,
             sunshine::restart_sunshine_in_user_mode,
             sunshine::restart_sunshine_service,
+            sunshine_service::set_sunshine_service_start_type,
+            sunshine_service::get_sunshine_service_status,
+            sunshine_service::control_sunshine_service,
             proxy_server::get_proxy_url_command,
             proxy_server::get_proxy_health_check,
             proxy_server::probe_sunshine_host,
@@ -316,6 +331,11 @@ fn main() {
             update::start_update_checker_when_ui_ready,
             update::get_include_prerelease_preference,
             update::set_include_prerelease_preference,
+            update::update_cdk_present,
+            update::update_cdk_set,
+            update::update_cdk_clear,
+            update::update_mirrorchyan_check,
+            update::set_update_source,
             update::download_update,
             update::check_cached_update,
             update::install_update,
@@ -353,6 +373,15 @@ fn main() {
             windows::panel_activity,
             windows::panel_first_paint,
             windows::test_synthetic_dpi,
+            dev_tools::dev_get_state,
+            dev_tools::dev_set_cover_mode,
+            dev_tools::dev_set_cold_cloak,
+            dev_tools::dev_simulate_dpi,
+            dev_tools::dev_open_devtools,
+            dev_tools::dev_clear_webview_cache,
+            dev_tools::dev_reset_desktop_settings,
+            dev_tools::dev_environment,
+            windows::resize_about_window,
             windows::resize_tool_window,
             hdr_enhanced::nr_live_status,
             hdr_enhanced::nr_live_set_enabled,

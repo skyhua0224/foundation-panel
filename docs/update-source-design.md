@@ -1,8 +1,11 @@
 # Update source and the Mirror酱 CDK: what the native side still has to build
 
 Status 2026-11-03. The renderer side is built (`useUpdateSource.js`, the 软件更新 section of `ControlPanelPage.vue`, `foundation-ui/update`: `source.js`, `mirrorchyan.js`, `sourceTexts.js`, with tests
-and a mock transport). The Rust side below is **stubbed**: the renderer calls these commands and treats a missing command as "the secure store needs a newer panel". They are built when the Windows
-VM is back, because they cannot be compiled on Linux (`libspa`).
+and a mock transport). The Rust side is **implemented** on `feat/panel-update-native`（`src-tauri/src/update/mirrorchyan.rs`、`src-tauri/src/update/cdk_store.rs`、`preferences.rs` 的
+`update_source`、`update.rs` 的五个命令与下载候选排序）: the five commands exist, the CDK lives only in the OS secure store (Windows Credential Manager; a macOS Keychain
+implementation is deliberately absent because the panel has no macOS build — the non-Windows path refuses instead of storing anywhere weaker), and `download_update` prepends the
+Mirror酱 address when the source is `mirror` and the CDK answers with one. The commands are verified on the Windows build; the sources read for them are in
+`docs/authority/source-index.tsv`（`panel-mirrorchyan-*`、`panel-ms-cred*`、`panel-reqwest-redirect-20261103`）.
 
 ## What the updater already does (read from `src-tauri/src/update.rs`)
 

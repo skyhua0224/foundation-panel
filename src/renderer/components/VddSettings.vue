@@ -38,6 +38,7 @@
         <MButton v-if="vddCanInstall" icon="download" :loading="isInstallingDriver" @click="installOrRepairDriver">{{ t.vddSettings.installRepairDriver }}</MButton>
         <MButton variant="tonal" icon="refresh" :loading="isCheckingDriver" @click="recheckDriver">{{ t.vddSettings.recheckDriver }}</MButton>
       </div>
+      <MProgress v-if="isInstallingDriver" class="vdd-installing" :label="t.vddSettings.installingDriver" />
       <DpiScaleSection />
     </template>
 

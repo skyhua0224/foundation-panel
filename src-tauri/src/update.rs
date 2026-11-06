@@ -13,6 +13,8 @@ use crate::github_download::{
     DownloadAttemptPhase, DownloadRequest,
 };
 
+mod cdk_store;
+mod mirrorchyan;
 mod metadata;
 mod preferences;
 
@@ -1222,6 +1224,79 @@ pub fn set_include_prerelease_preference(app: AppHandle, include: bool) {
     preferences::set_include_prerelease(&app, include);
 }
 
+/// Tauri命令：Mirror酱 CDK 是否已存入操作系统安全存储。只回答布尔值。
+#[tauri::command]
+pub async fn update_cdk_present() -> bool {
+    tauri::async_runtime::spawn_blocking(|| cdk_store::present(mirrorchyan::CREDENTIAL_TARGET))
+        .await
+        .unwrap_or(false)
+}
+
+/// Tauri命令：把 CDK 存入操作系统安全存储（Windows Credential Manager）。
+/// CDK 不写文件、不写日志、不跨 IPC 回传。
+#[tauri::command]
+pub async fn update_cdk_set(cdk: String) -> Result<bool, String> {
+    let cdk = cdk_store::validate_cdk(&cdk)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        cdk_store::set(mirrorchyan::CREDENTIAL_TARGET, &cdk)
+    })
+    .await
+    .map_err(|_| "系统安全存储任务失败".to_string())??;
+    Ok(true)
+}
+
+/// Tauri命令：从操作系统安全存储删除 CDK；不存在时也成功（幂等）。
+#[tauri::command]
+pub async fn update_cdk_clear() -> Result<bool, String> {
+    tauri::async_runtime::spawn_blocking(|| cdk_store::clear(mirrorchyan::CREDENTIAL_TARGET))
+        .await
+        .map_err(|_| "系统安全存储任务失败".to_string())??;
+    Ok(true)
+}
+
+/// Tauri命令：检查 Mirror酱 的最新版本。渲染层传入 `currentVersion` 与
+/// `channel`，CDK 在这里从安全存储读出并拼进请求 URL；回复是
+/// `{ status, json }`：`status: 0, json: null` 表示无回答（渲染层映射为
+/// network），`json` 已去掉 `data.url` 与任何 CDK 回显。完整 URL 与错误原文
+/// 都包含 CDK，绝不写日志。
+#[tauri::command]
+pub async fn update_mirrorchyan_check(
+    current_version: String,
+    channel: String,
+) -> serde_json::Value {
+    let current_version: String = current_version.chars().take(128).collect();
+    let channel = mirrorchyan::normalize_channel(&channel);
+    let cdk = read_stored_cdk().await;
+    let answer = mirrorchyan::check(&current_version, cdk.as_deref(), channel).await;
+    info!("Mirror酱 检查: {}", mirrorchyan::log_summary(&answer));
+    serde_json::json!({
+        "status": answer.status,
+        "json": mirrorchyan::sanitize_body(&answer),
+    })
+}
+
+/// Tauri命令：保存更新来源（auto|cnb|github|mirror）到 update_preferences.json。
+#[tauri::command]
+pub fn set_update_source(app: AppHandle, source: String) -> Result<bool, String> {
+    preferences::set_update_source(&app, &source)?;
+    Ok(true)
+}
+
+/// 读取安全存储中的 CDK；存储不可用或为空都按“无 CDK”处理。
+async fn read_stored_cdk() -> Option<String> {
+    match tauri::async_runtime::spawn_blocking(|| cdk_store::read(mirrorchyan::CREDENTIAL_TARGET))
+        .await
+    {
+        Ok(Ok(stored)) => stored,
+        Ok(Err(error)) => {
+            // 错误文本只含错误码，不含 CDK。
+            warn!("读取系统安全存储失败: {error}");
+            None
+        }
+        Err(_) => None,
+    }
+}
+
 /// Tauri 命令：手动检查更新
 #[tauri::command]
 pub async fn check_for_updates(app: AppHandle) -> Result<Option<UpdateInfo>, String> {
@@ -1689,6 +1764,64 @@ async fn finalize_download_file(
         })
 }
 
+/// 按来源把 Mirror酱 候选（若有）排在 CNB/GitHub 之前，并保持既有的
+/// 去重规则（fallback 与主地址相同则不重复）。
+fn download_candidates(
+    mirror: Option<github_download::DownloadCandidate>,
+    url: &str,
+    fallback_url: Option<&str>,
+) -> Vec<github_download::DownloadCandidate> {
+    let mut candidates = Vec::new();
+    if let Some(mirror) = mirror {
+        candidates.push(mirror);
+    }
+    candidates.push(github_download::DownloadCandidate {
+        name: download_source_name(url),
+        url: url.to_string(),
+    });
+    if let Some(fallback_url) = fallback_url {
+        if !candidates
+            .iter()
+            .any(|candidate| candidate.url == fallback_url)
+        {
+            candidates.push(github_download::DownloadCandidate {
+                name: download_source_name(fallback_url),
+                url: fallback_url.to_string(),
+            });
+        }
+    }
+    candidates
+}
+
+/// 当 CDK 有效且 Mirror酱 给出合规下载地址时返回首选候选。地址带时效令牌，
+/// 绝不写日志；文件内容仍按本项目 metadata 的 SHA-256 校验后才安装。
+async fn mirror_download_candidate(
+    app_handle: &AppHandle,
+) -> Option<github_download::DownloadCandidate> {
+    let cdk = read_stored_cdk().await?;
+    let current_version = get_current_sunshine_version()
+        .await
+        .unwrap_or_else(|error| {
+            warn!("获取当前版本失败（Mirror酱 检查按 0.0.0 处理）: {error}");
+            "0.0.0".to_string()
+        });
+    let channel = if get_include_prerelease(app_handle) {
+        "beta"
+    } else {
+        "stable"
+    };
+    let answer = mirrorchyan::check(&current_version, Some(&cdk), channel).await;
+    info!(
+        "Mirror酱 检查（下载候选）: {}",
+        mirrorchyan::log_summary(&answer)
+    );
+    let url = mirrorchyan::download_url_of(&answer)?;
+    Some(github_download::DownloadCandidate {
+        name: "Mirror酱",
+        url,
+    })
+}
+
 /// 下载更新文件（带真实进度报告）
 #[tauri::command]
 pub async fn download_update(
@@ -1767,21 +1900,14 @@ pub async fn download_update(
         "清理旧的临时下载文件",
     )?;
 
-    let mut candidates = vec![github_download::DownloadCandidate {
-        name: download_source_name(&url),
-        url: url.clone(),
-    }];
-    if let Some(fallback_url) = fallback_url {
-        if !candidates
-            .iter()
-            .any(|candidate| candidate.url == fallback_url)
-        {
-            candidates.push(github_download::DownloadCandidate {
-                name: download_source_name(&fallback_url),
-                url: fallback_url,
-            });
-        }
-    }
+    // 来源为 mirror 且 CDK 有效时，Mirror酱 的下载地址排在最前；
+    // 任何失败（无 CDK、CDK 错误、离线、地址不合规）都静默回退 CNB → GitHub。
+    let mirror_candidate = if preferences::update_source(&app_handle) == "mirror" {
+        mirror_download_candidate(&app_handle).await
+    } else {
+        None
+    };
+    let candidates = download_candidates(mirror_candidate, &url, fallback_url.as_deref());
 
     let mut last_progress_percent = 0;
     let outcome = github_download::download_to_file_from_candidates(
@@ -1933,6 +2059,31 @@ pub async fn check_cached_update(
 #[cfg(test)]
 mod download_source_tests {
     use super::*;
+
+    #[test]
+    fn mirror_candidate_is_first_and_the_cnb_github_order_is_kept() {
+        let cnb = "https://cnb.cool/AlkaidLab/foundation-sunshine-release/-/releases/download/v1/setup.exe";
+        let github = "https://github.com/AlkaidLab/foundation-sunshine/releases/download/v1/setup.exe";
+        let mirror = github_download::DownloadCandidate {
+            name: "Mirror酱",
+            url: "https://mirrorchyan.com/resources/download/token".to_string(),
+        };
+
+        let with_mirror = download_candidates(Some(mirror), cnb, Some(github));
+        let names: Vec<_> = with_mirror.iter().map(|candidate| candidate.name).collect();
+        assert_eq!(names, ["Mirror酱", "CNB", "GitHub"]);
+
+        let without_mirror = download_candidates(None, cnb, Some(github));
+        let names: Vec<_> = without_mirror.iter().map(|candidate| candidate.name).collect();
+        assert_eq!(names, ["CNB", "GitHub"]);
+    }
+
+    #[test]
+    fn duplicate_fallback_url_is_not_added_twice() {
+        let cnb = "https://cnb.cool/AlkaidLab/foundation-sunshine-release/-/releases/download/v1/setup.exe";
+        let candidates = download_candidates(None, cnb, Some(cnb));
+        assert_eq!(candidates.len(), 1);
+    }
 
     #[test]
     fn download_url_requires_an_allowlisted_foundation_release_host() {

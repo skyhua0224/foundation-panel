@@ -20,6 +20,7 @@ export const ROUTES = {
   SETTINGS_HUB: 'settings-hub', // the bottom bar's one entry for 主机设置, 输入与外设, 显示 and 系统: a list of those four
   HELP: 'help',
   ABOUT: 'about',
+  DEVELOPER: 'developer', // 开发者选项: a pushed page, reachable once developer mode is on
   ANNOUNCEMENTS: 'announcements', // 公告: every announcement, opened from the bell of the caption bar
   CAT_STREAM: 'cat-stream',
   CAT_INPUT: 'cat-input',
@@ -34,7 +35,10 @@ export const ROUTES = {
   WEB_INPUT_MOUSE: 'web-input-mouse',
   COMPONENTS: 'components',
   COMPONENT_STATUS: 'component-status',
+  SUNSHINE_SERVICE: 'sunshine-service', // 系统 › Sunshine 服务: the SCM, process and API layers, the startup type, start, stop, restart
   DIAGNOSTICS: 'diagnostics',
+  DOCTOR: 'doctor', // 体检: the host's health check
+  NETWORK_OVERVIEW: 'network-overview', // 网络概览: adapters, public IPv4/IPv6, NAT type, CGNAT, UPnP and firewall (GET /api/network/overview)
   // Pages of the Web UI shown in the embedded frame
   WEB_CLIENTS: 'web-clients',
   WEB_APPS: 'web-apps',
@@ -80,6 +84,7 @@ export const PAGES = {
   [ROUTES.WEB_DISPLAY_HDR]: { rail: 'display' },
   [ROUTES.VDD_SETTINGS]: { rail: 'display' },
   [ROUTES.HDR_ENHANCED]: { rail: 'display' },
+  [ROUTES.SUNSHINE_SERVICE]: { rail: 'system' }, // the first page of 系统
   [ROUTES.COMPONENT_STATUS]: { rail: 'system' },
   [ROUTES.COMPONENTS]: { rail: 'system' },
   [ROUTES.TOOLBOX]: { rail: 'system' },
@@ -87,6 +92,8 @@ export const PAGES = {
   [ROUTES.STREAM_TIMER]: { rail: 'system', list: false, push: true },
   [ROUTES.TEST_TOOLS]: { rail: 'system', list: false, push: true },
   [ROUTES.DIAGNOSTICS]: { rail: 'system' },
+  [ROUTES.DOCTOR]: { rail: 'system' },
+  [ROUTES.NETWORK_OVERVIEW]: { rail: 'system' },
   [ROUTES.AI_ASSISTANT]: { rail: 'assistant', list: false }, // 米塔 AI: the chat takes the whole width, its settings are behind the gear of the chat header
   [ROUTES.WEB_TROUBLESHOOTING]: { rail: 'system' },
   [ROUTES.RTSS]: { rail: 'system' },
@@ -94,6 +101,7 @@ export const PAGES = {
   [ROUTES.SETTINGS_HUB]: { rail: 'config', list: false },
   [ROUTES.HELP]: { rail: 'help', list: false },
   [ROUTES.ABOUT]: { rail: 'help', list: false, push: true },
+  [ROUTES.DEVELOPER]: { rail: 'system', list: false, push: true },
   [ROUTES.ANNOUNCEMENTS]: { rail: 'overview', list: false, push: true },
 }
 export const RAILS = ['overview', 'stream', 'config', 'input', 'audio', 'display', 'system', 'assistant', 'settings', 'help']

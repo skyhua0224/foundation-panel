@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs'
 // So `push: true` belongs to exactly the pages opened over another page, never to a place of the rails.
 const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8')
 const router = read('./useRouter.js')
-const PUSHED = ['ABOUT', 'ANNOUNCEMENTS', 'LATENCY_CLOCK', 'STREAM_TIMER', 'TEST_TOOLS', 'WELCOME']
+const PUSHED = ['ABOUT', 'ANNOUNCEMENTS', 'DEVELOPER', 'LATENCY_CLOCK', 'STREAM_TIMER', 'TEST_TOOLS', 'WELCOME']
 
 test('only pages opened over another page are pushed (they alone show Back beside a list)', () => {
   const pages = router.slice(router.indexOf('export const PAGES = {'), router.indexOf('export const RAILS'))

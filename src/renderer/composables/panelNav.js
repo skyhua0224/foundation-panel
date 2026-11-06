@@ -14,15 +14,16 @@ export function railItems(t) {
 export const ROW_OF_ROUTE = {
   [ROUTES.WEB_CLIENTS]: 'clients', [ROUTES.WEB_APPS]: 'apps', [ROUTES.WEB_DOWNLOADS]: 'downloads', [ROUTES.GAMEPAD]: 'gamepad', [ROUTES.WEB_INPUT_KEYBOARD]: 'keyboard', [ROUTES.WEB_INPUT_MOUSE]: 'mouse', [ROUTES.MICROPHONE]: 'microphone', [ROUTES.USB]: 'usb',
   [ROUTES.WEB_DISPLAY_OUTPUT]: 'display-output', [ROUTES.WEB_DISPLAY_MODES]: 'display-modes', [ROUTES.WEB_DISPLAY_ENCODERS]: 'display-encoders', [ROUTES.WEB_DISPLAY_VIDEO]: 'display-video', [ROUTES.WEB_DISPLAY_HDR]: 'display-hdr', [ROUTES.WEB_AUDIO_SOUND]: 'audio-output',
-  [ROUTES.VDD_SETTINGS]: 'vdd', [ROUTES.HDR_ENHANCED]: 'quality', [ROUTES.COMPONENT_STATUS]: 'components', [ROUTES.DIAGNOSTICS]: 'diagnostics', [ROUTES.TOOLBOX]: 'toolbox',
+  [ROUTES.VDD_SETTINGS]: 'vdd', [ROUTES.HDR_ENHANCED]: 'quality', [ROUTES.COMPONENT_STATUS]: 'components', [ROUTES.DIAGNOSTICS]: 'diagnostics', [ROUTES.NETWORK_OVERVIEW]: 'network', [ROUTES.TOOLBOX]: 'toolbox',
   [ROUTES.LATENCY_CLOCK]: 'latency-clock', [ROUTES.TEST_TOOLS]: 'test-tools', [ROUTES.STREAM_TIMER]: 'stream-timer',
   [ROUTES.PANEL_SETTINGS]: 'panel', [ROUTES.HELP]: 'help', [ROUTES.AI_ASSISTANT]: 'assistant',
-  [ROUTES.LIVE_SESSION]: 'session', [ROUTES.RTSS]: 'rtss',
+  [ROUTES.LIVE_SESSION]: 'session', [ROUTES.RTSS]: 'rtss', [ROUTES.SUNSHINE_SERVICE]: 'service',
 }
 
 export function pageItems(t, rail, runtime = {}) {
   const c = t.m3e
   const lines = runtime.lines || {}
+  const developer = runtime.developer ? [{ id: ROUTES.DEVELOPER, icon: 'code', tone: 'tertiary', label: runtime.developerTitle || 'Developer options', text: runtime.developerLine || '' }] : []
   const pages = {
     stream: [
       { id: ROUTES.WEB_CLIENTS, icon: 'devices', tone: 'tertiary', label: c.stream.clients[0], text: lines.clients },
@@ -50,14 +51,18 @@ export function pageItems(t, rail, runtime = {}) {
       { id: ROUTES.HDR_ENHANCED, icon: 'wand_stars', tone: 'tertiary', label: c.display.quality, text: lines.quality },
     ],
     system: [
+      { id: ROUTES.SUNSHINE_SERVICE, icon: 'dns', tone: 'primary', label: runtime.serviceTitle || 'Sunshine', text: lines.service },
       { id: ROUTES.COMPONENT_STATUS, icon: 'monitor_heart', tone: 'success', label: runtime.statusTitle || 'Components', text: lines.components },
+      { id: ROUTES.NETWORK_OVERVIEW, icon: 'lan', tone: 'primary', label: c.system.network, text: lines.network },
       { id: ROUTES.DIAGNOSTICS, icon: 'stethoscope', tone: 'warn', label: runtime.diagTitle || c.system.diagnostics, text: lines.diagnostics },
+      { id: ROUTES.DOCTOR, icon: 'health_and_safety', tone: 'success', label: runtime.doctorTitle || 'Health check', text: lines.doctor },
       { id: ROUTES.TOOLBOX, icon: 'build', tone: 'secondary', label: t.sidebar.toolbox, text: lines.toolbox },
       // the tools people come for have a row of their own: 系统 then the tool is two presses (inside the toolbox it was three)
       { id: ROUTES.LATENCY_CLOCK, icon: 'speed', tone: 'primary', label: t.sidebar.latencyClock, text: lines['latency-clock'] },
       { id: ROUTES.TEST_TOOLS, icon: 'science', tone: 'secondary', label: t.sidebar.testTools, text: lines['test-tools'] },
       { id: ROUTES.STREAM_TIMER, icon: 'timer', tone: 'tertiary', label: t.sidebar.streamTimer, text: lines['stream-timer'] },
       { id: ROUTES.RTSS, icon: 'speed', tone: 'tertiary', label: c.rtss.title, text: lines.rtss },
+      ...developer,
     ],
   }
   return pages[rail] || []

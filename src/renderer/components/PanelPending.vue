@@ -13,7 +13,7 @@ import { ROUTES } from '../composables/useRouter.js'
 defineProps({ locale: { type: String, default: 'en' } })
 const emit = defineEmits(['go'])
 const { t } = useI18n()
-const pending = usePending({ restartHost: () => tools.restartSunshineService() })
+const pending = usePending({ restartHost: () => tools.restartSunshineService(true) /* the pending dialog lists the live sessions that end */ })
 defineVddSource({ pageLabel: t.value.m3e.nav.display })
 defineUsbSource({ pageLabel: t.value.m3e.input.usb })
 

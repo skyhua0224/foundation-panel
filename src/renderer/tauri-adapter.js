@@ -170,6 +170,8 @@ export const dlssNr = {
 
 export const sunshine = {
   getVersion: () => wrapDefault('get_sunshine_version', 'Unknown'),
+  // the build identity of sunshine.exe (commit, channel, UTC build time, variant, package): its VERSIONINFO keys, else `--version --json`; null for an older host
+  getBuildInfo: () => wrapDefault('get_sunshine_build_info', null),
   parseConfig: () => wrapDefault('parse_sunshine_config', {}),
   getUrl: () => wrapDefault('get_sunshine_url', 'https://localhost:47990/'),
   getCommandLineUrl: () => wrapDefault('get_command_line_url', null),
@@ -185,14 +187,27 @@ export const sunshine = {
   stopAllSessions: () => invoke('stop_all_sessions'),
 }
 
+// ─── Sunshine 服务（SCM）────────────────────────────────
+
+// The SCM, process and API layers of SunshineService and the changes that need administrator approval (see
+// src-tauri/src/sunshine_service). Manual and Disabled need acknowledgeUnreachableAfterReboot; stop and restart during a
+// live stream need acknowledgeLiveStream: the back end refuses without them.
+export const sunshineService = {
+  status: () => invoke('get_sunshine_service_status'),
+  setStartType: (startType, acknowledgeUnreachableAfterReboot = false) => invoke('set_sunshine_service_start_type', { startType, acknowledgeUnreachableAfterReboot }),
+  control: (action, acknowledgeLiveStream = false) => invoke('control_sunshine_service', { action, acknowledgeLiveStream }),
+}
+
 // ─── 系统工具 ────────────────────────────────────────────
 
 export const tools = {
   restartGraphicsDriver: () => invoke('restart_graphics_driver'),
   // what the operating system says about the host (process, service, whether a stop was asked for): the 「Sunshine 意外停止」 surface is decided on it, not on a silence
   getHostFacts: () => invoke('get_sunshine_host_facts'),
-  restartSunshineService: () => invoke('restart_sunshine_service'),
-  restartSunshineInUserMode: () => invoke('restart_sunshine_in_user_mode'),
+  // through the hardened elevated helper (src-tauri/src/sunshine_service); during a live stream the back end needs acknowledgeLiveStream,
+  // which a caller passes only after its own confirmation said that streams end
+  restartSunshineService: (acknowledgeLiveStream = false) => invoke('restart_sunshine_service', { acknowledgeLiveStream }),
+  restartSunshineInUserMode: (acknowledgeLiveStream = false) => invoke('restart_sunshine_in_user_mode', { acknowledgeLiveStream }),
   uninstallVddDriver: () => invoke('uninstall_vdd_driver'),
   openNativeTool: (toolId) => invoke('open_native_tool', { toolId }),
 }

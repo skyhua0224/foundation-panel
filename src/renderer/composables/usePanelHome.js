@@ -141,7 +141,7 @@ export function usePanelHome() {
   const perfSession = computed(() => state.perf?.sessions?.find((x) => x.active) || state.perf?.sessions?.[0] || null)
   const share = computed(() => memoryShare(state.memory))
   const proxyUrl = computed(() => proxy.value)
-  return { state, proxyUrl, session, uptimeMs, perfSession, memoryShare: share, restart: () => invoke('restart_sunshine_service'), stopAll: () => sunshine.stopAllSessions(), openTool: (name) => invoke('open_tool_window', { toolName: name }) }
+  return { state, proxyUrl, session, uptimeMs, perfSession, memoryShare: share, restart: () => invoke('restart_sunshine_service', { acknowledgeLiveStream: true }) /* PanelHome confirms first: 串流会话会中断 */, stopAll: () => sunshine.stopAllSessions(), openTool: (name) => invoke('open_tool_window', { toolName: name }) }
 }
 
 export function formatUptime(ms) {

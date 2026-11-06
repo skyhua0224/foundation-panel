@@ -337,7 +337,8 @@ fn recover_sunshine_service<R: Runtime>(app: &AppHandle<R>) {
 
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        if let Err(error) = sunshine::restart_sunshine_service().await {
+        // recovery runs while the host is disconnected: no stream is live to acknowledge
+        if let Err(error) = sunshine::restart_sunshine_service(None).await {
             if finish_recovery_attempt(attempt) {
                 error!("Failed to recover Sunshine service from tray: {}", error);
                 refresh_recovery_menu(&app_handle);
@@ -500,24 +501,37 @@ async fn update_sunshine_mode_state<R: Runtime + 'static>(app: &AppHandle<R>, ch
     });
 }
 
-/// 切换 Sunshine 运行模式
+/// 切换 Sunshine 运行模式: asks first (the switch stops Sunshine, ends live streams and needs administrator
+/// approval), then runs it through the hardened elevated helper.
 #[cfg(target_os = "windows")]
-fn toggle_sunshine_mode<R: Runtime>(app: &AppHandle<R>) {
+fn toggle_sunshine_mode<R: Runtime + 'static>(app: &AppHandle<R>) {
+    use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
     info!("🔄 托盘菜单：切换 Sunshine 模式");
     refresh_menu(app);
+    let strings = get_tray_strings();
     let app_handle = app.clone();
+    app.dialog()
+        .message(strings.switch_mode_confirm)
+        .title(strings.restart_user_mode)
+        .kind(MessageDialogKind::Warning)
+        .buttons(MessageDialogButtons::YesNo)
+        .show(move |confirmed| {
+            if confirmed {
+                run_sunshine_mode_switch(app_handle);
+            }
+        });
+}
 
+#[cfg(target_os = "windows")]
+fn run_sunshine_mode_switch<R: Runtime + 'static>(app_handle: AppHandle<R>) {
     tauri::async_runtime::spawn(async move {
-        match crate::sunshine::toggle_sunshine_mode().await {
+        // the dialog said that live streams end: that is the acknowledgement
+        match crate::sunshine::toggle_sunshine_mode(Some(true)).await {
             Ok(msg) => {
                 info!("✅ {}", msg);
                 emit_message(&app_handle, "success", &msg);
-
-                // 切换由 UAC 提升的 PowerShell 在后台执行，需预留 UAC + stop + start
-                // 两次检查以减少"中间状态"导致的误判
-                tokio::time::sleep(Duration::from_secs(6)).await;
+                // the helper waits for the SCM; one check now and one after the host has had time to answer
                 update_sunshine_mode_state(&app_handle, "首次").await;
-
                 tokio::time::sleep(Duration::from_secs(5)).await;
                 update_sunshine_mode_state(&app_handle, "二次").await;
             }
@@ -589,15 +603,46 @@ fn check_for_updates<R: Runtime>(app: &AppHandle<R>) {
     });
 }
 
-/// 切换防止睡眠功能
+/// The tray's start-up item. With SunshineService it sets the service start
+/// type through the same back end as 系统 › Sunshine 服务; turning it off
+/// (Manual) first asks for confirmation that the host will not be reachable
+/// after a reboot. Without the service it toggles the panel's own start-up.
 #[cfg(target_os = "windows")]
 fn toggle_auto_start<R: Runtime + 'static>(app: &AppHandle<R>) {
     let enabled = !desktop_settings::is_combined_auto_start_enabled();
     refresh_menu(app);
+    let needs_confirmation = !enabled
+        && matches!(
+            desktop_settings::startup_owner(),
+            Ok(desktop_settings::StartupOwner::Service(_))
+        );
+    if needs_confirmation {
+        use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+        let strings = get_tray_strings();
+        let app_handle = app.clone();
+        app.dialog()
+            .message(strings.auto_start_off_confirm)
+            .title(strings.auto_start)
+            .kind(MessageDialogKind::Warning)
+            .buttons(MessageDialogButtons::YesNo)
+            .show(move |confirmed| {
+                if confirmed {
+                    apply_auto_start(&app_handle, false, true);
+                } else {
+                    refresh_menu(&app_handle);
+                }
+            });
+        return;
+    }
+    apply_auto_start(app, enabled, false);
+}
+
+#[cfg(target_os = "windows")]
+fn apply_auto_start<R: Runtime + 'static>(app: &AppHandle<R>, enabled: bool, acknowledged: bool) {
     let app_handle = app.clone();
     tauri::async_runtime::spawn(async move {
         let result = tauri::async_runtime::spawn_blocking(move || {
-            desktop_settings::set_combined_auto_start_enabled(enabled)
+            desktop_settings::set_combined_auto_start_enabled(enabled, acknowledged)
         })
         .await
         .map_err(|error| error.to_string())
@@ -606,9 +651,9 @@ fn toggle_auto_start<R: Runtime + 'static>(app: &AppHandle<R>) {
         let menu_handle = app_handle.clone();
         let _ = app_handle.run_on_main_thread(move || {
             match result {
-                Ok(()) => info!("Combined Core and tray auto-start changed: {}", enabled),
+                Ok(()) => info!("Start-up changed from the tray: {}", enabled),
                 Err(error) => {
-                    error!("Failed to update combined auto-start: {}", error);
+                    error!("Failed to update start-up: {}", error);
                     emit_message(
                         &menu_handle,
                         "error",
