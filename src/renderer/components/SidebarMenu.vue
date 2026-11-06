@@ -426,6 +426,15 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => { pairing.stop(); window.removeEventListener('message', onFramePin); if (unlistenConnect) unlistenConnect(); removeErrorHandlers?.() })
 onMounted(async () => { removeErrorHandlers = installErrorHandlers({ app: shellApp }); startAutoReport({ context: errorContext }); await telemetry.refresh(); telemetry.askWhenQuiet(consentOpen) })
+// what the buttons of 日志与诊断 do, from the search: the same host calls, the answer in the snackbar
+const hostAction = async (path, doneText, method = 'POST') => {
+  try {
+    const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')
+    const r = await fetch(`${base}${path}`, { method })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    useNotify().snack(doneText)
+  } catch { useNotify().snack(diagnosticsTexts(locale.value).failed) }
+}
 const actionHandlers = {
   restart: () => tools.restartSunshineService(),
   userMode: () => tools.restartSunshineInUserMode(),
@@ -435,7 +444,12 @@ const actionHandlers = {
   exportDiag: () => router.navigate(ROUTES.DIAGNOSTICS),
   checkUpdate: () => handleCheckForUpdates(),
   logs: () => router.navigate(ROUTES.DIAGNOSTICS),
-  addApp: () => openRoute(ROUTES.WEB_APPS),
+  addApp: () => { emit('webui-navigate', '/apps#guide-add'); router.navigate(ROUTES.WEB_APPS) },
+  scanGames: () => { emit('webui-navigate', '/apps#guide-scan'); router.navigate(ROUTES.WEB_APPS) },
+  stopApp: () => hostAction('/api/apps/close', diagnosticsTexts(locale.value).forceClose),
+  resetDisplay: () => hostAction('/api/reset-display-device-persistence', diagnosticsTexts(locale.value).resetDisplay),
+  setupGuide: () => openWelcome(),
+  quitHost: () => hostAction('/api/boom', diagnosticsTexts(locale.value).boom, 'GET'),
 }
 const searchDocs = computed(() => [
   ...settingDocs(searchItems.value, { prefix: settingsPlace, locale: locale.value }),
