@@ -92,7 +92,7 @@
 </template>
 
 <script setup>
-import { defineAsyncComponent, ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
+import { defineAsyncComponent, h, ref, computed, nextTick, onMounted, onUnmounted, watch } from 'vue'
 import { MNotifyHost, registerModeHandler, useAppearance } from 'foundation-ui/vue'
 
 // 桌面 UI 组件
@@ -161,14 +161,17 @@ import {
   showDesktopNotification,
 } from './composables/useDesktopSettings.js'
 import { useI18n } from './i18n/index.js'
+import DeskViewSkeleton from './components/DeskViewSkeleton.vue'
 
 // 视图组件
-const AppsView = defineAsyncComponent(() => import('./views/AppsView.vue'))
-const DashboardView = defineAsyncComponent(() => import('./views/DashboardView.vue'))
-const DevicesView = defineAsyncComponent(() => import('./views/DevicesView.vue'))
-const StreamView = defineAsyncComponent(() => import('./views/StreamView.vue'))
-const ToolsView = defineAsyncComponent(() => import('./views/ToolsView.vue'))
-const SettingsView = defineAsyncComponent(() => import('./views/SettingsView.vue'))
+// A view that is not there yet shows its own layout as a skeleton from the first frame (delay 0: the chunk is local, so a fast load shows it for a frame at most)
+const viewLoader = (kind, loader) => defineAsyncComponent({ loader, loadingComponent: { render: () => h(DeskViewSkeleton, { kind }) }, delay: 0 })
+const AppsView = viewLoader('apps', () => import('./views/AppsView.vue'))
+const DashboardView = viewLoader('dashboard', () => import('./views/DashboardView.vue'))
+const DevicesView = viewLoader('devices', () => import('./views/DevicesView.vue'))
+const StreamView = viewLoader('stream', () => import('./views/StreamView.vue'))
+const ToolsView = viewLoader('tools', () => import('./views/ToolsView.vue'))
+const SettingsView = viewLoader('settings', () => import('./views/SettingsView.vue'))
 
 // 导入图标资源
 import sunshineIcon from '../../assets/sunshine.ico'

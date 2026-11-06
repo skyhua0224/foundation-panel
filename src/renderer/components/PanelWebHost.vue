@@ -18,6 +18,8 @@ const props = defineProps({
 // frame has loaded (a `load` event after its address changed), or, when the page is told its place by a message and nothing reloads, after a short settle.
 const host = ref(null)
 const covered = ref(true)
+// the first cover (a cold start) shows its loading state at once; the covers of page changes wait 140 ms (a transition delay), so a fast switch does not flash it
+const first = ref(true)
 let waitLoad = false
 let settle = 0
 let ceiling = 0
@@ -32,6 +34,7 @@ const uncover = (by = '', fcp = 0) => {
   }
   coveredAt = 0
   covered.value = false
+  first.value = false
 }
 const cover = () => { if (!covered.value || !coveredAt) coveredAt = performance.now(); covered.value = true; clearTimeout(ceiling); ceiling = setTimeout(() => uncover('ceiling'), 6000) }
 // The frame is shown when its page says that it has painted its first frame (`panel-painted`, sent by the script the proxy puts into every page): the load event comes
@@ -66,13 +69,13 @@ onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); w
 </script>
 
 <template>
-  <div ref="host" class="panel-web" :class="{ 'is-covered': covered }">
+  <div ref="host" class="panel-web" :class="{ 'is-covered': covered, 'is-first': first }">
     <div v-if="scene?.canBack.value && !sub" class="panel-web__bar">
       <button type="button" class="m-page__back" @click="scene.back()"><svg class="m-icon" viewBox="0 -960 960 960" aria-hidden="true"><path d="M313-440l224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z" /></svg></button>
     </div>
     <div class="panel-web__frame">
       <slot />
-      <div class="panel-web__cover" aria-hidden="true"><MPageLoading :delay="140" /></div>
+      <div class="panel-web__cover" aria-hidden="true"><MPageLoading :delay="0" /></div>
     </div>
   </div>
 </template>
@@ -88,5 +91,7 @@ onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); w
 .panel-web__cover { position: absolute; inset: 0; z-index: 1; overflow: hidden; padding: 76px 16px 0; box-sizing: border-box; pointer-events: none; opacity: 0; transition: opacity 120ms linear; }
 .panel-web__cover > .m-pageload { width: min(100%, 840px); margin-inline: auto; }
 .panel-web.is-covered .panel-web__cover { opacity: 1; }
+/* the cover of a page change comes in after 140 ms; going away has no delay. The sweep of the rows runs on the mounted cover all the time (opacity does not restart it), so it does not begin again when .is-covered toggles */
+.panel-web.is-covered:not(.is-first) .panel-web__cover { transition-delay: 140ms; }
 @media (prefers-reduced-motion: reduce) { .panel-web__frame iframe, .panel-web__cover { transition: none; } }
 </style>

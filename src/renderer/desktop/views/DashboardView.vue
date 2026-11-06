@@ -80,7 +80,9 @@
         </div>
       </div>
 
-      <div class="memory-bar-container" v-if="memoryInfo.system_total_memory > 0">
+      <!-- before the first reading of the host: the bar and the process rows as bars at their size (the empty text below would be wrong, and would turn into the table) -->
+      <div v-if="!memoryLoaded" class="mem-skel" role="status" aria-busy="true"><i class="mem-skel__bar" /><i class="mem-skel__line" /><i class="mem-skel__line" /><i class="mem-skel__line" /></div>
+      <div class="memory-bar-container" v-else-if="memoryInfo.system_total_memory > 0">
         <div class="memory-bar" role="img" :aria-label="`Sunshine ${sunshineMemPercent}%, ${t.dashboard.systemUsed} ${systemUsedPercent}%, ${t.dashboard.free} ${freeMemPercent}%`">
           <div class="memory-bar-fill sunshine-fill" :style="{ width: sunshineMemPercent + '%' }"></div>
           <div class="memory-bar-fill system-fill" :style="{ width: systemUsedPercent + '%', left: sunshineMemPercent + '%' }"></div>
@@ -92,7 +94,7 @@
         </div>
       </div>
 
-      <div class="process-list" v-if="memoryInfo.processes.length > 0">
+      <div class="process-list" v-if="memoryLoaded && memoryInfo.processes.length > 0">
         <div class="process-row header">
           <span class="process-name">{{ t.dashboard.processName }}</span>
           <span class="process-pid">PID</span>
@@ -109,7 +111,7 @@
         </div>
       </div>
       <MBanner v-else-if="memoryInfo.error" tone="error" icon="warning">{{ memoryInfo.error }}</MBanner>
-      <div class="no-process" v-else>{{ t.dashboard.noSunshineProcess }}</div>
+      <div class="no-process" v-else-if="memoryLoaded">{{ t.dashboard.noSunshineProcess }}</div>
 
       <div class="memory-trend" v-if="memoryHistory.length > 1">
         <div class="trend-title">{{ t.dashboard.memoryTrend }}</div>
@@ -162,6 +164,8 @@ const systemInfo = ref({
 })
 
 // 内存监控数据
+// false until the first reading (or the first failure) is in: the card draws bars, not 「no process」
+const memoryLoaded = ref(false)
 const memoryInfo = ref({
   processes: [],
   total_working_set: 0,
@@ -368,7 +372,7 @@ const actions = computed(() => [
 ])
 
 async function loadMemoryInfo() {
-  if (!invoke.value) return
+  if (!invoke.value) { memoryLoaded.value = true; return }
   try {
     const data = await invoke.value('get_process_memory_info')
     memoryInfo.value = data
@@ -386,6 +390,8 @@ async function loadMemoryInfo() {
     console.error('Failed to load memory info:', e)
     // 如果命令不存在（旧版后端），标记错误
     memoryInfo.value.error = String(e)
+  } finally {
+    memoryLoaded.value = true
   }
 }
 
@@ -768,6 +774,16 @@ onUnmounted(() => {
   .process-mem.peak {
     color: var(--md-sys-color-on-surface-variant);
   }
+}
+
+.mem-skel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 24px;
+  i { display: block; border-radius: 8px; background: color-mix(in srgb, var(--md-sys-color-on-surface) 12%, transparent); }
+  .mem-skel__bar { height: 16px; margin-bottom: 18px; }
+  .mem-skel__line { height: 22px; }
 }
 
 .no-process {
