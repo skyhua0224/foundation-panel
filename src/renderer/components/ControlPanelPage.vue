@@ -27,7 +27,6 @@
               </template>
             </MItem>
           </template>
-          <MFooter>{{ sourceHint }} {{ src.verified }}</MFooter>
           <MItem icon="info" :title="t.sidebar.currentVersion" :text="currentVersion">
             <template #trail><MButton variant="tonal" icon="refresh" :loading="checkingUpdate" @click="checkUpdate">{{ t.sidebar.checkUpdate }}</MButton></template>
           </MItem>
@@ -89,7 +88,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFooter, MFieldItem, MBanner, MSupportSheet, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFieldItem, MBanner, MSupportSheet, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import ShortcutsSheet from './m3e/ShortcutsSheet.vue'
 import { usePanelPart } from '../composables/panelParts.js'
@@ -144,8 +143,6 @@ const sourceOptions = computed(() => UPDATE_SOURCES.map((value) => ({ value, lab
 const cdkDraft = ref('')
 // the state of the CDK and its sentences are the same words as in the first run (foundation-ui/update cdkView)
 const cdkResult = computed(() => cdkView(updateSource.status.value, src.value, { lastValid: updateSource.lastValid.value }))
-// no sentence names the host that is tried first: a sentence appears only when a source failed (the update sheet says so then)
-const sourceHint = computed(() => (updateSource.source.value === 'mirror' ? src.value.mirrorTip : ''))
 const saveCdk = async () => { if (await updateSource.saveCdk(cdkDraft.value)) cdkDraft.value = '' }
 onMounted(() => { void updateSource.refresh() })
 const sponsorOpen = ref(false)
