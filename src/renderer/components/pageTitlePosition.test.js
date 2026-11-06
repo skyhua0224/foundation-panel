@@ -33,7 +33,7 @@ test('the panel hands its frame no margin or padding above the web page: the tit
 })
 
 test('a framed page starts where a panel page starts: the injected stylesheet reserves no top padding, and the detail pane of the panel hides its scrollbar like the frame', () => {
-  const inject = readFileSync(join(root, '../src-tauri/inject-styles.css'), 'utf8')
+  const inject = readFileSync(join(root, '../../src-tauri/inject-styles.css'), 'utf8')
   assert.match(inject, /html\[data-sunshine-navigation='unified'\] body \{[^}]*padding-top: 0 !important;/)
   const menu = readFileSync(join(root, 'components/SidebarMenu.vue'), 'utf8')
   assert.match(menu, /\.panel-body \.m-scene__pane--detail \{ scrollbar-width: none; \}/)
