@@ -1,11 +1,14 @@
 <template>
   <div class="apps-list">
     <div
-      v-for="(app, index) in apps"
+      v-for="app in apps"
       :key="'list-' + app.name"
       class="app-list-item"
       :class="{ launching: launchingApp === app.name }"
+      role="button"
       tabindex="0"
+      :aria-label="app.name"
+      :aria-busy="launchingApp === app.name || undefined"
       :data-app-name="app.name"
       :data-focus-key="'app-' + app.name"
       @click="$emit('launch', app)"
@@ -28,18 +31,21 @@
         <span class="list-cmd" v-if="app.cmd">{{ app.cmd }}</span>
       </div>
       <div class="list-tags">
-        <span v-if="playtimeLabel(app.name)" class="list-tag playtime">{{ playtimeLabel(app.name) }}</span>
-        <span v-if="isFavorite(app.name)" class="list-tag fav"><MIcon name="star" fill /> {{ t.appContext.favorite }}</span>
-        <span v-if="app.elevated && app.elevated !== 'false'" class="list-tag admin">{{ t.appContext.admin }}</span>
+        <MChip v-if="playtimeLabel(app.name)" icon="schedule">{{ playtimeLabel(app.name) }}</MChip>
+        <MChip v-if="isFavorite(app.name)" tone="tertiary" icon="star">{{ t.appContext.favorite }}</MChip>
+        <MChip v-if="app.elevated && app.elevated !== 'false'" tone="warn" icon="shield">{{ t.appContext.admin }}</MChip>
       </div>
-      <button class="list-play" tabindex="-1"><MIcon name="play_circle" /></button>
+      <span class="list-play" aria-hidden="true">
+        <MLoading v-if="launchingApp === app.name" size="32px" />
+        <MIcon v-else name="play_arrow" fill />
+      </span>
     </div>
   </div>
 </template>
 
 <script setup>
 import { useI18n } from '../i18n/index.js'
-import { MIcon } from 'foundation-ui/vue'
+import { MChip, MIcon, MLoading } from 'foundation-ui/vue'
 import { formatDuration } from '../composables/useGameSession.js'
 const { t } = useI18n()
 
@@ -65,152 +71,93 @@ function playtimeLabel(appName) {
 .apps-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 12px;
+  padding: 6px 8px 28px;
+  margin: -6px -8px 0;
 }
 
 .app-list-item {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 10px 16px;
-  border-radius: 10px;
+  gap: 20px;
+  min-height: 96px;
+  padding: 12px 24px 12px 12px;
+  border-radius: 28px;
+  background: var(--md-sys-color-surface-container-high);
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
-  content-visibility: auto;
-  contain-intrinsic-size: auto 68px;
+  outline: none;
+  transition: background-color var(--m-spring-default-effects-duration, 200ms) var(--m-spring-default-effects, ease),
+    transform var(--m-spring-fast-spatial-duration, 200ms) var(--m-spring-fast-spatial, ease);
 
-  &:hover, &:focus-visible {
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.06);
-    transform: translateX(6px) scale(1.01);
-    .list-name { color: var(--fd-accent, #00fff5); }
+  &:hover {
+    background: var(--md-sys-color-surface-container-highest);
   }
 
-  &:active {
-    transform: scale(0.97);
-    transition-duration: 0.1s;
-  }
-
-  &.launching {
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-    animation: list-bounce 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
-  }
-
-  .list-cover {
-    width: 48px;
-    height: 48px;
-    border-radius: 8px;
-    overflow: hidden;
-    background: rgba(var(--fd-bg-secondary-rgb, 26, 26, 46), 0.7);
-    flex-shrink: 0;
-
-    img { width: 100%; height: 100%; object-fit: cover; }
-  }
-
-  .list-info {
-    flex: 1;
-    min-width: 0;
-
-    .list-name {
-      display: block;
-      font-size: 15px;
-      font-weight: 500;
-      color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.85);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .list-cmd {
-      display: block;
-      font-size: 12px;
-      color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.3);
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-  }
-
-  .list-tags {
-    display: flex;
-    gap: 6px;
-  }
-
-  .list-tag {
-    font-size: 11px;
-    padding: 2px 8px;
-    border-radius: 4px;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-
-    svg {
-      width: 12px;
-      height: 12px;
-    }
-
-    &.fav { background: rgba(var(--fd-status-warning-rgb, 255, 215, 0), 0.1); color: var(--fd-status-warning, #ffd700); }
-    &.admin { background: rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.1); color: var(--fd-status-danger, #ff6b35); }
-    &.playtime {
-      background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.06);
-      color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.4);
-      font-variant-numeric: tabular-nums;
-    }
-  }
-
-  .list-play {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-    background: transparent;
-    color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.6);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 12px;
-    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-    flex-shrink: 0;
-
-    svg {
-      width: 15px;
-      height: 15px;
-    }
-  }
-
-  &:hover .list-play {
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-    color: var(--fd-accent, #00fff5);
-    border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.4);
-    transform: scale(1.15) rotate(-10deg);
-  }
+  &:active { transform: scale(0.99); }
+  &.launching { pointer-events: none; opacity: 0.8; }
 }
 
-@keyframes list-bounce {
-  0% { transform: scale(1); }
-  30% { transform: scale(0.96) translateX(-4px); }
-  60% { transform: scale(1.03) translateX(4px); }
-  100% { transform: scale(1) translateX(0); }
+.list-cover {
+  flex: none;
+  width: 72px;
+  height: 72px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--md-sys-color-surface-container-highest);
+
+  img { width: 100%; height: 100%; object-fit: cover; display: block; }
 }
 
 .mini-placeholder {
   width: 100%;
   height: 100%;
+  display: grid;
+  place-items: center;
+  font: 700 30px/1 var(--md-ref-typeface-brand, system-ui);
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
+}
+
+.list-info {
+  flex: 1;
+  min-width: 0;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  font-weight: 700;
-  color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-  text-transform: uppercase;
+  flex-direction: column;
+  gap: 4px;
+
+  .list-name {
+    font: 600 20px/28px var(--md-ref-typeface-brand, system-ui);
+    color: var(--md-sys-color-on-surface);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .list-cmd {
+    font: 400 14px/20px var(--md-ref-typeface-brand, system-ui);
+    color: var(--md-sys-color-on-surface-variant);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
 }
 
-.fade-in {
-  animation: fadeInUp 0.35s ease both;
+.list-tags {
+  display: flex;
+  gap: 8px;
+  flex: none;
 }
 
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+.list-play {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 20px;
+  background: var(--md-sys-color-primary);
+  color: var(--md-sys-color-on-primary);
+
+  .m-icon { width: 32px; height: 32px; }
 }
 </style>

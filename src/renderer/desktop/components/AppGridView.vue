@@ -5,7 +5,10 @@
       :key="app.name"
       class="app-tile fade-in"
       :class="{ launching: launchingApp === app.name, favorited: isFavorite(app.name) }"
+      role="button"
       tabindex="0"
+      :aria-label="app.name"
+      :aria-busy="launchingApp === app.name || undefined"
       :data-app-name="app.name"
       :data-focus-key="'app-' + app.name"
       :style="{ animationDelay: `${Math.min(index * 0.03, 0.4)}s` }"
@@ -26,34 +29,38 @@
         <div v-else class="cover-placeholder">
           <span class="placeholder-letter">{{ app.name?.[0] || '?' }}</span>
         </div>
-        <!-- 收藏角标 -->
-        <div v-if="isFavorite(app.name)" class="favorite-badge" @click.stop="$emit('toggleFavorite', app.name)">
-          <MIcon name="star" fill />
-        </div>
-        <!-- 启动助手角标 -->
+
+        <span
+          v-if="isFavorite(app.name)"
+          class="favorite-badge"
+          :title="t.appContext.unfavorite"
+          @click.stop="$emit('toggleFavorite', app.name)"
+        ><MIcon name="star" fill /></span>
+
         <div v-if="helperIds(app.name).length" class="helper-badges">
           <LaunchHelperIcon
             v-for="helperId in helperIds(app.name)"
             :key="helperId"
             :template-id="helperId"
-            :size="12"
+            :size="16"
             class="helper-badge-icon"
           />
         </div>
-        <!-- Hover 遮罩 -->
-        <div class="tile-overlay">
-          <span class="play-icon"><MIcon name="play_circle" /></span>
+
+        <div class="tile-overlay" aria-hidden="true">
+          <span class="play-icon"><MIcon name="play_arrow" fill /></span>
         </div>
-        <!-- 启动动画 -->
+
         <div v-if="launchingApp === app.name" class="launch-overlay">
-          <div class="launch-spinner"></div>
+          <MLoading size="56px" />
           <span>{{ t.appContext.launching }}</span>
         </div>
       </div>
+
       <div class="tile-info">
         <span class="tile-name" :title="app.name">{{ app.name }}</span>
         <span v-if="playtimeLabel(app.name)" class="tile-playtime">{{ playtimeLabel(app.name) }}</span>
-        <span v-if="app.elevated && app.elevated !== 'false'" class="tile-badge admin">{{ t.appContext.admin }}</span>
+        <MChip v-if="app.elevated && app.elevated !== 'false'" class="tile-badge" tone="warn" icon="shield">{{ t.appContext.admin }}</MChip>
       </div>
     </div>
   </div>
@@ -61,7 +68,7 @@
 
 <script setup>
 import { useI18n } from '../i18n/index.js'
-import { MIcon } from 'foundation-ui/vue'
+import { MChip, MIcon, MLoading } from 'foundation-ui/vue'
 import LaunchHelperIcon from './LaunchHelperIcon.vue'
 import { formatDuration } from '../composables/useGameSession.js'
 const { t } = useI18n()
@@ -90,225 +97,156 @@ function playtimeLabel(appName) {
 <style lang="less" scoped>
 .apps-grid {
   display: grid;
-  gap: 20px;
+  gap: 28px;
+  padding: 12px 8px 28px;
+  margin: -12px -8px 0;
 
-  &.grid-small  { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
-  &.grid-medium { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); }
-  &.grid-large  { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+  &.grid-small { grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); }
+  &.grid-medium { grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+  &.grid-large { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
 }
 
+// 一张卡：surface-container-high，封面撑满上部（28 圆角），名字在下
 .app-tile {
+  display: flex;
+  flex-direction: column;
+  border-radius: var(--d-radius-tile);
+  background: var(--md-sys-color-surface-container-high);
   cursor: pointer;
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.3s ease;
-  border-radius: 12px;
-  position: relative;
-  content-visibility: auto;
-  contain-intrinsic-size: auto 280px;
-  will-change: transform;
+  outline: none;
+  overflow: hidden;
+  box-shadow: var(--d-shadow-1);
+  transition: transform var(--m-spring-fast-spatial-duration, 200ms) var(--m-spring-fast-spatial, ease),
+    box-shadow var(--m-spring-default-effects-duration, 200ms) var(--m-spring-default-effects, ease);
 
-  &:hover, &:focus-visible {
-    transform: scale(1.06) rotate(-0.8deg);
-    filter: brightness(1.1);
-    .tile-cover { box-shadow: 0 10px 30px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.22), 0 0 0 2px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15); }
+  &:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--d-shadow-3);
+
     .tile-overlay { opacity: 1; }
-    .cover-image { transform: scale(1.08); }
-    .tile-name { color: var(--fd-accent, #00fff5); }
   }
 
-  &:active {
-    transform: scale(0.92) rotate(0.5deg);
-    transition-duration: 0.1s;
-  }
-
-  &.launching {
-    pointer-events: none;
-    animation: tile-bounce 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-    .tile-cover { box-shadow: 0 0 40px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.4); }
-  }
-}
-
-@keyframes tile-bounce {
-  0% { transform: scale(1); }
-  30% { transform: scale(0.88) rotate(-1.5deg); }
-  60% { transform: scale(1.08) rotate(1deg); }
-  100% { transform: scale(1) rotate(0); }
+  &:active { transform: scale(0.98); }
 }
 
 .tile-cover {
   position: relative;
   aspect-ratio: 3 / 4;
-  border-radius: 12px;
   overflow: hidden;
-  background: linear-gradient(145deg, rgba(var(--fd-bg-secondary-rgb, 26, 26, 46), 0.9) 0%, rgba(22, 33, 62, 0.9) 100%);
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.06);
-  transition: box-shadow 0.25s ease;
+  background: var(--md-sys-color-surface-container-highest);
 
   .cover-image {
     width: 100%;
     height: 100%;
     object-fit: cover;
-    transition: transform 0.3s ease;
+    display: block;
   }
 
   .cover-placeholder {
     width: 100%;
     height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: linear-gradient(145deg, rgba(var(--fd-bg-secondary-rgb, 26, 26, 46), 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
+    display: grid;
+    place-items: center;
+    background: var(--md-sys-color-primary-container);
+    color: var(--md-sys-color-on-primary-container);
 
     .placeholder-letter {
-      font-size: 48px;
-      font-weight: 700;
-      color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-      text-transform: uppercase;
+      font: 800 84px/1 var(--md-ref-typeface-brand, system-ui);
     }
   }
 }
 
+// 角标只给鼠标用：手柄用 X 切换收藏，所以它不是可聚焦控件
 .favorite-badge {
   position: absolute;
-  top: 8px;
-  right: 8px;
-  color: var(--fd-status-warning, #ffd700);
-  text-shadow: 0 0 8px rgba(var(--fd-status-warning-rgb, 255, 215, 0), 0.4);
-  z-index: 3;
-  cursor: pointer;
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  top: 12px;
+  right: 12px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 16px;
+  background: var(--md-sys-color-tertiary-container);
+  color: var(--md-sys-color-on-tertiary-container);
 
-  &:hover {
-    transform: scale(1.4) rotate(15deg);
-  }
-
-  svg {
-    width: 16px;
-    height: 16px;
-  }
+  .m-icon { width: 26px; height: 26px; }
 }
 
 .helper-badges {
   position: absolute;
-  bottom: 8px;
-  left: 8px;
+  left: 12px;
+  bottom: 12px;
   display: flex;
-  gap: 2px;
-  z-index: 3;
+  gap: 6px;
 
   .helper-badge-icon {
-    width: 18px;
-    height: 18px;
-    background: rgba(0, 0, 0, 0.6);
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.9);
-    backdrop-filter: blur(4px);
-    border-radius: 4px;
-    padding: 3px;
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 12px;
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
   }
 }
 
 .tile-overlay {
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, transparent 50%, rgba(0, 0, 0, 0.65) 100%);
+  display: grid;
+  place-items: center;
   opacity: 0;
-  transition: opacity 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2;
+  background: color-mix(in srgb, var(--md-sys-color-scrim, #000) 36%, transparent);
+  transition: opacity var(--m-spring-default-effects-duration, 200ms) var(--m-spring-default-effects, ease);
 
   .play-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 50%;
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.9);
-    color: var(--fd-bg-primary, #0f0f23);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 0 20px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.35);
-    animation: play-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    display: grid;
+    place-items: center;
+    width: 88px;
+    height: 88px;
+    border-radius: 32px;
+    background: var(--md-sys-color-primary);
+    color: var(--md-sys-color-on-primary);
 
-    svg {
-      width: 18px;
-      height: 18px;
-    }
+    .m-icon { width: 48px; height: 48px; }
   }
-}
-
-@keyframes play-pop {
-  from { transform: scale(0) rotate(-30deg); opacity: 0; }
-  to { transform: scale(1) rotate(0); opacity: 1; }
 }
 
 .launch-overlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  z-index: 4;
-  color: var(--fd-accent, #00fff5);
-  font-size: 13px;
-
-  .launch-spinner {
-    width: 28px;
-    height: 28px;
-    border: 3px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-    border-top-color: var(--fd-accent, #00fff5);
-    border-radius: 50%;
-    animation: spin 0.7s linear infinite;
-  }
+  gap: 14px;
+  background: color-mix(in srgb, var(--md-sys-color-scrim, #000) 56%, transparent);
+  color: #fff;
+  font: 600 16px/24px var(--md-ref-typeface-brand, system-ui);
 }
 
 .tile-info {
-  padding: 8px 2px 2px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px 10px;
+  padding: 16px 20px 18px;
+  min-height: 78px;
+
+  .tile-name {
+    flex: 1 1 100%;
+    font: 600 18px/26px var(--md-ref-typeface-brand, system-ui);
+    color: var(--md-sys-color-on-surface);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .tile-playtime {
+    font: 400 14px/20px var(--md-ref-typeface-brand, system-ui);
+    color: var(--md-sys-color-on-surface-variant);
+  }
 }
 
-.tile-name {
-  font-size: 13px;
-  font-weight: 500;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.8);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  flex: 1;
-}
-
-.tile-badge {
-  font-size: 10px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-weight: 600;
-  flex-shrink: 0;
-
-  &.admin { background: rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.15); color: var(--fd-status-danger, #ff6b35); }
-}
-
-.tile-playtime {
-  font-size: 11px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.32);
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-}
-
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.fade-in {
-  animation: fadeInUp 0.35s ease both;
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-}
+.app-tile.launching { pointer-events: none; }
 </style>

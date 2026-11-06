@@ -1,19 +1,16 @@
 <template>
-  <div class="recent-section fade-in">
-    <div class="section-label">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="section-icon">
-        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-      </svg>
-      {{ t.apps.recentSection }}
-    </div>
+  <section class="recent-section">
+    <h2 class="section-label"><MIcon name="history" />{{ t.apps.recentSection }}</h2>
     <div class="recent-strip">
       <div
         v-for="app in apps"
         :key="'recent-' + app.name"
         class="recent-tile"
+        role="button"
         tabindex="0"
         :data-app-name="app.name"
         :data-focus-key="'recent-' + app.name"
+        :aria-label="app.name"
         @click="$emit('launch', app)"
         @keydown.enter="$emit('launch', app)"
         @contextmenu.prevent="$emit('contextmenu', $event, app)"
@@ -32,10 +29,11 @@
         <span class="recent-name">{{ app.name }}</span>
       </div>
     </div>
-  </div>
+  </section>
 </template>
 
 <script setup>
+import { MIcon } from 'foundation-ui/vue'
 import { useI18n } from '../i18n/index.js'
 
 const { t } = useI18n()
@@ -51,91 +49,86 @@ defineEmits(['launch', 'contextmenu'])
 
 <style lang="less" scoped>
 .recent-section {
-  margin-bottom: 28px;
+  margin-bottom: 36px;
 }
 
 .section-label {
-  font-size: 14px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.4);
-  margin-bottom: 12px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  margin: 0 0 16px;
+  font: 600 20px/28px var(--md-ref-typeface-brand, system-ui);
+  color: var(--md-sys-color-on-surface-variant);
 
-  .section-icon {
-    width: 16px;
-    height: 16px;
+  .m-icon {
+    width: 26px;
+    height: 26px;
+    color: var(--md-sys-color-primary);
   }
 }
 
+// 横向条：焦点环和抬升不能被裁掉，所以上下留出 padding
 .recent-strip {
   display: flex;
-  gap: 16px;
+  gap: 20px;
   overflow-x: auto;
-  padding-bottom: 4px;
-
-  &::-webkit-scrollbar { height: 4px; }
-  &::-webkit-scrollbar-thumb { background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15); border-radius: 2px; }
+  padding: 10px 8px 18px;
+  margin: -10px -8px 0;
+  scrollbar-width: none;
 }
 
 .recent-tile {
-  content-visibility: auto;
-  contain-intrinsic-size: auto 112px;
-  flex-shrink: 0;
-  width: 80px;
+  flex: none;
+  width: 132px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   cursor: pointer;
-  text-align: center;
-  transition: transform 0.2s ease, opacity 0.2s ease;
+  outline: none;
+  border-radius: 28px;
+  transition: transform var(--m-spring-fast-spatial-duration, 200ms) var(--m-spring-fast-spatial, ease);
 
   &:hover {
-    transform: translateY(-3px);
-    .recent-name { color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.9); }
+    transform: translateY(-4px);
   }
 
   &:active {
-    transform: scale(0.95);
+    transform: scale(0.97);
   }
+}
 
-  .recent-cover {
-    width: 80px;
-    height: 80px;
-    border-radius: 12px;
-    overflow: hidden;
-    background: rgba(var(--fd-bg-secondary-rgb, 26, 26, 46), 0.7);
-    border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-    margin-bottom: 6px;
+.recent-cover {
+  width: 132px;
+  height: 132px;
+  border-radius: 28px;
+  overflow: hidden;
+  background: var(--md-sys-color-surface-container-highest);
+  box-shadow: var(--d-shadow-1);
 
-    img { width: 100%; height: 100%; object-fit: cover; }
-  }
-
-  .recent-name {
-    font-size: 11px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
     display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
   }
 }
 
 .mini-placeholder {
   width: 100%;
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  font-weight: 700;
-  color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-  text-transform: uppercase;
+  display: grid;
+  place-items: center;
+  font: 700 48px/1 var(--md-ref-typeface-brand, system-ui);
+  background: var(--md-sys-color-primary-container);
+  color: var(--md-sys-color-on-primary-container);
 }
 
-.fade-in {
-  animation: fadeInUp 0.35s ease both;
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+.recent-name {
+  font: 500 15px/20px var(--md-ref-typeface-brand, system-ui);
+  color: var(--md-sys-color-on-surface);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>
