@@ -12,6 +12,8 @@ html {
   --d-radius-tile: 28px;
   --d-target: 56px; // 最小可点目标
   --d-focus: 4px;
+  // 焦点环颜色在 <html> 上就解析掉：个别组件（按钮、对话框）会在自己身上重定义 --md-sys-color-*，环不能跟着变
+  --d-ring: var(--md-sys-color-primary);
   --d-shadow-1: 0 1px 2px color-mix(in srgb, var(--md-sys-color-shadow, #000) 30%, transparent), 0 2px 6px color-mix(in srgb, var(--md-sys-color-shadow, #000) 15%, transparent);
   --d-shadow-3: 0 6px 12px color-mix(in srgb, var(--md-sys-color-shadow, #000) 28%, transparent), 0 14px 32px color-mix(in srgb, var(--md-sys-color-shadow, #000) 18%, transparent);
 }
@@ -30,7 +32,7 @@ html[data-fd-gamepad='true'] {
   cursor: none;
 
   *:focus {
-    outline: var(--d-focus) solid var(--md-sys-color-primary);
+    outline: var(--d-focus) solid var(--d-ring);
     outline-offset: 3px;
   }
 
@@ -41,7 +43,7 @@ html[data-fd-gamepad='true'] {
   .desktop-card:focus,
   .nav-item:focus {
     outline: none;
-    box-shadow: 0 0 0 var(--d-focus) var(--md-sys-color-primary), var(--d-shadow-3);
+    box-shadow: 0 0 0 var(--d-focus) var(--d-ring), var(--d-shadow-3);
   }
 
   .app-tile:focus {

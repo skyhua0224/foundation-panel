@@ -73,7 +73,7 @@ const hints = computed(() => {
 .gamepad-legend {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 8px 18px;
   flex-wrap: wrap;
   justify-content: center;
   padding: 10px 24px;
@@ -110,7 +110,7 @@ const hints = computed(() => {
 }
 
 .legend-label {
-  font: 500 16px/24px var(--md-ref-typeface-brand, system-ui);
+  font: 500 15px/22px var(--md-ref-typeface-brand, system-ui);
   color: var(--md-sys-color-on-surface-variant);
   white-space: nowrap;
 }
