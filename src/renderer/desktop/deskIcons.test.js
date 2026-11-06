@@ -8,7 +8,7 @@ import { ICONS } from 'foundation-ui/icons'
 const root = new URL('./', import.meta.url)
 const files = [
   ...fs.readdirSync(new URL('components/settings/', root)).filter((f) => f.endsWith('.vue')).map((f) => `components/settings/${f}`),
-  'components/ThemeEditor.vue', 'components/DeskPage.vue', 'components/PanelLink.vue', 'components/PanelLinkSection.vue', 'panelLinks.js',
+  'components/ThemeEditor.vue', 'components/DeskPage.vue', 'components/PanelLink.vue', 'components/PanelLinkSection.vue', 'panelLinks.js', 'views/DashboardView.vue', 'components/AppToolbar.vue',
   'views/SettingsView.vue', 'views/ToolsView.vue', 'views/DevicesView.vue', 'views/StreamView.vue',
 ]
 

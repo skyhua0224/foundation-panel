@@ -42,7 +42,7 @@ async function open() {
   position: relative; overflow: hidden; display: flex; align-items: center; gap: 20px; min-width: 0; min-height: 112px; padding: 18px 22px 18px 18px; cursor: pointer; outline: none;
   border-radius: var(--md-sys-shape-corner-extra-large); background: var(--l-bg); color: var(--l-fg);
   transition: border-radius var(--m-spring-default-spatial-duration, 300ms) var(--m-spring-default-spatial, ease), transform var(--m-spring-fast-spatial-duration, 200ms) var(--m-spring-fast-spatial, ease); }
-.dsk-link--tertiary { --l-bg: var(--md-sys-color-tertiary-container); --l-fg: var(--md-sys-color-on-tertiary-container); --l-accent: var(--md-sys-color-tertiary); --l-on: var(--md-sys-color-on-tertiary); }
+.dsk-link--tertiary { --l-bg: var(--dsk-tert-bg); --l-fg: var(--dsk-tert-fg); --l-accent: var(--md-sys-color-tertiary); --l-on: var(--md-sys-color-on-tertiary); }
 .dsk-link--secondary { --l-bg: var(--md-sys-color-secondary-container); --l-fg: var(--md-sys-color-on-secondary-container); --l-accent: var(--md-sys-color-secondary); --l-on: var(--md-sys-color-on-secondary); }
 .dsk-link--neutral { --l-bg: var(--md-sys-color-surface-container-high); --l-fg: var(--md-sys-color-on-surface); --l-accent: var(--md-sys-color-outline); --l-on: var(--md-sys-color-surface); }
 .dsk-link:hover, .dsk-link:focus-visible, .dsk-link:focus { border-radius: var(--md-sys-shape-corner-extra-extra-large); transform: translateY(-3px); }

@@ -56,3 +56,11 @@ test('design guard: every page of the big screen opens with a hero band and its 
   for (const view of ['StreamView', 'SettingsView', 'ToolsView']) assert.ok(read(`./views/${view}.vue`).includes('<PanelLinkSection'), `${view} has its rows 在 Panel 中打开`)
   assert.ok(read('./components/DesktopWindow.vue').includes('id="dsk-dock"'))
 })
+
+test('design guard: tonal tiles take the third colour from --dsk-tert-bg, which is a dark block in dark mode (the raw token is a light pink there)', () => {
+  const less = read('./desktop.less')
+  assert.ok(less.includes("html[data-theme='dark']") && less.includes('--dsk-tert-bg: color-mix('))
+  for (const file of ['views/DevicesView.vue', 'views/StreamView.vue', 'components/PanelLink.vue', 'components/AppGridView.vue']) {
+    assert.ok(!/var\(--md-sys-color-(on-)?tertiary-container\)/.test(read(`./${file}`)), `${file} uses the raw tertiary container`)
+  }
+})

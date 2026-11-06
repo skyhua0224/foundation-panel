@@ -279,7 +279,7 @@ onMounted(async () => {
 
 .dsk-codec, .dsk-flag { position: relative; display: flex; flex-direction: column; gap: 14px; padding: 20px 22px; border-radius: var(--md-sys-shape-corner-extra-large); background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); transition: background-color var(--m-spring-default-effects-duration, 200ms) var(--m-spring-default-effects, ease), border-radius var(--m-spring-default-spatial-duration, 300ms) var(--m-spring-default-spatial, ease); }
 .dsk-codec .dsk-tile__icon, .dsk-flag .dsk-tile__icon { background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); clip-path: var(--m-shape-circle); }
-.dsk-codec.is-on, .dsk-flag.is-on { background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); border-radius: var(--md-sys-shape-corner-extra-extra-large); }
+.dsk-codec.is-on, .dsk-flag.is-on { background: var(--dsk-tert-bg); color: var(--dsk-tert-fg); border-radius: var(--md-sys-shape-corner-extra-extra-large); }
 .dsk-codec.is-on .dsk-tile__icon, .dsk-flag.is-on .dsk-tile__icon { background: var(--md-sys-color-tertiary); color: var(--md-sys-color-on-tertiary); clip-path: var(--m-shape-cookie); }
 .dsk-codec__head { display: flex; align-items: center; gap: 16px; }
 .dsk-flag { flex-direction: row; align-items: center; gap: 16px; }

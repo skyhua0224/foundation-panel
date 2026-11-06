@@ -166,8 +166,8 @@ function playtimeLabel(appName) {
   width: 44px;
   height: 44px;
   border-radius: 16px;
-  background: var(--md-sys-color-tertiary-container);
-  color: var(--md-sys-color-on-tertiary-container);
+  background: var(--dsk-tert-bg);
+  color: var(--dsk-tert-fg);
 
   .m-icon { width: 26px; height: 26px; }
 }

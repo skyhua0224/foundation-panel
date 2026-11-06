@@ -5,6 +5,19 @@
 // 仍在读 --fd-* 的代码使用；这里的新样式不再依赖它们。
 // 动画时长与缓动只取 --m-spring-*，减少动态由 foundation-ui 的 .m-app 规则统一关掉。
 
+// === 色调块的第三色 ===
+// foundation-ui 的深色方案在一部分外观下给出的 tertiary-container 是浅粉（色调 90），深色界面里会冒出一块亮砖。
+// 大屏上的第三色色调块都读这一对变量：浅色用 token 本身，深色用 tertiary 压在深色表面上调出的暗色块，字用 on-surface。
+html {
+  --dsk-tert-bg: var(--md-sys-color-tertiary-container);
+  --dsk-tert-fg: var(--md-sys-color-on-tertiary-container);
+}
+html[data-theme='dark'],
+html[data-bs-theme='dark'] {
+  --dsk-tert-bg: color-mix(in srgb, var(--md-sys-color-tertiary) 24%, var(--md-sys-color-surface-container-high));
+  --dsk-tert-fg: var(--md-sys-color-on-surface);
+}
+
 // === 大屏尺度（10 英尺：字大、目标大）===
 html {
   --d-gap: 24px;

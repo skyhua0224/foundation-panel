@@ -338,7 +338,7 @@ onUnmounted(() => {
 .dsk-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: stretch; margin-bottom: 32px; }
 .dsk-tile { position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; gap: 18px; min-width: 0; padding: 26px 28px 28px; border-radius: var(--md-sys-shape-corner-extra-extra-large); color: var(--md-sys-color-on-surface); }
 .dsk-tile::after { content: ''; position: absolute; z-index: -1; right: -60px; top: -70px; width: 240px; height: 240px; background: currentColor; opacity: .07; clip-path: var(--m-shape-cookie); animation: m-turn 48s linear infinite; }
-.dsk-tile--qr { background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); }
+.dsk-tile--qr { background: var(--dsk-tert-bg); color: var(--dsk-tert-fg); }
 .dsk-tile--pin { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
 .dsk-tile__head { display: flex; align-items: center; gap: 14px; }
 .dsk-tile__icon { flex: none; width: 52px; height: 52px; display: grid; place-items: center; font-size: 28px; background: currentColor; clip-path: var(--m-shape-squircle); position: relative; }
@@ -372,8 +372,8 @@ onUnmounted(() => {
 .dsk-device__avatar { position: relative; flex: none; width: 76px; height: 76px; display: grid; place-items: center; font-size: 36px; color: var(--md-sys-color-on-primary-container); }
 .dsk-device__shape { position: absolute; inset: 0; background: var(--md-sys-color-primary-container); animation: m-turn 60s linear infinite; }
 .dsk-device__avatar :deep(.m-icon) { position: relative; }
-.dsk-device.is-clover .dsk-device__shape { background: var(--md-sys-color-tertiary-container); }
-.dsk-device.is-clover .dsk-device__avatar { color: var(--md-sys-color-on-tertiary-container); }
+.dsk-device.is-clover .dsk-device__shape { background: var(--dsk-tert-bg); }
+.dsk-device.is-clover .dsk-device__avatar { color: var(--dsk-tert-fg); }
 .dsk-device.is-sunny .dsk-device__shape { background: var(--md-sys-color-secondary-container); }
 .dsk-device.is-sunny .dsk-device__avatar { color: var(--md-sys-color-on-secondary-container); }
 .dsk-device__body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }

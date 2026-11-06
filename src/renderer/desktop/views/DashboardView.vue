@@ -1,8 +1,6 @@
 <template>
   <div class="dashboard-view">
-    <header class="dash-hero fade-in">
-      <h1 class="hero-title">Foundation <span>Desktop</span></h1>
-    </header>
+    <MHero class="dash-hero fade-in" :tone="heroTone" icon="dashboard" title="Foundation Desktop" :text="heroText" />
 
     <!-- 状态 -->
     <div class="desktop-grid cols-4 stat-row">
@@ -45,20 +43,20 @@
     <div class="desktop-card system-info-card fade-in">
       <div class="info-grid">
         <div class="info-item">
-          <span class="info-label">{{ t.dashboard.sunshineVersion }}</span>
-          <span class="info-value">{{ systemInfo.sunshineVersion }}</span>
+          <span class="info-icon"><MIcon name="light_mode" fill /></span>
+          <span class="info-text"><span class="info-label">{{ t.dashboard.sunshineVersion }}</span><span class="info-value">{{ systemInfo.sunshineVersion }}</span></span>
         </div>
         <div class="info-item">
-          <span class="info-label">{{ t.dashboard.os }}</span>
-          <span class="info-value">{{ systemInfo.os }}</span>
+          <span class="info-icon"><MIcon name="desktop_windows" fill /></span>
+          <span class="info-text"><span class="info-label">{{ t.dashboard.os }}</span><span class="info-value">{{ systemInfo.os }}</span></span>
         </div>
         <div class="info-item">
-          <span class="info-label">{{ t.dashboard.gpu }}</span>
-          <span class="info-value">{{ systemInfo.gpu }}</span>
+          <span class="info-icon"><MIcon name="memory" fill /></span>
+          <span class="info-text"><span class="info-label">{{ t.dashboard.gpu }}</span><span class="info-value">{{ systemInfo.gpu }}</span></span>
         </div>
         <div class="info-item">
-          <span class="info-label">{{ t.dashboard.encoder }}</span>
-          <span class="info-value">{{ systemInfo.encoder }}</span>
+          <span class="info-icon"><MIcon name="videocam" fill /></span>
+          <span class="info-text"><span class="info-label">{{ t.dashboard.encoder }}</span><span class="info-value">{{ systemInfo.encoder }}</span></span>
         </div>
       </div>
     </div>
@@ -136,7 +134,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { MBanner, MIcon } from 'foundation-ui/vue'
+import { MBanner, MHero, MIcon } from 'foundation-ui/vue'
 import { useI18n } from '../i18n/index.js'
 
 const { t } = useI18n()
@@ -148,6 +146,10 @@ const proxyUrl = ref('http://localhost:48081')
 // 状态数据
 const serviceStatus = ref({ text: '', class: 'connecting' })
 const statusTone = computed(() => ({ online: 'ok', offline: 'error', connecting: 'warn' }[serviceStatus.value.class] || ''))
+// the hero says how the host is, in the colour of that: online green, connecting amber, otherwise the primary tone
+const HERO_TONES = { online: 'success', connecting: 'tertiary' }
+const heroTone = computed(() => HERO_TONES[serviceStatus.value.class] || 'primary')
+const heroText = computed(() => [serviceStatus.value.text, uptime.value !== '--:--:--' ? uptime.value : ''].filter(Boolean).join(' · '))
 const pairedDevices = ref(0)
 const activeSessions = ref(0)
 const uptime = ref('--:--:--')
@@ -422,21 +424,16 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
+// the hero band, the same one the other pages open with: a burst shape with the page's icon, the name, and how the host is right now
 .dash-hero {
-  margin-bottom: 32px;
+  margin-bottom: 28px;
+  padding: 30px 40px;
+  gap: 28px;
 
-  .hero-title {
-    margin: 0;
-    font: 700 48px/56px var(--md-ref-typeface-brand, system-ui);
-    letter-spacing: -0.5px;
-
-    span {
-      color: var(--md-sys-color-primary);
-    }
-  }
+  :deep(.m-hero__shape) { width: 120px; height: 120px; font-size: 56px; }
+  :deep(.m-hero__title) { font: var(--m-display-medium); font-weight: 700; letter-spacing: -0.01em; color: inherit; }
+  :deep(.m-hero__text) { font: var(--m-headline-small); color: inherit; }
 }
-
-.dash-hero .hero-title { color: var(--md-sys-color-on-surface); }
 
 .stat-row {
   margin-bottom: 8px;
@@ -456,13 +453,21 @@ onUnmounted(() => {
     flex: none;
     display: grid;
     place-items: center;
-    width: 64px;
-    height: 64px;
-    border-radius: 22px;
-    background: var(--md-sys-color-surface-container-highest);
-    color: var(--md-sys-color-primary);
+    position: relative;
+    width: 72px;
+    height: 72px;
+    color: var(--md-sys-color-on-primary-container);
 
-    .m-icon { width: 34px; height: 34px; }
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--md-sys-color-primary-container);
+      clip-path: var(--m-shape-burst);
+      animation: m-turn 50s linear infinite;
+    }
+
+    .m-icon { position: relative; width: 34px; height: 34px; }
   }
 
   .stat-info {
@@ -495,13 +500,17 @@ onUnmounted(() => {
   align-items: center;
   gap: 12px;
   margin: 44px 0 20px;
-  font: 600 24px/32px var(--md-ref-typeface-brand, system-ui);
+  font: 700 28px/36px var(--md-ref-typeface-brand, system-ui);
   color: var(--md-sys-color-on-surface);
 
   .m-icon {
+    box-sizing: content-box;
     width: 28px;
     height: 28px;
-    color: var(--md-sys-color-primary);
+    padding: 10px;
+    color: var(--md-sys-color-on-primary-container);
+    background: var(--md-sys-color-primary-container);
+    clip-path: var(--m-shape-squircle);
   }
 }
 
@@ -518,9 +527,12 @@ onUnmounted(() => {
   color: var(--md-sys-color-on-secondary-container);
   border: 0;
 
-  &:hover {
+  transition: border-radius var(--m-spring-default-spatial-duration, 300ms) var(--m-spring-default-spatial, ease), transform var(--m-spring-fast-spatial-duration, 200ms) var(--m-spring-fast-spatial, ease), box-shadow var(--m-spring-default-effects-duration, 200ms) var(--m-spring-default-effects, ease);
+
+  &:hover, &:focus {
     box-shadow: var(--d-shadow-3);
     transform: translateY(-3px);
+    border-radius: var(--md-sys-shape-corner-extra-extra-large);
   }
 
   &:active {
@@ -528,21 +540,33 @@ onUnmounted(() => {
   }
 
   .action-icon {
+    position: relative;
     flex: none;
     display: grid;
     place-items: center;
-    width: 64px;
-    height: 64px;
-    border-radius: 22px;
-    background: var(--md-sys-color-primary);
+    width: 72px;
+    height: 72px;
     color: var(--md-sys-color-on-primary);
 
-    .m-icon { width: 34px; height: 34px; }
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: var(--md-sys-color-primary);
+      clip-path: var(--m-shape-cookie);
+      animation: m-turn 40s linear infinite;
+      transition: transform var(--m-spring-default-spatial-duration, 300ms) var(--m-spring-default-spatial, ease);
+    }
+
+    .m-icon { position: relative; width: 34px; height: 34px; }
   }
 
+  &:hover .action-icon::before, &:focus .action-icon::before { transform: scale(1.1); }
+
   &.warning .action-icon {
-    background: var(--md-sys-color-tertiary);
     color: var(--md-sys-color-on-tertiary);
+
+    &::before { background: var(--md-sys-color-tertiary); }
   }
 
   .action-info {
@@ -579,9 +603,30 @@ onUnmounted(() => {
 
 .info-item {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  align-items: center;
+  gap: 16px;
   min-width: 0;
+  padding: 16px 18px;
+  border-radius: var(--md-sys-shape-corner-large);
+  background: var(--md-sys-color-surface-container-high);
+
+  .info-icon {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 52px;
+    height: 52px;
+    background: var(--md-sys-color-secondary-container);
+    color: var(--md-sys-color-on-secondary-container);
+    clip-path: var(--m-shape-squircle);
+  }
+
+  .info-text {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
 
   .info-label {
     font: 500 14px/20px var(--md-ref-typeface-brand, system-ui);

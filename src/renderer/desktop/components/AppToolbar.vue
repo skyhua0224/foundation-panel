@@ -1,5 +1,6 @@
 <template>
   <header class="apps-toolbar">
+    <span class="apps-hero" aria-hidden="true"><MIcon name="apps" fill /></span>
     <h1 class="apps-title">{{ t.apps.libraryTitle }}</h1>
 
     <div class="filter-tabs" role="group" :aria-label="t.apps.libraryTitle">
@@ -70,7 +71,7 @@
 
 <script setup>
 import { computed } from 'vue'
-import { MButton, MChip, MField, MSeg } from 'foundation-ui/vue'
+import { MButton, MChip, MField, MIcon, MSeg } from 'foundation-ui/vue'
 import { useI18n } from '../i18n/index.js'
 
 const { t } = useI18n()
@@ -105,17 +106,60 @@ function onViewChange(next) {
 </script>
 
 <style lang="less" scoped>
+// the library's hero band: the same language as the other pages (a burst shape with the icon, the name big), and the controls inside it
 .apps-toolbar {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 16px 20px;
   margin-bottom: 28px;
+  padding: 20px 28px;
+  border-radius: var(--md-sys-shape-corner-extra-extra-large);
+  background: var(--md-sys-color-surface-container-high);
+
+  &::after {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    right: -60px;
+    top: -80px;
+    width: 260px;
+    height: 260px;
+    background: var(--md-sys-color-primary);
+    opacity: 0.08;
+    clip-path: var(--m-shape-cookie);
+    animation: m-turn 48s linear infinite;
+  }
+}
+
+.apps-hero {
+  position: relative;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 80px;
+  height: 80px;
+  font-size: 38px;
+  color: var(--md-sys-color-on-primary);
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--md-sys-color-primary);
+    clip-path: var(--m-shape-burst);
+    animation: m-turn 40s linear infinite;
+  }
+
+  .m-icon { position: relative; }
 }
 
 .apps-title {
   margin: 0 12px 0 0;
-  font: 700 40px/48px var(--md-ref-typeface-brand, system-ui);
+  font: var(--m-display-small-emphasized);
   letter-spacing: -0.5px;
   color: var(--md-sys-color-on-surface);
 }
