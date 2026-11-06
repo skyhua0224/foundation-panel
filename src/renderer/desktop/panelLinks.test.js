@@ -48,3 +48,11 @@ test('the pad moves inside the page before it leaves for the rail or the docked 
   assert.ok(nav.includes("current.closest('.desktop-window-main')") && nav.includes("current.closest('.desktop-sidebar')"))
   assert.ok(nav.includes('focusables.filter((element) => page.contains(element))'))
 })
+
+test('design guard: every page of the big screen opens with a hero band and its headings keep the colour of their tile', () => {
+  const page = read('./components/DeskPage.vue')
+  assert.ok(page.includes('<MHero v-if="icon"') && page.includes('.dsk-page :is(h1, h2, h3, h4, p) { color: inherit; }'))
+  for (const view of ['DevicesView', 'StreamView', 'SettingsView', 'ToolsView']) assert.match(read(`./views/${view}.vue`), /<DeskPage[^>]*\sicon="[a-z_]+"/, view)
+  for (const view of ['StreamView', 'SettingsView', 'ToolsView']) assert.ok(read(`./views/${view}.vue`).includes('<PanelLinkSection'), `${view} has its rows 在 Panel 中打开`)
+  assert.ok(read('./components/DesktopWindow.vue').includes('id="dsk-dock"'))
+})

@@ -42,3 +42,8 @@ const style = computed(() => ({ zoom: scale.value }))
 .dsk-page__hero :deep(.m-hero__title) { font: var(--m-display-small-emphasized); letter-spacing: -0.01em; }
 .dsk-page__hero :deep(.m-hero__text) { font: var(--m-title-large); }
 </style>
+
+<style>
+/* a global heading colour of the panel (dark slate) would sit on the tonal tiles in dark mode: headings and paragraphs of a page take the colour of the tile they are on */
+.dsk-page :is(h1, h2, h3, h4, p) { color: inherit; }
+</style>
