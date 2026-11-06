@@ -43,6 +43,6 @@ html[data-sunshine-navigation='unified'] .navbar {
   display: none !important;
 }
 html[data-sunshine-navigation='unified'] body {
-  /* Reserve the native caption's hit area without retaining the WebUI navbar gap. */
-  padding-top: 32px !important;
+  /* The frame starts under the native caption, so a framed page needs no reserve: its title row sits where a panel title row sits. */
+  padding-top: 0 !important;
 }

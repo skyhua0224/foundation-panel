@@ -18,7 +18,7 @@ const props = defineProps({
 // frame has loaded (a `load` event after its address changed), or, when the page is told its place by a message and nothing reloads, after a short settle.
 const host = ref(null)
 const covered = ref(true)
-// the first cover (a cold start) shows its loading state at once; the covers of page changes wait 140 ms (a transition delay), so a fast switch does not flash it
+// the first cover (a cold start) shows its loading state at once; the covers of page changes wait 300 ms (a transition delay), so a fast switch does not flash it
 const first = ref(true)
 let waitLoad = false
 let settle = 0
@@ -59,9 +59,11 @@ onMounted(() => {
   observer.observe(host.value, { subtree: true, attributes: true, attributeFilter: ['src'], childList: true })
   cover()
 })
+// A page change inside the frame that is already open (the page is told its place, nothing reloads) is not covered at all: it is instant, and a skeleton there would only flash. A change that does
+// move the frame (a new address) is covered by the observer above, and that cover shows only after 300 ms of nothing painted (CSS below).
 watch(() => props.page, (page) => {
   if (!page) return
-  cover()
+  if (!covered.value) return
   clearTimeout(settle)
   settle = setTimeout(() => { if (!waitLoad) uncover('settle') }, 320)
 })
@@ -91,7 +93,7 @@ onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); w
 .panel-web__cover { position: absolute; inset: 0; z-index: 1; overflow: hidden; padding: 76px 16px 0; box-sizing: border-box; pointer-events: none; opacity: 0; transition: opacity 120ms linear; }
 .panel-web__cover > .m-pageload { width: min(100%, 840px); margin-inline: auto; }
 .panel-web.is-covered .panel-web__cover { opacity: 1; }
-/* the cover of a page change comes in after 140 ms; going away has no delay. The sweep of the rows runs on the mounted cover all the time (opacity does not restart it), so it does not begin again when .is-covered toggles */
-.panel-web.is-covered:not(.is-first) .panel-web__cover { transition-delay: 140ms; }
+/* the cover of a page change comes in after 300 ms of nothing painted; going away has no delay. The sweep of the rows runs on the mounted cover all the time (opacity does not restart it), so it does not begin again when .is-covered toggles */
+.panel-web.is-covered:not(.is-first) .panel-web__cover { transition-delay: 300ms; }
 @media (prefers-reduced-motion: reduce) { .panel-web__frame iframe, .panel-web__cover { transition: none; } }
 </style>

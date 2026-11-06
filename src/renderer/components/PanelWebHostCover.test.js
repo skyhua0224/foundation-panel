@@ -4,10 +4,10 @@ import test from 'node:test'
 
 const src = readFileSync(new URL('./PanelWebHost.vue', import.meta.url), 'utf8')
 
-test('the first cover of a cold start shows at once; the covers of page changes wait 140 ms so a fast switch does not flash', () => {
+test('the first cover of a cold start shows at once; the covers of page changes wait 300 ms so a fast switch does not flash', () => {
   assert.match(src, /<MPageLoading :delay="0" \/>/)
   assert.match(src, /'is-first': first/)
-  assert.match(src, /\.panel-web\.is-covered:not\(\.is-first\) \.panel-web__cover \{ transition-delay: 140ms; \}/)
+  assert.match(src, /\.panel-web\.is-covered:not\(\.is-first\) \.panel-web__cover \{ transition-delay: 300ms; \}/)
   assert.match(src, /first\.value = false/, 'the first cover ends with the first reveal')
 })
 
