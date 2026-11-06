@@ -62,11 +62,11 @@
         <MButton class="osk-key wide" variant="tonal" data-focusable data-focus-key="osk-clear" @click="draft = ''">{{ t.osk.clear }}</MButton>
       </div>
 
-      <p class="osk-hint">{{ t.osk.hint }}</p>
+      <p class="osk-hint"><PadHint :text="t.osk.hint" /></p>
     </div>
 
     <template #actions>
-      <MButton variant="text" size="lg" data-focusable data-focus-key="osk-cancel" @click="cancel">{{ t.osk.cancel }}</MButton>
+      <MButton variant="text" size="lg" data-focusable data-focus-key="osk-cancel" @click="cancel">{{ t.osk.cancel }}<PadGlyph v-if="gamepadActive" action="back" size="sm" class="dialog-pad" /></MButton>
       <MButton size="lg" icon="check" data-focusable data-focus-key="osk-confirm" @click="commit">{{ t.osk.confirm }}</MButton>
     </template>
   </MDialog>
@@ -78,6 +78,9 @@ import { MButton, MDialog } from 'foundation-ui/vue'
 import { cancelOsk, commitOsk, oskState } from '../composables/useOsk.js'
 import { popFocusScope, pushFocusScope } from '../composables/useFocusNav.js'
 import { useI18n } from '../i18n/index.js'
+import { gamepadActive } from '../composables/useGamepad.js'
+import PadGlyph from './PadGlyph.vue'
+import PadHint from './PadHint.vue'
 
 const { t } = useI18n()
 

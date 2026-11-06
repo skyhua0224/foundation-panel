@@ -11,7 +11,7 @@
     <p class="confirm-message">{{ state.message }}</p>
     <template #actions>
       <MButton variant="text" size="lg" data-focusable data-focus-key="confirm-cancel" @click="reject">
-        {{ state.cancelLabel || t.common.cancel }}
+        {{ state.cancelLabel || t.common.cancel }}<PadGlyph v-if="gamepadActive" action="back" size="sm" class="dialog-pad" />
       </MButton>
       <MButton :variant="state.danger ? 'danger' : 'filled'" size="lg" data-focusable data-focus-key="confirm-accept" @click="accept">
         {{ state.confirmLabel || t.common.confirm }}
@@ -26,6 +26,8 @@ import { MButton, MDialog } from 'foundation-ui/vue'
 import { acceptConfirm, confirmState, rejectConfirm } from '../composables/useConfirm.js'
 import { useModalFocusScope } from '../composables/useFocusNav.js'
 import { useI18n } from '../i18n/index.js'
+import { gamepadActive } from '../composables/useGamepad.js'
+import PadGlyph from './PadGlyph.vue'
 
 const { t } = useI18n()
 

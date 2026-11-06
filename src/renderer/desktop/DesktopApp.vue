@@ -105,6 +105,7 @@ import ConfirmDialog from './components/ConfirmDialog.vue'
 import LaunchOverlay from './components/LaunchOverlay.vue'
 import RunningGameBar from './components/RunningGameBar.vue'
 import GamepadLegend from './components/GamepadLegend.vue'
+import { useHostPadType } from './composables/useHostPadType.js'
 import BackHoldRing from './components/BackHoldRing.vue'
 
 // 手柄 / 焦点 / 屏幕键盘
@@ -567,6 +568,8 @@ function handleAction(action) {
   }
 }
 
+// the pad type of a stream is the host's report (the virtual pad), not the pad the browser sees
+useHostPadType()
 // 手柄状态是模块级单例，这里只负责驱动它
 useGamepad({
   onNavigate(direction) {

@@ -57,14 +57,25 @@ export function createFixedShortcutTracker() {
   }
 }
 
+// The names are the positions of the standard mapping: A the bottom face button, B the right one, X the left one, Y the top one. What is printed on a button
+// depends on the pad: Xbox A B X Y, PlayStation ✕ ○ □ △ (a DualSense and a DualShock 4 alike), Nintendo B A Y X (the same positions, the letters of the other
+// layout), and for a pad that is none of them (generic) the position itself, as an arrow.
 const FACE_CHIPS = {
   xbox: { A: ['A', 'a'], B: ['B', 'b'], X: ['X', 'x'], Y: ['Y', 'y'] },
-  ps: { A: ['✕', 'x'], B: ['○', 'b'], X: ['□', 'y'], Y: ['△', 'a'] }
+  ps: { A: ['✕', 'x'], B: ['○', 'b'], X: ['□', 'y'], Y: ['△', 'a'] },
+  nintendo: { A: ['B', 'a'], B: ['A', 'b'], X: ['Y', 'x'], Y: ['X', 'y'] },
+  generic: { A: ['↓', 'a'], B: ['→', 'b'], X: ['←', 'x'], Y: ['↑', 'y'] }
+}
+const ALIASES = {
+  xbox: { Back: 'View', Start: 'Menu' },
+  ps: { LB: 'L1', RB: 'R1', LT: 'L2', RT: 'R2', Back: 'Share', Start: 'Options' },
+  nintendo: { LB: 'L', RB: 'R', LT: 'ZL', RT: 'ZR', Back: '−', Start: '+' },
+  generic: { LB: 'L1', RB: 'R1', LT: 'L2', RT: 'R2', Back: 'Select' }
 }
 export function controllerButtonChip(button, layout = 'xbox') {
   const face = (FACE_CHIPS[layout] || FACE_CHIPS.xbox)[button]
   if (face) return { glyph: face[0], tone: face[1] }
-  const aliases = layout === 'ps' ? { LB: 'L1', RB: 'R1', LT: 'L2', RT: 'R2', Back: 'Share', Start: 'Options' } : {}
+  const aliases = ALIASES[layout] || {}
   return { glyph: aliases[button] || button, tone: 'neutral' }
 }
 export function displayGamepadShortcut(value, layout = 'xbox') {
