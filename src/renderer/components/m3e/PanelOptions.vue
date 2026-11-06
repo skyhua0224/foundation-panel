@@ -9,6 +9,7 @@ import { useDesktopPet } from '../../composables/useDesktopPet.js'
 import { INTERVAL_PRESETS, JITTER_PRESETS, VISION_INTERVAL_PRESETS, usePetSpeech } from '../../composables/usePetSpeech.js'
 import { usePanelPart } from '../../composables/panelParts.js'
 import { isTauriRuntime } from '../../desktop/composables/useTauri.js'
+import { openBigScreenWithNotice } from '../../composables/openBigScreen.js'
 import { fileMapping, sunshine } from '../../tauri-adapter.js'
 
 // Every option of the earlier desktop window, in the settings of the control panel: start up, notifications, the big screen
@@ -21,6 +22,7 @@ const st = computed(() => t.value.settings)
 const settings = desktopSettings
 const hasTauri = ref(false)
 const notice = ref('')
+const openDesktop = () => openBigScreenWithNotice((m) => { notice.value = m }, t.value.sidebar.openBigScreenFailed)
 // short results go to the one snackbar of the window
 watch(notice, (message) => { if (message) { useNotify().snack(message); notice.value = '' } })
 const sheet = ref('')
@@ -182,6 +184,7 @@ const resetAll = async () => {
     <MGroup>
       <MItem action icon="power_settings_new" :title="st.startup" data-panel-option="startup" @click="open('startup')"><template #trail><span class="m-item__count">{{ onCount(startup, settings) }}</span></template></MItem>
       <MItem action icon="notifications" :title="st.notifications" data-panel-option="notifications" @click="open('notifications')"><template #trail><span class="m-item__count">{{ onCount(notifications, settings) }}</span></template></MItem>
+      <MItem action icon="tv" :title="t.sidebar.openBigScreen" data-panel-option="openBigScreen" @click="openDesktop"><template #trail><MIcon name="open_in_new" /></template></MItem>
       <MItem action icon="tv_gen" :title="st.bigScreen" data-panel-option="bigScreen" @click="open('bigscreen')"><template #trail><span class="m-item__count">{{ bigOn }} / {{ bigScreen.length + 1 }}</span></template></MItem>
     </MGroup>
   </MSection>

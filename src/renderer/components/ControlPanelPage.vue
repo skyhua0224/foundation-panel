@@ -67,6 +67,7 @@
         <MGroup>
           <MItem action icon="info" :title="aboutText.title" :text="'Foundation Sunshine ' + currentVersion" @click="emit('open-about')" />
           <MItem action icon="rocket_launch" :title="guide.guide" :text="guide.helpRow" @click="emit('open-guide')" />
+          <MItem action icon="tv" :title="t.sidebar.openBigScreen" :text="t.sidebar.openBigScreenHelp" data-help-row="bigScreen" @click="openDesktop" />
           <MItem action icon="lightbulb" :title="coach.rerun" @click="startCoach" />
           <MItem action icon="public" :title="remote.openText" @click="emit('open-remote')" />
           <MItem action icon="checklist" :title="startText.guideTitle" :text="startText.guideSub" @click="startCard.reopen()" />
@@ -89,11 +90,12 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFooter, MFieldItem, MBanner, MSupportSheet, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFooter, MFieldItem, MBanner, MSupportSheet, useNotify, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import ShortcutsSheet from './m3e/ShortcutsSheet.vue'
 import { usePanelPart } from '../composables/panelParts.js'
 import { useI18n } from '../desktop/i18n/index.js'
+import { openBigScreenWithNotice } from '../composables/openBigScreen.js'
 import PanelOptions from './m3e/PanelOptions.vue'
 import { ROUTES } from '../composables/useRouter.js'
 import { useUpdateCheckTime } from '../composables/useUpdateCheckTime.js'
@@ -116,6 +118,8 @@ const props = defineProps({
 })
 const emit = defineEmits(['theme-change', 'locale-change', 'channel-change', 'webui-navigate', 'open-guide', 'open-remote', 'open-about'])
 const { t } = useI18n()
+const notify = useNotify()
+const openDesktop = () => openBigScreenWithNotice((m) => notify.snack(m), t.value.sidebar.openBigScreenFailed)
 // The guided first run can be opened again from here; its texts come with the package (zh and en)
 const guide = computed(() => guideTexts(props.locale))
 const remote = computed(() => remoteTexts(props.locale))

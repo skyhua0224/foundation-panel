@@ -11,6 +11,7 @@ import { SPONSORS } from '../config/sponsors.js'
 import { openExternalUrl, sunshine, vdd as vddApi, virtualMicrophone } from '../tauri-adapter.js'
 import { hostBase, hostFetch } from '../composables/hostBase.js'
 import { useI18n } from '../desktop/i18n/index.js'
+import { openBigScreenWithNotice } from '../composables/openBigScreen.js'
 
 const props = defineProps({
   runtime: { type: Object, required: true },
@@ -142,6 +143,8 @@ const catalogueInput = computed(() => {
     display: vddInput.value && vddInput.value.hdr !== undefined ? { hdr: vddInput.value.hdr } : null,
     temps: state.hw.available ? { cpu: state.hw.cpuTemp, gpu: state.hw.gpuTemp } : null,
     pairQr: pairQr.view,
+    // the panel runs on the host: the big screen opens on this machine
+    canOpenDesktop: true,
     announcements: announcements.list.value.map((a) => ({ id: a.id, title: a.title || a.text || '', category: a.category, banner: a.banner || firstImage(a.body), date: dateOfPost(a.published), read: a.read || a.snoozed, hasText: !!a.body, url: a.url || '' })),
   }
 })
@@ -176,6 +179,7 @@ function onAction(a) {
     case 'pin-open': emit('open', `setting:${a.value?.key}`); break
     case 'detail-external': emit('open', 'check-update'); break
     case 'open-url': openExternalUrl(a.value); break
+    case 'open-desktop': void openBigScreenWithNotice((m) => notify.snack(m), t.value.sidebar.openBigScreenFailed); break
     case 'pair-qr-begin': pairQr.begin(); break
     case 'pair-qr-stop': pairQr.stop(); break
     case 'table-row': onTableRow(a.value); break
