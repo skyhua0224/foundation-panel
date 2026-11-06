@@ -1,8 +1,9 @@
 <template>
-  <SettingsCard :title="t.settings.advanced" icon="settings">
+  <SettingsCard :title="t.settings.advanced" icon="tune">
     <SettingsRow :name="t.settings.devMode" :description="t.settings.devModeDesc">
       <SettingsSwitch
         :model-value="Boolean(values.devMode)"
+        :label="t.settings.devMode"
         @update:model-value="emit('update-value', 'devMode', $event)"
       />
     </SettingsRow>
@@ -13,14 +14,16 @@
     >
       <SettingsSwitch
         :model-value="Boolean(values.textContextEnabled)"
+        :label="t.settings.textContextEnabled"
         @update:model-value="emit('update-value', 'textContextEnabled', $event)"
       />
     </SettingsRow>
 
-    <SettingsRow :name="t.settings.logLevel" :description="t.settings.logLevelDesc">
+    <SettingsRow :name="t.settings.logLevel" :description="t.settings.logLevelDesc" stack>
       <SettingsSelect
         :model-value="values.logLevel"
         :options="logLevelOptions"
+        :label="t.settings.logLevel"
         @update:model-value="emit('update-value', 'logLevel', $event)"
       />
     </SettingsRow>
@@ -36,10 +39,7 @@ import SettingsSelect from './SettingsSelect.vue'
 import SettingsSwitch from './SettingsSwitch.vue'
 
 defineProps({
-  values: {
-    type: Object,
-    required: true,
-  },
+  values: { type: Object, required: true },
 })
 
 const emit = defineEmits(['update-value'])

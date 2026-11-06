@@ -1,61 +1,30 @@
 <template>
-  <Transition name="notice">
-    <div
-      v-if="notice"
-      class="settings-notice fade-in"
-      :class="notice.type"
-    >
-      {{ notice.message }}
-    </div>
+  <Transition name="dsk-notice">
+    <MNotice v-if="notice" class="dsk-notice" :tone="tone" :icon="icon">{{ notice.message }}</MNotice>
   </Transition>
 </template>
 
 <script setup>
-defineProps({
-  notice: {
-    type: Object,
-    default: null,
-  },
+import { computed } from 'vue'
+import { MNotice } from 'foundation-ui/vue'
+
+// The result of the last save, reset or update check, in the tone it has. It goes by itself (the state clears it).
+const TONES = {
+  success: { tone: 'info', icon: 'check_circle' },
+  info: { tone: 'info', icon: 'info' },
+  warning: { tone: 'warn', icon: 'warning' },
+  error: { tone: 'error', icon: 'error' },
+}
+
+const props = defineProps({
+  notice: { type: Object, default: null },
 })
+
+const tone = computed(() => (TONES[props.notice?.type] || TONES.info).tone)
+const icon = computed(() => (TONES[props.notice?.type] || TONES.info).icon)
 </script>
 
-<style lang="less" scoped>
-.settings-notice {
-  display: flex;
-  align-items: center;
-  min-height: 42px;
-  margin: 8px 0 20px;
-  padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-  background: rgba(var(--fd-bg-secondary-rgb, 26, 26, 46), 0.72);
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.82);
-  font-size: 13px;
-
-  &.success {
-    border-color: rgba(var(--fd-status-success-rgb, 0, 255, 136), 0.35);
-    color: var(--fd-status-success, #00ff88);
-  }
-
-  &.warning,
-  &.info {
-    border-color: rgba(var(--fd-status-warning-rgb, 255, 215, 0), 0.3);
-  }
-
-  &.error {
-    border-color: rgba(var(--fd-status-danger-rgb, 255, 107, 53), 0.35);
-    color: var(--fd-status-danger, #ff6b35);
-  }
-}
-
-.notice-enter-active,
-.notice-leave-active {
-  transition: opacity 0.2s ease, transform 0.2s ease;
-}
-
-.notice-enter-from,
-.notice-leave-to {
-  opacity: 0;
-  transform: translateY(6px);
-}
+<style scoped>
+.dsk-notice-enter-active, .dsk-notice-leave-active { transition: opacity var(--m-spring-default-effects-duration) var(--m-spring-default-effects), transform var(--m-spring-default-spatial-duration) var(--m-spring-default-spatial); }
+.dsk-notice-enter-from, .dsk-notice-leave-to { opacity: 0; transform: translateY(8px); }
 </style>

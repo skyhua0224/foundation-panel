@@ -1,92 +1,35 @@
 <template>
-  <div class="setting-item" :class="{ disabled }">
-    <div class="setting-info">
-      <div class="setting-name" :class="nameClass">
-        <slot name="name">{{ name }}</slot>
-      </div>
-      <div class="setting-desc">
-        <slot name="description">{{ description }}</slot>
-      </div>
-    </div>
-    <div class="setting-control" :class="controlClass">
-      <slot></slot>
-    </div>
-  </div>
+  <MItem
+    class="dsk-row"
+    :class="{ 'dsk-row--tool': nameClass }"
+    :title="name"
+    :text="description"
+    :disabled="disabled"
+    :stack="stack"
+  >
+    <template #title><slot name="name">{{ name }}</slot></template>
+    <template v-if="$slots.description" #default><slot name="description" /></template>
+    <template v-if="stack" #control><slot /></template>
+    <template v-else #trail><slot /></template>
+  </MItem>
 </template>
 
 <script setup>
+import { MItem } from 'foundation-ui/vue'
+
+// One row of a settings section: the name, one line of what it does, the control at the end (or below it when `stack`).
 defineProps({
-  name: {
-    type: String,
-    default: '',
-  },
-  description: {
-    type: String,
-    default: '',
-  },
-  nameClass: {
-    type: [String, Array, Object],
-    default: null,
-  },
-  controlClass: {
-    type: [String, Array, Object],
-    default: null,
-  },
-  disabled: {
-    type: Boolean,
-    default: false,
-  },
+  name: { type: String, default: '' },
+  description: { type: String, default: '' },
+  nameClass: { type: [String, Array, Object], default: null },
+  controlClass: { type: [String, Array, Object], default: null },
+  disabled: { type: Boolean, default: false },
+  stack: { type: Boolean, default: false },
 })
 </script>
 
-<style lang="less" scoped>
-.setting-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 0;
-  border-bottom: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-
-  &:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-  }
-
-  &:first-child {
-    padding-top: 0;
-  }
-
-  &.disabled {
-    opacity: 0.5;
-  }
-}
-
-.setting-name {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--fd-text-primary, #fff);
-  margin-bottom: 4px;
-}
-
-.setting-desc {
-  font-size: 14px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-  line-height: 1.45;
-}
-
-.tool-path-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.tool-path-item {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 10px;
-
-  .setting-control {
-    width: 100%;
-  }
-}
+<style scoped>
+.dsk-row { min-height: 72px; }
+.dsk-row :deep(.m-item__title) { font: var(--m-title-medium); }
+.dsk-row--tool :deep(.m-item__title) { display: inline-flex; align-items: center; gap: 10px; }
 </style>
