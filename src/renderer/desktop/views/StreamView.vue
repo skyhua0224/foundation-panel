@@ -179,7 +179,8 @@
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { MBanner, MButton, MChip, MField, MIcon, MIconButton, MItem, MLoading, MSeg, MSlider, MSwitch } from 'foundation-ui/vue'
+import { MBanner, MButton, MChip, MField, MIcon, MIconButton, MItem, MLoading, MSeg, MSlider, MSwitch, useNotify } from 'foundation-ui/vue'
+import { requestConfirm } from '../composables/useConfirm.js'
 import DeskPage from '../components/DeskPage.vue'
 import SettingsCard from '../components/settings/SettingsCard.vue'
 import SettingsNotice from '../components/settings/SettingsNotice.vue'
@@ -193,6 +194,8 @@ import { useI18n } from '../i18n/index.js'
 import { nvidiaVsyncUi, observeNvidiaVsyncStatus } from '../../composables/nvidiaVsync.js'
 
 const { t } = useI18n()
+const say = (message) => useNotify().snack(String(message), { timeout: 8000 })
+const ask = (message, confirmLabel = '') => requestConfirm({ message, confirmLabel })
 
 const invoke = ref(null)
 const proxyUrl = ref('http://localhost:48081')
@@ -539,7 +542,7 @@ async function loadVddStatus() {
 }
 
 async function installOrRepairVdd() {
-  if (!confirm(t.value.vddSettings.installRepairConfirm)) return
+  if (!(await ask(t.value.vddSettings.installRepairConfirm, t.value.vddSettings.installRepairDriver))) return
   vddInstalling.value = true
   try {
     const install = () => installVddWithRecovery({
@@ -553,9 +556,9 @@ async function installOrRepairVdd() {
 
     await install()
 
-    alert(t.value.vddSettings.installRepairSuccess)
+    say(t.value.vddSettings.installRepairSuccess)
   } catch (error) {
-    alert(`${t.value.vddSettings.installRepairFailed}: ${error?.message || error}`)
+    say(`${t.value.vddSettings.installRepairFailed}: ${error?.message || error}`)
   } finally {
     vddInstalling.value = false
   }
@@ -572,7 +575,7 @@ async function toggleVddOption(option) {
     if (!result?.success) throw new Error(result?.message || t.value.stream.msg.saveFailed)
     configData.value[key] = enabled ? 'enabled' : 'disabled'
   } catch (error) {
-    alert(error?.message || error)
+    say(error?.message || error)
   } finally {
     vddConfigSaving.value = false
   }
@@ -599,36 +602,36 @@ const vmouseStatusLabel = computed(() => {
 })
 
 async function installVmouse() {
-  if (!confirm(t.value.stream.msg.vmouseInstallConfirm)) return
+  if (!(await ask(t.value.stream.msg.vmouseInstallConfirm, t.value.stream.vmouseInstall))) return
   vmouseInstalling.value = true
   try {
     const result = await vmouseApi.install()
     if (result?.success) {
-      alert(result.data)
+      say(result.data)
       await reloadVmouseAfterOperation()
     } else {
-      alert(t.value.stream.msg.vmouseInstallFailed + (result?.message || ''))
+      say(t.value.stream.msg.vmouseInstallFailed + (result?.message || ''))
     }
   } catch (e) {
-    alert(t.value.stream.msg.vmouseInstallFailed + e)
+    say(t.value.stream.msg.vmouseInstallFailed + e)
   } finally {
     vmouseInstalling.value = false
   }
 }
 
 async function uninstallVmouse() {
-  if (!confirm(t.value.stream.msg.vmouseUninstallConfirm)) return
+  if (!(await ask(t.value.stream.msg.vmouseUninstallConfirm, t.value.stream.vmouseUninstall))) return
   vmouseUninstalling.value = true
   try {
     const result = await vmouseApi.uninstall()
     if (result?.success) {
-      alert(result.data)
+      say(result.data)
       await reloadVmouseAfterOperation()
     } else {
-      alert(t.value.stream.msg.vmouseUninstallFailed + (result?.message || ''))
+      say(t.value.stream.msg.vmouseUninstallFailed + (result?.message || ''))
     }
   } catch (e) {
-    alert(t.value.stream.msg.vmouseUninstallFailed + e)
+    say(t.value.stream.msg.vmouseUninstallFailed + e)
   } finally {
     vmouseUninstalling.value = false
   }
