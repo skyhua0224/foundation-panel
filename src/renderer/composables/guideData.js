@@ -22,6 +22,7 @@ export function createGuideData(deps) {
     setup: { completed: false, locale: '', showLanguage: true, adapters: [], displayDevices: [], adapter: '', display: '', prep: 'ensure_only_display', virtual: true },
     host: { platform: '', addresses: null },
     network: { port: 47989, upnpActive: null, upnpSaved: null, loaded: false, endpoints: '' },
+    webAccess: { scope: 'lan', bind: '', active: null, saved: null },
     reach: deps.reach ? deps.reach.view : { report: null, status: 'idle' },
     clients: null,
     sessions: null,
@@ -107,6 +108,26 @@ export function createGuideData(deps) {
       try { state.network.endpoints = endpointsOfConfig(await getJson('/api/config')).join(', ') } catch { /* the field stays as it was */ }
     } catch {
       state.network.loaded = false
+    }
+  }
+
+  /** Who may open the Web UI and the bind address as saved, and what the host runs now (the choice is applied after a restart). */
+  async function loadWebAccess() {
+    try {
+      const [listeners, config] = await Promise.all([getJson('/api/network/listeners'), getJson('/api/config')])
+      Object.assign(state.webAccess, { scope: config.origin_web_ui_allowed || 'lan', bind: config.bind_address || '', active: listeners.active || null, saved: listeners.saved || null })
+    } catch { /* the step shows the default and the save reports what the host says */ }
+  }
+
+  /** origin_web_ui_allowed and/or bind_address in the saved configuration. */
+  async function saveWebAccess(extra) {
+    try {
+      const { response } = await postJson('/api/config', { ...(await getJson('/api/config')), ...extra })
+      if (!response.ok) return { ok: false, error: await response.text().catch(() => '') }
+      Object.assign(state.webAccess, { scope: extra.origin_web_ui_allowed ?? state.webAccess.scope, bind: extra.bind_address ?? state.webAccess.bind })
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error?.message || '' }
     }
   }
 
@@ -200,6 +221,8 @@ export function createGuideData(deps) {
     refreshClients,
     refreshSessions,
     loadNetwork,
+    loadWebAccess,
+    saveWebAccess,
     checkReach: (force) => deps.reach?.refresh(force),
     setUpnp,
     setPublicEndpoints,
