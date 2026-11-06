@@ -647,7 +647,7 @@ export const zh = {
     pokeFailed: '观察未完成，请检查 AI 配置和桌宠状态后重试',
     visionHistory: '最近历史',
     visionHistoryDesc: '查看桌宠最近的 5 句历史',
-    visionHistoryEmpty: '还没有历史记录，戳一下试试～',
+    visionHistoryEmpty: '还没有历史记录',
     visionHistoryClear: '清空',
     visionHistoryView: '查看',
     aiKeyMissing: '尚未配置米塔 AI',
