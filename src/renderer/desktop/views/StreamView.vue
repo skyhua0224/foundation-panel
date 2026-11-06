@@ -167,12 +167,12 @@
       </div>
 
       <!-- save -->
-      <div class="dsk-stream__foot">
+      <DeskDock>
         <SettingsNotice :notice="saveNotice" />
         <div class="m-savebar">
           <MButton size="lg" icon="check" :loading="saving" @click="saveSettings">{{ saving ? t.stream.saving : t.stream.saveSettings }}</MButton>
         </div>
-      </div>
+      </DeskDock>
     </template>
   </DeskPage>
 </template>
@@ -182,6 +182,7 @@ import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { MBanner, MButton, MChip, MField, MIcon, MIconButton, MItem, MLoading, MSeg, MSlider, MSwitch, useNotify } from 'foundation-ui/vue'
 import { requestConfirm } from '../composables/useConfirm.js'
 import DeskPage from '../components/DeskPage.vue'
+import DeskDock from '../components/DeskDock.vue'
 import SettingsCard from '../components/settings/SettingsCard.vue'
 import SettingsNotice from '../components/settings/SettingsNotice.vue'
 import SettingsRow from '../components/settings/SettingsRow.vue'
@@ -649,5 +650,4 @@ async function uninstallVmouse() {
 .dsk-stream__range .m-slider { flex: 1; min-width: 0; }
 .dsk-stream__status { display: block; margin-top: 2px; color: var(--md-sys-color-primary-text); }
 .dsk-stream__tap { cursor: pointer; }
-.dsk-stream__foot { position: sticky; bottom: 16px; z-index: 8; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 </style>

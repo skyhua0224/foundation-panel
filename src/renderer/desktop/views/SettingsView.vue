@@ -50,10 +50,10 @@
       @check-update="checkUpdate"
     />
 
-    <div class="dsk-settings__foot">
+    <DeskDock>
       <SettingsNotice :notice="statusNotice" />
       <SettingsActions @reset="resetSettings" @save="saveSettings" />
-    </div>
+    </DeskDock>
   </DeskPage>
 </template>
 
@@ -63,6 +63,7 @@ import { useSettingsState } from '../composables/useSettingsState'
 import { bigScreenSettings, setBigScreenSetting } from '../composables/useBigScreenSettings.js'
 import { useI18n } from '../i18n/index.js'
 import DeskPage from '../components/DeskPage.vue'
+import DeskDock from '../components/DeskDock.vue'
 import SettingsActions from '../components/settings/SettingsActions.vue'
 import SettingsAboutCard from '../components/settings/SettingsAboutCard.vue'
 import SettingsAdvancedCard from '../components/settings/SettingsAdvancedCard.vue'
@@ -173,5 +174,4 @@ onUnmounted(() => {
 @media (min-width: 1500px) {
   .dsk-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 }
-.dsk-settings__foot { position: sticky; bottom: 16px; z-index: 8; display: flex; flex-direction: column; align-items: center; gap: 8px; margin-top: 16px; }
 </style>
