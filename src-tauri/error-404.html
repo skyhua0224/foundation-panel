@@ -40,6 +40,26 @@
         }
         .btn:hover { filter: brightness(1.08); } .btn:active { border-radius: 14px; }
         .btn:focus-visible { outline: 3px solid var(--primary); outline-offset: 3px; }
+        .tips li { display: flex; align-items: center; gap: 12px; padding: 0 4px; }
+        .tip-ic { flex: none; width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--secondary-container); }
+        .tip-ic svg { width: 18px; height: 18px; fill: var(--on-secondary-container); }
+        .wait { display: flex; align-items: center; justify-content: center; gap: 14px; position: relative; min-height: 48px; }
+        .ring { width: 44px; height: 44px; flex: none; transform: rotate(-90deg); }
+        .ring circle { fill: none; stroke-width: 4; stroke-linecap: round; }
+        .ring-track { stroke: var(--outline-variant); }
+        .ring-arc { stroke: var(--primary); stroke-dasharray: 113.1; stroke-dashoffset: 113.1; transition: stroke-dashoffset .9s linear; }
+        .ring.spin { animation: spin 1.1s linear infinite; }
+        .ring.spin .ring-arc { stroke-dashoffset: 80; transition: none; }
+        @keyframes spin { to { transform: rotate(270deg); } }
+        .wait-num { position: absolute; left: 0; width: 44px; text-align: center; font-size: .8rem; font-weight: 600; font-variant-numeric: tabular-nums; }
+        .wait-text { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 2px; }
+        .wait-text b { font-size: .95rem; font-weight: 600; }
+        .wait-text span { font-size: .85rem; color: var(--on-surface-variant); font-variant-numeric: tabular-nums; }
+        .btn svg { width: 20px; height: 20px; fill: currentColor; }
+        .btn[disabled] { opacity: .72; cursor: progress; }
+        .btn.busy svg { animation: spin2 1s linear infinite; }
+        @keyframes spin2 { to { transform: rotate(360deg); } }
+        @media (prefers-reduced-motion: reduce) { .ring.spin, .btn.busy svg { animation: none; } .ring-arc { transition: none; } }
         .footer { font-size: .9rem; color: var(--on-surface-variant); min-height: 1.4em; font-variant-numeric: tabular-nums; }
     </style>
 </head>
@@ -54,18 +74,19 @@
         <div class="tips">
             <h3><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-80q-33 0-56.5-23.5T400-160h160q0 33-23.5 56.5T480-80ZM320-200v-80h320v80H320Zm10-120q-69-41-109.500-110T180-580q0-125 87.500-212.500T480-880q125 0 212.500 87.500T780-580q0 81-40.500 150T630-320H330Z"/></svg>可以这样排查：</h3>
             <ul>
-                <li>Sunshine 服务有没有在运行</li>
-                <li>端口 47990 有没有被占用或被拦截</li>
-                <li>防火墙有没有拦截 Sunshine</li>
+                <li><span class="tip-ic"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M484-80q-84 0-157.5-32t-128-86.5Q144-253 112-326.5T80-484q0-132 77.5-238T361-868q17-5 31 5t12 27q-7 88 23.5 169.5T521-522q63 63 145 94t170 24q17-2 26.5 13t4.5 32q-40 125-145.5 202T484-80Zm0-60q100 0 182-57t132-145q-90-8-173-41.5T478.5-480Q415-543 382-625.5T341-797q-88 48-144.5 130.5T140-484q0 143.33 100.33 243.67Q340.67-140 484-140Zm-6-340Z"/></svg></span><span>Sunshine 服务有没有在运行</span></li>
+                <li><span class="tip-ic"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M120-140v-150q0-24.75 17.63-42.38Q155.25-350 180-350h60v-100q0-24.75 17.63-42.38Q275.25-510 300-510h150v-100h-60q-24.75 0-42.37-17.63Q330-645.25 330-670v-150q0-24.75 17.63-42.38Q365.25-880 390-880h180q24.75 0 42.38 17.62Q630-844.75 630-820v150q0 24.75-17.62 42.37Q594.75-610 570-610h-60v100h150q24.75 0 42.38 17.62Q720-474.75 720-450v100h60q24.75 0 42.38 17.62Q840-314.75 840-290v150q0 24.75-17.62 42.37Q804.75-80 780-80H600q-24.75 0-42.37-17.63Q540-115.25 540-140v-150q0-24.75 17.63-42.38Q575.25-350 600-350h60v-100H300v100h60q24.75 0 42.38 17.62Q420-314.75 420-290v150q0 24.75-17.62 42.37Q384.75-80 360-80H180q-24.75 0-42.37-17.63Q120-115.25 120-140Zm270-530h180v-150H390v150ZM180-140h180v-150H180v150Zm420 0h180v-150H600v150ZM480-670ZM360-290Zm240 0Z"/></svg></span><span>端口 47990 有没有被占用或被拦截</span></li>
+                <li><span class="tip-ic"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M470.12-85q-4.56-1-9.12-3-139-47-220-168.5t-81-266.61V-719q0-19.26 10.88-34.66Q181.75-769.07 199-776l260-97q11-4 21-4t21 4l260 97q17.25 6.93 28.13 22.34Q800-738.26 800-719v195.89Q800-378 719-256.5T499-88q-4.56 2-9.12 3T480-84q-5.32 0-9.88-1Zm9.88-58q115-38 187.5-143.5T740-523v-196l-260-98-260 98v196q0 131 72.5 236.5T480-143Zm0-337Z"/></svg></span><span>防火墙有没有拦截 Sunshine</span></li>
             </ul>
         </div>
 
-        <div>
-            <button class="btn" onclick="location.reload()">再试一次</button>
+        <div class="wait" role="status" aria-live="polite">
+            <svg class="ring" id="ring" viewBox="0 0 44 44" aria-hidden="true"><circle class="ring-track" cx="22" cy="22" r="18"/><circle class="ring-arc" id="ring-arc" cx="22" cy="22" r="18"/></svg>
+            <span class="wait-num" id="wait-num" aria-hidden="true"></span>
+            <div class="wait-text"><b id="wait-head">第1次探测 Sunshine…</b><span id="footer-text">Sunshine 恢复后，这个页面会自动返回。</span></div>
         </div>
-
-        <div class="footer" id="footer-text">
-            Sunshine 恢复后，这个页面会自动返回。
+        <div>
+            <button class="btn" id="retry" type="button"><svg viewBox="0 -960 960 960" aria-hidden="true"><path d="M480-160q-133 0-226.5-93.5T160-480q0-133 93.5-226.5T480-800q85 0 149 34.5T740-671v-99q0-13 8.5-21.5T770-800q13 0 21.5 8.5T800-770v194q0 13-8.5 21.5T770-546H576q-13 0-21.5-8.5T546-576q0-13 8.5-21.5T576-606h138q-38-60-97-97t-137-37q-109 0-184.5 75.5T220-480q0 109 75.5 184.5T480-220q75 0 140-39.5T717-366q5-11 16.5-16.5t22.5-.5q12 5 16 16.5t-1 23.5q-39 84-117.5 133.5T480-160Z"/></svg><span id="retry-label">再试一次</span></button>
         </div>
     </div>
 
@@ -75,14 +96,36 @@
         // 阶段2: 第2-5轮每5秒探测
         // 阶段3: 之后每30秒探测
         const footerEl = document.getElementById('footer-text');
+        const headEl = document.getElementById('wait-head');
+        const numEl = document.getElementById('wait-num');
+        const ringEl = document.getElementById('ring');
+        const arcEl = document.getElementById('ring-arc');
+        const retryEl = document.getElementById('retry');
+        const retryLabel = document.getElementById('retry-label');
+        const CIRC = 113.1;
         const PHASE1_DURATION = 10;
         const PHASE2_INTERVAL = 5;
         const PHASE2_ROUNDS = 4;
         const PHASE3_INTERVAL = 30;
+        const BACK = 'Sunshine 恢复后，这个页面会自动返回。';
         let roundCount = 0;
         let countdown = 0;
+        let interval = 0;
         let countdownTimer = null;
-        
+        // the ring is the wait: turning while a probe is out, filling down second by second until the next one
+        function showProbing(text) {
+            headEl.textContent = text; footerEl.textContent = BACK; numEl.textContent = '';
+            ringEl.classList.add('spin');
+            retryEl.disabled = true; retryEl.classList.add('busy'); retryLabel.textContent = '正在探测…';
+        }
+        function showWaiting() {
+            ringEl.classList.remove('spin');
+            arcEl.style.strokeDashoffset = String(CIRC * (1 - countdown / interval));
+            numEl.textContent = String(countdown);
+            headEl.textContent = `第${roundCount - 1}次探测失败`;
+            footerEl.textContent = `${countdown}秒后重试…`;
+            retryEl.disabled = false; retryEl.classList.remove('busy'); retryLabel.textContent = '再试一次';
+        }
         async function probe(timeoutMs) {
             try {
                 const resp = await fetch(location.origin + '/', {
@@ -92,53 +135,48 @@
                 return resp.status !== 503 && resp.status !== 502;
             } catch { return false; }
         }
-        
         function onSuccess() {
             if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
-            footerEl.textContent = 'Sunshine 已恢复，正在返回…';
+            ringEl.classList.remove('spin'); arcEl.style.strokeDashoffset = '0'; numEl.textContent = '';
+            headEl.textContent = 'Sunshine 已恢复，正在返回…'; footerEl.textContent = '';
+            retryEl.disabled = true; retryLabel.textContent = '正在返回…';
             setTimeout(() => location.reload(), 300);
         }
-        
         function scheduleNextRound() {
             roundCount++;
-            const interval = roundCount <= 1 + PHASE2_ROUNDS ? PHASE2_INTERVAL : PHASE3_INTERVAL;
+            interval = roundCount <= 1 + PHASE2_ROUNDS ? PHASE2_INTERVAL : PHASE3_INTERVAL;
             countdown = interval;
-            footerEl.textContent = `第${roundCount - 1}次探测失败，${countdown}秒后重试…`;
+            showWaiting();
             countdownTimer = setInterval(() => {
                 if (--countdown <= 0) {
                     clearInterval(countdownTimer);
                     countdownTimer = null;
                     normalProbe();
                 } else {
-                    footerEl.textContent = `第${roundCount - 1}次探测失败，${countdown}秒后重试…`;
+                    showWaiting();
                 }
             }, 1000);
         }
-        
-        // 阶段1: 10秒内每秒探测（超时1秒，确保总时长可控）
+        // phase 1: ten seconds of one probe a second (1 s timeout, so the total stays bounded)
         async function phase1() {
             roundCount = 1;
             for (let i = 0; i < PHASE1_DURATION; i++) {
-                footerEl.textContent = `第1次探测 Sunshine…`;
+                showProbing('第1次探测 Sunshine…');
                 if (await probe(1000)) return onSuccess();
                 if (i < PHASE1_DURATION - 1) await new Promise(r => setTimeout(r, 1000));
             }
             scheduleNextRound();
         }
-        
         async function normalProbe() {
-            footerEl.textContent = `第${roundCount}次探测 Sunshine…`;
+            showProbing(`第${roundCount}次探测 Sunshine…`);
             if (await probe()) return onSuccess();
             scheduleNextRound();
         }
-
-        document.querySelector('.btn').addEventListener('click', (e) => {
-            e.preventDefault();
+        retryEl.addEventListener('click', () => {
             if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
             roundCount = 0;
             phase1();
         });
-        
         phase1();
     </script>
 </body>
