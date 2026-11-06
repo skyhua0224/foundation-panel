@@ -131,6 +131,7 @@ pub async fn open_panel_page(app: AppHandle, page: String) -> Result<(), String>
     }
     info!("Opening panel page: {}", page);
     windows::open_main_panel_page(&app, &page)
+}
 /// 打开大屏（Foundation Desktop）：已经开着就把它带到前台，不开第二个窗口。和托盘的「打开桌面 UI」是同一条路。
 #[tauri::command]
 pub async fn open_desktop(app: AppHandle) -> Result<(), String> {
