@@ -10,6 +10,8 @@ test('native entries open the shell pages and the toolbar menu keeps its routes'
   assert.deepEqual(Object.fromEntries(Object.entries(PANEL_PAGES).map(([k, v]) => [k, v.route])), {
     about: ROUTES.ABOUT, pairing: ROUTES.WEB_CLIENTS, logs: ROUTES.DIAGNOSTICS, quality: ROUTES.HDR_ENHANCED, rtss: ROUTES.RTSS,
     vdd: ROUTES.VDD_SETTINGS, 'desktop-scale': ROUTES.VDD_SETTINGS, 'live-session': ROUTES.LIVE_SESSION, shortcuts: ROUTES.HELP, pet: ROUTES.PANEL_SETTINGS,
+    // the rows 在 Panel 中打开 of the big screen
+    'tool-paths': ROUTES.PANEL_SETTINGS, 'file-sharing': ROUTES.PANEL_SETTINGS, 'panel-advanced': ROUTES.PANEL_SETTINGS, 'display-modes': ROUTES.WEB_DISPLAY_MODES, 'input-drivers': ROUTES.COMPONENT_STATUS,
   })
   assert.equal(requestPanelPage('nothing'), null)
 })

@@ -13,6 +13,12 @@ export const PANEL_PAGES = Object.freeze({
   'live-session': { route: 'live-session', part: '' }, // 码率调整 -> 串流 › 当前串流
   shortcuts: { route: 'help', part: 'shortcuts' }, // 快捷键手册 -> 帮助与关于 › 快捷键手册
   pet: { route: 'panel-settings', part: 'pet' }, // 桌宠设置 -> 面板设置 › 桌宠
+  // the rows "在 Panel 中打开" of the big screen (desktop/panelLinks.js): what a sofa does not need often lives here
+  'tool-paths': { route: 'panel-settings', part: 'helpers' }, // 启动助手的工具路径 -> 面板设置 › 启动助手
+  'file-sharing': { route: 'panel-settings', part: 'sharing' }, // 文件共享 -> 面板设置 › 文件共享
+  'panel-advanced': { route: 'panel-settings', part: 'expert' }, // 开发者模式, 文本上下文, 日志级别 -> 面板设置 › 高级
+  'display-modes': { route: 'web-display-modes', part: '' }, // 输出显示器, 分辨率与刷新率调整 -> 显示与视频
+  'input-drivers': { route: 'component-status', part: '' }, // 虚拟鼠标驱动的安装与修复 -> 组件状态
 })
 
 // Pages that live in the Web frame need their address changed as well as the

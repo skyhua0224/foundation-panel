@@ -31,6 +31,10 @@ const bigOn = computed(() => bigScreen.value.filter(([key]) => Boolean(unref(big
 const closeSheet = (value) => { if (!value) sheet.value = '' }
 // the toolbar menu's 桌宠设置 opens the pet sheet here
 usePanelPart('pet', () => open('pet'))
+// and the rows 在 Panel 中打开 of the big screen: tool paths, file sharing, the advanced switches
+usePanelPart('helpers', () => open('helpers'))
+usePanelPart('sharing', () => openSharing())
+usePanelPart('expert', () => open('expert'))
 
 onMounted(async () => {
   hasTauri.value = await isTauriRuntime()
