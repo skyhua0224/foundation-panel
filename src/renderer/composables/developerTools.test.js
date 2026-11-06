@@ -110,7 +110,7 @@ test('the developer page is a pushed page of 系统, the row is only there in de
   assert.match(nav, /const developer = runtime\.developer \?/)
   assert.match(nav, /\.\.\.developer,/)
   assert.match(shell, /<DeveloperPage v-else-if="entry\.id === ROUTES\.DEVELOPER"/)
-  assert.match(shell, /NEEDS_NO_HOST = new Set\(\[ROUTES\.DEVELOPER,/, 'the page stays reachable while a host loss is simulated')
+  assert.match(shell, /NEEDS_NO_HOST = new Set\(\[(?:ROUTES\.SUNSHINE_SERVICE, )?ROUTES\.DEVELOPER,/, 'the page stays reachable while a host loss is simulated')
   assert.match(shell, /@open-developer="router\.navigate\(ROUTES\.DEVELOPER\)"/)
   assert.match(about, /emit\('open-developer'\)/)
   assert.match(options, /data-panel-option="developer-page"/)

@@ -464,6 +464,7 @@ const hostAction = async (path, doneText, method = 'POST') => {
     if (!r.ok) throw new Error(`HTTP ${r.status}`)
     useNotify().snack(doneText)
   } catch { useNotify().snack(diagnosticsTexts(locale.value).failed) }
+}
 async function confirmedRestart(mode) {
   const answer = await hostRestart.confirm(mode === 'user' ? 'user-mode' : 'restart')
   if (!answer) return
