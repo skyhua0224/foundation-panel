@@ -326,7 +326,8 @@ onUnmounted(() => {
   display: grid;
   place-items: center;
   min-height: 0;
-  background: var(--md-sys-color-surface);
+  // .m-app 给了页面底色变量（壁纸时透明）：启动页必须不透明
+  background: var(--md-sys-color-surface) !important;
   color: var(--md-sys-color-on-surface);
 }
 

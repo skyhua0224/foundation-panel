@@ -97,7 +97,7 @@ onUnmounted(() => {
 .context-menu {
   position: fixed;
   z-index: 20000;
-  min-width: 300px;
+  min-width: 360px;
   padding: 10px;
   display: flex;
   flex-direction: column;
@@ -110,8 +110,11 @@ onUnmounted(() => {
   .menu-item {
     justify-content: flex-start;
     width: 100%;
-    border-radius: 20px;
-    padding: 0 20px;
+    height: 64px;
+    border-radius: 22px;
+    padding: 0 24px;
+    gap: 16px;
+    font: 500 20px/28px var(--md-ref-typeface-brand, system-ui);
   }
 
   .menu-divider {

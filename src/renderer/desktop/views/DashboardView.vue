@@ -7,10 +7,13 @@
 
     <!-- 状态 -->
     <div class="desktop-grid cols-4 stat-row">
-      <MStat class="fade-in delay-1" icon="sensors" :label="t.dashboard.serviceStatus" :value="serviceStatus.text || '…'" :tone="statusTone" />
-      <MStat class="fade-in delay-2" icon="devices" :label="t.dashboard.pairedDevices" :value="pairedDevices" />
-      <MStat class="fade-in delay-3" icon="cast_connected" :label="t.dashboard.activeSessions" :value="activeSessions" />
-      <MStat class="fade-in delay-4" icon="schedule" :label="t.dashboard.uptime" :value="uptime" />
+      <div v-for="(stat, i) in stats" :key="stat.id" class="desktop-card stat-card fade-in" :class="[stat.tone, 'delay-' + (i + 1)]" role="status">
+        <span class="stat-icon"><MIcon :name="stat.icon" /></span>
+        <span class="stat-info">
+          <span class="stat-label">{{ stat.label }}</span>
+          <span class="stat-big">{{ stat.value }}</span>
+        </span>
+      </div>
     </div>
 
     <!-- 快捷操作 -->
@@ -134,7 +137,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { MBanner, MIcon, MStat } from 'foundation-ui/vue'
+import { MBanner, MIcon } from 'foundation-ui/vue'
 import { useI18n } from '../i18n/index.js'
 
 const { t } = useI18n()
@@ -347,6 +350,14 @@ async function openHostPerformance() {
   }
 }
 
+// 状态卡：一个数据表驱动四张
+const stats = computed(() => [
+  { id: 'service', icon: 'sensors', label: t.value.dashboard.serviceStatus, value: serviceStatus.value.text || '…', tone: statusTone.value },
+  { id: 'paired', icon: 'devices', label: t.value.dashboard.pairedDevices, value: pairedDevices.value, tone: '' },
+  { id: 'sessions', icon: 'cast_connected', label: t.value.dashboard.activeSessions, value: activeSessions.value, tone: '' },
+  { id: 'uptime', icon: 'schedule', label: t.value.dashboard.uptime, value: uptime.value, tone: '' },
+])
+
 // 快捷操作：一个数据表驱动四张卡
 const actions = computed(() => [
   { id: 'web', icon: 'public', title: t.value.dashboard.webConsole, desc: t.value.dashboard.webConsoleDesc, run: openWebUI },
@@ -432,8 +443,58 @@ onUnmounted(() => {
   }
 }
 
+.dash-hero .hero-title { color: var(--md-sys-color-on-surface); }
+
 .stat-row {
   margin-bottom: 8px;
+}
+
+// 状态卡：大数字，图标在 tone 色的圆角块里；服务状态按 ok / warn / error 换底色
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 22px 24px;
+  min-height: 112px;
+  border: 0;
+  background: var(--md-sys-color-surface-container-high);
+
+  .stat-icon {
+    flex: none;
+    display: grid;
+    place-items: center;
+    width: 64px;
+    height: 64px;
+    border-radius: 22px;
+    background: var(--md-sys-color-surface-container-highest);
+    color: var(--md-sys-color-primary);
+
+    .m-icon { width: 34px; height: 34px; }
+  }
+
+  .stat-info {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+
+  .stat-label {
+    font: 500 16px/24px var(--md-ref-typeface-brand, system-ui);
+    color: var(--md-sys-color-on-surface-variant);
+  }
+
+  .stat-big {
+    font: 700 36px/44px var(--md-ref-typeface-brand, system-ui);
+    letter-spacing: -0.5px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  &.ok { background: var(--md-sys-color-success-container, var(--md-sys-color-secondary-container)); color: var(--md-sys-color-on-success-container, var(--md-sys-color-on-secondary-container)); }
+  &.warn { background: var(--md-sys-color-warning-container, var(--md-sys-color-tertiary-container)); color: var(--md-sys-color-on-warning-container, var(--md-sys-color-on-tertiary-container)); }
+  &.error { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
+  &.ok .stat-label, &.warn .stat-label, &.error .stat-label { color: inherit; opacity: 0.8; }
 }
 
 .section-title {
