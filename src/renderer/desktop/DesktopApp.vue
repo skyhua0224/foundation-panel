@@ -1,91 +1,94 @@
 <template>
-  <DesktopWindow
-    :title="appTitle"
-    :icon="sunshineIcon"
-    :has-sidebar="true"
-    :show-title-bar="false"
-    :class="{ 'gamepad-active': gamepadActive, 'cursor-mode': cursorEnabled }"
-  >
-    <template #sidebar>
-      <DesktopSidebar
-        :items="navItems"
-        :bottom-items="bottomNavItems"
-        :active-item="activeNav"
-        @item-click="handleNavClick"
-        @update:active-item="activeNav = $event"
-      />
-    </template>
-
-    <template #default>
-      <component :is="currentView" @openThemeEditor="themeEditorOpen = true" />
-    </template>
-
-    <template #footer>
-      <!-- 两者都是底部居中的浮层，必须放在同一个 flex 列里堆叠。
-           各自绝对定位时会完全重叠，而运行条的 z-index 更高，会把按键提示整条盖掉
-           —— 而「游戏在跑 + 手柄模式」正是沙发场景下最常见的状态。 -->
-      <div class="desktop-footer-dock">
-        <RunningGameBar
-          :game="runningGame"
-          :elapsed="elapsedSeconds"
-          :stat="runningStat"
-          @resume="resumeGame"
-          @stop="confirmStopGame"
+  <!-- m-app：foundation-ui 的减少动态 / 动画偏好按 .m-app 后代生效，弹层、键盘、启动页都要在它里面 -->
+  <div class="m-app desktop-root">
+    <DesktopWindow
+      :title="appTitle"
+      :icon="sunshineIcon"
+      :has-sidebar="true"
+      :show-title-bar="false"
+      :class="{ 'gamepad-active': gamepadActive, 'cursor-mode': cursorEnabled }"
+    >
+      <template #sidebar>
+        <DesktopSidebar
+          :items="navItems"
+          :bottom-items="bottomNavItems"
+          :active-item="activeNav"
+          @item-click="handleNavClick"
+          @update:active-item="activeNav = $event"
         />
+      </template>
 
-        <GamepadLegend v-if="gamepadActive" :cursor-mode="cursorEnabled" />
-      </div>
-    </template>
-  </DesktopWindow>
+      <template #default>
+        <component :is="currentView" @openThemeEditor="themeEditorOpen = true" />
+      </template>
 
-  <ThemeEditor
-    :open="themeEditorOpen"
-    :vars="themeVars"
-    :activePreset="activePreset"
-    :presets="presets"
-    :wallpaper="wallpaper"
-    :wallpaperColors="wallpaperColors"
-    :wallpaperSeeds="wallpaperSeeds"
-    :activeWallpaperSeed="activeWallpaperSeed"
-    @close="themeEditorOpen = false"
-    @setVar="setVar"
-    @applyPreset="applyPreset"
-    @export="handleThemeExport"
-    @import="handleThemeImport"
-    @setWallpaper="setWallpaper"
-    @applySeed="applySeedColor"
-    @removeWallpaper="removeWallpaper"
-  />
+      <template #footer>
+        <!-- 两者都是底部居中的浮层，必须放在同一个 flex 列里堆叠。
+             各自绝对定位时会完全重叠，而运行条的 z-index 更高，会把按键提示整条盖掉
+             —— 而「游戏在跑 + 手柄模式」正是沙发场景下最常见的状态。 -->
+        <div class="desktop-footer-dock">
+          <RunningGameBar
+            :game="runningGame"
+            :elapsed="elapsedSeconds"
+            :stat="runningStat"
+            @resume="resumeGame"
+            @stop="confirmStopGame"
+          />
 
-  <OnScreenKeyboard />
+          <GamepadLegend v-if="gamepadActive" :cursor-mode="cursorEnabled" />
+        </div>
+      </template>
+    </DesktopWindow>
 
-  <BackHoldRing :progress="backHoldProgress" />
+    <ThemeEditor
+      :open="themeEditorOpen"
+      :vars="themeVars"
+      :activePreset="activePreset"
+      :presets="presets"
+      :wallpaper="wallpaper"
+      :wallpaperColors="wallpaperColors"
+      :wallpaperSeeds="wallpaperSeeds"
+      :activeWallpaperSeed="activeWallpaperSeed"
+      @close="themeEditorOpen = false"
+      @setVar="setVar"
+      @applyPreset="applyPreset"
+      @export="handleThemeExport"
+      @import="handleThemeImport"
+      @setWallpaper="setWallpaper"
+      @applySeed="applySeedColor"
+      @removeWallpaper="removeWallpaper"
+    />
 
-  <ConfirmDialog />
+    <OnScreenKeyboard />
 
-  <LaunchOverlay
-    :state="launchState"
-    @dismiss="dismissLaunchState"
-    @stop="confirmStopGame"
-  />
+    <BackHoldRing :progress="backHoldProgress" />
 
-  <div
-    v-if="cursorEnabled"
-    class="gamepad-cursor"
-    :style="{ transform: `translate(${cursorX}px, ${cursorY}px)` }"
-    aria-hidden="true"
-  >
-    <svg viewBox="0 0 24 24">
-      <path d="M5 2 L5 19 L10 14.5 L13 21.5 L16 20 L13 13.5 L19.5 13 Z" />
-    </svg>
+    <ConfirmDialog />
+
+    <LaunchOverlay
+      :state="launchState"
+      @dismiss="dismissLaunchState"
+      @stop="confirmStopGame"
+    />
+
+    <div
+      v-if="cursorEnabled"
+      class="gamepad-cursor"
+      :style="{ transform: `translate(${cursorX}px, ${cursorY}px)` }"
+      aria-hidden="true"
+    >
+      <svg viewBox="0 0 24 24">
+        <path d="M5 2 L5 19 L10 14.5 L13 21.5 L16 20 L13 13.5 L19.5 13 Z" />
+      </svg>
+    </div>
+
+    <SplashScreen
+      :visible="showSplash"
+      @done="showSplash = false"
+    />
+
+    <MNotifyHost />
   </div>
-
-  <SplashScreen
-    :visible="showSplash"
-    @done="showSplash = false"
-  />
-
-  <MNotifyHost />
 </template>
 
 <script setup>
@@ -612,6 +615,10 @@ watch(
 </script>
 
 <style lang="less" scoped>
+.desktop-root {
+  display: contents;
+}
+
 .desktop-footer-dock {
   position: absolute;
   left: 50%;
