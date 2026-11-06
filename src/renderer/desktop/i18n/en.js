@@ -835,6 +835,7 @@ Output only one short sentence, no explanation. Reply in English.`,
   // === VDD Settings ===
   vddSettings: {
     title: 'Virtual Display Settings',
+    removeResolution: 'Remove',
     driverPrerequisiteTitle: 'Virtual Display Driver',
     driverPrerequisiteDesc: 'Install and verify the bundled ZakoVDD driver before using virtual-display features.',
     driverDetectionKicker: 'ZAKOVDD // DRIVER CHECK',

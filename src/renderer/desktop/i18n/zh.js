@@ -835,6 +835,7 @@ export const zh = {
   // === VDD 设置 ===
   vddSettings: {
     title: '基地显示器设置（ZakoVDD）',
+    removeResolution: '移除',
     driverPrerequisiteTitle: '基地显示器驱动（ZakoVDD）',
     driverPrerequisiteDesc: '基地显示器（ZakoVDD）是 Sunshine 的虚拟屏幕功能，使用前需要先安装并验证随附的基地显示器驱动。',
     driverDetectionKicker: '基地显示器 // 核心握手',
