@@ -1,72 +1,31 @@
 <template>
-  <SectionPanel :title="t.hwinfo.title">
-    <template #icon><MIcon name="monitor" /></template>
-    <template #actions>
-      <button class="refresh-btn" @click="loadSensors" :disabled="loading">
-        <MIcon name="refresh" />
-      </button>
-      <ToggleSwitch :modelValue="injecting" @update:modelValue="toggleInject" :disabled="!available" />
-    </template>
-
-    <!-- 不可用提示 -->
-    <div v-if="!available && !loading" class="unavailable-hint">
-      <MIcon name="warning" fill class="warn-icon" />
-      <span>{{ t.hwinfo.unavailable }}</span>
-      <div class="hint-sub">{{ t.hwinfo.enableHint }}</div>
-    </div>
-
-    <!-- 加载中 -->
-    <div v-else-if="loading" class="loading-hint">{{ t.hwinfo.loading }}</div>
-
-    <!-- 传感器选择 -->
+  <MSection :title="t.hwinfo.title">
+    <template #action><MIconButton icon="refresh" :label="t.rtssTool.refresh" :disabled="loading" @click="loadSensors" /></template>
+    <MBanner v-if="!available && !loading" tone="warn" icon="warning">{{ t.hwinfo.unavailable }}. {{ t.hwinfo.enableHint }}</MBanner>
+    <div v-else-if="loading" class="m-hw__wait"><MLoading size="28px" /><span>{{ t.hwinfo.loading }}</span></div>
     <template v-else>
-      <input
-        v-model="searchQuery"
-        class="search-input"
-        :placeholder="t.hwinfo.searchPlaceholder"
-      />
-
-      <div class="sensor-list">
-        <div
-          v-for="group in filteredGroups"
-          :key="group.name"
-          class="sensor-group"
-        >
-          <div class="sensor-group-header" @click="group.collapsed = !group.collapsed">
-            <span class="collapse-arrow">{{ group.collapsed ? '▶' : '▼' }}</span>
-            {{ group.name }}
-            <span class="sensor-count">{{ group.readings.length }}</span>
-          </div>
-          <div v-show="!group.collapsed" class="sensor-readings">
-            <label
-              v-for="r in group.readings"
-              :key="r.index"
-              class="reading-item"
-              :class="{ selected: selectedIds.has(r.index) }"
-            >
-              <input type="checkbox" :checked="selectedIds.has(r.index)" @change="toggleReading(r.index)" />
-              <span class="reading-label">{{ r.label }}</span>
-              <span class="reading-value">{{ r.value.toFixed(1) }} {{ r.unit }}</span>
-            </label>
-          </div>
-        </div>
-        <div v-if="filteredGroups.length === 0" class="no-match">{{ t.hwinfo.noMatch }}</div>
-      </div>
-
-      <div class="selection-bar" v-if="selectedIds.size > 0">
-        <span>{{ t.hwinfo.selectedCount.replace('{count}', selectedIds.size) }}</span>
-      </div>
+      <MGroup>
+        <MSwitchItem :model-value="injecting" icon="monitor" :title="t.hwinfo.title" :text="t.hwinfo.selectedCount.replace('{count}', selectedIds.size)" :disabled="!available" @update:model-value="toggleInject" />
+      </MGroup>
+      <MField v-model="searchQuery" :label="t.hwinfo.searchPlaceholder" />
+      <MEmpty v-if="filteredGroups.length === 0" icon="search" :title="t.hwinfo.noMatch" />
+      <MSection v-for="group in filteredGroups" :key="group.name" :title="`${group.name} · ${group.readings.length}`">
+        <template #action><MIconButton :icon="group.collapsed ? 'chevron_right' : 'keyboard_arrow_down'" :label="group.name" @click="group.collapsed = !group.collapsed" /></template>
+        <MGroup v-if="!group.collapsed">
+          <MItem v-for="r in group.readings" :key="r.index" action :selected="selectedIds.has(r.index)" :title="r.label" :value="`${r.value.toFixed(1)} ${r.unit}`" role="checkbox" :aria-checked="selectedIds.has(r.index)" @click="toggleReading(r.index)">
+            <template #trail><MIcon :name="selectedIds.has(r.index) ? 'check_circle' : 'add_circle'" /></template>
+          </MItem>
+        </MGroup>
+      </MSection>
     </template>
-  </SectionPanel>
+  </MSection>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
-import { MIcon } from 'foundation-ui/vue'
+import { MBanner, MIcon, MEmpty, MField, MGroup, MIconButton, MItem, MLoading, MSection, MSwitchItem } from 'foundation-ui/vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../../../desktop/i18n/index.js'
-import SectionPanel from '../../components/SectionPanel.vue'
-import ToggleSwitch from '../../components/ToggleSwitch.vue'
 
 const { t } = useI18n()
 const emit = defineEmits(['message'])
@@ -297,4 +256,8 @@ onUnmounted(() => {
   &:disabled { opacity: 0.3; }
   svg, :deep(svg) { width: 14px; height: 14px; }
 }
+</style>
+
+<style scoped>
+.m-hw__wait { display: flex; align-items: center; gap: 12px; padding: 12px; color: var(--md-sys-color-on-surface-variant); font: var(--m-body-large); }
 </style>

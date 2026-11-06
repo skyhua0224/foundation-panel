@@ -1,64 +1,22 @@
 <template>
-  <SectionPanel :title="t.rtssTool.fpsLimiter">
-    <template #icon><MIcon name="speed" /></template>
-    <template #actions>
-      <ToggleSwitch :modelValue="limiterEnabled" @update:modelValue="onToggleLimiter" />
-    </template>
-
-    <div class="fps-display">
-      <span class="fps-value">{{ fpsValue }}</span>
-      <span class="fps-label">FPS</span>
+  <MSection :title="t.rtssTool.fpsLimiter">
+    <MGroup>
+      <MSwitchItem :model-value="limiterEnabled" icon="speed" :title="t.rtssTool.fpsLimiter" :disabled="applying" @update:model-value="onToggleLimiter" />
+      <MSliderItem v-model="fpsValue" icon="speed" :title="t.rtssTool.fpsLimiter" :min="15" :max="360" :step="1" :decimals="0" unit=" FPS" size="m" :disabled="applying" />
+      <MItem stack :title="t.rtssTool.fpsLimiter"><template #control><MChipSet v-model="fpsValue" :label="t.rtssTool.fpsLimiter" :options="presets.map((v) => ({ value: v, label: String(v) }))" :disabled="applying" /></template></MItem>
+    </MGroup>
+    <div class="m-rtss__actions">
+      <MButton variant="text" icon="close" :disabled="applying" @click="removeLimit">{{ t.rtssTool.removeFps }}</MButton>
+      <MButton icon="check" :loading="applying" :disabled="applying" @click="applyLimit">{{ applying ? t.rtssTool.applying : t.rtssTool.applyFps }}</MButton>
     </div>
-
-    <div class="slider-container">
-      <input
-        type="range"
-        v-model.number="fpsValue"
-        :min="15"
-        :max="360"
-        :step="1"
-        class="fps-slider"
-        :disabled="applying"
-      />
-      <div class="slider-labels">
-        <span>15</span>
-        <span>60</span>
-        <span>120</span>
-        <span>240</span>
-        <span>360</span>
-      </div>
-    </div>
-
-    <div class="presets">
-      <button
-        v-for="preset in presets"
-        :key="preset"
-        @click="fpsValue = preset"
-        :class="{ active: fpsValue === preset }"
-        class="preset-btn"
-      >
-        {{ preset }}
-      </button>
-    </div>
-
-    <div class="actions">
-      <button @click="applyLimit" class="apply-btn" :disabled="applying">
-        {{ applying ? t.rtssTool.applying : t.rtssTool.applyFps }}
-      </button>
-      <button @click="removeLimit" class="reset-btn" :disabled="applying">
-        {{ t.rtssTool.removeFps }}
-      </button>
-    </div>
-  </SectionPanel>
+  </MSection>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import { MIcon } from 'foundation-ui/vue'
+import { MButton, MChipSet, MGroup, MItem, MSection, MSliderItem, MSwitchItem } from 'foundation-ui/vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../../../desktop/i18n/index.js'
-import SectionPanel from '../../components/SectionPanel.vue'
-import ToggleSwitch from '../../components/ToggleSwitch.vue'
 
 const { t } = useI18n()
 const emit = defineEmits(['message'])
@@ -239,3 +197,4 @@ defineExpose({ loadState })
   &:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 </style>
+
