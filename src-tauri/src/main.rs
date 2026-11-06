@@ -381,7 +381,6 @@ fn main() {
             dev_tools::dev_clear_webview_cache,
             dev_tools::dev_reset_desktop_settings,
             dev_tools::dev_environment,
-            windows::resize_about_window,
             windows::resize_tool_window,
             hdr_enhanced::nr_live_status,
             hdr_enhanced::nr_live_set_enabled,
