@@ -32,6 +32,13 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
     let args: Vec<String> = std::env::args().collect();
     let show_toolbar = args.iter().any(|arg| arg == "--toolbar" || arg == "-t");
     let show_desktop = args.iter().any(|arg| arg == "--desktop" || arg == "-d");
+    // The Sunshine host runs `--close-desktop` when a stream of its Big Screen entry ends. With no panel running there is nothing to close:
+    // do not start one (and do not block the undo command of the host, which waits for this process).
+    if args.iter().any(|arg| arg == "--close-desktop") {
+        info!("🖥️ --close-desktop：没有正在运行的面板，无需关闭桌面 UI");
+        app.handle().exit(0);
+        return Ok(());
+    }
     let agent_only = args.iter().any(|arg| arg == "--hidden");
     let explicit_minimized = args.iter().any(|arg| arg == "--minimized");
     let desktop_settings = crate::desktop_settings::load_desktop_settings_from_disk();
@@ -315,6 +322,17 @@ pub fn handle_single_instance(app: &AppHandle, args: Vec<String>) {
 
     let windows: Vec<_> = app.webview_windows().keys().cloned().collect();
     info!("📋 当前存在的窗口: {:?}", windows);
+
+    // 主机的「大屏」应用在串流结束时用它关掉大屏（`--desktop` 的反向）
+    if args.iter().any(|arg| arg == "--close-desktop") {
+        let state = if windows::close_desktop_window(app) {
+            "已关闭"
+        } else {
+            "本来就没打开"
+        };
+        info!("🖥️ 检测到 --close-desktop 参数，桌面 UI {}", state);
+        return;
+    }
 
     // 检查是否要打开桌面 UI
     if args.iter().any(|arg| arg == "--desktop" || arg == "-d") {

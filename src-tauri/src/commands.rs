@@ -104,6 +104,13 @@ pub async fn toggle_dark_mode(_window: tauri::Window) -> Result<bool, String> {
     Ok(true)
 }
 
+/// 打开大屏（Foundation Desktop）：已经开着就把它带到前台，不开第二个窗口。和托盘的「打开桌面 UI」是同一条路。
+#[tauri::command]
+pub async fn open_desktop(app: AppHandle) -> Result<(), String> {
+    info!("Opening the big screen from the control panel");
+    windows::open_desktop_window(&app)
+}
+
 #[tauri::command]
 pub async fn open_tool_window(app: AppHandle, tool_name: String) -> Result<(), String> {
     info!("Opening tool window: {}", tool_name);

@@ -773,6 +773,21 @@ pub fn open_desktop_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String>
     Ok(())
 }
 
+/// 关闭桌面 UI 窗口。主机在串流结束时通过 undo 命令 `sunshine-gui.exe --close-desktop` 调用（见 handle_single_instance），
+/// 这样大屏不会留在主机屏幕上；窗口本来就没开时什么也不做。返回是否真的关了一个窗口。
+pub fn close_desktop_window<R: Runtime>(app: &AppHandle<R>) -> bool {
+    match app.get_webview_window(DESKTOP_WINDOW_ID) {
+        Some(window) => {
+            if let Err(e) = window.close() {
+                warn!("⚠️ 关闭桌面 UI 窗口失败: {}", e);
+                return false;
+            }
+            true
+        }
+        None => false,
+    }
+}
+
 /// 激活主窗口
 pub fn activate_main_window(app: &tauri::AppHandle, target_url: Option<String>) {
     debug!(
