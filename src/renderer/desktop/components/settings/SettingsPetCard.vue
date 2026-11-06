@@ -1,8 +1,9 @@
 <template>
-  <SettingsCard :title="t.settings.pet" icon="forum">
+  <SettingsCard :title="t.settings.pet" icon="pets">
     <SettingsRow :name="t.settings.deskObserve" :description="t.settings.deskObserveDesc">
       <SettingsSwitch
         v-model="petEnabled"
+        :label="t.settings.deskObserve"
         :disabled="visionConfirmPending"
         @change="onPetToggle"
       />
@@ -12,10 +13,12 @@
       v-if="petEnabled"
       :name="t.settings.observeInterval"
       :description="t.settings.observeIntervalDesc"
+      stack
     >
       <SettingsSelect
         v-model="petIntervalSec"
         :options="petIntervalOptions"
+        :label="t.settings.observeInterval"
         @change="onPetIntervalChange"
       />
     </SettingsRow>
@@ -26,26 +29,20 @@
     >
       <template #description>
         {{ t.settings.pokeMitaDesc }}
-        <span v-if="pokeFailed" class="pet-error">{{ t.petTool.pokeFailed }}</span>
+        <span v-if="pokeFailed" class="dsk-pet-error">{{ t.petTool.pokeFailed }}</span>
       </template>
-      <button class="desktop-btn" :disabled="isObserving" @click="poke">
+      <MButton variant="tonal" icon="touch_app" :loading="isObserving" @click="poke">
         {{ isObserving ? t.settings.pokeBtnObserving : t.settings.pokeBtn }}
-      </button>
+      </MButton>
     </SettingsRow>
-
-    <PetVisionConsentDialog
-      :open="visionConfirmOpen"
-      :text="t.petTool.visionPrivacyConfirm"
-      @confirm="finishVisionConfirmation(true)"
-      @cancel="finishVisionConfirmation(false)"
-    />
   </SettingsCard>
 </template>
 
 <script setup>
 import { computed, ref, watch } from 'vue'
+import { MButton } from 'foundation-ui/vue'
 import { useDesktopPet } from '../../../composables/useDesktopPet.js'
-import PetVisionConsentDialog from '../../../components/PetVisionConsentDialog.vue'
+import { requestConfirm } from '../../composables/useConfirm.js'
 import { useI18n } from '../../i18n/index.js'
 import SettingsCard from './SettingsCard.vue'
 import SettingsRow from './SettingsRow.vue'
@@ -67,7 +64,6 @@ const {
 
 const petIntervalSec = ref(Math.round(observeInterval.value / 1000))
 const visionConfirmPending = ref(false)
-const visionConfirmOpen = ref(false)
 watch(observeInterval, (value) => {
   petIntervalSec.value = Math.round(value / 1000)
 })
@@ -80,7 +76,7 @@ const petIntervalOptions = computed(() => [
   { value: 300, label: t.value.settings.intervals.m5 },
 ])
 
-function onPetToggle(nextValue = petEnabled.value) {
+async function onPetToggle(nextValue = petEnabled.value) {
   if (!nextValue) {
     stopObserving()
     return
@@ -91,12 +87,19 @@ function onPetToggle(nextValue = petEnabled.value) {
   if (visionConfirmPending.value) return
 
   visionConfirmPending.value = true
-  visionConfirmOpen.value = true
+  // The window's own confirm dialog (a pad can answer it); screenshots leave the machine, so the answer is asked every time.
+  const consent = t.value.petTool.visionPrivacyConfirm
+  const accepted = await requestConfirm({
+    title: consent.title,
+    message: consent.message,
+    confirmLabel: consent.accept,
+    cancelLabel: consent.cancel,
+  })
+  finishVisionConfirmation(accepted)
 }
 
 function finishVisionConfirmation(accepted) {
   if (!visionConfirmPending.value) return
-  visionConfirmOpen.value = false
   visionConfirmPending.value = false
   if (accepted) startObserving()
 }
@@ -106,10 +109,6 @@ function onPetIntervalChange(nextValue = petIntervalSec.value) {
 }
 </script>
 
-<style lang="less" scoped>
-.pet-error {
-  display: block;
-  margin-top: 4px;
-  color: var(--fd-status-danger, #ff6b35);
-}
+<style scoped>
+.dsk-pet-error { display: block; margin-top: 4px; color: var(--md-sys-color-error); }
 </style>

@@ -1,9 +1,5 @@
 <template>
-  <SettingsCard :title="t.settings.launchAssistant" icon="bolt">
-    <p class="section-desc">
-      {{ t.settings.launchAssistantDesc }}
-    </p>
-
+  <SettingsCard :title="t.settings.launchAssistant" icon="bolt" :lead="t.settings.launchAssistantDesc">
     <SettingsToolPathRow
       v-for="template in helperTemplates"
       :key="template.id"
@@ -59,11 +55,3 @@ async function browseToolPath(templateId, paramKey) {
   }
 }
 </script>
-
-<style lang="less" scoped>
-.section-desc {
-  font-size: 14px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-  margin: 0 0 16px 0;
-}
-</style>

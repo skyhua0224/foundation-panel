@@ -1,164 +1,149 @@
 <template>
   <Teleport to="body">
-    <!-- 半透明遮罩 -->
-    <Transition name="fade">
-      <div v-if="open" class="theme-overlay" @click="$emit('close')"></div>
+    <Transition name="dsk-te-fade">
+      <div v-if="open" class="dsk-te__scrim" @click="$emit('close')"></div>
     </Transition>
 
-    <!-- 编辑面板 -->
-    <Transition name="slide">
-      <div v-if="open" ref="editorRef" class="theme-editor" @click.stop>
-        <div class="editor-header">
-          <h2><MIcon name="palette" /> {{ t.themeEditor.title }}</h2>
-          <button class="close-btn" @click="$emit('close')">✕</button>
-        </div>
+    <Transition name="dsk-te-slide">
+      <aside
+        v-if="open"
+        ref="editorRef"
+        class="dsk-te"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="t.themeEditor.title"
+        :style="{ zoom: scale }"
+        @click.stop
+      >
+        <header class="dsk-te__head">
+          <MIcon name="palette" fill />
+          <h2 class="dsk-te__title">{{ t.themeEditor.title }}</h2>
+          <MIconButton icon="close" :label="T.close" @click="$emit('close')" />
+        </header>
 
-        <div class="editor-body">
-          <!-- 壁纸 -->
-          <section class="editor-section">
-            <label class="section-title">{{ t.themeEditor.wallpaper }}</label>
+        <div class="dsk-te__body">
+          <!-- wallpaper -->
+          <MSection :title="t.themeEditor.wallpaper">
             <div
-              class="wallpaper-drop"
-              :class="{ dragging: isDragging, 'has-wallpaper': wallpaper }"
+              class="dsk-te__drop"
+              :class="{ 'is-dragging': isDragging, 'has-wallpaper': wallpaper }"
               @dragover.prevent="isDragging = true"
               @dragleave="isDragging = false"
               @drop.prevent="handleDrop"
-              @click="triggerFileInput"
             >
-              <template v-if="wallpaper">
-                <img :src="wallpaper" class="wallpaper-preview" />
-                <div class="wallpaper-actions">
-                  <button class="wp-btn" @click.stop="triggerFileInput"><MIcon name="refresh" /> {{ t.themeEditor.replace }}</button>
-                  <button class="wp-btn danger" @click.stop="$emit('removeWallpaper')">✕ {{ t.themeEditor.remove }}</button>
-                </div>
-              </template>
-              <template v-else>
-                <div class="drop-icon"><MIcon name="image" /></div>
-                <div class="drop-text">{{ t.themeEditor.dropImage }}<br/><small>{{ t.themeEditor.chooseFile }}</small></div>
-              </template>
+              <img v-if="wallpaper" :src="wallpaper" class="dsk-te__preview" alt="" />
+              <div v-else class="dsk-te__empty">
+                <MIcon name="image" fill />
+                <span>{{ t.themeEditor.dropImage }}</span>
+              </div>
+              <div class="dsk-te__drop-actions">
+                <template v-if="wallpaper">
+                  <MButton variant="tonal" icon="sync" @click="triggerFileInput">{{ t.themeEditor.replace }}</MButton>
+                  <MButton variant="text" icon="delete" @click="$emit('removeWallpaper')">{{ t.themeEditor.remove }}</MButton>
+                </template>
+                <MButton v-else icon="upload_file" @click="triggerFileInput">{{ T.pick }}</MButton>
+              </div>
             </div>
             <input
               ref="fileInputRef"
               type="file"
               accept="image/*"
-              style="display: none"
+              hidden
               @change="handleFileSelect"
             />
-            <!-- 提取的色板：点击切换强调色（Material You 取色选项） -->
-            <div
-              v-if="wallpaperColors.length"
-              class="color-palette"
-              role="group"
-              :aria-label="t.themeEditor.pickSeed"
-            >
-              <button
-                v-for="(color, i) in wallpaperColors"
-                :key="i"
-                type="button"
-                class="palette-dot"
-                :class="{ selected: wallpaperSeeds[i] === activeWallpaperSeed }"
-                :aria-pressed="wallpaperSeeds[i] === activeWallpaperSeed"
-                data-focusable
-                :data-focus-key="'seed-' + i"
-                :style="{ background: `rgb(${color.map(Math.round).join(',')})` }"
-                :title="`rgb(${color.map(Math.round).join(', ')})`"
-                :aria-label="`rgb(${color.map(Math.round).join(', ')})`"
-                @click="$emit('applySeed', i)"
-              ></button>
-            </div>
-            <p v-if="wallpaperColors.length" class="palette-hint">{{ t.themeEditor.pickSeed }}</p>
-          </section>
+            <!-- colours taken from the picture: choose one to make it the accent (Material You) -->
+            <template v-if="wallpaperColors.length">
+              <MSwatches v-model="selectedSwatch" :colors="swatches" :label="t.themeEditor.pickSeed" />
+              <p class="dsk-te__hint">{{ t.themeEditor.pickSeed }}</p>
+            </template>
+          </MSection>
 
-          <!-- 预设主题 -->
-          <section class="editor-section">
-            <label class="section-title">{{ t.themeEditor.presets }}</label>
-            <div class="preset-grid">
-              <button
+          <!-- light or dark -->
+          <MSection :title="T.mode">
+            <MSeg block :model-value="ap.state.mode" :label="T.mode" :options="modeOptions" @update:model-value="(v) => ap.set({ mode: v })" />
+            <MSeg v-if="ap.state.mode !== 'light'" block :model-value="ap.state.dark" :label="T.darkStyle" :options="darkOptions" @update:model-value="(v) => ap.set({ dark: v })" />
+          </MSection>
+
+          <!-- presets -->
+          <MSection :title="t.themeEditor.presets">
+            <MGroup>
+              <MItem
                 v-for="(preset, key) in presets"
                 :key="key"
-                class="preset-btn"
-                :class="{ active: activePreset === key }"
+                action
+                :selected="activePreset === key"
+                :title="t.themeEditor.presetNames[key] || preset.label"
                 @click="$emit('applyPreset', key)"
               >
-                <span class="preset-dot" :style="{ background: preset.vars['--fd-accent'] }"></span>
-                {{ t.themeEditor.presetNames[key] || preset.label }}
-              </button>
-            </div>
-          </section>
+                <template #lead><span class="dsk-te__disc" :style="{ background: `linear-gradient(135deg, ${preset.vars['--fd-accent'] || 'var(--md-sys-color-primary)'} 50%, ${preset.vars['--fd-accent-secondary'] || 'var(--md-sys-color-tertiary)'} 50%)` }"></span></template>
+                <template v-if="activePreset === key" #trail><MIcon name="check" /></template>
+              </MItem>
+            </MGroup>
+          </MSection>
 
-          <!-- 颜色 -->
-          <section class="editor-section">
-            <label class="section-title">{{ t.themeEditor.colors }}</label>
-            <div class="control-row">
-              <span class="control-label">{{ t.themeEditor.accentColor }}</span>
-              <input type="color" :value="vars['--fd-accent']" @input="throttledSetVar('--fd-accent', $event.target.value)" @change="$emit('setVar', '--fd-accent', $event.target.value)" />
-            </div>
-            <div class="control-row">
-              <span class="control-label">{{ t.themeEditor.secondaryColor }}</span>
-              <input type="color" :value="vars['--fd-accent-secondary']" @input="throttledSetVar('--fd-accent-secondary', $event.target.value)" @change="$emit('setVar', '--fd-accent-secondary', $event.target.value)" />
-            </div>
-            <div class="control-row">
-              <span class="control-label">{{ t.themeEditor.backgroundPrimary }}</span>
-              <input type="color" :value="vars['--fd-bg-primary']" @input="throttledSetVar('--fd-bg-primary', $event.target.value)" @change="$emit('setVar', '--fd-bg-primary', $event.target.value)" />
-            </div>
-            <div class="control-row">
-              <span class="control-label">{{ t.themeEditor.backgroundSecondary }}</span>
-              <input type="color" :value="vars['--fd-bg-secondary']" @input="throttledSetVar('--fd-bg-secondary', $event.target.value)" @change="$emit('setVar', '--fd-bg-secondary', $event.target.value)" />
-            </div>
-          </section>
+          <!-- colours -->
+          <MSection :title="t.themeEditor.colors">
+            <MGroup>
+              <MItem v-for="row in colorRows" :key="row.key" :title="row.label" :text="vars[row.key]">
+                <template #lead><span class="dsk-te__dot" :style="{ background: vars[row.key] }"></span></template>
+                <template #trail>
+                  <MIconButton icon="colorize" tonal :label="row.label" @click="pickColor(row.key)" />
+                  <input
+                    :ref="(el) => setColorInput(row.key, el)"
+                    type="color"
+                    class="dsk-te__native"
+                    tabindex="-1"
+                    aria-hidden="true"
+                    :value="vars[row.key]"
+                    @input="throttledSetVar(row.key, $event.target.value)"
+                    @change="$emit('setVar', row.key, $event.target.value)"
+                  />
+                </template>
+              </MItem>
+            </MGroup>
+          </MSection>
 
-          <!-- 外观 -->
-          <section class="editor-section">
-            <label class="section-title">{{ t.themeEditor.appearance }}</label>
-            <div class="control-row">
-              <span class="control-label">{{ t.themeEditor.cardRadius }}</span>
-              <input type="range" min="0" max="32" :value="parseInt(vars['--fd-card-radius'])" @input="$emit('setVar', '--fd-card-radius', $event.target.value + 'px')" />
-              <span class="control-value">{{ vars['--fd-card-radius'] }}</span>
-            </div>
-            <div class="control-row">
-              <span class="control-label">{{ t.themeEditor.fontSize }}</span>
-              <input type="range" min="12" max="18" :value="parseInt(vars['--fd-font-size'])" @input="$emit('setVar', '--fd-font-size', $event.target.value + 'px')" />
-              <span class="control-value">{{ vars['--fd-font-size'] }}</span>
-            </div>
-          </section>
+          <!-- appearance -->
+          <MSection :title="t.themeEditor.appearance">
+            <MGroup>
+              <MItem v-for="row in rangeRows" :key="row.key" stack :title="row.label" :value="vars[row.key]">
+                <template #control>
+                  <div class="dsk-te__range">
+                    <MIconButton icon="remove" tonal :label="`${row.label} −`" :disabled="rangeValue(row) <= row.min" @click="nudge(row, -1)" />
+                    <MSlider :model-value="rangeValue(row)" :min="row.min" :max="row.max" :step="1" size="s" :label="row.label" @update:model-value="(v) => setRange(row, v)" />
+                    <MIconButton icon="add" tonal :label="`${row.label} +`" :disabled="rangeValue(row) >= row.max" @click="nudge(row, 1)" />
+                  </div>
+                </template>
+              </MItem>
+            </MGroup>
+          </MSection>
 
-          <!-- 效果 -->
-          <section class="editor-section">
-            <label class="section-title">{{ t.themeEditor.effects }}</label>
-            <div class="control-row">
-              <span class="control-label">{{ t.themeEditor.backgroundGrid }}</span>
-              <label class="switch">
-                <input type="checkbox" :checked="vars['--fd-grid-visible'] === '1'" @change="$emit('setVar', '--fd-grid-visible', $event.target.checked ? '1' : '0')" />
-                <span class="slider"></span>
-              </label>
-            </div>
-            <div class="control-row">
-              <span class="control-label">{{ t.themeEditor.scanlines }}</span>
-              <label class="switch">
-                <input type="checkbox" :checked="vars['--fd-scanline-visible'] === '1'" @change="$emit('setVar', '--fd-scanline-visible', $event.target.checked ? '1' : '0')" />
-                <span class="slider"></span>
-              </label>
-            </div>
-          </section>
+          <!-- effects -->
+          <MSection :title="t.themeEditor.effects">
+            <MGroup>
+              <MSwitchItem :model-value="vars['--fd-grid-visible'] === '1'" :title="t.themeEditor.backgroundGrid" @update:model-value="(on) => $emit('setVar', '--fd-grid-visible', on ? '1' : '0')" />
+              <MSwitchItem :model-value="vars['--fd-scanline-visible'] === '1'" :title="t.themeEditor.scanlines" @update:model-value="(on) => $emit('setVar', '--fd-scanline-visible', on ? '1' : '0')" />
+            </MGroup>
+          </MSection>
 
-          <!-- 导入导出 -->
-          <section class="editor-section">
-            <label class="section-title">{{ t.themeEditor.data }}</label>
-            <div class="action-row">
-              <button class="action-btn" @click="handleExport"><MIcon name="upload" /> {{ t.themeEditor.exportTheme }}</button>
-              <button class="action-btn" @click="handleImport"><MIcon name="download" /> {{ t.themeEditor.importTheme }}</button>
-            </div>
-          </section>
+          <!-- export and import -->
+          <MSection :title="t.themeEditor.data">
+            <MGroup>
+              <MItem action icon="download" :title="t.themeEditor.exportTheme" @click="handleExport" />
+              <MItem action icon="upload_file" :title="t.themeEditor.importTheme" @click="handleImport" />
+            </MGroup>
+          </MSection>
         </div>
-      </div>
+      </aside>
     </Transition>
   </Teleport>
 </template>
 
 <script setup>
-import { ref } from 'vue'
-import { MIcon } from 'foundation-ui/vue'
+import { computed, ref, watch } from 'vue'
+import { MButton, MGroup, MIcon, MIconButton, MItem, MSection, MSeg, MSlider, MSwatches, MSwitchItem, appearanceTexts, useAppearance } from 'foundation-ui/vue'
 import { useModalFocusScope } from '../composables/useFocusNav.js'
+import { useDeskScale } from '../composables/useDeskScale.js'
 import { useI18n } from '../i18n/index.js'
 
 const props = defineProps({
@@ -177,9 +162,63 @@ const emit = defineEmits(['close', 'setVar', 'applyPreset', 'export', 'import', 
 const editorRef = ref(null)
 useModalFocusScope(editorRef, () => props.open)
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+const scale = useDeskScale()
 const isDragging = ref(false)
 const fileInputRef = ref(null)
+
+// light or dark follows the appearance of foundation-ui (system, light, dark; tinted or true black)
+const ap = useAppearance()
+const T = computed(() => ({ ...appearanceTexts(locale.value), close: t.value.fileSharing?.close || 'Close' }))
+// The accent of the editor (a colour of the picture, a preset, the picker, an import) is also the colour the window's Material surfaces are drawn
+// from. The 'material' preset has no colours of its own: it leaves the appearance as the person set it.
+let mirrored = false
+watch([() => props.activePreset, () => props.vars['--fd-accent']], ([preset, hex]) => {
+  if (preset === 'material') {
+    if (mirrored) { mirrored = false; void ap.set({ color: 'wallpaper' }) }
+    return
+  }
+  if (/^#[0-9a-f]{6}$/i.test(hex || '')) { mirrored = true; void ap.set({ color: 'custom', custom: hex.toLowerCase() }) }
+})
+const modeOptions = computed(() => [
+  { value: 'system', label: T.value.system, icon: 'contrast' },
+  { value: 'light', label: T.value.light, icon: 'light_mode' },
+  { value: 'dark', label: T.value.dark, icon: 'dark_mode' },
+])
+const darkOptions = computed(() => [
+  { value: 'tinted', label: T.value.darkTinted, icon: 'invert_colors' },
+  { value: 'black', label: T.value.darkBlack, icon: 'brightness_1' },
+])
+
+// the colours of the picture
+const toHex = (color) => `#${color.map((channel) => Math.round(channel).toString(16).padStart(2, '0')).join('')}`
+const swatches = computed(() => props.wallpaperColors.map((color) => ({ value: toHex(color), label: `rgb(${color.map(Math.round).join(', ')})` })))
+const selectedSwatch = computed({
+  get: () => swatches.value[props.wallpaperSeeds.indexOf(props.activeWallpaperSeed)]?.value ?? '',
+  set: (value) => {
+    const index = swatches.value.findIndex((swatch) => swatch.value === value)
+    if (index >= 0) emit('applySeed', index)
+  },
+})
+
+// the four colours: the chip opens the system colour picker
+const colorRows = computed(() => [
+  { key: '--fd-accent', label: t.value.themeEditor.accentColor },
+  { key: '--fd-accent-secondary', label: t.value.themeEditor.secondaryColor },
+  { key: '--fd-bg-primary', label: t.value.themeEditor.backgroundPrimary },
+  { key: '--fd-bg-secondary', label: t.value.themeEditor.backgroundSecondary },
+])
+const colorInputs = {}
+function setColorInput(key, el) {
+  if (el) colorInputs[key] = el
+  else delete colorInputs[key]
+}
+function pickColor(key) {
+  const input = colorInputs[key]
+  if (!input) return
+  if (typeof input.showPicker === 'function') input.showPicker()
+  else input.click()
+}
 
 // 颜色选择器节流 —— 拖拽时最多每 50ms 更新一次
 let colorThrottleTimer = null
@@ -188,6 +227,15 @@ function throttledSetVar(key, value) {
   emit('setVar', key, value)
   colorThrottleTimer = setTimeout(() => { colorThrottleTimer = null }, 50)
 }
+
+// card corner and text size: a slider with a step button on each side (a pad cannot drag)
+const rangeRows = computed(() => [
+  { key: '--fd-card-radius', label: t.value.themeEditor.cardRadius, min: 0, max: 32 },
+  { key: '--fd-font-size', label: t.value.themeEditor.fontSize, min: 12, max: 18 },
+])
+const rangeValue = (row) => parseInt(props.vars[row.key])
+const setRange = (row, value) => emit('setVar', row.key, `${Math.round(value)}px`)
+const nudge = (row, delta) => setRange(row, Math.min(row.max, Math.max(row.min, rangeValue(row) + delta)))
 
 function handleExport() {
   emit('export')
@@ -218,414 +266,29 @@ function handleDrop(e) {
 }
 </script>
 
-<style lang="less" scoped>
-.theme-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.5);
-  z-index: 9998;
-}
+<style scoped>
+.dsk-te__scrim { position: fixed; inset: 0; z-index: 9998; background: color-mix(in srgb, var(--md-sys-color-scrim) 40%, transparent); }
+.dsk-te { position: fixed; top: 0; right: 0; bottom: 0; z-index: 9999; width: 460px; max-width: 100vw; box-sizing: border-box; display: flex; flex-direction: column; background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface); border-radius: var(--md-sys-shape-corner-extra-large) 0 0 var(--md-sys-shape-corner-extra-large); box-shadow: 0 8px 32px color-mix(in srgb, var(--md-sys-color-shadow) 36%, transparent); }
+.dsk-te__head { display: flex; align-items: center; gap: 12px; padding: 20px 20px 12px 28px; font-size: 28px; color: var(--md-sys-color-primary-text); }
+.dsk-te__title { margin: 0; flex: 1; min-width: 0; font: var(--m-headline-small); color: var(--md-sys-color-on-surface); letter-spacing: 0; }
+.dsk-te__body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 20px 28px; display: flex; flex-direction: column; gap: 4px; scrollbar-width: thin; }
 
-.theme-editor {
-  position: fixed;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  width: 340px;
-  background: rgba(var(--fd-bg-primary-rgb, 15, 15, 30), 0.97);
-  backdrop-filter: blur(20px);
-  border-left: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.5);
+.dsk-te__drop { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 16px; border-radius: var(--md-sys-shape-corner-large); background: var(--md-sys-color-surface-container); box-shadow: inset 0 0 0 2px transparent; transition: box-shadow var(--m-spring-fast-effects-duration) var(--m-spring-fast-effects); }
+.dsk-te__drop.is-dragging { box-shadow: inset 0 0 0 2px var(--md-sys-color-primary); background: var(--md-sys-color-primary-container); }
+.dsk-te__preview { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--md-sys-shape-corner-medium); }
+.dsk-te__empty { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 20px 0 4px; font: var(--m-body-large); color: var(--md-sys-color-on-surface-variant); }
+.dsk-te__empty .m-icon { font-size: 48px; color: var(--md-sys-color-primary); }
+.dsk-te__drop-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.dsk-te__hint { margin: 0; font: var(--m-body-small); color: var(--md-sys-color-on-surface-variant); }
 
-  :deep(svg) {
-    width: 16px;
-    height: 16px;
-    display: block;
-    flex: 0 0 auto;
-  }
-}
+.dsk-te__disc { display: block; width: 32px; height: 32px; border-radius: 50%; box-shadow: 0 0 0 2px var(--md-sys-color-outline-variant); }
+.dsk-te__dot { display: block; width: 32px; height: 32px; border-radius: 12px; box-shadow: 0 0 0 2px var(--md-sys-color-outline-variant); }
+.dsk-te__native { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.dsk-te__range { display: flex; align-items: center; gap: 12px; }
+.dsk-te__range .m-slider { flex: 1; min-width: 0; }
 
-.editor-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.06);
-
-  h2 {
-    margin: 0;
-    font-size: 18px;
-    font-weight: 600;
-    color: var(--fd-text-primary, #fff);
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    line-height: 1;
-
-    :deep(svg) {
-      width: 20px;
-      height: 20px;
-      color: var(--fd-accent, #00fff5);
-    }
-  }
-
-  .close-btn {
-    width: 32px;
-    height: 32px;
-    border: none;
-    background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.06);
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    border-radius: 8px;
-    cursor: pointer;
-    font-size: 14px;
-    transition: all 0.15s ease;
-
-    &:hover {
-      background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.12);
-      color: var(--fd-text-primary, #fff);
-    }
-  }
-}
-
-.editor-body {
-  flex: 1;
-  overflow-y: auto;
-  padding: 16px 24px;
-
-  &::-webkit-scrollbar { width: 4px; }
-  &::-webkit-scrollbar-thumb { background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.1); border-radius: 2px; }
-}
-
-.editor-section {
-  margin-bottom: 24px;
-
-  .section-title {
-    display: block;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.35);
-    margin-bottom: 12px;
-  }
-}
-
-.preset-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-}
-
-.preset-btn {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 12px;
-  border: 1px solid rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.08);
-  background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.03);
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: all 0.15s ease;
-
-  .preset-dot {
-    width: 12px;
-    height: 12px;
-    border-radius: 50%;
-    flex-shrink: 0;
-  }
-
-  &:hover {
-    background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.06);
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.9);
-  }
-
-  &.active {
-    border-color: var(--fd-accent, #00fff5);
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-    color: var(--fd-accent, #00fff5);
-  }
-}
-
-.control-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
-
-  .control-label {
-    flex: 1;
-    font-size: 13px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-  }
-
-  .control-value {
-    font-size: 11px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.35);
-    min-width: 40px;
-    text-align: right;
-  }
-
-  input[type="color"] {
-    width: 32px;
-    height: 32px;
-    border: 2px solid rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.1);
-    border-radius: 8px;
-    background: none;
-    cursor: pointer;
-    padding: 2px;
-
-    &::-webkit-color-swatch-wrapper { padding: 0; }
-    &::-webkit-color-swatch { border: none; border-radius: 5px; }
-  }
-
-  input[type="range"] {
-    width: 100px;
-    height: 4px;
-    -webkit-appearance: none;
-    appearance: none;
-    background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.1);
-    border-radius: 2px;
-    outline: none;
-
-    &::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 14px;
-      height: 14px;
-      border-radius: 50%;
-      background: var(--fd-accent, #00fff5);
-      cursor: pointer;
-      box-shadow: 0 0 6px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.4);
-    }
-  }
-}
-
-// Toggle switch
-.switch {
-  position: relative;
-  width: 40px;
-  height: 22px;
-  display: inline-block;
-
-  input {
-    opacity: 0;
-    width: 0;
-    height: 0;
-  }
-
-  .slider {
-    position: absolute;
-    inset: 0;
-    background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.1);
-    border-radius: 11px;
-    cursor: pointer;
-    transition: background 0.2s ease;
-
-    &::before {
-      content: '';
-      position: absolute;
-      left: 3px;
-      top: 3px;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-      transition: transform 0.2s ease, background 0.2s ease;
-    }
-  }
-
-  input:checked + .slider {
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-
-    &::before {
-      transform: translateX(18px);
-      background: var(--fd-accent, #00fff5);
-    }
-  }
-}
-
-.action-row {
-  display: flex;
-  gap: 8px;
-}
-
-.action-btn {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.08);
-  background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.03);
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: all 0.15s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-
-  &:hover {
-    background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.06);
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.9);
-  }
-}
-
-// 壁纸上传区
-.wallpaper-drop {
-  border: 2px dashed rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.12);
-  border-radius: 12px;
-  padding: 20px;
-  text-align: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
-  min-height: 80px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-
-  &:hover, &.dragging {
-    border-color: var(--fd-accent, #00fff5);
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.05);
-  }
-
-  &.has-wallpaper {
-    padding: 0;
-    border-style: solid;
-    border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-  }
-
-  .drop-icon {
-    margin-bottom: 6px;
-    color: var(--fd-accent, #00fff5);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-
-    :deep(svg) {
-      width: 32px;
-      height: 32px;
-    }
-  }
-
-  .drop-text {
-    font-size: 12px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.4);
-
-    small {
-      font-size: 11px;
-      color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.25);
-    }
-  }
-}
-
-.wallpaper-preview {
-  width: 100%;
-  height: 100px;
-  object-fit: cover;
-  display: block;
-  border-radius: 10px;
-}
-
-.wallpaper-actions {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  gap: 4px;
-  padding: 6px;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.7));
-  border-radius: 0 0 10px 10px;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-
-  .wallpaper-drop:hover & {
-    opacity: 1;
-  }
-}
-
-.wp-btn {
-  padding: 3px 10px;
-  border: none;
-  border-radius: 4px;
-  font-size: 11px;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
-  transition: background 0.15s ease;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-
-  :deep(svg) {
-    width: 12px;
-    height: 12px;
-  }
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.25);
-  }
-
-  &.danger:hover {
-    background: rgba(255, 60, 60, 0.5);
-  }
-}
-
-.color-palette {
-  display: flex;
-  gap: 6px;
-  margin-top: 10px;
-  justify-content: center;
-}
-
-.palette-dot {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 2px solid rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.1);
-  cursor: pointer;
-  padding: 0;
-  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
-
-  &:hover {
-    transform: scale(1.3);
-  }
-
-  // 焦点用 outline 表示：border-color 会被后面的 .selected 以相同特异性覆盖，
-  // 已选中项聚焦时会看不出焦点在哪；outline 层独立于两者
-  &:focus-visible {
-    transform: scale(1.3);
-    outline: 2px solid rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.9);
-    outline-offset: 3px;
-  }
-
-  &.selected {
-    border-color: var(--fd-accent, #00fff5);
-    box-shadow: 0 0 0 2px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.35);
-    transform: scale(1.2);
-  }
-}
-
-.palette-hint {
-  margin: 6px 0 0;
-  font-size: 11px;
-  text-align: center;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.35);
-}
-
-// 过渡动画
-.fade-enter-active, .fade-leave-active { transition: opacity 0.25s ease; }
-.fade-enter-from, .fade-leave-to { opacity: 0; }
-
-.slide-enter-active, .slide-leave-active { transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1); }
-.slide-enter-from, .slide-leave-to { transform: translateX(100%); }
+.dsk-te-fade-enter-active, .dsk-te-fade-leave-active { transition: opacity var(--m-spring-default-effects-duration) var(--m-spring-default-effects); }
+.dsk-te-fade-enter-from, .dsk-te-fade-leave-to { opacity: 0; }
+.dsk-te-slide-enter-active, .dsk-te-slide-leave-active { transition: transform var(--m-spring-default-spatial-duration) var(--m-spring-default-spatial), opacity var(--m-spring-default-effects-duration) var(--m-spring-default-effects); }
+.dsk-te-slide-enter-from, .dsk-te-slide-leave-to { transform: translateX(100%); opacity: 0; }
 </style>
