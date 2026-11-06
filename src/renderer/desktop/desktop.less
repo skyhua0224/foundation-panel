@@ -65,10 +65,21 @@ html[data-fd-gamepad='true'] {
   }
 }
 
-// 非手柄模式：鼠标点击不出现焦点环
+// 非手柄模式：鼠标点击不出现焦点环，键盘 Tab 到的元素仍然有（:focus-visible）
 html:not([data-fd-gamepad='true']) {
-  .desktop-window *:focus,
-  .context-menu *:focus {
+  .desktop-window *:focus:not(:focus-visible),
+  .context-menu *:focus:not(:focus-visible) {
+    outline: none;
+  }
+
+  .desktop-window *:focus-visible,
+  .context-menu *:focus-visible {
+    outline: var(--d-focus) solid var(--d-ring);
+    outline-offset: 3px;
+  }
+
+  .nav-item:focus-visible {
+    box-shadow: 0 0 0 var(--d-focus) var(--d-ring);
     outline: none;
   }
 }

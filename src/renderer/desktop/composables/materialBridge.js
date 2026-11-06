@@ -74,6 +74,26 @@ export function applyMaterialBridge(root = document.documentElement) {
   return true
 }
 
+/**
+ * 桥当前写在根上的 --fd-* 颜色，原样取出。material 预设只存圆角和尺寸，颜色在桥里；
+ * 用户一改变量就离开 material 预设，桥被清掉，没有这份快照就只剩被改的那一个键。
+ */
+export function snapshotMaterialBridge(root = document.documentElement) {
+  const out = {}
+  for (const key of BRIDGED_KEYS) {
+    const value = root.style.getPropertyValue(key)
+    if (value) out[key] = value
+  }
+  return out
+}
+
+/** vars 缺哪个桥接颜色，就用快照补上（vars 里已有的不动）。 */
+export function withBridgedColours(vars, snapshot) {
+  const out = { ...vars }
+  for (const [key, value] of Object.entries(snapshot)) if (!(key in out)) out[key] = value
+  return out
+}
+
 export function clearMaterialBridge(root = document.documentElement) {
   lastSignature = ''
   for (const key of BRIDGED_KEYS) root.style.removeProperty(key)
