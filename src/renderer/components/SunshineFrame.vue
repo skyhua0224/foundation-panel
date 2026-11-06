@@ -34,7 +34,7 @@ import SidebarMenu from './SidebarMenu.vue'
 import { proxyBlock } from '../composables/proxyBlock.js'
 import { createProxyGate } from '../composables/proxyGate.js'
 import { isWebuiNavigationPath } from '../composables/webuiNavigation.js'
-import { BLANK, routeChanged, webuiNavigated } from '../composables/frameRoute.js'
+import { BLANK, framePageGo, routeChanged, webuiNavigated } from '../composables/frameRoute.js'
 import { webPathOf, routeForWebPath } from '../composables/useRouter.js'
 import { createReportLimiter, normalizeFrameReport } from '../composables/frameReport.js'
 import { parseSettingsHash } from 'foundation-ui/settings/index.js'
@@ -48,7 +48,9 @@ const sunshineUrl = ref('')
 // A frame whose address is set again navigates, and a navigation adds an entry to the window's joint history: the frame's step is then the first thing Back (the mouse button, Alt+Left) undoes,
 // no popstate comes to the panel, and the person stays on the page. Every address gets a frame of its own: the first navigation of a new frame replaces its empty page and adds no entry.
 const frameKey = ref(0)
-watch(sunshineUrl, () => { frameKey.value++ }, { flush: 'sync' })
+// The Web in the frame says (once, after it mounted) that it can be told the page: from then on a request for another framed page is a message to this frame (handleWebuiNavigate), not a new address. A new frame has not said it yet.
+let frameGoReady = false
+watch(sunshineUrl, () => { frameKey.value++; frameGoReady = false }, { flush: 'sync' })
 const currentPath = ref('/')
 const sunshineIframe = ref(null)
 const sidebarMenuRef = ref(null)
@@ -190,7 +192,7 @@ let windowSuspendedUrl = ''
 const settingsPlaceMessage = (path) => {
   const at = path.indexOf('#')
   if (at < 0 || path.slice(0, at) !== '/config' || !sunshineUrl.value || sunshineUrl.value === 'about:blank') return false
-  if (new URL(sunshineUrl.value, window.location.href).pathname.replace(/\.html$/, '') !== '/config') return false
+  if (currentPath.value.split(/[?#]/, 1)[0].replace(/\.html$/, '') !== '/config') return false
   const place = parseSettingsHash(path.slice(at))
   const frame = sunshineIframe.value?.contentWindow
   if (!place || !frame) return false
@@ -209,6 +211,17 @@ const handleWebuiNavigate = (path) => {
   requestedWebuiPath = path
   windowSuspendedUrl = ''
   const next = webuiNavigated(path, { currentPath: currentPath.value, url: sunshineUrl.value, saved: savedIframeUrl }, { urlOf: frameUrlOf })
+  // the frame is one document for the framed pages: it is told the page and swaps the view (nothing reloads, no cover; the Web keeps the chunks of the other pages ready)
+  if (next.url && framePageGo(path, { goReady: frameGoReady, url: sunshineUrl.value, currentPath: currentPath.value })) {
+    const origin = frameOrigin()
+    const frame = sunshineIframe.value?.contentWindow
+    if (origin && frame) {
+      frame.postMessage({ type: 'foundation-frame-go', path }, origin)
+      savedIframeUrl = next.saved
+      currentPath.value = next.currentPath
+      return
+    }
+  }
   savedIframeUrl = next.saved
   currentPath.value = next.currentPath
   if (next.url === null && sunshineUrl.value && sunshineUrl.value !== BLANK) return
@@ -307,6 +320,7 @@ const createMessageHandler = () => {
       beginLoading()
     },
     'webui-ready': finishLoading,
+    'foundation-frame-go-ready': (_data, event) => { if (isTrustedSunshineEvent(event)) frameGoReady = true },
     // errors, long frames and slow calls inside the page, written to the panel's log (frameReport.js); only the frame that is shown may say them
     'panel-frame-report': (data, event) => {
       if (!isTrustedSunshineEvent(event) || !frameLimiter.allow()) return

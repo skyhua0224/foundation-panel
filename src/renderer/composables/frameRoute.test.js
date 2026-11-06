@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { BLANK, routeChanged, webuiNavigated } from './frameRoute.js'
+import { BLANK, framePageGo, routeChanged, webuiNavigated } from './frameRoute.js'
 
 // the route tables of the panel, as useRouter has them for the destinations that matter here
 const WEB = { 'web-clients': '/pin', 'web-apps': '/apps', 'web-downloads': '/downloads', 'web-config': '/config', 'web-troubleshooting': '/troubleshooting' }
@@ -54,4 +54,16 @@ test('asking for the page the frame already shows does nothing; asking while it 
   assert.equal(webuiNavigated('/pin', frame(), deps).url, null)
   assert.equal(webuiNavigated('/pin', frame({ url: BLANK }), deps).url, 'http://127.0.0.1:48081/pin')
   assert.equal(webuiNavigated('/apps', frame(), deps).url, 'http://127.0.0.1:48081/apps')
+})
+
+test('another framed page is a message to the open frame when its Web can be told (one document, no new address); otherwise the address changes as before', () => {
+  const open = { goReady: true, url: 'http://127.0.0.1:48081/pin', currentPath: '/pin' }
+  for (const to of ['/apps', '/downloads', '/config', '/config#tab=network', '/password']) assert.equal(framePageGo(to, open), true, to)
+  assert.equal(framePageGo('/apps', { ...open, goReady: false }), false, 'an older Web in the frame has not said that it can be told')
+  assert.equal(framePageGo('/apps', { ...open, url: BLANK }), false, 'a sleeping frame is loaded, not told')
+  assert.equal(framePageGo('/apps', { ...open, url: 'tauri://localhost/x' }), false)
+  assert.equal(framePageGo('/pin', open), false, 'the same page again is not a message')
+  assert.equal(framePageGo('/config#tab=av', { ...open, currentPath: '/config#tab=general' }), false, 'a place inside /config has its own message')
+  assert.equal(framePageGo('/troubleshooting', open), false, 'a page that is not one of the framed ones')
+  assert.equal(framePageGo('/apps', { ...open, currentPath: '/' }), false, 'the overview is not a framed page')
 })
