@@ -38,7 +38,7 @@
               </div>
               <div class="dsk-te__drop-actions">
                 <template v-if="wallpaper">
-                  <MButton variant="tonal" icon="autorenew" @click="triggerFileInput">{{ t.themeEditor.replace }}</MButton>
+                  <MButton variant="tonal" icon="sync" @click="triggerFileInput">{{ t.themeEditor.replace }}</MButton>
                   <MButton variant="text" icon="delete" @click="$emit('removeWallpaper')">{{ t.themeEditor.remove }}</MButton>
                 </template>
                 <MButton v-else icon="upload_file" @click="triggerFileInput">{{ T.pick }}</MButton>

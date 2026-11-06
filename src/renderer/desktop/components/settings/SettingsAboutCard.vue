@@ -10,7 +10,7 @@
         <MButton variant="text" size="sm" icon="forum" @click="emit('open-link', 'discord')">Discord</MButton>
       </div>
     </div>
-    <MButton variant="tonal" icon="system_update" :loading="checking" @click="emit('check-update')">
+    <MButton variant="tonal" icon="update" :loading="checking" @click="emit('check-update')">
       {{ checking ? t.settings.checking : t.settings.checkUpdate }}
     </MButton>
   </section>

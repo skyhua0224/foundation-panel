@@ -37,7 +37,7 @@
 
       <MEmpty v-else-if="!hasTauri" icon="desktop_windows" :title="text.desktopOnly" />
 
-      <MEmpty v-else-if="mappings.length === 0" icon="folder_off" :title="text.empty">
+      <MEmpty v-else-if="mappings.length === 0" icon="folder" :title="text.empty">
         <MButton icon="add" :disabled="actionDisabled" @click="addFolder">{{ text.chooseFolder }}</MButton>
       </MEmpty>
 

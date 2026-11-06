@@ -1,347 +1,190 @@
 <template>
-  <div class="stream-view">
-    <div class="page-header fade-in">
-      <h1 class="page-title">{{ t.stream.pageTitle }}</h1>
-      <p class="page-subtitle">{{ t.stream.pageSubtitle }}</p>
-    </div>
-
-    <!-- 加载状态 -->
-    <div v-if="loading" class="loading-state fade-in">
-      <div class="loading-spinner"></div>
+  <DeskPage class="stream-view" :title="t.stream.pageTitle" wide>
+    <div v-if="loading" class="dsk-stream__wait">
+      <MLoading size="40px" :label="t.stream.loading" />
       <span>{{ t.stream.loading }}</span>
     </div>
 
     <template v-else>
-      <!-- 编码格式 -->
-      <div class="desktop-card fade-in">
-        <div class="card-header">
-          <div class="card-title">
-            <span class="title-icon"><MIcon name="movie" /></span>
-            {{ t.stream.codec.format }}
-          </div>
-        </div>
-        <div class="card-content">
-          <div class="codec-grid">
-            <div 
-              v-for="codec in codecs" 
+      <div class="dsk-stream">
+        <div class="dsk-stream__col">
+          <!-- codecs -->
+          <SettingsCard :title="t.stream.codec.format" icon="movie">
+            <MItem
+              v-for="codec in codecs"
               :key="codec.key"
-              class="codec-card"
-              :class="{ active: configData[codec.key] > 0 }"
-              @click="toggleCodec(codec.key)"
+              :stack="configData[codec.key] > 0"
+              :title="codec.name"
+              :text="codec.desc"
             >
-              <div class="codec-header">
-                <span class="codec-name">{{ codec.name }}</span>
-                <span class="codec-toggle" :class="{ on: configData[codec.key] > 0 }">
-                  {{ configData[codec.key] > 0 ? t.stream.codec.enabled : t.stream.codec.disabled }}
-                </span>
-              </div>
-              <div class="codec-desc">{{ codec.desc }}</div>
-              <div v-if="configData[codec.key] > 0" class="codec-mode" @click.stop>
-                <PillGroup v-model="configData[codec.key]" :options="codecModes" />
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+              <template #trail>
+                <MSwitch :model-value="configData[codec.key] > 0" :label="codec.name" @update:model-value="toggleCodec(codec.key)" />
+              </template>
+              <template v-if="configData[codec.key] > 0" #control>
+                <MSeg v-model="configData[codec.key]" block :label="codec.name" :options="codecModes" />
+              </template>
+            </MItem>
+          </SettingsCard>
 
-      <!-- 码率上限 & HDR -->
-      <div class="desktop-grid cols-2 fade-in">
-        <div class="desktop-card">
-          <div class="card-header">
-            <div class="card-title">
-              <span class="title-icon"><MIcon name="monitoring" /></span>
-              {{ t.stream.bitrateLimit }}
-            </div>
-            <div class="card-actions">
-              <span class="bitrate-badge">{{ bitrateDisplay }}</span>
-            </div>
-          </div>
-          <div class="card-content">
-            <input 
-              type="range" 
-              v-model.number="bitrateKbps" 
-              :min="1000" 
-              :max="200000" 
-              :step="1000"
-              class="slider"
-            />
-            <div class="slider-labels">
-              <span>1 Mbps</span>
-              <span>200 Mbps</span>
-            </div>
-            <div class="preset-row">
-              <button class="preset-btn" @click="bitrateKbps = 20000">20 Mbps</button>
-              <button class="preset-btn" @click="bitrateKbps = 50000">50 Mbps</button>
-              <button class="preset-btn" @click="bitrateKbps = 100000">100 Mbps</button>
-              <button class="preset-btn" @click="bitrateKbps = 0">{{ t.stream.bitrateUnlimited }}</button>
-            </div>
-          </div>
-        </div>
-
-        <div class="desktop-card">
-          <div class="card-header">
-            <div class="card-title">
-              <span class="title-icon"><MIcon name="light_mode" /></span>
-              {{ t.stream.hdr }}
-            </div>
-          </div>
-          <div class="card-content">
-            <div class="toggle-row">
-              <div class="toggle-info">
-                <div class="toggle-label">{{ t.stream.hdrAutoSwitch }}</div>
-                <div class="toggle-desc">{{ t.stream.hdrAutoSwitchDesc }}</div>
-              </div>
-              <button 
-                class="toggle-btn" 
-                :class="{ on: configData.hdr_prep === 'automatic' }"
-                @click="configData.hdr_prep = configData.hdr_prep === 'automatic' ? 'no_operation' : 'automatic'"
-              >
-                {{ configData.hdr_prep === 'automatic' ? t.stream.hdrMode.auto : t.stream.hdrMode.manual }}
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 显示与捕获 -->
-      <div class="desktop-card fade-in">
-        <div class="card-header">
-          <div class="card-title">
-            <span class="title-icon"><MIcon name="monitor" /></span>
-            {{ t.stream.displayCapture }}
-          </div>
-        </div>
-        <div class="card-content settings-list">
-          <div class="setting-row">
-            <div class="setting-info">
-              <div class="setting-label">{{ t.stream.outputDisplay }}</div>
-              <div class="setting-desc">{{ t.stream.outputDisplayDesc }}</div>
-            </div>
-            <FdDropdown 
-              v-model="configData.output_name" 
-              :options="displayOptions" 
-              :placeholder="t.stream.outputDisplayAuto" 
-            />
-          </div>
-          <div class="setting-row">
-            <div class="setting-info">
-              <div class="setting-label">{{ t.stream.resolutionAdapt }}</div>
-              <div class="setting-desc">{{ t.stream.resolutionAdaptDesc }}</div>
-            </div>
-            <PillGroup v-model="configData.resolution_change" :options="adaptModes" />
-          </div>
-          <div v-if="configData.resolution_change === 2" class="setting-row sub">
-            <div class="setting-info">
-              <div class="setting-label">{{ t.stream.manualResolution }}</div>
-            </div>
-            <input 
-              v-model="configData.manual_resolution" 
-              class="setting-input" 
-              placeholder="1920x1080"
-            />
-          </div>
-          <div class="setting-row">
-            <div class="setting-info">
-              <div class="setting-label">{{ t.stream.refreshRateAdapt }}</div>
-              <div class="setting-desc">{{ t.stream.refreshRateAdaptDesc }}</div>
-            </div>
-            <PillGroup v-model="configData.refresh_rate_change" :options="adaptModes" />
-          </div>
-          <div v-if="configData.refresh_rate_change === 2" class="setting-row sub">
-            <div class="setting-info">
-              <div class="setting-label">{{ t.stream.manualRefreshRate }}</div>
-            </div>
-            <input 
-              v-model="configData.manual_refresh_rate" 
-              class="setting-input" 
-              placeholder="60"
-            />
-          </div>
-        </div>
-      </div>
-
-      <!-- 启动模式 -->
-      <div class="desktop-card fade-in">
-        <div class="card-header">
-          <div class="card-title">
-            <span class="title-icon"><MIcon name="send" /></span>
-            {{ t.stream.launchMode }}
-          </div>
-        </div>
-        <div class="card-content">
-          <div class="launch-mode-card" :class="{ active: autoLaunchDesktop }" @click="autoLaunchDesktop = !autoLaunchDesktop">
-            <div class="launch-mode-main">
-              <div class="launch-mode-info">
-                <div class="launch-mode-title">{{ t.stream.autoLaunchDesktopUI }}</div>
-                <div class="launch-mode-desc">
-                  {{ t.stream.autoLaunchDesktopUIDesc }}
+          <!-- bitrate limit -->
+          <SettingsCard :title="t.stream.bitrateLimit" icon="monitoring">
+            <template #actions><MChip tone="info">{{ bitrateDisplay }}</MChip></template>
+            <MItem stack :title="t.stream.bitrateLimit" :value="bitrateDisplay">
+              <template #control>
+                <div class="dsk-stream__range">
+                  <MIconButton icon="remove" tonal :label="`${t.stream.bitrateLimit} −`" @click="nudgeBitrate(-5000)" />
+                  <MSlider v-model="bitrateKbps" :min="1000" :max="200000" :step="1000" size="m" :label="t.stream.bitrateLimit" />
+                  <MIconButton icon="add" tonal :label="`${t.stream.bitrateLimit} +`" @click="nudgeBitrate(5000)" />
                 </div>
-              </div>
-              <button 
-                class="toggle-btn" 
-                :class="{ on: autoLaunchDesktop }"
-                @click.stop="autoLaunchDesktop = !autoLaunchDesktop"
-              >
-                {{ autoLaunchDesktop ? t.stream.launchOn : t.stream.launchOff }}
-              </button>
-            </div>
-          </div>
+                <MSeg v-model="bitrateKbps" block :label="t.stream.bitrateLimit" :options="BITRATE_PRESETS" />
+              </template>
+            </MItem>
+          </SettingsCard>
+
+          <!-- HDR -->
+          <SettingsCard :title="t.stream.hdr" icon="hdr_on">
+            <SettingsRow :name="t.stream.hdrAutoSwitch" :description="t.stream.hdrAutoSwitchDesc">
+              <SettingsSwitch
+                :model-value="configData.hdr_prep === 'automatic'"
+                :label="t.stream.hdrAutoSwitch"
+                @update:model-value="configData.hdr_prep = $event ? 'automatic' : 'no_operation'"
+              />
+            </SettingsRow>
+          </SettingsCard>
+
+          <!-- launch mode -->
+          <SettingsCard :title="t.stream.launchMode" icon="send">
+            <SettingsRow class="dsk-stream__tap" :name="t.stream.autoLaunchDesktopUI" :description="t.stream.autoLaunchDesktopUIDesc" @click="onLaunchRow">
+              <SettingsSwitch v-model="autoLaunchDesktop" :label="t.stream.autoLaunchDesktopUI" />
+            </SettingsRow>
+          </SettingsCard>
+        </div>
+
+        <div class="dsk-stream__col">
+          <!-- display and capture -->
+          <SettingsCard :title="t.stream.displayCapture" icon="monitor">
+            <SettingsRow :name="t.stream.outputDisplay" :description="t.stream.outputDisplayDesc" />
+            <MItem
+              v-for="option in displayOptions"
+              :key="option.value"
+              action
+              :selected="configData.output_name === option.value"
+              :title="option.label"
+              @click="configData.output_name = option.value"
+            >
+              <template #trail><MIcon v-if="configData.output_name === option.value" name="check" /></template>
+            </MItem>
+
+            <SettingsRow stack :name="t.stream.resolutionAdapt" :description="t.stream.resolutionAdaptDesc">
+              <MSeg v-model="configData.resolution_change" block :label="t.stream.resolutionAdapt" :options="adaptModes" />
+            </SettingsRow>
+            <MItem v-if="configData.resolution_change === 2" stack :title="t.stream.manualResolution">
+              <template #control>
+                <MField v-model="configData.manual_resolution" :label="t.stream.manualResolution" placeholder="1920x1080" data-focusable data-focus-key="stream-manual-resolution" />
+              </template>
+            </MItem>
+
+            <SettingsRow stack :name="t.stream.refreshRateAdapt" :description="t.stream.refreshRateAdaptDesc">
+              <MSeg v-model="configData.refresh_rate_change" block :label="t.stream.refreshRateAdapt" :options="adaptModes" />
+            </SettingsRow>
+            <MItem v-if="configData.refresh_rate_change === 2" stack :title="t.stream.manualRefreshRate">
+              <template #control>
+                <MField v-model="configData.manual_refresh_rate" :label="t.stream.manualRefreshRate" placeholder="60" suffix="Hz" data-focusable data-focus-key="stream-manual-refresh" />
+              </template>
+            </MItem>
+          </SettingsCard>
+
+          <!-- virtual display -->
+          <MBanner v-if="vddStatus.state !== 'ready'" :tone="vddReady ? 'warn' : 'error'" icon="warning">
+            <strong>{{ t.vddSettings.driverPrerequisiteTitle }}</strong>
+            {{ vddStatus.status_text || t.vddSettings.driverPrerequisiteDesc }}
+            <template #actions>
+              <MButton v-if="vddCanInstall" variant="text" :loading="vddInstalling" @click="installOrRepairVdd">{{ t.vddSettings.installRepairDriver }}</MButton>
+              <MButton variant="text" :loading="vddChecking" @click="loadVddStatus">{{ t.vddSettings.recheckDriver }}</MButton>
+            </template>
+          </MBanner>
+          <SettingsCard :title="t.stream.virtualDisplay" icon="desktop_windows">
+            <template #actions><MChip :tone="vddTone">{{ vddStatusLabel }}</MChip></template>
+            <SettingsRow v-if="nvidiaVsync.visible" :name="t.stream.nvidiaVsync.title" :disabled="nvidiaVsync.disabled || saving">
+              <template #description>
+                {{ t.stream.nvidiaVsync.description }}
+                <span class="dsk-stream__status" role="status">{{ t.stream.nvidiaVsync[nvidiaVsync.state] }}</span>
+              </template>
+              <SettingsSwitch
+                :model-value="nvidiaVsync.checked"
+                :label="t.stream.nvidiaVsync.title"
+                :disabled="nvidiaVsync.disabled || saving"
+                @update:model-value="configData.nvenc_vdd_force_vsync = nvidiaVsync.checked ? 'disabled' : 'enabled'"
+              />
+            </SettingsRow>
+            <SettingsRow stack :name="t.stream.vddPhysicalHandling" :description="t.stream.vddPhysicalHandlingDesc">
+              <MSeg
+                v-model="configData.vdd_prep"
+                block
+                :label="t.stream.vddPhysicalHandling"
+                :options="[{ value: 0, label: t.stream.vddPhysicalMode.noAction }, { value: 1, label: t.stream.vddPhysicalMode.disable }]"
+              />
+            </SettingsRow>
+            <SettingsRow :name="t.stream.vddKeepEnabled" :description="t.stream.vddKeepEnabledDesc">
+              <SettingsSwitch
+                :model-value="configData.vdd_keep_enabled === 'enabled'"
+                :label="t.stream.vddKeepEnabled"
+                :disabled="vddConfigSaving || (configData.vdd_keep_enabled !== 'enabled' && !vddReady)"
+                @update:model-value="toggleVddOption('keep')"
+              />
+            </SettingsRow>
+            <SettingsRow :name="t.stream.vddHeadlessCreate" :description="t.stream.vddHeadlessCreateDesc">
+              <SettingsSwitch
+                :model-value="configData.vdd_headless_create_enabled === 'enabled'"
+                :label="t.stream.vddHeadlessCreate"
+                :disabled="vddConfigSaving || (configData.vdd_headless_create_enabled !== 'enabled' && !vddReady)"
+                @update:model-value="toggleVddOption('headless')"
+              />
+            </SettingsRow>
+          </SettingsCard>
+
+          <!-- virtual mouse driver -->
+          <SettingsCard :title="t.stream.vmouse" icon="mouse">
+            <template #actions><MChip :tone="vmouseTone">{{ vmouseStatusLabel }}</MChip></template>
+            <SettingsRow :name="t.stream.vmouseToggle" :description="vmouseNotice || t.stream.vmouseToggleDesc" :disabled="vmouseConfigSaving || !vmouseStatusKnown">
+              <SettingsSwitch
+                :model-value="vmouseEnabled"
+                :label="t.stream.vmouseToggle"
+                :disabled="vmouseConfigSaving || !vmouseStatusKnown"
+                @update:model-value="toggleVmouse"
+              />
+            </SettingsRow>
+            <SettingsRow :name="t.stream.vmouseDriverStatus" :description="vmouseStatus.status_text || t.stream.vmouseDetecting">
+              <MButton v-if="!vmouseStatus.installed" icon="download" :loading="vmouseInstalling" @click="installVmouse">
+                {{ vmouseInstalling ? t.stream.vmouseInstalling : t.stream.vmouseInstall }}
+              </MButton>
+              <MButton v-else variant="danger" icon="delete" :loading="vmouseUninstalling" @click="uninstallVmouse">
+                {{ vmouseUninstalling ? t.stream.vmouseUninstalling : t.stream.vmouseUninstall }}
+              </MButton>
+            </SettingsRow>
+          </SettingsCard>
         </div>
       </div>
 
-      <!-- 虚拟显示器 -->
-      <div class="desktop-card fade-in">
-        <div class="card-header">
-          <div class="card-title">
-            <span class="title-icon"><MIcon name="monitor" /></span>
-            {{ t.stream.virtualDisplay }}
-          </div>
-          <div class="card-actions">
-            <span class="status-badge" :class="vddStatusClass">{{ vddStatusLabel }}</span>
-          </div>
-        </div>
-        <div class="card-content settings-list">
-          <div v-if="vddStatus.state !== 'ready'" class="driver-notice" :class="{ unavailable: !vddReady }">
-            <div class="driver-notice-copy">
-              <strong>{{ t.vddSettings.driverPrerequisiteTitle }}</strong>
-              <span>{{ vddStatus.status_text || t.vddSettings.driverPrerequisiteDesc }}</span>
-            </div>
-            <div class="driver-notice-actions">
-              <button
-                v-if="vddCanInstall"
-                class="desktop-btn primary"
-                :disabled="vddInstalling"
-                @click="installOrRepairVdd"
-              >
-                {{ t.vddSettings.installRepairDriver }}
-              </button>
-              <button class="desktop-btn" :disabled="vddChecking" @click="loadVddStatus">
-                {{ t.vddSettings.recheckDriver }}
-              </button>
-            </div>
-          </div>
-          <div v-if="nvidiaVsync.visible" class="setting-row">
-            <div class="setting-info">
-              <div id="nvidia-vsync-label" class="setting-label">{{ t.stream.nvidiaVsync.title }}</div>
-              <div id="nvidia-vsync-desc" class="setting-desc">{{ t.stream.nvidiaVsync.description }}</div>
-              <div id="nvidia-vsync-status" class="setting-desc" role="status">{{ t.stream.nvidiaVsync[nvidiaVsync.state] }}</div>
-            </div>
-            <button class="toggle-btn" role="switch" :aria-checked="nvidiaVsync.checked"
-                    aria-labelledby="nvidia-vsync-label" aria-describedby="nvidia-vsync-desc nvidia-vsync-status"
-                    :class="{ on: nvidiaVsync.checked }" :disabled="nvidiaVsync.disabled || saving"
-                    @click="configData.nvenc_vdd_force_vsync = nvidiaVsync.checked ? 'disabled' : 'enabled'">
-              {{ nvidiaVsync.checked ? t.stream.yes : t.stream.no }}
-            </button>
-          </div>
-          <div class="setting-row">
-            <div class="setting-info">
-              <div class="setting-label">{{ t.stream.vddPhysicalHandling }}</div>
-              <div class="setting-desc">{{ t.stream.vddPhysicalHandlingDesc }}</div>
-            </div>
-            <PillGroup 
-              v-model="configData.vdd_prep" 
-              :options="[{ value: 0, label: t.stream.vddPhysicalMode.noAction }, { value: 1, label: t.stream.vddPhysicalMode.disable }]" 
-            />
-          </div>
-          <div class="setting-row">
-            <div class="setting-info">
-              <div class="setting-label">{{ t.stream.vddKeepEnabled }}</div>
-              <div class="setting-desc">{{ t.stream.vddKeepEnabledDesc }}</div>
-            </div>
-            <button 
-              class="toggle-btn" 
-              :class="{ on: configData.vdd_keep_enabled === 'enabled' }"
-              :disabled="vddConfigSaving || (configData.vdd_keep_enabled !== 'enabled' && !vddReady)"
-              @click="toggleVddOption('keep')"
-            >
-              {{ configData.vdd_keep_enabled === 'enabled' ? t.stream.yes : t.stream.no }}
-            </button>
-          </div>
-          <div class="setting-row">
-            <div class="setting-info">
-              <div class="setting-label">{{ t.stream.vddHeadlessCreate }}</div>
-              <div class="setting-desc">{{ t.stream.vddHeadlessCreateDesc }}</div>
-            </div>
-            <button 
-              class="toggle-btn" 
-              :class="{ on: configData.vdd_headless_create_enabled === 'enabled' }"
-              :disabled="vddConfigSaving || (configData.vdd_headless_create_enabled !== 'enabled' && !vddReady)"
-              @click="toggleVddOption('headless')"
-            >
-              {{ configData.vdd_headless_create_enabled === 'enabled' ? t.stream.yes : t.stream.no }}
-            </button>
-          </div>
+      <!-- save -->
+      <div class="dsk-stream__foot">
+        <SettingsNotice :notice="saveNotice" />
+        <div class="m-savebar">
+          <MButton size="lg" icon="check" :loading="saving" @click="saveSettings">{{ saving ? t.stream.saving : t.stream.saveSettings }}</MButton>
         </div>
       </div>
-
-      <!-- 虚拟鼠标驱动 -->
-      <div class="desktop-card fade-in">
-        <div class="card-header">
-          <div class="card-title">
-            <span class="title-icon"><MIcon name="mouse" /></span>
-            {{ t.stream.vmouse }}
-          </div>
-          <div class="card-actions">
-            <span class="status-badge" :class="vmouseStatusClass">{{ vmouseStatusLabel }}</span>
-          </div>
-        </div>
-        <div class="card-content settings-list">
-          <div class="setting-row">
-            <div class="setting-info">
-              <div class="setting-label">{{ t.stream.vmouseToggle }}</div>
-              <div role="status" class="setting-desc">{{ vmouseNotice || t.stream.vmouseToggleDesc }}</div>
-            </div>
-            <button 
-              class="toggle-btn" 
-              :class="{ on: vmouseEnabled }"
-              @click="toggleVmouse"
-              :disabled="vmouseConfigSaving || !vmouseStatusKnown"
-            >
-              {{ !vmouseStatusKnown ? t.stream.vmouseUnknown : vmouseEnabled ? t.stream.vmouseOn : t.stream.vmouseOff }}
-            </button>
-          </div>
-          <div class="setting-row">
-            <div class="setting-info">
-              <div class="setting-label">{{ t.stream.vmouseDriverStatus }}</div>
-              <div class="setting-desc">{{ vmouseStatus.status_text || t.stream.vmouseDetecting }}</div>
-            </div>
-            <button 
-              v-if="!vmouseStatus.installed"
-              class="desktop-btn primary"
-              :disabled="vmouseInstalling"
-              @click="installVmouse"
-            >
-              {{ vmouseInstalling ? t.stream.vmouseInstalling : t.stream.vmouseInstall }}
-            </button>
-            <button 
-              v-else
-              class="desktop-btn danger"
-              :disabled="vmouseUninstalling"
-              @click="uninstallVmouse"
-            >
-              {{ vmouseUninstalling ? t.stream.vmouseUninstalling : t.stream.vmouseUninstall }}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- 保存 -->
-      <div class="actions-bar fade-in">
-        <span v-if="saveMsg" class="save-msg" :class="saveMsg.type">{{ saveMsg.text }}</span>
-        <button class="desktop-btn primary" :disabled="saving" @click="saveSettings">
-          {{ saving ? t.stream.saving : t.stream.saveSettings }}
-        </button>
-      </div>
-
     </template>
-  </div>
+  </DeskPage>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
-import { MIcon } from 'foundation-ui/vue'
-import PillGroup from '../components/PillGroup.vue'
-import FdDropdown from '../components/FdDropdown.vue'
+import { MBanner, MButton, MChip, MField, MIcon, MIconButton, MItem, MLoading, MSeg, MSlider, MSwitch } from 'foundation-ui/vue'
+import DeskPage from '../components/DeskPage.vue'
+import SettingsCard from '../components/settings/SettingsCard.vue'
+import SettingsNotice from '../components/settings/SettingsNotice.vue'
+import SettingsRow from '../components/settings/SettingsRow.vue'
+import SettingsSwitch from '../components/settings/SettingsSwitch.vue'
 import { useVmouse, reloadVmouseAfterOperation } from '../../composables/useVmouse.js'
 import { vdd as vddApi, vmouse as vmouseApi } from '../../tauri-adapter.js'
 import { installVddWithRecovery } from '../../composables/vddInstallRecovery.js'
@@ -424,6 +267,25 @@ const displayOptions = computed(() => {
   }
   return opts
 })
+
+// A press anywhere on the launch-mode row but the switch itself flips it (the old card did).
+function onLaunchRow(event) {
+  if (event.target?.closest?.('.m-switch')) return
+  autoLaunchDesktop.value = !autoLaunchDesktop.value
+}
+
+const STATUS_TONES = { good: 'ok', warn: 'warn', off: 'neutral' }
+const vddTone = computed(() => STATUS_TONES[vddStatusClass.value] || 'neutral')
+const vmouseTone = computed(() => STATUS_TONES[vmouseStatusClass.value] || 'neutral')
+const saveNotice = computed(() => (saveMsg.value ? { type: saveMsg.value.type, message: saveMsg.value.text } : null))
+const BITRATE_PRESETS = computed(() => [
+  { value: 20000, label: '20 Mbps' },
+  { value: 50000, label: '50 Mbps' },
+  { value: 100000, label: '100 Mbps' },
+  { value: 0, label: t.value.stream.bitrateUnlimited },
+])
+// the step buttons beside the slider (a pad cannot drag): 5 Mbps, inside the slider's range
+const nudgeBitrate = (delta) => { bitrateKbps.value = Math.min(200000, Math.max(1000, (bitrateKbps.value || 200000) + delta)) }
 
 function formatDisplayDeviceName(data = '') {
   const text = String(data || '')
@@ -773,426 +635,16 @@ async function uninstallVmouse() {
 }
 </script>
 
-<style lang="less" scoped>
-.stream-view {
-  max-width: 1200px;
-  margin: 0 auto;
+<style scoped>
+.dsk-stream { display: grid; grid-template-columns: minmax(0, 1fr); gap: 24px; margin-bottom: 24px; }
+.dsk-stream__col { display: flex; flex-direction: column; gap: 24px; min-width: 0; }
+@media (min-width: 1500px) {
+  .dsk-stream { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 }
-
-.page-header {
-  margin-bottom: 40px;
-
-  .page-title {
-    font-size: 40px;
-    font-weight: 700;
-    color: var(--fd-text-primary, #fff);
-    margin: 0 0 10px 0;
-  }
-
-  .page-subtitle {
-    font-size: 18px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-    margin: 0;
-  }
-}
-
-// Loading
-.loading-state {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 80px 0;
-  font-size: 16px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-}
-
-.loading-spinner {
-  width: 24px;
-  height: 24px;
-  border: 3px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-  border-top-color: var(--fd-accent, #00fff5);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-// Cards
-.desktop-card {
-  margin-bottom: 24px;
-}
-
-// Codec grid
-.codec-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-
-  @media (max-width: 700px) {
-    grid-template-columns: 1fr;
-  }
-}
-
-.codec-card {
-  padding: 20px;
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-  }
-
-  &.active {
-    border-color: var(--fd-accent, #00fff5);
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-  }
-
-  .codec-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 6px;
-  }
-
-  .codec-name {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--fd-text-primary, #fff);
-  }
-
-  .codec-toggle {
-    font-size: 12px;
-    padding: 3px 10px;
-    border-radius: 12px;
-    background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.08);
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.4);
-    transition: all 0.2s ease;
-
-    &.on {
-      background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-      color: var(--fd-accent, #00fff5);
-    }
-  }
-
-  .codec-desc {
-    font-size: 13px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.45);
-  }
-
-  .codec-mode {
-    margin-top: 12px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-  }
-}
-
-// Bitrate
-.bitrate-badge {
-  font-size: 22px;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--fd-accent, #00fff5) 0%, var(--fd-accent-secondary, #ff00ff) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-.slider {
-  width: 100%;
-  height: 6px;
-  border-radius: 3px;
-  background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.1);
-  appearance: none;
-  outline: none;
-  margin-bottom: 8px;
-
-  &::-webkit-slider-thumb {
-    appearance: none;
-    width: 18px;
-    height: 18px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, var(--fd-accent, #00fff5) 0%, var(--fd-accent-secondary, #ff00ff) 100%);
-    cursor: pointer;
-    box-shadow: 0 0 8px rgba(var(--fd-accent-rgb, 0, 255, 245), 0.4);
-  }
-}
-
-.slider-labels {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.35);
-  margin-bottom: 14px;
-}
-
-.preset-row {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.preset-btn {
-  padding: 6px 14px;
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-  border-radius: 6px;
-  background: transparent;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: var(--fd-accent, #00fff5);
-    color: var(--fd-accent, #00fff5);
-  }
-}
-
-// Toggle button
-.toggle-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.toggle-info {
-  flex: 1;
-}
-
-.toggle-label {
-  font-weight: 500;
-  color: var(--fd-text-primary, #fff);
-  margin-bottom: 2px;
-}
-
-.toggle-desc {
-  font-size: 13px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.45);
-}
-
-.toggle-btn {
-  padding: 8px 20px;
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-  border-radius: 8px;
-  background: transparent;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.5);
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  transition: all 0.2s ease;
-  min-width: 80px;
-  text-align: center;
-
-  &.on {
-    border-color: var(--fd-accent, #00fff5);
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-    color: var(--fd-accent, #00fff5);
-  }
-}
-
-// Settings list
-.driver-notice {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  margin-bottom: 12px;
-  padding: 14px 16px;
-  border: 1px solid rgba(251, 191, 36, 0.3);
-  border-radius: 10px;
-  background: rgba(251, 191, 36, 0.08);
-
-  &.unavailable {
-    border-color: rgba(248, 113, 113, 0.35);
-    background: rgba(248, 113, 113, 0.08);
-  }
-}
-
-.driver-notice-copy {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 4px;
-  color: var(--fd-text-primary, #fff);
-
-  span {
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.6);
-    font-size: 13px;
-  }
-}
-
-.driver-notice-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.settings-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-
-@media (max-width: 700px) {
-  .driver-notice {
-    align-items: stretch;
-    flex-direction: column;
-  }
-}
-
-.setting-row {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 0;
-  border-bottom: 1px solid rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.06);
-
-  &:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-  }
-
-  &:first-child {
-    padding-top: 0;
-  }
-
-  &.sub {
-    padding-left: 24px;
-    opacity: 0.85;
-  }
-}
-
-.setting-info {
-  flex: 1;
-}
-
-.setting-label {
-  font-weight: 500;
-  color: var(--fd-text-primary, #fff);
-  margin-bottom: 2px;
-}
-
-.setting-desc {
-  font-size: 13px;
-  color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.45);
-}
-
-.setting-input {
-  padding: 8px 12px;
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
-  border-radius: 8px;
-  background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.05);
-  color: var(--fd-text-primary, #fff);
-  font-size: 14px;
-  outline: none;
-  width: 140px;
-
-  &:focus {
-    border-color: var(--fd-accent, #00fff5);
-  }
-}
-
-// Launch mode
-.launch-mode-card {
-  padding: 20px;
-  border: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.15);
-  border-radius: 12px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-
-  &:hover {
-    border-color: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.3);
-  }
-
-  &.active {
-    border-color: var(--fd-accent, #00fff5);
-    background: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.08);
-  }
-
-  .launch-mode-main {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-
-  .launch-mode-info {
-    flex: 1;
-  }
-
-  .launch-mode-title {
-    font-size: 16px;
-    font-weight: 600;
-    color: var(--fd-text-primary, #fff);
-    margin-bottom: 6px;
-  }
-
-  .launch-mode-desc {
-    font-size: 13px;
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.45);
-    line-height: 1.5;
-  }
-}
-
-// Actions bar
-.actions-bar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 16px;
-  margin-top: 32px;
-  padding-top: 24px;
-  border-top: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-}
-
-.save-msg {
-  font-size: 14px;
-  margin-right: auto;
-
-  &.success {
-    color: var(--fd-status-online, #4ade80);
-  }
-
-  &.error {
-    color: var(--fd-status-error, #f87171);
-  }
-}
-
-// VMouse status badge
-.status-badge {
-  font-size: 12px;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: 20px;
-  letter-spacing: 0.5px;
-
-  &.good {
-    background: rgba(74, 222, 128, 0.15);
-    color: #4ade80;
-  }
-
-  &.warn {
-    background: rgba(251, 191, 36, 0.15);
-    color: #fbbf24;
-  }
-
-  &.off {
-    background: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.08);
-    color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.4);
-  }
-}
-
-.desktop-btn.danger {
-  color: #f87171;
-  border-color: rgba(248, 113, 113, 0.3);
-
-  &:hover {
-    background: rgba(248, 113, 113, 0.1);
-    border-color: #f87171;
-  }
-}
-
+.dsk-stream__wait { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 64px; font: var(--m-title-medium); color: var(--md-sys-color-on-surface-variant); }
+.dsk-stream__range { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.dsk-stream__range .m-slider { flex: 1; min-width: 0; }
+.dsk-stream__status { display: block; margin-top: 2px; color: var(--md-sys-color-primary-text); }
+.dsk-stream__tap { cursor: pointer; }
+.dsk-stream__foot { position: sticky; bottom: 16px; z-index: 8; display: flex; flex-direction: column; align-items: center; gap: 8px; }
 </style>
-
