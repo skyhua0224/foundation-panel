@@ -172,3 +172,23 @@ test('the panel keeps its progress under its own key', () => {
   assert.equal(readProgress(storage, 'foundation.guide.panel').step, 'pair')
   assert.equal(readProgress(storage, 'foundation.guide.web').step, null)
 })
+
+test('the Web UI access step reads the saved scope and bind address and saves one key without touching the rest', async () => {
+  const calls = []
+  const data = make({
+    '/api/config': { origin_web_ui_allowed: 'wan', bind_address: '192.168.1.5', port: '57989', locale: 'zh' },
+    '/api/network/listeners': { status: true, active: { origin_web_ui_allowed: 'lan', bind_address: '' }, saved: { origin_web_ui_allowed: 'wan', bind_address: '192.168.1.5' }, addresses: [] },
+  }, {}, calls)
+  await data.callbacks.loadWebAccess()
+  assert.equal(data.state.webAccess.scope, 'wan')
+  assert.equal(data.state.webAccess.bind, '192.168.1.5')
+  assert.equal(data.state.webAccess.active.origin_web_ui_allowed, 'lan')
+  assert.equal(data.state.webAccess.saved.origin_web_ui_allowed, 'wan')
+  const answer = await data.callbacks.saveWebAccess({ origin_web_ui_allowed: 'pc' })
+  assert.deepEqual(answer, { ok: true })
+  const post = calls.find((c) => c.method === 'POST')
+  assert.equal(post.path, '/api/config')
+  assert.deepEqual(post.body, { origin_web_ui_allowed: 'pc', bind_address: '192.168.1.5', port: '57989', locale: 'zh' })
+  assert.equal(data.state.webAccess.scope, 'pc')
+  assert.ok(buildGuideSteps().some((s) => s.id === 'webaccess'))
+})
