@@ -632,6 +632,8 @@ watch(
   flex-direction: column;
   align-items: center;
   gap: 12px;
+  // an absolutely placed box at left: 50% would shrink to half the screen: take the width of the content, up to the screen
+  width: max-content;
   max-width: calc(100vw - 180px);
   // 空档区不能吃掉点击；子元素各自恢复
   pointer-events: none;

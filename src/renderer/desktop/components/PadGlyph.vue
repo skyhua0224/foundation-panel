@@ -136,10 +136,8 @@ const DOTS = [
 .tone-red { --pg-fill: var(--md-sys-color-error-container); --pg-ink: var(--md-sys-color-on-error-container); }
 .tone-blue { --pg-fill: var(--md-sys-color-primary-container); --pg-ink: var(--md-sys-color-on-primary-container); }
 .tone-yellow { --pg-fill: var(--md-sys-color-warning-container, var(--md-sys-color-tertiary-container)); --pg-ink: var(--md-sys-color-on-warning-container, var(--md-sys-color-on-tertiary-container)); }
-.tone-pink {
-  --pg-fill: color-mix(in srgb, var(--md-sys-color-error-container) 55%, var(--md-sys-color-tertiary-container));
-  --pg-ink: color-mix(in srgb, var(--md-sys-color-on-error-container) 55%, var(--md-sys-color-on-tertiary-container));
-}
+// 粉（□）：用 tertiary 容器与它自己的 on 色，这一对由主题保证对比度（两色混出来的墨色在深色下会和底色糊在一起）
+.tone-pink { --pg-fill: var(--md-sys-color-tertiary-container); --pg-ink: var(--md-sys-color-on-tertiary-container); }
 .pg-key.tone-neutral, .pg-face.tone-neutral { --pg-fill: var(--md-sys-color-surface-container-highest); --pg-ink: var(--md-sys-color-on-surface); }
 .pg-key { background: var(--pg-fill, var(--md-sys-color-surface-container-highest)); color: var(--pg-ink, var(--md-sys-color-on-surface)); }
 
@@ -147,8 +145,9 @@ const DOTS = [
   from { opacity: 0; transform: scale(0.6); }
   to { opacity: 1; transform: scale(1); }
 }
+// 减少动效：跟随系统时看 prefers-reduced-motion，设置里选「完整」就不降，选「减少」一律降（foundation-ui 的 data-motion）
 @media (prefers-reduced-motion: reduce) {
-  .pg { animation: none; }
+  :global(html:not([data-motion='full'])) .pg { animation: none; }
 }
-:global(.m-app[data-motion='reduced']) .pg { animation: none; }
+:global(html[data-motion='reduced']) .pg { animation: none; }
 </style>

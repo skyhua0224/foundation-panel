@@ -75,7 +75,7 @@ const hints = computed(() => {
 .gamepad-legend {
   display: inline-flex;
   align-items: center;
-  max-width: min(100%, 1500px);
+  max-width: min(100%, 1800px);
   padding: 12px 30px 12px 22px;
   border-radius: 9999px;
   background: color-mix(in srgb, var(--md-sys-color-surface-container-high) 88%, transparent);
@@ -90,7 +90,7 @@ const hints = computed(() => {
   align-items: center;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px 30px;
+  gap: 8px 26px;
 }
 
 .legend-item {
@@ -125,6 +125,11 @@ const hints = computed(() => {
   transform: translateY(10px) scale(0.92);
 }
 @media (prefers-reduced-motion: reduce) {
-  .legend-item-enter-active, .legend-item-leave-active, .legend-item-move { transition: none; }
+  :global(html:not([data-motion='full'])) .legend-item-enter-active,
+  :global(html:not([data-motion='full'])) .legend-item-leave-active,
+  :global(html:not([data-motion='full'])) .legend-item-move { transition: none; }
 }
+:global(html[data-motion='reduced']) .legend-item-enter-active,
+:global(html[data-motion='reduced']) .legend-item-leave-active,
+:global(html[data-motion='reduced']) .legend-item-move { transition: none; }
 </style>

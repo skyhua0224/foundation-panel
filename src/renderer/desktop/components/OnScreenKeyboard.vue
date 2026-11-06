@@ -297,7 +297,8 @@ function onKeydown(event) {
 .osk-hint {
   margin: 4px 0 0;
   text-align: center;
-  font: 400 14px/20px var(--md-ref-typeface-brand, system-ui);
+  // the keys of the pad in the sentence are drawn at the size of the text: 10 feet away it is read at 17px, not 14
+  font: 500 17px/26px var(--md-ref-typeface-brand, system-ui);
   color: var(--md-sys-color-on-surface-variant);
 }
 </style>
