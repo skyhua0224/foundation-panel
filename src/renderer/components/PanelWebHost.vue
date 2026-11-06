@@ -20,6 +20,11 @@ const host = ref(null)
 const covered = ref(true)
 // the first cover (a cold start) shows its loading state at once; the covers of page changes wait 300 ms (a transition delay), so a fast switch does not flash it
 const first = ref(true)
+// the skeleton (veil) is a timer of its own, not a CSS transition delay: where the system turns animations off (prefers-reduced-motion, a remote session) transitions, and with them their delay, are
+// dropped, and the skeleton showed at once on every page change. It comes in after 300 ms of nothing painted, never before, and not at all on a page that paints sooner.
+const veil = ref(true)
+let veilTimer = 0
+const VEIL_MS = 300
 let waitLoad = false
 let settle = 0
 let ceiling = 0
@@ -33,10 +38,15 @@ const uncover = (by = '', fcp = 0) => {
     if (line) invoke('frontend_slow', line).catch(() => {})
   }
   coveredAt = 0
+  clearTimeout(veilTimer)
   covered.value = false
+  veil.value = false
   first.value = false
 }
-const cover = () => { if (!covered.value || !coveredAt) coveredAt = performance.now(); covered.value = true; clearTimeout(ceiling); ceiling = setTimeout(() => uncover('ceiling'), 6000) }
+const cover = () => {
+  if (!covered.value || !coveredAt) coveredAt = performance.now()
+  if (!covered.value) { veil.value = first.value; clearTimeout(veilTimer); if (!first.value) veilTimer = setTimeout(() => { veil.value = covered.value }, VEIL_MS) }
+  covered.value = true; clearTimeout(ceiling); ceiling = setTimeout(() => uncover('ceiling'), 6000) }
 // The frame is shown when its page says that it has painted its first frame (`panel-painted`, sent by the script the proxy puts into every page): the load event comes
 // 50 to 100 ms before that, and a frame shown at load showed 4 to 6 frames with nothing in them. Where no such message comes (a page the proxy does not change) the load
 // event shows the frame after a longer settle.
@@ -71,7 +81,7 @@ onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); w
 </script>
 
 <template>
-  <div ref="host" class="panel-web" :class="{ 'is-covered': covered, 'is-first': first }">
+  <div ref="host" class="panel-web" :class="{ 'is-covered': covered, 'is-veil': covered && veil, 'is-first': first }">
     <div v-if="scene?.canBack.value && !sub" class="panel-web__bar">
       <button type="button" class="m-page__back" @click="scene.back()"><svg class="m-icon" viewBox="0 -960 960 960" aria-hidden="true"><path d="M313-440l224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z" /></svg></button>
     </div>
@@ -92,8 +102,8 @@ onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); w
 .panel-web.is-covered .panel-web__frame iframe { opacity: 0.01; transition: none; }
 .panel-web__cover { position: absolute; inset: 0; z-index: 1; overflow: hidden; padding: 76px 16px 0; box-sizing: border-box; pointer-events: none; opacity: 0; transition: opacity 120ms linear; }
 .panel-web__cover > .m-pageload { width: min(100%, 840px); margin-inline: auto; }
-.panel-web.is-covered .panel-web__cover { opacity: 1; }
+.panel-web.is-veil .panel-web__cover { opacity: 1; }
 /* the cover of a page change comes in after 300 ms of nothing painted; going away has no delay. The sweep of the rows runs on the mounted cover all the time (opacity does not restart it), so it does not begin again when .is-covered toggles */
-.panel-web.is-covered:not(.is-first) .panel-web__cover { transition-delay: 300ms; }
+
 @media (prefers-reduced-motion: reduce) { .panel-web__frame iframe, .panel-web__cover { transition: none; } }
 </style>

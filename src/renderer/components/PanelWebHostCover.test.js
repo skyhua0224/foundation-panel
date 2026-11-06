@@ -7,7 +7,9 @@ const src = readFileSync(new URL('./PanelWebHost.vue', import.meta.url), 'utf8')
 test('the first cover of a cold start shows at once; the covers of page changes wait 300 ms so a fast switch does not flash', () => {
   assert.match(src, /<MPageLoading :delay="0" \/>/)
   assert.match(src, /'is-first': first/)
-  assert.match(src, /\.panel-web\.is-covered:not\(\.is-first\) \.panel-web__cover \{ transition-delay: 300ms; \}/)
+  assert.match(src, /const VEIL_MS = 300/)
+  assert.match(src, /\.panel-web\.is-veil \.panel-web__cover \{ opacity: 1; \}/)
+  assert.doesNotMatch(src, /transition-delay/, 'a CSS delay is dropped where animations are off: the veil is a timer')
   assert.match(src, /first\.value = false/, 'the first cover ends with the first reveal')
 })
 
