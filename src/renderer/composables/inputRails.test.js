@@ -97,3 +97,8 @@ test('the tools people come for are rows of 系统: the latency clock, the test 
   assert.deepEqual([...system.matchAll(/id: ROUTES\.(\w+),/g)].map((m) => m[1]), ['COMPONENT_STATUS', 'DIAGNOSTICS', 'TOOLBOX', 'LATENCY_CLOCK', 'TEST_TOOLS', 'STREAM_TIMER', 'RTSS'])
   assert.ok(nav.includes("[ROUTES.LATENCY_CLOCK]: 'latency-clock', [ROUTES.TEST_TOOLS]: 'test-tools', [ROUTES.STREAM_TIMER]: 'stream-timer'"))
 })
+
+test('the list of 串流 has 添加应用 above its rows: the rail and the button are two presses', () => {
+  const menu = read('../components/SidebarMenu.vue')
+  assert.ok(menu.includes(`<template v-if="entry.rail === 'stream'" #top><div class="m-navlist__add"><MButton variant="tonal" icon="add" @click="openDestination('apps:add')">{{ homeTexts(locale)['c_act-add-app'] }}</MButton></div></template>`))
+})
