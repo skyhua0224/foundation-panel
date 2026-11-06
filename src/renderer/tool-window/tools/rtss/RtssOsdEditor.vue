@@ -1,72 +1,36 @@
 <template>
-  <SectionPanel :title="t.rtssTool.osdControl">
-    <template #icon><MIcon name="forum" /></template>
-    <template #actions>
-      <button v-if="hasCli" class="overlay-btn" @click="onToggleOverlay">
-        {{ t.rtssTool.toggleOverlay }}
-      </button>
-    </template>
+  <MSection :title="t.rtssTool.osdControl">
+    <template v-if="hasCli" #action><MButton variant="text" size="sm" icon="layers" @click="onToggleOverlay">{{ t.rtssTool.toggleOverlay }}</MButton></template>
 
     <!-- 格式工具栏 -->
-    <div class="format-toolbar">
-      <div class="format-group">
-        <button class="fmt-btn" @click="insertTag('B')" title="Bold"><b>B</b></button>
-        <button class="fmt-btn" @click="insertTag('I')" title="Italic"><i>I</i></button>
-      </div>
-      <div class="format-group">
-        <label class="color-btn" :title="t.rtssTool.textColor">
-          <span class="color-preview" :style="{ background: '#' + color }"></span>
-          <span>A</span>
-          <input type="color" :value="'#' + color" @input="onColorPick" class="hidden-input" />
-        </label>
-        <button class="fmt-btn" @click="insertColorTag" :title="t.rtssTool.insertColor"><MIcon name="format_color_text" /></button>
-      </div>
-      <div class="format-group">
-        <select v-model="fontSize" class="fmt-select" @change="insertSizeTag" :title="t.rtssTool.fontSize">
-          <option :value="0">{{ t.rtssTool.defaultSize }}</option>
-          <option :value="12">12px</option>
-          <option :value="16">16px</option>
-          <option :value="20">20px</option>
-          <option :value="24">24px</option>
-          <option :value="32">32px</option>
-        </select>
-      </div>
-      <div class="format-group">
-        <button class="fmt-btn fmt-tag" @click="insertRawTag('<C=>')" title="Color">&lt;C=&gt;</button>
-        <button class="fmt-btn fmt-tag" @click="insertRawTag('<S=>')" title="Size">&lt;S=&gt;</button>
-        <button class="fmt-btn fmt-tag" @click="insertRawTag('\\n')" title="Newline">↵</button>
-      </div>
+    <div class="m-rtss__fmt" role="toolbar" :aria-label="t.rtssTool.osdText">
+      <MIconButton icon="format_bold" label="Bold" @click="insertTag('B')" />
+      <MIconButton icon="format_italic" label="Italic" @click="insertTag('I')" />
+      <MIconButton icon="format_color_text" :label="t.rtssTool.insertColor" @click="insertColorTag" />
+      <MButton variant="text" size="sm" title="Color" @click="insertRawTag('<C=>')">&lt;C=&gt;</MButton>
+      <MButton variant="text" size="sm" title="Size" @click="insertRawTag('<S=>')">&lt;S=&gt;</MButton>
+      <MIconButton icon="keyboard_return" label="Newline" @click="insertRawTag('\\n')" />
     </div>
+    <MGroup>
+      <MItem stack icon="palette" :title="t.rtssTool.textColor"><template #control><RtssColor v-model="color" :label="t.rtssTool.textColor" /></template></MItem>
+      <MChoiceItem :model-value="fontSize" icon="format_size" :title="t.rtssTool.fontSize" :options="SIZES.map((v) => ({ value: v, label: v ? `${v}px` : t.rtssTool.defaultSize }))" :cancel-label="t.common.cancel" @update:model-value="insertSizeTag" />
+    </MGroup>
 
-    <div class="osd-input-group">
-      <label class="field-label">{{ t.rtssTool.osdText }}</label>
-      <textarea
-        ref="textarea"
-        v-model="text"
-        class="osd-textarea"
-        :placeholder="t.rtssTool.osdPlaceholder"
-        rows="4"
-      ></textarea>
-      <div class="osd-hint">{{ t.rtssTool.osdHint }}</div>
-    </div>
+    <MField ref="field" v-model="text" type="textarea" :rows="4" :label="t.rtssTool.osdText" :placeholder="t.rtssTool.osdPlaceholder" :supporting="t.rtssTool.osdHint" />
 
-    <div class="actions">
-      <button @click="applyOsd" class="apply-btn" :disabled="applying">
-        {{ applying ? t.rtssTool.applying : t.rtssTool.applyOsd }}
-      </button>
-      <button @click="clearOsd" class="reset-btn" :disabled="applying">
-        {{ t.rtssTool.clearOsd }}
-      </button>
+    <div class="m-rtss__actions">
+      <MButton variant="text" icon="delete" :disabled="applying" @click="clearOsd">{{ t.rtssTool.clearOsd }}</MButton>
+      <MButton icon="check" :loading="applying" :disabled="applying" @click="applyOsd">{{ applying ? t.rtssTool.applying : t.rtssTool.applyOsd }}</MButton>
     </div>
-  </SectionPanel>
+  </MSection>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import { MIcon } from 'foundation-ui/vue'
+import { MButton, MChoiceItem, MField, MGroup, MIconButton, MItem, MSection } from 'foundation-ui/vue'
+import RtssColor from './RtssColor.vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../../../desktop/i18n/index.js'
-import SectionPanel from '../../components/SectionPanel.vue'
 
 const { t } = useI18n()
 const emit = defineEmits(['message'])
@@ -77,13 +41,16 @@ defineProps({
 
 const text = ref('')
 const applying = ref(false)
-const textarea = ref(null)
+const field = ref(null)
+// the text area inside the field: its selection is where a tag goes
+const area = () => field.value?.$el
 const color = ref('FFFFFF')
 const fontSize = ref(0)
+const SIZES = [0, 12, 16, 20, 24, 32]
 
 // ─── 格式标签插入 ───
 function insertTag(tag) {
-  const ta = textarea.value
+  const ta = area()
   if (!ta) return
   const start = ta.selectionStart
   const end = ta.selectionEnd
@@ -95,20 +62,17 @@ function insertTag(tag) {
   requestAnimationFrame(() => { ta.focus(); ta.setSelectionRange(newPos, newPos) })
 }
 
-function onColorPick(e) {
-  color.value = e.target.value.replace('#', '').toUpperCase()
-}
-
 function insertColorTag() {
   insertRawTag(`<C=${color.value}>`)
 }
 
-function insertSizeTag() {
+function insertSizeTag(v) {
+  fontSize.value = Number(v)
   if (fontSize.value > 0) insertRawTag(`<S=${fontSize.value}>`)
 }
 
 function insertRawTag(tag) {
-  const ta = textarea.value
+  const ta = area()
   if (!ta) return
   const start = ta.selectionStart
   const val = text.value
@@ -331,4 +295,8 @@ async function onToggleOverlay() {
   &:hover { background: rgba(255, 255, 255, 0.14); color: white; }
   &:disabled { opacity: 0.4; cursor: not-allowed; }
 }
+</style>
+
+<style scoped>
+.m-rtss__fmt { display: flex; align-items: center; flex-wrap: wrap; gap: 2px; margin-bottom: 8px; }
 </style>

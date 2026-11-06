@@ -507,6 +507,7 @@ export const en = {
 
   // === Tool Window ===
   toolWindow: {
+    close: 'Close',
     loading: 'Loading...',
   },
 

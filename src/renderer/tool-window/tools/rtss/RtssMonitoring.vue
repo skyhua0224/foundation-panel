@@ -1,83 +1,38 @@
 <template>
-  <SectionPanel :title="t.rtssTool.monitoring">
-    <template #icon><MIcon name="monitoring" /></template>
-    <template #actions>
-      <ToggleSwitch :modelValue="active" @update:modelValue="toggleMonitoring" />
-    </template>
-
-    <!-- 指标选择 -->
-    <div class="metric-groups">
-      <div v-for="group in metricGroups" :key="group.id" class="metric-group">
-        <div class="metric-group-label">{{ group.label }}</div>
-        <div class="metric-chips">
-          <button
-            v-for="m in group.metrics"
-            :key="m.id"
-            class="metric-chip"
-            :class="{ active: config.metrics.includes(m.id) }"
-            @click="toggleMetric(m.id)"
-          >
-            {{ m.label }}
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <small v-if="config.metrics.includes('pipeline_fps')" class="frame-rate-hint">
-      {{ locale === 'zh'
-        ? 'Src 源更新 · Cap 捕获交付 · Submit 编码提交 · Out 编码输出 · Repeat 重复提交（FPS）。与 RTSS 游戏帧率对照；仅在监控开启并选择该指标时启用本入口采集，重新开启需约 1 秒预热。'
-        : 'Src source updates · Cap capture delivery · Submit encoder input · Out encoded output · Repeat repeated input (FPS). Compare with RTSS game FPS. This monitor collects only while enabled with this metric selected; allow about 1 second to warm up after enabling.' }}
-    </small>
+  <MSection>
+    <MGroup>
+      <MSwitchItem :model-value="active" icon="monitoring" :title="t.rtssTool.monitoring" @update:model-value="toggleMonitoring" />
+      <MItem v-for="group in metricGroups" :key="group.id" stack :title="group.label">
+        <template #control>
+          <MChipSet multiple :model-value="config.metrics.filter((m) => group.metrics.some((g) => g.id === m))" :label="group.label" :options="group.metrics.map((m) => ({ value: m.id, label: m.label }))" @update:model-value="(ids) => setGroupMetrics(group, ids)" />
+        </template>
+      </MItem>
+    </MGroup>
+    <MNotice v-if="config.metrics.includes('pipeline_fps')" tone="info">{{ pipelineHint }}</MNotice>
 
     <!-- 样式配置 -->
-    <div class="monitor-style">
-      <div class="style-row">
-        <label>{{ t.rtssTool.headerText }}</label>
-        <input v-model="config.header_text" class="style-input" placeholder="☀ Foundation Sunshine" />
-      </div>
-      <div class="style-row cjk-hint">
-        <small>{{ t.rtssTool.cjkHint || '中文/CJK 需在 RTSS Setup 中启用“Vector 3D”并选择中文字体（如 Microsoft YaHei）' }}</small>
-      </div>
-      <div class="style-row">
-        <label>{{ t.rtssTool.updateInterval }}</label>
-        <select v-model.number="config.interval_ms" class="fmt-select wide">
-          <option :value="500">0.5s</option>
-          <option :value="1000">1s</option>
-          <option :value="2000">2s</option>
-          <option :value="5000">5s</option>
-        </select>
-      </div>
-      <div class="style-row colors-row">
-        <div class="color-field">
-          <label>{{ t.rtssTool.titleColor }}</label>
-          <input type="color" :value="'#' + config.title_color" @input="e => config.title_color = e.target.value.slice(1)" />
-        </div>
-        <div class="color-field">
-          <label>{{ t.rtssTool.labelColor }}</label>
-          <input type="color" :value="'#' + config.label_color" @input="e => config.label_color = e.target.value.slice(1)" />
-        </div>
-        <div class="color-field">
-          <label>{{ t.rtssTool.valueColor }}</label>
-          <input type="color" :value="'#' + config.value_color" @input="e => config.value_color = e.target.value.slice(1)" />
-        </div>
-      </div>
-    </div>
+    <MGroup>
+      <MItem stack icon="edit" :title="t.rtssTool.headerText" :text="cjkHint"><template #control><MField v-model="config.header_text" :label="t.rtssTool.headerText" placeholder="☀ Foundation Sunshine" /></template></MItem>
+      <MChoiceItem v-model="config.interval_ms" icon="timer" :title="t.rtssTool.updateInterval" :options="INTERVALS.map((v) => ({ value: v, label: `${v / 1000}s` }))" :cancel-label="t.common.cancel" @update:model-value="(v) => { config.interval_ms = Number(v) }" />
+      <MItem stack icon="palette" :title="t.rtssTool.titleColor"><template #control><RtssColor v-model="config.title_color" :label="t.rtssTool.titleColor" /></template></MItem>
+      <MItem stack icon="palette" :title="t.rtssTool.labelColor"><template #control><RtssColor v-model="config.label_color" :label="t.rtssTool.labelColor" /></template></MItem>
+      <MItem stack icon="palette" :title="t.rtssTool.valueColor"><template #control><RtssColor v-model="config.value_color" :label="t.rtssTool.valueColor" /></template></MItem>
+    </MGroup>
 
     <!-- OSD 预览 -->
-    <div v-if="active && snapshot.osd_text" class="osd-preview">
-      <div class="osd-preview-label">{{ t.rtssTool.osdPreview }}</div>
-      <pre class="osd-preview-text">{{ snapshot.osd_text }}</pre>
-    </div>
-  </SectionPanel>
+    <figure v-if="active && snapshot.osd_text" class="m-rtss__preview">
+      <figcaption>{{ t.rtssTool.osdPreview }}</figcaption>
+      <pre>{{ snapshot.osd_text }}</pre>
+    </figure>
+  </MSection>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
-import { MIcon } from 'foundation-ui/vue'
+import { MChipSet, MChoiceItem, MField, MGroup, MItem, MNotice, MSection, MSwitchItem } from 'foundation-ui/vue'
+import RtssColor from './RtssColor.vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../../../desktop/i18n/index.js'
-import SectionPanel from '../../components/SectionPanel.vue'
-import ToggleSwitch from '../../components/ToggleSwitch.vue'
 
 const { t, locale } = useI18n()
 const emit = defineEmits(['message'])
@@ -110,6 +65,10 @@ const snapshot = reactive({ active: false, osd_text: '', metrics: {} })
 const config = reactive(loadPersistedConfig())
 
 const availableMetrics = ref([])
+const pipelineHint = computed(() => locale.value === 'zh'
+  ? 'Src 源更新 · Cap 捕获交付 · Submit 编码提交 · Out 编码输出 · Repeat 重复提交（FPS）。与 RTSS 游戏帧率对照；仅在监控开启并选择该指标时启用本入口采集，重新开启需约 1 秒预热。'
+  : 'Src source updates · Cap capture delivery · Submit encoder input · Out encoded output · Repeat repeated input (FPS). Compare with RTSS game FPS. This monitor collects only while enabled with this metric selected; allow about 1 second to warm up after enabling.')
+const cjkHint = computed(() => t.value.rtssTool.cjkHint || '中文/CJK 需在 RTSS Setup 中启用“Vector 3D”并选择中文字体（如 Microsoft YaHei）')
 let pollTimer = null
 
 // 持久化 config 到 localStorage
@@ -132,6 +91,13 @@ const metricGroups = computed(() => {
 })
 
 // ─── 方法 ───
+const INTERVALS = [500, 1000, 2000, 5000]
+// the chips of a group are one multi-select: the metrics of the other groups stay as they are
+function setGroupMetrics(group, ids) {
+  const keep = config.metrics.filter((m) => !group.metrics.some((g) => g.id === m))
+  config.metrics.splice(0, config.metrics.length, ...keep, ...ids)
+  if (active.value) startMonitoring()
+}
 function toggleMetric(id) {
   const idx = config.metrics.indexOf(id)
   if (idx >= 0) config.metrics.splice(idx, 1)
@@ -360,4 +326,10 @@ defineExpose({ loadState })
   margin: 0;
   line-height: 1.6;
 }
+</style>
+
+<style scoped>
+.m-rtss__preview { margin: 8px 0 0; padding: 12px 16px; border-radius: var(--md-sys-shape-corner-large); background: var(--md-sys-color-surface-container-high); }
+.m-rtss__preview figcaption { font: var(--m-label-medium); color: var(--md-sys-color-on-surface-variant); }
+.m-rtss__preview pre { margin: 4px 0 0; font: var(--m-body-medium); font-family: var(--m-font-mono); white-space: pre-wrap; overflow-wrap: anywhere; }
 </style>

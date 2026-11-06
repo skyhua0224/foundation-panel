@@ -1,119 +1,56 @@
 <template>
-  <div ref="containerRef" class="tool-container" :class="{ embedded, expanded: isExpanded }">
-    <div class="monitor-head" v-bind="dragRegionAttrs">
-      <div class="session-block" v-bind="dragRegionAttrs">
-        <div class="status-line">
-          <span class="status-dot" :class="statusClass"></span>
-          <span class="status-text">{{ statusText }}</span>
-        </div>
-        <div class="session-title">{{ sessionTitle }}</div>
-        <div class="session-meta">{{ sessionMeta }}</div>
+  <div ref="containerRef" class="m-perf" :class="{ 'is-embedded': embedded, 'is-expanded': isExpanded }">
+    <header class="m-perf__head" v-bind="dragRegionAttrs">
+      <div class="m-perf__session" v-bind="dragRegionAttrs">
+        <MChip :tone="statusTone">{{ statusText }}</MChip>
+        <b>{{ sessionTitle }}</b>
+        <span>{{ sessionMeta }}</span>
       </div>
-
-      <div class="head-actions">
-        <button class="icon-btn" :disabled="refreshing" :title="t.performanceTool.refresh" @click="loadSnapshot(true)">
-          <MIcon name="refresh" :class="{ spinning: refreshing }" />
-        </button>
-        <button v-if="!embedded" class="icon-btn" :title="expandTitle" @click="isExpanded = !isExpanded">
-          <MIcon name="keyboard_arrow_up" v-if="isExpanded" />
-          <MIcon name="keyboard_arrow_down" v-else />
-        </button>
-        <button v-if="!embedded" class="icon-btn close-btn" :title="t.performanceTool.close" @click="$emit('close')">
-          <MIcon name="close" />
-        </button>
+      <div class="m-perf__actions">
+        <MIconButton icon="refresh" :label="t.performanceTool.refresh" :disabled="refreshing" @click="loadSnapshot(true)" />
+        <MIconButton v-if="!embedded" :icon="isExpanded ? 'keyboard_arrow_up' : 'keyboard_arrow_down'" :label="expandTitle" @click="isExpanded = !isExpanded" />
+        <MIconButton v-if="!embedded" icon="close" :label="t.performanceTool.close" @click="$emit('close')" />
       </div>
-    </div>
+    </header>
 
-    <div v-if="loading" class="state-panel compact-state">
-      <MIcon name="monitor" class="state-icon" />
-      <span>{{ t.performanceTool.loading }}</span>
-    </div>
-
-    <div v-else-if="error" class="state-panel compact-state error">
-      <MIcon name="warning" class="state-icon" />
-      <span>{{ t.performanceTool.loadFailed.replace('{error}', error) }}</span>
-    </div>
-
-    <div v-else-if="!currentSession" class="state-panel compact-state">
-      <MIcon name="monitor" class="state-icon" />
-      <span>{{ t.performanceTool.noStream }}</span>
-    </div>
+    <div v-if="loading" class="m-perf__wait"><MLoading size="32px" /><span>{{ t.performanceTool.loading }}</span></div>
+    <MBanner v-else-if="error" tone="error" icon="error">{{ t.performanceTool.loadFailed.replace('{error}', error) }}</MBanner>
+    <MEmpty v-else-if="!currentSession" icon="monitor" :title="t.performanceTool.noStream" />
 
     <template v-else>
-      <div class="hud-row">
-        <div class="hud-metric primary">
-          <span>{{ t.performanceTool.p95 }}</span>
-          <strong>{{ formatMs(hostLatency.p95_ms) }}</strong>
-        </div>
-        <div class="hud-metric">
-          <span>{{ t.performanceTool.recentFps }}</span>
-          <strong>{{ formatNumber(hostLatency.recent_fps) }}</strong>
-        </div>
-        <div class="hud-metric">
-          <span>{{ t.performanceTool.budgetUsage }}</span>
-          <strong>{{ formatPercent(budgetUsage) }}</strong>
-        </div>
+      <div class="m-perf__hud" role="group" :aria-label="t.performanceTool.hostLatency">
+        <div class="m-perf__metric is-primary"><span>{{ t.performanceTool.p95 }}</span><b>{{ formatMs(hostLatency.p95_ms) }}</b></div>
+        <div class="m-perf__metric"><span>{{ t.performanceTool.recentFps }}</span><b>{{ formatNumber(hostLatency.recent_fps) }}</b></div>
+        <div class="m-perf__metric" :class="`is-${statusTone}`"><span>{{ t.performanceTool.budgetUsage }}</span><b>{{ formatPercent(budgetUsage) }}</b></div>
       </div>
 
-      <div class="chart-panel" :class="{ compact: !isExpanded && !embedded }">
-        <div class="chart-header">
-          <span>{{ t.performanceTool.hostLatency }}</span>
-          <span>{{ t.performanceTool.samples.replace('{count}', hostLatency.samples ?? 0) }}</span>
-        </div>
-        <svg class="sparkline" viewBox="0 0 320 74" preserveAspectRatio="none">
-          <line x1="0" y1="56" x2="320" y2="56" class="grid-line" />
-          <polyline v-if="sparklinePoints" :points="sparklinePoints" class="sparkline-line" />
+      <figure class="m-perf__chart" :class="{ 'is-compact': !isExpanded && !embedded }">
+        <figcaption><span>{{ t.performanceTool.hostLatency }}</span><span>{{ t.performanceTool.samples.replace('{count}', hostLatency.samples ?? 0) }}</span></figcaption>
+        <svg viewBox="0 0 320 74" preserveAspectRatio="none" aria-hidden="true">
+          <line x1="0" y1="56" x2="320" y2="56" class="m-perf__grid" />
+          <polyline v-if="sparklinePoints" :points="sparklinePoints" class="m-perf__line" />
         </svg>
-      </div>
+      </figure>
 
-      <div v-if="isExpanded || embedded" class="details">
-        <div class="section-caption">{{ t.performanceTool.windowStats }}</div>
-        <div class="detail-grid">
-          <div v-for="item in detailStats" :key="item.label" class="detail-item">
-            <span>{{ item.label }}</span>
-            <strong>{{ item.value }}</strong>
-          </div>
-        </div>
-
-        <template v-if="pipelineSegments.length">
-          <div class="section-caption">{{ t.performanceTool.pipelineStats }}</div>
-          <div class="pipeline-list">
-            <div v-for="segment in pipelineSegments" :key="segment.key" class="pipeline-item">
-              <span>{{ segment.label }}</span>
-              <strong>{{ formatMs(segment.stats.p95_ms) }}</strong>
-              <small>
-                {{ t.performanceTool.avgShort }} {{ formatMs(segment.stats.avg_ms) }}
-                / {{ t.performanceTool.lastShort }} {{ formatMs(segment.stats.last_ms) }}
-              </small>
-            </div>
-          </div>
-        </template>
-
-        <div class="section-caption">{{ t.performanceTool.sessionStats }}</div>
-        <div class="session-grid">
-          <div>
-            <span>{{ t.performanceTool.encoderCapture }}</span>
-            <strong>{{ currentSession.encoder || 'auto' }} / {{ currentSession.capture || 'auto' }}</strong>
-          </div>
-          <div>
-            <span>{{ t.performanceTool.bitrate }}</span>
-            <strong>{{ formatBitrate(currentSession.bitrate_kbps) }}</strong>
-          </div>
-          <div>
-            <span>{{ t.performanceTool.uptime }}</span>
-            <strong>{{ formatUptime(currentSession.uptime_ms) }}</strong>
-          </div>
-        </div>
-        <div class="stop-row">
-          <button
-            class="stop-btn"
-            :class="{ armed: stopArmed }"
-            :disabled="stopBusy"
-            @click="requestStopAll"
-          >
-            {{ stopArmed ? t.performanceTool.confirmStopAll : t.performanceTool.stopAllSessions }}
-          </button>
-          <span v-if="stopMessage" class="stop-message">{{ stopMessage }}</span>
+      <div v-if="isExpanded || embedded" class="m-perf__details">
+        <MSection :title="t.performanceTool.windowStats">
+          <dl class="m-perf__grid-list"><div v-for="item in detailStats" :key="item.label"><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></div></dl>
+        </MSection>
+        <MSection v-if="pipelineSegments.length" :title="t.performanceTool.pipelineStats">
+          <MGroup>
+            <MItem v-for="segment in pipelineSegments" :key="segment.key" :title="segment.label" :text="`${t.performanceTool.avgShort} ${formatMs(segment.stats.avg_ms)} / ${t.performanceTool.lastShort} ${formatMs(segment.stats.last_ms)}`" :value="formatMs(segment.stats.p95_ms)" />
+          </MGroup>
+        </MSection>
+        <MSection :title="t.performanceTool.sessionStats">
+          <MGroup>
+            <MItem icon="memory" :title="t.performanceTool.encoderCapture" :value="`${currentSession.encoder || 'auto'} / ${currentSession.capture || 'auto'}`" />
+            <MItem icon="speed" :title="t.performanceTool.bitrate" :value="formatBitrate(currentSession.bitrate_kbps)" />
+            <MItem icon="timer" :title="t.performanceTool.uptime" :value="formatUptime(currentSession.uptime_ms)" />
+          </MGroup>
+        </MSection>
+        <div class="m-perf__stop">
+          <MButton :variant="stopArmed ? 'danger' : 'tonal'" icon="stop_circle" :loading="stopBusy" :disabled="stopBusy" @click="requestStopAll">{{ stopArmed ? t.performanceTool.confirmStopAll : t.performanceTool.stopAllSessions }}</MButton>
+          <span v-if="stopMessage" class="m-perf__note" role="status">{{ stopMessage }}</span>
         </div>
       </div>
     </template>
@@ -123,7 +60,7 @@
 <script setup>
 import { useTouchWindowDrag } from '../../composables/useTouchWindowDrag.js'
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { MIcon } from 'foundation-ui/vue'
+import { MBanner, MButton, MChip, MEmpty, MGroup, MIconButton, MItem, MLoading, MSection } from 'foundation-ui/vue'
 import { sunshine } from '../../tauri-adapter.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 import { useAdaptiveWindowSize } from '../../composables/useAdaptiveWindowSize.js'
@@ -232,6 +169,8 @@ const statusClass = computed(() => {
   if (statusPressure.value <= 170) return 'warning'
   return 'error'
 })
+
+const statusTone = computed(() => ({ good: 'ok', warning: 'warn', error: 'error' })[statusClass.value] || 'neutral')
 
 const statusText = computed(() => {
   if (error.value) return t.value.performanceTool.status.error
@@ -425,443 +364,25 @@ onUnmounted(() => {
 })
 </script>
 
-<style lang="less" scoped>
-.tool-container {
-  --perf-bg: #f7fbff;
-  --perf-surface: #ffffff;
-  --perf-surface-soft: #f1f7fd;
-  --perf-border: #dce9f5;
-  --perf-border-muted: #e8f0f8;
-  --perf-text: #26344d;
-  --perf-text-muted: #78869b;
-  --perf-accent: #55bfd0;
-  --perf-accent-soft: #e4f7fa;
-  --perf-accent-hover: #b8e5ec;
-  --perf-accent-text: #218191;
-  --perf-good: #68c7a2;
-  --perf-warning: #f3bd63;
-  --perf-danger: #f27f90;
-  --perf-danger-soft: #fff0f3;
-  --perf-danger-border: #f6c8d0;
-  --perf-danger-text: #c24c61;
-  --perf-grid: #deebf4;
-  --perf-section: #8c98aa;
-
-  width: 100vw;
-  padding: 12px;
-  box-sizing: border-box;
-  color: var(--perf-text);
-  border-radius: var(--fd-card-radius, 12px);
-  background: var(--perf-bg);
-  box-shadow: none;
-  transition: width 0.18s ease, background 0.18s ease;
-
-  &.expanded {
-    width: 100vw;
-    overflow: visible;
-  }
-
-  &.embedded {
-    --perf-surface: rgba(var(--fd-bg-primary-rgb, 15, 15, 35), 0.22);
-    --perf-border: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-    --perf-border-muted: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.08);
-    --perf-text: var(--fd-text-primary, #fff);
-    --perf-text-muted: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.58);
-    --perf-accent: var(--fd-accent, #00fff5);
-    --perf-accent-soft: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.1);
-    --perf-accent-hover: rgba(var(--fd-accent-rgb, 0, 255, 245), 0.34);
-    --perf-accent-text: var(--fd-accent, #00fff5);
-    --perf-good: var(--fd-status-success, #34d399);
-    --perf-warning: var(--fd-status-warning, #fbbf24);
-    --perf-danger: var(--fd-status-danger, #f87171);
-    --perf-danger-soft: rgba(var(--fd-status-danger-rgb, 248, 113, 113), 0.18);
-    --perf-danger-border: rgba(var(--fd-status-danger-rgb, 248, 113, 113), 0.34);
-    --perf-danger-text: var(--fd-status-danger, #f87171);
-    --perf-grid: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.1);
-    --perf-section: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.46);
-
-    width: 100%;
-    max-height: none;
-    padding: 0;
-    border: none;
-    background: transparent;
-    box-shadow: none;
-    backdrop-filter: none;
-    overflow: visible;
-  }
-}
-
-.monitor-head,
-.status-line,
-.head-actions,
-.chart-header {
-  display: flex;
-  align-items: center;
-}
-
-.monitor-head {
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.session-block {
-  min-width: 0;
-}
-
-.tool-container:not(.embedded) {
-  .monitor-head,
-  .session-block {
-    cursor: move;
-    touch-action: none;
-    app-region: drag;
-    -webkit-app-region: drag;
-  }
-}
-
-.tool-container.embedded {
-  .monitor-head,
-  .session-block {
-    cursor: default;
-    app-region: no-drag;
-    -webkit-app-region: no-drag;
-  }
-}
-
-.status-line {
-  gap: 6px;
-  height: 18px;
-  margin-bottom: 5px;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-
-  &.good {
-    background: var(--perf-good);
-  }
-
-  &.warning,
-  &.waiting {
-    background: var(--perf-warning);
-  }
-
-  &.error {
-    background: var(--perf-danger);
-  }
-
-  &.idle {
-    background: var(--perf-accent);
-  }
-}
-
-.status-text,
-.session-meta,
-.chart-header,
-.detail-item span,
-.session-grid span,
-.hud-metric span {
-  font-size: 11px;
-  color: var(--perf-text-muted);
-}
-
-.session-title {
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1.15;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.session-meta {
-  margin-top: 2px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.head-actions {
-  app-region: no-drag;
-  -webkit-app-region: no-drag;
-  gap: 6px;
-  flex-shrink: 0;
-  cursor: default;
-  -webkit-app-region: no-drag;
-}
-
-.icon-btn {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-  border: 1px solid var(--perf-border-muted);
-  border-radius: 8px;
-  background: var(--perf-surface);
-  color: var(--perf-text);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  -webkit-app-region: no-drag;
-  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
-
-  svg {
-    width: 15px;
-    height: 15px;
-  }
-
-  &:hover:not(:disabled) {
-    border-color: var(--perf-accent-hover);
-    background: var(--perf-accent-soft);
-    color: var(--perf-accent-text);
-  }
-
-  &:disabled {
-    opacity: 0.55;
-    cursor: not-allowed;
-  }
-}
-
-.close-btn:hover {
-  border-color: var(--perf-danger-border);
-  background: var(--perf-danger-soft);
-  color: var(--perf-danger-text);
-}
-
-.spinning {
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.compact-state {
-  min-height: 72px;
-  margin-top: 10px;
-}
-
-.state-panel {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  text-align: center;
-  border: 1px dashed var(--perf-border);
-  border-radius: 10px;
-  background: var(--perf-surface);
-  color: var(--perf-text-muted);
-  font-size: 12px;
-
-  &.error {
-    color: var(--perf-danger-text);
-    border-color: var(--perf-danger-border);
-  }
-}
-
-.state-icon {
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-}
-
-.hud-row {
-  display: grid;
-  grid-template-columns: 1.2fr 0.9fr 0.9fr;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.hud-metric {
-  min-width: 0;
-  padding: 9px 10px;
-  border-radius: 10px;
-  background: var(--perf-surface);
-  border: 1px solid var(--perf-border);
-
-  &.primary {
-    border-color: var(--perf-accent-hover);
-    background: var(--perf-accent-soft);
-  }
-
-  span,
-  strong {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  strong {
-    margin-top: 4px;
-    font-size: 18px;
-    line-height: 1.15;
-  }
-}
-
-.chart-panel {
-  margin-top: 10px;
-  padding: 10px;
-  border: 1px solid var(--perf-border);
-  border-radius: 10px;
-  background: var(--perf-surface);
-
-  &.compact {
-    padding-bottom: 6px;
-  }
-}
-
-.chart-header {
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.sparkline {
-  width: 100%;
-  height: 74px;
-  display: block;
-}
-
-.compact .sparkline {
-  height: 46px;
-}
-
-.grid-line {
-  stroke: var(--perf-grid);
-  stroke-width: 1;
-}
-
-.sparkline-line {
-  fill: none;
-  stroke: var(--perf-accent);
-  stroke-width: 2.2;
-  stroke-linejoin: round;
-  stroke-linecap: round;
-}
-
-.details {
-  margin-top: 12px;
-}
-
-.section-caption {
-  margin: 12px 0 7px;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--perf-section);
-}
-
-.detail-grid,
-.session-grid,
-.pipeline-list {
-  display: grid;
-  gap: 8px;
-}
-
-.detail-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.session-grid {
-  grid-template-columns: 1.4fr 0.8fr 0.8fr;
-}
-
-.stop-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-top: 10px;
-}
-
-.stop-btn {
-  padding: 6px 14px;
-  border-radius: 6px;
-  font-size: 12px;
-  cursor: pointer;
-  color: var(--perf-text-secondary, #b4552f);
-  background: var(--perf-surface);
-  border: 1px solid var(--perf-border-muted);
-
-  &:hover {
-    border-color: currentColor;
-  }
-
-  &.armed {
-    color: #c0392b;
-    font-weight: 600;
-    border-color: #c0392b;
-    background: rgba(192, 57, 43, 0.08);
-  }
-
-  &:disabled {
-    opacity: 0.55;
-    cursor: default;
-  }
-}
-
-.stop-message {
-  font-size: 11px;
-  color: var(--perf-text-secondary, inherit);
-  opacity: 0.85;
-}
-
-.pipeline-list {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.detail-item,
-.session-grid > div,
-.pipeline-item {
-  min-width: 0;
-  padding: 8px;
-  border-radius: 8px;
-  background: var(--perf-surface);
-  border: 1px solid var(--perf-border-muted);
-
-  span,
-  strong,
-  small {
-    display: block;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  strong {
-    margin-top: 3px;
-    font-size: 13px;
-  }
-
-  small {
-    margin-top: 2px;
-    font-size: 10px;
-    color: var(--perf-text-muted);
-  }
-}
-
-.pipeline-item {
-  span {
-    font-size: 13px;
-    font-weight: 700;
-  }
-}
-
-@media (max-width: 420px) {
-  .tool-container,
-  .tool-container.expanded {
-    width: 100vw;
-  }
-
-  .detail-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .pipeline-list {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
+<style scoped>
+.m-perf { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; width: 100%; box-sizing: border-box; padding: 12px; color: var(--md-sys-color-on-surface); background: var(--md-sys-color-surface-container); border-radius: var(--md-sys-shape-corner-extra-large); }
+.m-perf:not(.is-embedded) { width: 100vw; }
+.m-perf.is-embedded { padding: 0; background: none; }
+.m-perf__head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.m-perf__session { display: grid; gap: 2px; min-width: 0; justify-items: start; } .m-perf__session b { font: var(--m-title-medium); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; } .m-perf__session span { font: var(--m-body-small); color: var(--md-sys-color-on-surface-variant); }
+.m-perf__actions { display: flex; flex: none; }
+.m-perf__wait { display: flex; align-items: center; gap: 12px; padding: 16px; color: var(--md-sys-color-on-surface-variant); font: var(--m-body-large); }
+.m-perf__hud { display: grid; grid-template-columns: 1.4fr 1fr 1fr; gap: 6px; }
+.m-perf__metric { display: grid; gap: 2px; padding: 12px 16px; border-radius: var(--md-sys-shape-corner-large); background: var(--md-sys-color-surface-container-high); } .m-perf__metric span { font: var(--m-label-medium); color: var(--md-sys-color-on-surface-variant); } .m-perf__metric b { font: var(--m-headline-small); font-variant-numeric: tabular-nums; }
+.m-perf__metric.is-primary { background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); } .m-perf__metric.is-primary span { color: inherit; }
+.m-perf__metric.is-warn { background: var(--md-sys-color-tertiary-container); color: var(--md-sys-color-on-tertiary-container); } .m-perf__metric.is-error { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
+.m-perf__metric.is-warn span, .m-perf__metric.is-error span { color: inherit; }
+.m-perf__chart { margin: 0; padding: 12px 16px; border-radius: var(--md-sys-shape-corner-large); background: var(--md-sys-color-surface-container-high); } .m-perf__chart figcaption { display: flex; justify-content: space-between; font: var(--m-label-medium); color: var(--md-sys-color-on-surface-variant); }
+.m-perf__chart svg { display: block; width: 100%; height: 74px; } .m-perf__chart.is-compact svg { height: 52px; }
+.m-perf__grid { stroke: var(--md-sys-color-outline-variant); stroke-width: 1; stroke-dasharray: 4 4; vector-effect: non-scaling-stroke; }
+.m-perf__line { fill: none; stroke: var(--md-sys-color-primary); stroke-width: 2.5; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.m-perf__details { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.m-perf__grid-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 6px; margin: 0; } .m-perf__grid-list div { display: grid; padding: 8px 12px; border-radius: var(--md-sys-shape-corner-medium); background: var(--md-sys-color-surface-container-high); } .m-perf__grid-list dt { font: var(--m-label-small); color: var(--md-sys-color-on-surface-variant); } .m-perf__grid-list dd { margin: 0; font: var(--m-title-small); font-variant-numeric: tabular-nums; }
+.m-perf__stop { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; } .m-perf__note { font: var(--m-body-medium); color: var(--md-sys-color-on-surface-variant); }
+@media (max-width: 380px) { .m-perf__hud { grid-template-columns: 1fr 1fr; } .m-perf__metric.is-primary { grid-column: 1 / -1; } }
 </style>

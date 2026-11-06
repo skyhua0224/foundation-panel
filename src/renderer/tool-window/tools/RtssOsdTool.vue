@@ -1,56 +1,26 @@
 <template>
-  <div class="tool-container" :class="{ 'embedded': embedded }">
-    <div v-if="!embedded" class="tool-header">
-      <h2>{{ t.rtssTool.title }}</h2>
-      <button class="close-btn" @click="$emit('close')">×</button>
-    </div>
+  <div class="m-rtss" :class="{ 'is-embedded': embedded }">
+    <header v-if="!embedded" class="m-rtss__head"><h2>{{ t.rtssTool.title }}</h2><MIconButton icon="close" :label="t.toolWindow.close" @click="$emit('close')" /></header>
+    <MBanner v-if="problem" tone="error" icon="error">{{ problem }}</MBanner>
 
-    <div class="tool-content">
-      <RtssStatusBar
-        :status="status"
-        :loading="statusLoading"
-        @refresh="loadStatus"
-        @message="showMessage"
-      />
+    <RtssStatusBar :status="status" :loading="statusLoading" @refresh="loadStatus" @message="showMessage" />
 
-      <template v-if="status.running">
-        <div class="two-col-grid">
-          <RtssFpsSection
-            v-if="status.cli_path"
-            @message="showMessage"
-          />
-
-          <RtssOsdEditor
-            :has-cli="!!status.cli_path"
-            @message="showMessage"
-          />
-
-          <RtssOsdSettings
-            v-if="status.cli_path"
-            @message="showMessage"
-          />
-
-          <RtssMonitoring
-            @message="showMessage"
-          />
-
-          <HwInfoMonitor
-            @message="showMessage"
-          />
-        </div>
-      </template>
-
-      <!-- 消息提示 -->
-      <div v-if="message" :class="['message', messageType]">
-        {{ message }}
+    <template v-if="status.running">
+      <div class="m-rtss__grid">
+        <RtssFpsSection v-if="status.cli_path" @message="showMessage" />
+        <RtssOsdEditor :has-cli="!!status.cli_path" @message="showMessage" />
+        <RtssOsdSettings v-if="status.cli_path" @message="showMessage" />
+        <RtssMonitoring @message="showMessage" />
+        <HwInfoMonitor @message="showMessage" />
       </div>
-    </div>
+    </template>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { MBanner, MIconButton, useNotify } from 'foundation-ui/vue'
 import { useI18n } from '../../desktop/i18n/index.js'
 
 import RtssStatusBar from './rtss/RtssStatusBar.vue'
@@ -77,8 +47,7 @@ const status = ref({
   hooks_dll_path: '',
 })
 
-const message = ref('')
-const messageType = ref('')
+const problem = ref('')
 
 async function loadStatus() {
   statusLoading.value = true
@@ -92,10 +61,11 @@ async function loadStatus() {
   }
 }
 
+// what worked is a snackbar; what failed (or needs a choice first) stays as a banner until the next message
 function showMessage(msg, type) {
-  message.value = msg
-  messageType.value = type
-  setTimeout(() => { message.value = '' }, 4000)
+  if (type === 'error' || type === 'warning') { problem.value = msg; return }
+  problem.value = ''
+  useNotify().snack(msg)
 }
 
 onMounted(() => {
@@ -103,100 +73,9 @@ onMounted(() => {
 })
 </script>
 
-<style lang="less" scoped>
-.tool-container {
-  width: 100%;
-  color: white;
-  font-size: 14px;
-
-  &.embedded {
-    .tool-header { display: none; }
-    .tool-content { padding: 0; }
-  }
-}
-
-.tool-header {
-  padding: 10px 16px;
-  background: rgba(0, 0, 0, 0.15);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  position: relative;
-
-  h2 {
-    margin: 0;
-    font-size: 16px;
-    font-weight: 700;
-    text-align: center;
-    letter-spacing: 0.5px;
-  }
-}
-
-.close-btn {
-  position: absolute;
-  top: 6px;
-  right: 10px;
-  width: 26px;
-  height: 26px;
-  border: none;
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  font-size: 18px;
-  line-height: 1;
-  border-radius: 50%;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.25);
-    transform: rotate(90deg);
-  }
-}
-
-.tool-content {
-  padding: 20px 24px 28px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  max-width: 880px;
-  margin: 0 auto;
-  width: 100%;
-}
-
-.two-col-grid {
-  column-count: 2;
-  column-gap: 10px;
-
-  > * {
-    break-inside: avoid;
-    margin-bottom: 10px;
-  }
-}
-
-.message {
-  padding: 8px 14px;
-  border-radius: 10px;
-  font-size: 12px;
-  font-weight: 500;
-  text-align: center;
-  animation: fadeIn 0.2s;
-
-  &.success {
-    background: rgba(74, 222, 128, 0.15);
-    border: 1px solid rgba(74, 222, 128, 0.3);
-    color: #4ade80;
-  }
-
-  &.error {
-    background: rgba(248, 113, 113, 0.15);
-    border: 1px solid rgba(248, 113, 113, 0.3);
-    color: #f87171;
-  }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: none; }
-}
+<style>
+.m-rtss { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; width: 100%; color: var(--md-sys-color-on-surface); }
+.m-rtss__head { display: flex; align-items: center; justify-content: space-between; } .m-rtss__head h2 { margin: 0; font: var(--m-title-large); }
+.m-rtss__grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px, 100%), 1fr)); gap: 24px 16px; align-items: start; }
+.m-rtss__actions { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
 </style>

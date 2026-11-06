@@ -507,6 +507,7 @@ export const zh = {
 
   // === 工具窗口 ===
   toolWindow: {
+    close: '关闭',
     loading: '加载中...',
   },
 

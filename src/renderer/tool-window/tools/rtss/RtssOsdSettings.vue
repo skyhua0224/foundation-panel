@@ -1,80 +1,28 @@
 <template>
-  <SectionPanel :title="t.rtssTool.osdSettings">
-    <template #icon><MIcon name="settings" /></template>
-    <template #actions>
-      <button class="refresh-btn" @click="load" :title="t.rtssTool.refresh">↻</button>
-    </template>
-
-    <div class="prop-grid">
-      <div class="prop-row">
-        <label>{{ t.rtssTool.osdEnabled }}</label>
-        <ToggleSwitch :modelValue="props.osd_enabled === 1" @update:modelValue="v => setProp('OSD', v ? '1' : '0')" />
-      </div>
-      <div class="prop-row">
-        <label>{{ t.rtssTool.showOwnStats }}</label>
-        <ToggleSwitch :modelValue="props.show_own_stats === 1" @update:modelValue="v => setProp('OSDShowOwnStatistics', v ? '1' : '0')" />
-      </div>
-      <div class="prop-row">
-        <label>{{ t.rtssTool.osdZoom }}</label>
-        <div class="zoom-btns">
-          <button
-            v-for="z in [1, 2, 3, 4]"
-            :key="z"
-            class="preset-btn small"
-            :class="{ active: props.zoom === z }"
-            @click="setProp('OnScreenDisplayZoom', String(z))"
-          >
-            {{ z }}x
-          </button>
-        </div>
-      </div>
-      <div class="prop-row">
-        <label>{{ t.rtssTool.osdPosition }}</label>
-        <div class="pos-inputs">
-          <div class="pos-field">
-            <span class="pos-label">X</span>
-            <input
-              type="number"
-              :value="props.position_x"
-              @change="e => setProp('OnScreenDisplayX', e.target.value)"
-              class="pos-input"
-              min="0"
-            />
+  <MSection :title="t.rtssTool.osdSettings">
+    <template #action><MIconButton icon="refresh" :label="t.rtssTool.refresh" @click="load" /></template>
+    <MGroup>
+      <MSwitchItem :model-value="props.osd_enabled === 1" icon="layers" :title="t.rtssTool.osdEnabled" @update:model-value="(v) => setProp('OSD', v ? '1' : '0')" />
+      <MSwitchItem :model-value="props.show_own_stats === 1" icon="monitoring" :title="t.rtssTool.showOwnStats" @update:model-value="(v) => setProp('OSDShowOwnStatistics', v ? '1' : '0')" />
+      <MItem stack icon="zoom_in" :title="t.rtssTool.osdZoom"><template #control><MChipSet :model-value="props.zoom" :label="t.rtssTool.osdZoom" :options="[1, 2, 3, 4].map((z) => ({ value: z, label: `${z}x` }))" @update:model-value="(z) => setProp('OnScreenDisplayZoom', String(z))" /></template></MItem>
+      <MItem stack icon="picture_in_picture" :title="t.rtssTool.osdPosition">
+        <template #control>
+          <div class="m-rtss__pos">
+            <MField :model-value="positionText.x" type="number" label="X" @update:model-value="(v) => setPosition('OnScreenDisplayX', 'x', v)" />
+            <MField :model-value="positionText.y" type="number" label="Y" @update:model-value="(v) => setPosition('OnScreenDisplayY', 'y', v)" />
           </div>
-          <div class="pos-field">
-            <span class="pos-label">Y</span>
-            <input
-              type="number"
-              :value="props.position_y"
-              @change="e => setProp('OnScreenDisplayY', e.target.value)"
-              class="pos-input"
-              min="0"
-            />
-          </div>
-        </div>
-      </div>
-      <div class="prop-row">
-        <label>{{ t.rtssTool.coordSpace }}</label>
-        <select
-          :value="props.coordinate_space"
-          @change="e => setProp('OSDCoordinateSpace', e.target.value)"
-          class="fmt-select wide"
-        >
-          <option :value="0">{{ t.rtssTool.coordFramebuffer }}</option>
-          <option :value="1">{{ t.rtssTool.coordScreen }}</option>
-        </select>
-      </div>
-    </div>
-  </SectionPanel>
+        </template>
+      </MItem>
+      <MChoiceItem :model-value="props.coordinate_space ?? 0" icon="monitor" :title="t.rtssTool.coordSpace" :options="[{ value: 0, label: t.rtssTool.coordFramebuffer }, { value: 1, label: t.rtssTool.coordScreen }]" :cancel-label="t.common.cancel" @update:model-value="(v) => setProp('OSDCoordinateSpace', String(v))" />
+    </MGroup>
+  </MSection>
 </template>
 
 <script setup>
-import { reactive, onMounted } from 'vue'
-import { MIcon } from 'foundation-ui/vue'
+import { computed, reactive, onMounted } from 'vue'
+import { MChipSet, MChoiceItem, MField, MGroup, MItem, MSection, MSwitchItem, MIconButton } from 'foundation-ui/vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../../../desktop/i18n/index.js'
-import SectionPanel from '../../components/SectionPanel.vue'
-import ToggleSwitch from '../../components/ToggleSwitch.vue'
 
 const { t } = useI18n()
 const emit = defineEmits(['message'])
@@ -116,6 +64,16 @@ async function setProp(key, value) {
   } catch (e) {
     emit('message', String(e), 'error')
   }
+}
+
+// a position is written when the field holds a whole number of 0 or more; anything else is left for the person to finish typing
+const typed = reactive({ x: null, y: null })
+const positionText = computed(() => ({ x: typed.x ?? (props.position_x ?? ''), y: typed.y ?? (props.position_y ?? '') }))
+async function setPosition(key, axis, value) {
+  typed[axis] = value
+  if (!/^\d+$/.test(String(value))) return
+  await setProp(key, String(value))
+  typed[axis] = null
 }
 
 onMounted(() => load())
@@ -224,4 +182,8 @@ defineExpose({ load })
   &.wide { min-width: 80px; }
   option { background: #1e1e2e; color: white; }
 }
+</style>
+
+<style scoped>
+.m-rtss__pos { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 </style>

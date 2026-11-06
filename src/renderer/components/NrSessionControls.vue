@@ -13,36 +13,10 @@
       </MSwitchItem>
     </div>
     <template v-if="pipeline.nr_live_controls_version >= 2">
-      <div class="live-scale">
-        <span>{{ text.scale }}<strong>{{ draft.scale }}%</strong></span>
-        <MSlider
-          :model-value="draft.scale"
-          :min="20"
-          :max="100"
-          :step="5"
-          unit="%"
-          :label="text.scale"
-          :disabled="!canChange || !pipeline.nr_requested_enabled"
-          @update:model-value="draft.scale = $event"
-          @commit="commit('scale')"
-        />
-      </div>
-      <p class="quality-note">{{ text.scaleHint }}</p>
-      <div class="live-scale">
-        <span>{{ overlayText.intensity }}<strong>{{ draft.intensity }}%</strong></span>
-        <MSlider
-          :model-value="draft.intensity"
-          :min="0"
-          :max="100"
-          :step="5"
-          unit="%"
-          :label="overlayText.intensity"
-          :disabled="!canChange"
-          @update:model-value="draft.intensity = $event"
-          @commit="commit('intensity')"
-        />
-      </div>
-      <p class="quality-note">{{ overlayText.applyHint }}</p>
+      <MGroup>
+        <MSliderItem :model-value="draft.scale" icon="aspect_ratio" :title="text.scale" :text="text.scaleHint" :min="20" :max="100" :step="5" :decimals="0" unit="%" size="m" :disabled="!canChange || !pipeline.nr_requested_enabled" @update:model-value="draft.scale = $event" @commit="commit('scale')" />
+        <MSliderItem :model-value="draft.intensity" icon="tune" :title="overlayText.intensity" :text="overlayText.applyHint" :min="0" :max="100" :step="5" :decimals="0" unit="%" size="m" :disabled="!canChange" @update:model-value="draft.intensity = $event" @commit="commit('intensity')" />
+      </MGroup>
       <MSection :title="overlayText.advanced">
         <MGroup>
           <template v-if="pipeline.nr_live_controls_version >= 3">
@@ -76,7 +50,7 @@
 </template>
 <script setup>
 import { computed, reactive, ref, watch } from 'vue'
-import { MLoading, MSlider, MSliderItem, MSwitchItem, MSeg, MItem, MGroup, MSection, MButton } from 'foundation-ui/vue'
+import { MLoading, MSliderItem, MSwitchItem, MSeg, MItem, MGroup, MSection, MButton } from 'foundation-ui/vue'
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../desktop/i18n/index.js'
 import { enhancementControlsText } from '../composables/enhancementControls.js'
@@ -169,9 +143,6 @@ async function run(build) {
 .live-controls .live-control-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 8px; }
 .live-controls .live-control-row strong { font: var(--m-title-small); color: var(--md-sys-color-on-surface); }
 .live-controls .live-control-row p { margin: 4px 0 0; font: var(--m-body-medium); color: var(--md-sys-color-on-surface-variant); }
-.live-controls .live-scale { display: grid; gap: 4px; }
-.live-controls .live-scale > span { display: flex; align-items: baseline; gap: 8px; font: var(--m-title-small); color: var(--md-sys-color-on-surface); }
-.live-controls .live-scale > span > strong { font: var(--m-label-large); font-variant-numeric: tabular-nums; color: var(--md-sys-color-primary-text); }
 .live-controls .quality-note, .live-controls .quality-warning { margin: 0 0 8px; font: var(--m-body-small); color: var(--md-sys-color-on-surface-variant); }
 .live-controls .quality-warning { color: var(--md-sys-color-error); }
 </style>
