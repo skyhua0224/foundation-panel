@@ -79,7 +79,7 @@ html:not([data-fd-gamepad='true']) {
   scrollbar-color: color-mix(in srgb, var(--md-sys-color-on-surface) 28%, transparent) transparent;
 }
 
-// === 共用块（设置、设备、串流、工具页还在用这些类名）===
+// === 共用块（仪表盘、应用库还在用这些类名）===
 .desktop-card {
   background: var(--md-sys-color-surface-container);
   border: 1px solid var(--md-sys-color-outline-variant);
@@ -122,85 +122,6 @@ html:not([data-fd-gamepad='true']) {
     color: var(--md-sys-color-on-surface-variant);
     font-size: 15px;
   }
-}
-
-.desktop-btn {
-  padding: 12px 22px;
-  min-height: 48px;
-  border-radius: 9999px;
-  border: 1px solid var(--md-sys-color-outline);
-  background: transparent;
-  color: var(--md-sys-color-primary);
-  font: 500 16px/24px var(--md-ref-typeface-brand, system-ui);
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  transition: background-color var(--m-spring-default-effects-duration, 200ms) var(--m-spring-default-effects, ease);
-
-  &:hover {
-    background: color-mix(in srgb, var(--md-sys-color-primary) 8%, transparent);
-  }
-
-  &.primary {
-    background: var(--md-sys-color-primary);
-    border-color: transparent;
-    color: var(--md-sys-color-on-primary);
-
-    &:hover {
-      background: color-mix(in srgb, var(--md-sys-color-primary) 90%, var(--md-sys-color-on-primary));
-    }
-  }
-
-  &.danger {
-    color: var(--md-sys-color-error);
-    border-color: var(--md-sys-color-error);
-
-    &:hover {
-      background: color-mix(in srgb, var(--md-sys-color-error) 10%, transparent);
-    }
-  }
-}
-
-.status-indicator {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  display: inline-block;
-
-  &.online {
-    background: var(--md-sys-color-success, var(--md-sys-color-primary));
-  }
-
-  &.offline {
-    background: var(--md-sys-color-error);
-  }
-
-  &.connecting {
-    background: var(--md-sys-color-warning, var(--md-sys-color-tertiary));
-    animation: pulse 1.5s infinite;
-  }
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.5;
-  }
-}
-
-.stat-value {
-  font-size: 40px;
-  line-height: 1.1;
-  font-weight: 700;
-  color: var(--md-sys-color-primary);
-}
-
-.gradient-text {
-  color: var(--md-sys-color-primary);
 }
 
 .desktop-grid {
