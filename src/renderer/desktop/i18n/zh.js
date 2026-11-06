@@ -87,7 +87,6 @@ export const zh = {
 
   // === 仪表盘 ===
   dashboard: {
-    subtitle: '高性能游戏串流解决方案',
     serviceStatus: '服务状态',
     pairedDevices: '已配对设备',
     activeSessions: '活动会话',
@@ -97,8 +96,8 @@ export const zh = {
     webConsoleDesc: '打开 Sunshine Web UI',
     restartService: '重启服务',
     restartServiceDesc: '重新启动 Sunshine 服务',
-    viewLogs: '查看日志',
-    viewLogsDesc: '打开日志控制台',
+    viewLogs: '诊断与日志',
+    viewLogsDesc: '日志、服务状态与故障排查',
     hostPerformance: '主机性能',
     hostPerformanceDesc: '打开实时性能监控',
     systemInfo: '系统信息',

@@ -2,7 +2,6 @@
   <div class="dashboard-view">
     <header class="dash-hero fade-in">
       <h1 class="hero-title">Foundation <span>Desktop</span></h1>
-      <p class="hero-sub">{{ t.dashboard.subtitle }}</p>
     </header>
 
     <!-- 状态 -->
@@ -434,12 +433,6 @@ onUnmounted(() => {
     span {
       color: var(--md-sys-color-primary);
     }
-  }
-
-  .hero-sub {
-    margin: 6px 0 0;
-    font: 400 20px/28px var(--md-ref-typeface-brand, system-ui);
-    color: var(--md-sys-color-on-surface-variant);
   }
 }
 

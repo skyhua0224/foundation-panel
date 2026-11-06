@@ -87,7 +87,6 @@ export const en = {
 
   // === Dashboard ===
   dashboard: {
-    subtitle: 'High-performance game streaming solution',
     serviceStatus: 'Service Status',
     pairedDevices: 'Paired Devices',
     activeSessions: 'Active Sessions',
@@ -97,8 +96,8 @@ export const en = {
     webConsoleDesc: 'Open Sunshine Web management interface',
     restartService: 'Restart Service',
     restartServiceDesc: 'Restart Sunshine service',
-    viewLogs: 'View Logs',
-    viewLogsDesc: 'Open Log Console',
+    viewLogs: 'Diagnostics and logs',
+    viewLogsDesc: 'Logs, service status and troubleshooting',
     hostPerformance: 'Host Performance',
     hostPerformanceDesc: 'Open the live performance monitor',
     systemInfo: 'System Information',
