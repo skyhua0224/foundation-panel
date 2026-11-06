@@ -113,7 +113,7 @@ const fail = (e) => say(String(e))
 const loading = ref(true), loaded = ref(false)
 const status = ref({ running: false, version: '', cli_path: '' })
 async function loadStatus() {
-  try { status.value = await invoke('get_rtss_status') } catch { status.value = { ...status.value, running: false } }
+  try { status.value = (await invoke('get_rtss_status')) || { running: false, version: '', cli_path: '' } } catch { status.value = { ...status.value, running: false } }
 }
 async function loadAll() {
   loading.value = true

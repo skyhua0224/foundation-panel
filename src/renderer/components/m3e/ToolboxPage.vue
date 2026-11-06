@@ -7,7 +7,7 @@
       <MItem action icon="edit" :title="t.controllersHub.peripherals.stylus.title" @click="byId('stylus-input-probe')?.action()">
         <template #trail><span class="panel-tool__go">{{ t.controllersHub.peripherals.stylus.launch }}</span></template>
       </MItem>
-      <MItem v-for="tool in others" :key="tool.id" action :icon="ICONS[tool.id] || 'build'" :title="tool.label" @click="tool.action()">
+      <MItem v-for="tool in others" :key="tool.id" action :icon="ICONS[tool.id] || 'build'" :title="tool.label" :text="tool.description" @click="tool.action()">
         <template v-if="tool.external" #trail><MIcon name="open_in_new" /></template>
       </MItem>
     </MGroup>

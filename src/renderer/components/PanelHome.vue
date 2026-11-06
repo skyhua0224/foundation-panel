@@ -181,6 +181,7 @@ function onAction(a) {
     case 'table-row': onTableRow(a.value); break
     case 'app': emit('open', 'apps'); break
     case 'add-app': emit('open', 'apps:add'); break
+    case 'scan-games': emit('open', 'apps:scan'); break
     case 'open': emit('open', a.value); break
     case 'guide-go': guideStepGo(a.value); break
     case 'guide-skip': guide.toggle(a.value); break

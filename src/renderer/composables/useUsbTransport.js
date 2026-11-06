@@ -144,7 +144,7 @@ export function useUsbTransport() {
       await ElMessageBox.confirm(
         t.value.deviceHub.usb.cleanupConfirm,
         removing ? t.value.deviceHub.components.uninstallTransport : t.value.deviceHub.usb.cleanupResidual,
-        { confirmButtonText: removing ? t.value.dualSense.uninstall : t.value.deviceHub.usb.continue, cancelButtonText: t.value.deviceHub.usb.cancel, type: 'warning', danger: removing },
+        { confirmButtonText: removing ? t.value.systemTools.uninstall : t.value.deviceHub.usb.continue, cancelButtonText: t.value.deviceHub.usb.cancel, type: 'warning', danger: removing },
       )
     } catch { cleaning.value = false; return }
     if (statusRefreshPromise) await statusRefreshPromise

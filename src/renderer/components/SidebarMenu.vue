@@ -432,6 +432,15 @@ onMounted(async () => {
 })
 onBeforeUnmount(() => { pairing.stop(); window.removeEventListener('message', onFramePin); if (unlistenConnect) unlistenConnect(); removeErrorHandlers?.() })
 onMounted(async () => { removeErrorHandlers = installErrorHandlers({ app: shellApp }); startAutoReport({ context: errorContext }); void refreshLogs(); await telemetry.refresh(); telemetry.askWhenQuiet(consentOpen) })
+// what the buttons of 日志与诊断 do, from the search: the same host calls, the answer in the snackbar
+const hostAction = async (path, doneText, method = 'POST') => {
+  try {
+    const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')
+    const r = await fetch(`${base}${path}`, { method })
+    if (!r.ok) throw new Error(`HTTP ${r.status}`)
+    useNotify().snack(doneText)
+  } catch { useNotify().snack(diagnosticsTexts(locale.value).failed) }
+}
 const actionHandlers = {
   restart: () => tools.restartSunshineService(),
   userMode: () => tools.restartSunshineInUserMode(),
@@ -441,7 +450,12 @@ const actionHandlers = {
   exportDiag: () => router.navigate(ROUTES.DIAGNOSTICS),
   checkUpdate: () => handleCheckForUpdates(),
   logs: () => router.navigate(ROUTES.DIAGNOSTICS),
-  addApp: () => openRoute(ROUTES.WEB_APPS),
+  addApp: () => { emit('webui-navigate', '/apps#guide-add'); router.navigate(ROUTES.WEB_APPS) },
+  scanGames: () => { emit('webui-navigate', '/apps#guide-scan'); router.navigate(ROUTES.WEB_APPS) },
+  stopApp: () => hostAction('/api/apps/close', diagnosticsTexts(locale.value).forceClose),
+  resetDisplay: () => hostAction('/api/reset-display-device-persistence', diagnosticsTexts(locale.value).resetDisplay),
+  setupGuide: () => openWelcome(),
+  quitHost: () => hostAction('/api/boom', diagnosticsTexts(locale.value).boom, 'GET'),
 }
 const searchDocs = computed(() => [
   ...settingDocs(searchItems.value, { prefix: settingsPlace, locale: locale.value }),
@@ -568,6 +582,7 @@ const openDestination = (id) => {
   if (id === 'pair') { emit('webui-navigate', '/pin#pairing'); router.navigate(ROUTES.WEB_CLIENTS); return }
   if (id === 'pair:qr') { emit('webui-navigate', '/pin#pairing-qr'); router.navigate(ROUTES.WEB_CLIENTS); return }
   if (id === 'apps:add') { emit('webui-navigate', '/apps#guide-add'); router.navigate(ROUTES.WEB_APPS); return }
+  if (id === 'apps:scan') { emit('webui-navigate', '/apps#guide-scan'); router.navigate(ROUTES.WEB_APPS); return }
   if (id.startsWith('downloads:')) { emit('webui-navigate', `/downloads?platform=${encodeURIComponent(id.slice(10))}`); router.navigate(ROUTES.WEB_DOWNLOADS); return }
   const web = { clients: ROUTES.WEB_CLIENTS, apps: ROUTES.WEB_APPS, settings: ROUTES.WEB_CONFIG, downloads: ROUTES.WEB_DOWNLOADS }
   if (id === 'settings') { openConfig({ tab: 'general' }); return }
