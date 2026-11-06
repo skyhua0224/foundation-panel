@@ -75,3 +75,10 @@ test('F-04 a disabled nav item is out of the Tab order and the pad list; keyboar
   assert.ok(block.includes('*:focus:not(:focus-visible)') && block.includes('*:focus-visible'), 'only mouse focus loses the ring')
   assert.ok(block.includes('.nav-item:focus-visible'))
 })
+
+test('F-02 the theme editor rows show the colours in force on the Material preset, not an empty dot', () => {
+  const te = read('../components/ThemeEditor.vue')
+  assert.ok(te.includes('const shown = ref({})') && te.includes("props.vars[row.key] || style?.getPropertyValue(row.key)"))
+  assert.ok(te.includes(':text="shown[row.key]"') && te.includes('background: shown[row.key]') && te.includes(':value="shown[row.key]"'))
+  assert.ok(!/vars\[row\.key\]\s*\}\s*\"><\/span>/.test(te), 'the dot does not read vars directly any more')
+})

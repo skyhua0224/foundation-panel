@@ -84,8 +84,8 @@
           <!-- colours -->
           <MSection :title="t.themeEditor.colors">
             <MGroup>
-              <MItem v-for="row in colorRows" :key="row.key" :title="row.label" :text="vars[row.key]">
-                <template #lead><span class="dsk-te__dot" :style="{ background: vars[row.key] }"></span></template>
+              <MItem v-for="row in colorRows" :key="row.key" :title="row.label" :text="shown[row.key]">
+                <template #lead><span class="dsk-te__dot" :style="{ background: shown[row.key] }"></span></template>
                 <template #trail>
                   <MIconButton icon="colorize" tonal :label="row.label" @click="pickColor(row.key)" />
                   <input
@@ -94,7 +94,7 @@
                     class="dsk-te__native"
                     tabindex="-1"
                     aria-hidden="true"
-                    :value="vars[row.key]"
+                    :value="shown[row.key]"
                     @input="throttledSetVar(row.key, $event.target.value)"
                     @change="$emit('setVar', row.key, $event.target.value)"
                   />
@@ -140,7 +140,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { MButton, MGroup, MIcon, MIconButton, MItem, MSection, MSeg, MSlider, MSwatches, MSwitchItem, appearanceTexts, useAppearance } from 'foundation-ui/vue'
 import { useModalFocusScope } from '../composables/useFocusNav.js'
 import { useDeskScale } from '../composables/useDeskScale.js'
@@ -208,6 +208,19 @@ const colorRows = computed(() => [
   { key: '--fd-bg-primary', label: t.value.themeEditor.backgroundPrimary },
   { key: '--fd-bg-secondary', label: t.value.themeEditor.backgroundSecondary },
 ])
+// The 'material' preset keeps no colours in vars: they are the Material colours the bridge writes on <html>. The rows show what is in force.
+const shown = ref({})
+function readShown() {
+  const style = typeof document === 'undefined' ? null : getComputedStyle(document.documentElement)
+  const out = {}
+  for (const row of colorRows.value) out[row.key] = props.vars[row.key] || style?.getPropertyValue(row.key).trim() || ''
+  shown.value = out
+}
+// the bridge follows light/dark and the appearance a frame later: read again once it has written
+watch([() => props.open, () => props.activePreset, () => props.vars, () => ap.state.mode, () => ap.state.dark], () => {
+  void nextTick(readShown)
+  setTimeout(readShown, 160)
+}, { immediate: true, deep: true })
 const colorInputs = {}
 function setColorInput(key, el) {
   if (el) colorInputs[key] = el
