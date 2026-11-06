@@ -5,6 +5,7 @@ import {
   imageDataToArgb,
   m3ThemeFromSeed,
 } from './useDynamicColor.js'
+import { applyMaterialBridge, clearMaterialBridge, watchMaterialBridge } from './materialBridge.js'
 
 const STORAGE_KEY = 'foundation-desktop-theme'
 const WALLPAPER_KEY = 'foundation-desktop-wallpaper'
@@ -53,6 +54,16 @@ async function idbDelete(key) {
 
 // 预设主题
 const presets = {
+  // 默认：颜色不写死，由 materialBridge 从 foundation-ui 的 --md-sys-color-* 推出来
+  material: {
+    label: 'Material',
+    vars: {
+      '--fd-card-radius': '28px',
+      '--fd-font-size': '16px',
+      '--fd-grid-visible': '0',
+      '--fd-scanline-visible': '0',
+    },
+  },
   cyberpunk: {
     label: '赛博朋克',
     vars: {
@@ -185,7 +196,7 @@ const presets = {
   },
 }
 
-const defaultPreset = 'cyberpunk'
+const defaultPreset = 'material'
 
 // 获取默认变量
 function getDefaultVars() {
@@ -248,8 +259,19 @@ export function useTheme() {
   const activeWallpaperSeed = ref(null) // 当前生效的种子 ARGB
 
   // 应用 CSS 变量到 document
+  let stopBridge = null
   function applyTheme(vars) {
     const el = document.documentElement
+    // material 预设：颜色跟 foundation-ui 走；其余预设和自定义主题照旧写死
+    if (activePreset.value === 'material') {
+      clearMaterialBridge(el)
+      if (stopBridge) applyMaterialBridge(el)
+      else stopBridge = watchMaterialBridge(el)
+    } else if (stopBridge) {
+      stopBridge()
+      stopBridge = null
+      clearMaterialBridge(el)
+    }
     for (const [key, value] of Object.entries(vars)) {
       el.style.setProperty(key, value)
       // 自动为 hex 颜色生成 -rgb 变体（跳过已有的 -rgb 键）
@@ -376,6 +398,11 @@ export function useTheme() {
     if (saved) {
       try {
         const data = JSON.parse(saved)
+        // 旧默认主题（赛博朋克）随 Material 重做换成新默认；之后重新选它则照旧保留
+        if (data.preset === 'cyberpunk' && localStorage.getItem(STORAGE_KEY + '-m3') !== '1') {
+          data.vars = null
+        }
+        localStorage.setItem(STORAGE_KEY + '-m3', '1')
         if (data.vars) {
           themeVars.value = { ...getDefaultVars(), ...data.vars }
           activePreset.value = data.preset || 'custom'

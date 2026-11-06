@@ -44,14 +44,14 @@ const props = defineProps({
 </script>
 
 <style lang="less" scoped>
+// 小号顶栏（48）：surface-container，无分隔线，标题用 title-small
 .desktop-titlebar {
-  height: 32px;
-  background: rgba(var(--fd-bg-primary-rgb, 15, 15, 35), 0.95);
-  border-bottom: 1px solid rgba(var(--fd-accent-rgb, 0, 255, 245), 0.2);
+  height: 48px;
+  background: var(--md-sys-color-surface-container);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 8px;
+  padding: 0 12px 0 20px;
   position: relative;
   z-index: 100;
   user-select: none;
@@ -63,20 +63,19 @@ const props = defineProps({
   .titlebar-left {
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 12px;
     flex: 1;
     -webkit-app-region: no-drag;
 
     .app-icon {
-      width: 16px;
-      height: 16px;
+      width: 24px;
+      height: 24px;
     }
 
     .app-title {
-      font-size: 12px;
-      font-weight: 500;
-      color: rgba(var(--fd-text-primary-rgb, 255, 255, 255), 0.7);
-      letter-spacing: 0.5px;
+      font: 500 14px/20px var(--md-ref-typeface-brand, system-ui);
+      color: var(--md-sys-color-on-surface-variant);
+      letter-spacing: 0.1px;
     }
   }
 
@@ -96,4 +95,3 @@ const props = defineProps({
   }
 }
 </style>
-

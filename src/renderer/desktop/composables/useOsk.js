@@ -81,15 +81,14 @@ function inferMaxLength(input) {
  * 写回后派发 input/change 事件，这样 `v-model` 和 `@input` 绑定都能收到更新。
  */
 export async function editInputWithOsk(input, options = {}) {
-  const isEditable =
-    input instanceof HTMLInputElement || input instanceof HTMLTextAreaElement
-  if (!isEditable || input.readOnly || input.disabled) return false
+  if (!isTextEntryElement(input) || input.readOnly || input.disabled) return false
 
   const next = await openOsk({
     value: input.value,
     title:
       options.title ||
       input.getAttribute('aria-label') ||
+      input.getAttribute('label') ||
       input.getAttribute('placeholder') ||
       '',
     mode: options.mode || inferMode(input),
@@ -105,8 +104,20 @@ export async function editInputWithOsk(input, options = {}) {
   return true
 }
 
+/**
+ * Material 的文本框（md-outlined-text-field 等）是 shadow DOM 里的 input：焦点停在宿主上，
+ * value / type / readOnly / disabled 都是宿主的属性，所以按标签名认，不靠 instanceof。
+ */
+export function isMaterialTextField(element) {
+  return typeof element?.localName === 'string' && /^md-(outlined|filled)-text-field$/.test(element.localName)
+}
+
 /** 焦点落在文本输入上时，A 键应该打开键盘而不是「点击」它。 */
 export function isTextEntryElement(element) {
+  if (isMaterialTextField(element)) {
+    return !['checkbox', 'radio', 'button', 'file', 'range', 'color'].includes(element.type)
+  }
+  if (typeof HTMLTextAreaElement === 'undefined') return false
   if (element instanceof HTMLTextAreaElement) return true
   if (!(element instanceof HTMLInputElement)) return false
   const nonText = ['checkbox', 'radio', 'button', 'submit', 'reset', 'file', 'range', 'color']
