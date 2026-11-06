@@ -75,7 +75,7 @@
                 :title="t.themeEditor.presetNames[key] || preset.label"
                 @click="$emit('applyPreset', key)"
               >
-                <template #lead><span class="dsk-te__disc" :style="{ background: `linear-gradient(135deg, ${preset.vars['--fd-accent']} 50%, ${preset.vars['--fd-accent-secondary']} 50%)` }"></span></template>
+                <template #lead><span class="dsk-te__disc" :style="{ background: `linear-gradient(135deg, ${preset.vars['--fd-accent'] || 'var(--md-sys-color-primary)'} 50%, ${preset.vars['--fd-accent-secondary'] || 'var(--md-sys-color-tertiary)'} 50%)` }"></span></template>
                 <template v-if="activePreset === key" #trail><MIcon name="check" /></template>
               </MItem>
             </MGroup>
@@ -170,7 +170,16 @@ const fileInputRef = ref(null)
 // light or dark follows the appearance of foundation-ui (system, light, dark; tinted or true black)
 const ap = useAppearance()
 const T = computed(() => ({ ...appearanceTexts(locale.value), close: t.value.fileSharing?.close || 'Close' }))
-watch(() => props.open, (open) => { if (open) void ap.init() }, { immediate: true })
+// The accent of the editor (a colour of the picture, a preset, the picker, an import) is also the colour the window's Material surfaces are drawn
+// from. The 'material' preset has no colours of its own: it leaves the appearance as the person set it.
+let mirrored = false
+watch([() => props.activePreset, () => props.vars['--fd-accent']], ([preset, hex]) => {
+  if (preset === 'material') {
+    if (mirrored) { mirrored = false; void ap.set({ color: 'wallpaper' }) }
+    return
+  }
+  if (/^#[0-9a-f]{6}$/i.test(hex || '')) { mirrored = true; void ap.set({ color: 'custom', custom: hex.toLowerCase() }) }
+})
 const modeOptions = computed(() => [
   { value: 'system', label: T.value.system, icon: 'contrast' },
   { value: 'light', label: T.value.light, icon: 'light_mode' },

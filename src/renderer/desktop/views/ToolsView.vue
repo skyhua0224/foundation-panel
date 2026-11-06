@@ -142,7 +142,7 @@ onMounted(async () => {
 .dsk-tool, .dsk-diag { display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 20px; border-radius: var(--md-sys-shape-corner-extra-large); background: var(--m-card); color: var(--md-sys-color-on-surface); }
 .dsk-tool__head { display: flex; align-items: center; gap: 12px; }
 .dsk-tool__icon { flex: none; width: 40px; height: 40px; border-radius: 14px; display: grid; place-items: center; font-size: 24px; background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
-.dsk-tool__title { margin: 0; min-width: 0; font: var(--m-title-large); letter-spacing: 0; }
+.dsk-tool__title { margin: 0; min-width: 0; color: var(--md-sys-color-on-surface); font: var(--m-title-large); letter-spacing: 0; }
 .dsk-tool__body { min-height: 0; }
 .dsk-tool__body :deep(.tool-header) { display: none; }
 
