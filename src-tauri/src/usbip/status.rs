@@ -48,7 +48,7 @@ pub async fn usbip_get_status() -> Result<UsbipStatus, String> {
         // report a clean transport. Propagating the error surfaces the probe
         // as unavailable, hiding install and attach actions.
         let interfaces = super::device::enumerate_vhci_interfaces()?;
-        let devnodes = super::device::enumerate_vhci_devnodes()?;
+        let nodes = super::device::enumerate_transport_nodes()?;
         let installation = match super::manager::find_installation() {
             Ok(installation) => installation,
             Err(detail) => {
@@ -64,7 +64,7 @@ pub async fn usbip_get_status() -> Result<UsbipStatus, String> {
                     // A registration without a usable executable is also a
                     // partial uninstall and must go through shared cleanup.
                     vhci_residual: !interfaces.is_empty()
-                        || !devnodes.is_empty()
+                        || !nodes.is_empty()
                         || partially_installed,
                     error_code: detail_error_code(&detail),
                     attached_devices: Vec::new(),
@@ -73,7 +73,10 @@ pub async fn usbip_get_status() -> Result<UsbipStatus, String> {
             }
         };
         let version_valid = super::supported_usbip_installed(Some(&installation.version));
-        let vhci_residual = super::device::has_vhci_residual(&interfaces, &devnodes);
+        // A disabled node under the other enumerator is not a residual: the
+        // live controller is the single present interface, on ROOT\USB or
+        // ROOT\ALKAIDUSB. An enabled phantom or a second interface still blocks.
+        let vhci_residual = super::device::transport_not_ready(&interfaces, &nodes);
         if !version_valid {
             let detail = format!(
                 "USBIP-SETUP-003: the tested USB/IP {REQUIRED_VERSION} tools and driver are required"
