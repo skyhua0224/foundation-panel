@@ -1,13 +1,15 @@
 <template>
   <MOnboardWindow :mode="onboardMode" :label="accountTexts?.title || ''" @close="closeGuide">
   <div class="panel-guide">
-    <MLoading v-if="state.account.exists === null || consentShow === null" class="panel-guide__loading" />
+    <MLoading v-if="state.account.exists === null || consentShow === null || !entry" class="panel-guide__loading" />
     <MGuideFlow
       v-else
       :steps="steps"
       :state="flowState"
       :callbacks="callbacks"
       :locale="locale"
+      :version="version"
+      :mode="entry.mode"
       :texts="accountTexts"
       :storage-key="GUIDE_STORAGE_KEY"
       :qr="qrMatrix"
@@ -24,12 +26,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import QRCode from 'qrcode'
 import { invoke } from '@tauri-apps/api/core'
-import { MGuideFlow, MLoading, MOnboardWindow, buildGuideSteps, useTelemetryConsent } from 'foundation-ui/vue'
+import { MGuideFlow, MLoading, MOnboardWindow, buildGuideSteps, guideEntry, readProgress, upgradeSkips, useTelemetryConsent } from 'foundation-ui/vue'
 import { supportedLocales, setLocaleChoice as setWelcomeChoice, localeChoice, systemLocale, useWelcomeI18n } from '../../i18n/index.js'
 import { useI18n as useDesktopI18n } from '../desktop/i18n/index.js'
 import { telemetryApi } from '../composables/telemetryApi.js'
 import { openExternalUrl, sunshine } from '../tauri-adapter.js'
 import { GUIDE_DISMISSED_KEY, GUIDE_STORAGE_KEY, createGuideData } from '../composables/guideData.js'
+import { panelVersion } from '../composables/panelVersion.js'
 import { useHostReach } from '../composables/useHostReach.js'
 import { useUpdateSource } from '../composables/useUpdateSource.js'
 
@@ -52,6 +55,7 @@ const data = createGuideData({
   reach: useHostReach(),
   // The apps page of the Web UI takes the request from the address (#guide-scan, #guide-add, #guide-restore)
   openApps: (mode) => emit('webui-navigate', `/apps#guide-${mode}`),
+  openTools: () => emit('webui-navigate', '/#test-tools'),
 })
 const { state, probeAccount } = data
 // the update method (the last step): the same source and CDK the 更新 page keeps; the CDK itself stays in the native side
@@ -72,7 +76,11 @@ const callbacks = {
   saveCdk: async (cdk) => ({ ok: await updateSource.saveCdk(cdk) }),
   clearCdk: () => updateSource.clearCdk(),
 }
-const steps = computed(() => buildGuideSteps({ skip: [...(state.account.exists ? ['account'] : []), ...(consentShow.value === false ? ['consent'] : [])] }))
+// First install (the whole flow) or an upgrade (what is new first, what is done left out), from the host's real state: the version stored for this panel, the setup flag, the paired clients and the account.
+// Opened by hand on an install that has seen this version, the whole flow is shown.
+const version = ref('')
+const entry = ref(null)
+const steps = computed(() => buildGuideSteps({ mode: entry.value?.mode || 'fresh', skip: [...(entry.value?.skip || []), ...(state.account.exists ? ['account'] : []), ...(consentShow.value === false ? ['consent'] : [])] }))
 const qrMatrix = (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules
 
 // The credential form keeps the texts of the welcome page, in every language it has. The title and the lead of the step say it is the Web UI account (the shared
@@ -98,7 +106,11 @@ const closeGuide = () => {
 }
 
 onMounted(async () => {
-  await Promise.all([probeAccount(), telemetry.refresh().then(() => { consentShow.value = telemetry.consent.value === 'ask' })])
+  await Promise.all([probeAccount(), telemetry.refresh().then(() => { consentShow.value = telemetry.consent.value === 'ask' }), panelVersion().then((v) => { version.value = v })])
+  if (state.account.exists) await Promise.all([callbacks.loadSetup?.(), callbacks.refreshClients?.()])
+  const pairedCount = Array.isArray(state.clients) ? state.clients.length : null
+  const found = state.account.exists ? guideEntry({ progress: readProgress(null, GUIDE_STORAGE_KEY), version: version.value, setupCompleted: !!state.setup.completed, pairedCount, configExists: true }) : null
+  entry.value = found?.mode === 'upgrade' ? { mode: 'upgrade', skip: upgradeSkips({ accountExists: true, setupCompleted: !!state.setup.completed, pairedCount }) } : { mode: 'fresh', skip: [] }
 })
 </script>
 

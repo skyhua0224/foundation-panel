@@ -192,3 +192,42 @@ test('the Web UI access step reads the saved scope and bind address and saves on
   assert.equal(data.state.webAccess.scope, 'pc')
   assert.ok(buildGuideSteps().some((s) => s.id === 'webaccess'))
 })
+
+test('an upgrade: a host that is set up opens the guide once per new version of the panel', async () => {
+  const routes = (named) => host({ '/api/config': { setup_wizard_completed: true }, '/api/clients/list': { named_certs: named } })
+  const ask = (extra = {}) => shouldOpenGuide({ proxyUrl: async () => 'http://proxy', fetchImpl: routes([{ name: 'Pixel', uuid: '1' }]), progress: null, version: '2.4.0', ...extra })
+  assert.equal(await ask(), true)
+  assert.equal(await ask({ progress: { finished: true, visited: [], version: '2.3.0', mode: 'fresh' } }), true)
+  assert.equal(await ask({ progress: { finished: false, visited: ['whatsnew'], version: '2.4.0', mode: 'upgrade' } }), false, 'closed or skipped for this version')
+  assert.equal(await ask({ progress: { finished: true, visited: [], version: '2.4.0', mode: 'upgrade' } }), false)
+  assert.equal(await ask({ dismissed: true }), false)
+  assert.equal(await ask({ version: '' }), false, 'without a version of the panel only a first run opens it')
+})
+
+test('the guide scans the game libraries on the host and adds the chosen games to the apps list', async () => {
+  const calls = []
+  const fetchImpl = async (url, init = {}) => {
+    const path = String(url).replace('http://proxy', '')
+    calls.push({ path, method: init.method || 'GET', body: init.body ? JSON.parse(init.body) : null })
+    if (path === '/api/apps/scan') return new Response(JSON.stringify({ games: [{ name: 'Portal', platform: 'steam', launch: 'steam://run/400', install_dir: 'C:/Steam/Portal' }] }), { status: 200 })
+    if (path === '/api/apps') return new Response(JSON.stringify(init.method === 'POST' ? { status: true } : { apps: [{ name: 'Desktop' }] }), { status: 200 })
+    return new Response('{}', { status: 404 })
+  }
+  const data = createGuideData({ proxyUrl: async () => 'http://proxy', fetchImpl })
+  const scan = await data.callbacks.scanGames(['steam'])
+  assert.equal(scan.ok, true)
+  assert.deepEqual(calls[0].body, { sources: ['steam'] })
+  assert.equal(scan.games[0].name, 'Portal')
+  assert.deepEqual(await data.callbacks.addGames(scan.games), { ok: true, added: 1 })
+  const saved = calls.filter((c) => c.method === 'POST' && c.path === '/api/apps').at(-1).body.apps
+  assert.deepEqual(saved.map((a) => a.name), ['Desktop', 'Portal'])
+  assert.equal(saved[1].cmd, 'steam://run/400')
+  const old = createGuideData({ proxyUrl: async () => 'http://proxy', fetchImpl: async () => new Response('', { status: 404 }) })
+  assert.equal((await old.callbacks.scanGames(['steam'])).unsupported, true)
+})
+
+test('the test tools are opened through the injected navigation', () => {
+  const asked = []
+  make({}, { openTools: () => asked.push('tools') }).callbacks.openTools()
+  assert.deepEqual(asked, ['tools'])
+})
