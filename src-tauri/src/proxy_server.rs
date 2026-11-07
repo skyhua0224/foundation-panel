@@ -10,9 +10,9 @@ use bytes::Bytes;
 use futures_util::StreamExt;
 use log::{debug, error, info, warn};
 use std::fs;
+use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::LazyLock;
-use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, RwLock};
 use tauri::{AppHandle, Manager, Runtime};
@@ -46,8 +46,11 @@ static PROXY_PENDING_PERMITS: LazyLock<Arc<Semaphore>> =
 static PROXY_HEALTH_TOKEN: LazyLock<String> = LazyLock::new(|| uuid::Uuid::new_v4().to_string());
 
 #[cfg(test)]
-static TEST_LOCAL_AUTH_TOKEN: LazyLock<Mutex<Option<String>>> =
-    LazyLock::new(|| Mutex::new(Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string())));
+static TEST_LOCAL_AUTH_TOKEN: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| {
+    Mutex::new(Some(
+        "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string(),
+    ))
+});
 
 /// 快速失败冷却时间（秒）- 在此时间内不重试，超过后会重新尝试连接
 const FAST_FAIL_COOLDOWN_SECS: u64 = 3;
@@ -135,15 +138,17 @@ pub fn get_proxy_health_check() -> ProxyHealthCheck {
 pub async fn probe_sunshine_host(timeout_ms: Option<u64>) -> Result<u16, String> {
     let timeout = std::time::Duration::from_millis(timeout_ms.unwrap_or(2500).clamp(500, 10_000));
     let url = format!("{}/", get_sunshine_target().trim_end_matches('/'));
-    let local_token = read_local_auth_token()?;
-    get_http_client()
-        .get(url)
-        .header("X-Sunshine-Local-Token", local_token)
-        .timeout(timeout)
-        .send()
-        .await
-        .map(|response| response.status().as_u16())
-        .map_err(|error| error.to_string())
+    let response = send_local_authenticated_request(
+        get_http_client(),
+        &url,
+        &axum::http::Method::GET,
+        &axum::http::HeaderMap::new(),
+        &Bytes::new(),
+        Some(timeout),
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+    Ok(response.status().as_u16())
 }
 
 async fn proxy_health_handler(request: Request) -> Response {
@@ -890,7 +895,12 @@ fn long_poll_timeout(method: &axum::http::Method, url: &str) -> Option<std::time
     if url.path() != "/api/pairing/pending" {
         return None;
     }
-    let wait = url.query_pairs().find(|(key, _)| key == "wait")?.1.parse::<u64>().ok()?;
+    let wait = url
+        .query_pairs()
+        .find(|(key, _)| key == "wait")?
+        .1
+        .parse::<u64>()
+        .ok()?;
     Some(std::time::Duration::from_secs(wait.min(60) + 5))
 }
 
@@ -924,16 +934,23 @@ fn throttle_log(
 /// A failure of the proxy is written once a minute per path and kind, with the number of those left out; a page that polls does not fill the log.
 fn log_proxy_failure(path: &str, kind: &str, error: &str) {
     use std::sync::{LazyLock, Mutex};
-    static SEEN: LazyLock<Mutex<std::collections::HashMap<String, (std::time::Instant, u32)>>> = LazyLock::new(Default::default);
-    let decision = SEEN
-        .lock()
-        .ok()
-        .and_then(|mut seen| throttle_log(&mut seen, &format!("{path}|{kind}"), std::time::Instant::now()));
+    static SEEN: LazyLock<Mutex<std::collections::HashMap<String, (std::time::Instant, u32)>>> =
+        LazyLock::new(Default::default);
+    let decision = SEEN.lock().ok().and_then(|mut seen| {
+        throttle_log(
+            &mut seen,
+            &format!("{path}|{kind}"),
+            std::time::Instant::now(),
+        )
+    });
     if let Some(left_out) = decision {
         if left_out == 0 {
             error!("❌ 代理错误 [{}] ({}): {}", path, kind, error);
         } else {
-            error!("❌ 代理错误 [{}] ({}): {} (另有 {} 次同类错误未记录)", path, kind, error, left_out);
+            error!(
+                "❌ 代理错误 [{}] ({}): {} (另有 {} 次同类错误未记录)",
+                path, kind, error, left_out
+            );
         }
     }
 }
@@ -1070,7 +1087,11 @@ async fn proxy_handler(req: Request) -> Response {
             if long_poll_timeout(&method, &target_url).is_some() && is_timeout_error(&error_str) {
                 // Sunshine did not answer within the wait it was given: the page asks again; the service is not marked unavailable and the target is not refreshed
                 debug!("long poll [{}] ended without an answer", path);
-                return (axum::http::StatusCode::GATEWAY_TIMEOUT, "long poll timed out").into_response();
+                return (
+                    axum::http::StatusCode::GATEWAY_TIMEOUT,
+                    "long poll timed out",
+                )
+                    .into_response();
             }
             log_proxy_failure(&path, error_kind, &error_str);
 
@@ -1316,8 +1337,8 @@ fn read_local_auth_token_from(path: &Path) -> Result<String, String> {
     // POSIX mode. Read it for each upstream request so a host restart rotates
     // the credential without retaining an old value
     // [panel-rust-read-to-string-20261107] [panel-reqwest-request-builder-20261107].
-    let token = fs::read_to_string(path)
-        .map_err(|_| "Local host credential is unavailable".to_string())?;
+    let token =
+        fs::read_to_string(path).map_err(|_| "Local host credential is unavailable".to_string())?;
     let token = token.trim();
     if token.len() != 64 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
         return Err("Local host credential is invalid".to_string());
@@ -1399,7 +1420,11 @@ async fn send_request(
         let key_str = key.as_str();
         if !matches!(
             key_str,
-            "host" | "connection" | "content-length" | "transfer-encoding" | "x-sunshine-local-token"
+            "host"
+                | "connection"
+                | "content-length"
+                | "transfer-encoding"
+                | "x-sunshine-local-token"
         ) {
             if let Ok(value_str) = value.to_str() {
                 req_builder = req_builder.header(key_str, value_str);
@@ -1420,6 +1445,36 @@ async fn send_request(
     req_builder.send().await
 }
 
+async fn send_local_authenticated_request(
+    client: &reqwest::Client,
+    url: &str,
+    method: &axum::http::Method,
+    headers: &axum::http::HeaderMap,
+    body: &Bytes,
+    timeout: Option<std::time::Duration>,
+) -> Result<reqwest::Response, Box<dyn std::error::Error + Send + Sync>> {
+    let token = read_local_auth_token().map_err(std::io::Error::other)?;
+    let response = send_request(client, url, method, headers, body, timeout, Some(&token)).await?;
+    if response.status() != reqwest::StatusCode::UNAUTHORIZED {
+        return Ok(response);
+    }
+
+    // The host rotates this credential when the active console user changes.
+    // Re-read once so an in-flight request does not strand the Panel on a
+    // stale value; a second 401 is returned to the normal error path.
+    let refreshed = read_local_auth_token().map_err(std::io::Error::other)?;
+    Ok(send_request(
+        client,
+        url,
+        method,
+        headers,
+        body,
+        timeout,
+        Some(&refreshed),
+    )
+    .await?)
+}
+
 /// 获取并代理内容
 async fn fetch_and_proxy(
     url: &str,
@@ -1428,7 +1483,6 @@ async fn fetch_and_proxy(
     body: &Bytes,
     is_ai_api: bool,
 ) -> Result<Response, Box<dyn std::error::Error + Send + Sync>> {
-    let local_token = read_local_auth_token().map_err(std::io::Error::other)?;
     let response_body_limit = proxy_response_body_limit(url, method, headers);
     let client = if response_body_limit.is_none() {
         get_streaming_http_client()
@@ -1440,15 +1494,20 @@ async fn fetch_and_proxy(
 
     // 尝试请求，HTTPS 失败时降级到 HTTP（仅限非连接错误）
     let long_poll = long_poll_timeout(method, url);
-    let response = match send_request(client, url, method, headers, body, long_poll, Some(&local_token)).await {
-        Ok(resp) => resp,
-        Err(e) if url.starts_with("https://") && !is_connection_error(&e.to_string()) => {
-            let http_url = url.replace("https://", "http://");
-            warn!("⚠️  HTTPS 连接失败，尝试 HTTP: {}", http_url);
-            send_request(client, &http_url, method, headers, body, long_poll, Some(&local_token)).await?
-        }
-        Err(e) => return Err(e.into()),
-    };
+    let response =
+        match send_local_authenticated_request(client, url, method, headers, body, long_poll).await
+        {
+            Ok(resp) => resp,
+            Err(e) if url.starts_with("https://") && !is_connection_error(&e.to_string()) => {
+                let http_url = url.replace("https://", "http://");
+                warn!("⚠️  HTTPS 连接失败，尝试 HTTP: {}", http_url);
+                send_local_authenticated_request(
+                    client, &http_url, method, headers, body, long_poll,
+                )
+                .await?
+            }
+            Err(e) => return Err(e.into()),
+        };
 
     let status = response.status();
     let resp_headers = response.headers().clone();
@@ -1546,7 +1605,11 @@ fn inject_theme_script(html: String) -> String {
         "window.TAURI_PRODUCTION = false;"
     };
 
-    let inject_size = INJECT_STYLES.len() + INJECT_TRACES.len() + INJECT_SCRIPT.len() + production_flag.len() + 150;
+    let inject_size = INJECT_STYLES.len()
+        + INJECT_TRACES.len()
+        + INJECT_SCRIPT.len()
+        + production_flag.len()
+        + 150;
     let mut result = String::with_capacity(html.len() + inject_size);
 
     result.push_str(&html[..pos]);
@@ -1622,7 +1685,8 @@ mod tests {
     use axum::body::Body;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-    static TEST_LOCK: LazyLock<tokio::sync::Mutex<()>> = LazyLock::new(|| tokio::sync::Mutex::new(()));
+    static TEST_LOCK: LazyLock<tokio::sync::Mutex<()>> =
+        LazyLock::new(|| tokio::sync::Mutex::new(()));
 
     async fn unused_local_port() -> u16 {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1699,7 +1763,9 @@ mod tests {
             }
             let _ = request_seen.send(String::from_utf8_lossy(&request).into_owned());
             stream
-                .write_all(b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                .write_all(
+                    b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+                )
                 .await
                 .unwrap();
         });
@@ -1834,11 +1900,23 @@ mod tests {
     fn a_pairing_long_poll_may_wait_as_long_as_it_asks_plus_five_seconds() {
         let get = axum::http::Method::GET;
         let secs = |url: &str| long_poll_timeout(&get, url).map(|d| d.as_secs());
-        assert_eq!(secs("https://127.0.0.1:57990/api/pairing/pending?wait=25&since=7"), Some(30));
-        assert_eq!(secs("https://127.0.0.1:57990/api/pairing/pending?wait=600"), Some(65));
+        assert_eq!(
+            secs("https://127.0.0.1:57990/api/pairing/pending?wait=25&since=7"),
+            Some(30)
+        );
+        assert_eq!(
+            secs("https://127.0.0.1:57990/api/pairing/pending?wait=600"),
+            Some(65)
+        );
         assert_eq!(secs("https://127.0.0.1:57990/api/pairing/pending"), None);
         assert_eq!(secs("https://127.0.0.1:57990/api/config?wait=25"), None);
-        assert_eq!(long_poll_timeout(&axum::http::Method::POST, "https://x/api/pairing/pending?wait=25"), None);
+        assert_eq!(
+            long_poll_timeout(
+                &axum::http::Method::POST,
+                "https://x/api/pairing/pending?wait=25"
+            ),
+            None
+        );
     }
 
     #[test]
@@ -1846,10 +1924,22 @@ mod tests {
         let mut seen = std::collections::HashMap::new();
         let start = std::time::Instant::now();
         assert_eq!(throttle_log(&mut seen, "a", start), Some(0));
-        assert_eq!(throttle_log(&mut seen, "a", start + std::time::Duration::from_secs(10)), None);
-        assert_eq!(throttle_log(&mut seen, "a", start + std::time::Duration::from_secs(20)), None);
-        assert_eq!(throttle_log(&mut seen, "b", start + std::time::Duration::from_secs(20)), Some(0));
-        assert_eq!(throttle_log(&mut seen, "a", start + std::time::Duration::from_secs(61)), Some(2));
+        assert_eq!(
+            throttle_log(&mut seen, "a", start + std::time::Duration::from_secs(10)),
+            None
+        );
+        assert_eq!(
+            throttle_log(&mut seen, "a", start + std::time::Duration::from_secs(20)),
+            None
+        );
+        assert_eq!(
+            throttle_log(&mut seen, "b", start + std::time::Duration::from_secs(20)),
+            Some(0)
+        );
+        assert_eq!(
+            throttle_log(&mut seen, "a", start + std::time::Duration::from_secs(61)),
+            Some(2)
+        );
     }
 
     #[tokio::test]
