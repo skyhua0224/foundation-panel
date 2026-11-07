@@ -17,3 +17,14 @@ test('the cover stays mounted and only its opacity toggles, so the rows\' sweep 
   assert.doesNotMatch(src, /<div class="panel-web__cover"[^>]*v-(if|show)/)
   assert.doesNotMatch(src, /\.panel-web__cover[^{]*\{[^}]*display:\s*none/)
 })
+
+test('the Back bubble and the loading cover take the inset from the host\'s own width: the host is the container, so a framed first page has one left edge on a phone', () => {
+  assert.match(src, /\.panel-web \{[^}]*container-type: inline-size;/)
+  assert.match(src, /@container \(max-width: 700px\) \{ \.panel-web__bar, \.panel-web__cover \{ --m-gutter: 16px; \} \}/)
+  assert.match(src, /@container \(max-width: 560px\) \{ \.panel-web__bar, \.panel-web__cover \{ --m-gutter: 12px; \} \}/)
+  assert.doesNotMatch(src, /@container \([^)]*\) \{ \.panel-web \{/, 'a query on the host itself looks at an ancestor that is not there')
+})
+test('the bar of the Back bubble has air under it, so the scrolled page is clipped below the bubble and not at its edge', () => {
+  // the column of the pages: the inset under the maximum, centred beyond it (pageTitlePosition.test.js), and the 8 px under the bubble stay
+  assert.match(src, /\.panel-web__bar \{ padding: 8px max\(var\(--m-gutter\), calc\(\(100% - 960px\) \/ 2\)\); flex: none; \}/)
+})

@@ -63,6 +63,10 @@ test('title left equals content left, centred once the pane is wider than the co
   const host = readFileSync(join(root, 'components/PanelWebHost.vue'), 'utf8')
   assert.match(host, /\.panel-web__cover > \.m-pageload \{ width: 100%; margin-inline: 0; \}/)
   assert.match(host, /\.panel-web \{ --m-gutter: 32px;/)
-  assert.match(host, /\.panel-web__bar \{ padding: 8px max\(var\(--m-gutter\), calc\(\(100% - 960px\) \/ 2\)\) 0; flex: none; \}/)
+  assert.match(host, /\.panel-web__bar \{ padding: 8px max\(var\(--m-gutter\), calc\(\(100% - 960px\) \/ 2\)\); flex: none; \}/)
   assert.match(host, /\.panel-web__cover \{[^}]*padding: 76px max\(var\(--m-gutter\), calc\(\(100% - 960px\) \/ 2\)\) 0;/)
+  // the host is the container of its own bar and cover (the panel puts it outside the scene), so the steps 700 and 560 are answered here
+  assert.match(host, /\.panel-web \{[^}]*container-type: inline-size; \}/)
+  assert.match(host, /@container \(max-width: 700px\) \{ \.panel-web__bar, \.panel-web__cover \{ --m-gutter: 16px; \} \}/)
+  assert.match(host, /@container \(max-width: 560px\) \{ \.panel-web__bar, \.panel-web__cover \{ --m-gutter: 12px; \} \}/)
 })
