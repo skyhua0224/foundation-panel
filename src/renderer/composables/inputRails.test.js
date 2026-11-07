@@ -102,3 +102,10 @@ test('the list of 串流 has 添加应用 above its rows: the rail and the butto
   const menu = read('../components/SidebarMenu.vue')
   assert.ok(menu.includes(`<template v-if="entry.rail === 'stream'" #top><div class="m-navlist__add"><MButton variant="tonal" icon="add" @click="openDestination('apps:add')">{{ homeTexts(locale)['c_act-add-app'] }}</MButton></div></template>`))
 })
+
+// fs52-gamepad-test-rumble: the panel's gamepad tool rumbles a stream's pad through the host
+test('the panel test tools page hands the gamepad tool a call to the host rumble route', () => {
+  const page = read('../components/m3e/TestToolsPage.vue')
+  assert.ok(page.includes(':host-rumble="hostRumble"') && page.includes("'/api/dualsense/rumble-test'"))
+  assert.ok(page.includes("sunshine.getProxyUrl()") && page.includes('status: response.status'), 'the address of the host and the HTTP status of a refusal')
+})
