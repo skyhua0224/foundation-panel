@@ -82,18 +82,13 @@
             <span class="vdd-preview__note">{{ previewRefresh }} Hz{{ previewHdr ? ' · HDR' : '' }}</span>
           </div>
           <MGroup>
-            <MItem icon="aspect_ratio" :title="t.vddSettings.resolutionPresets" :text="ml.resolution.hint" stack data-cfg="vdd_resolution_list">
-              <template #control><VddModeList v-model="resolutionList" kind="resolution" :suggestions="suggestedResolutions" :texts="ml.resolution" /></template>
-            </MItem>
-            <MItem icon="speed" :title="t.vddSettings.refreshRatePresets" :text="ml.rate.hint" stack data-cfg="vdd_refresh_list">
-              <template #control><VddModeList v-model="rateList" kind="rate" :suggestions="suggestedRefreshRates" :texts="ml.rate" /></template>
-            </MItem>
+            <MModeListRow kind="resolution" :values="resolutionList" :title="mlt.resolutionTitle" :locale="locale" data-cfg="vdd_resolution_list" @edit="modesOpen = true" />
+            <MModeListRow kind="rate" :values="rateList" :title="mlt.rateTitle" :locale="locale" data-cfg="vdd_refresh_list" @edit="modesOpen = true" />
             <MValueItem v-if="!gpuOptions.length" :model-value="gpuFriendlyName" :label="t.vddSettings.gpuBinding" :placeholder="t.vddSettings.gpuPlaceholder" :ok-label="t.common.confirm" :cancel-label="t.common.cancel" @update:model-value="(v) => { gpuFriendlyName = v; saveGpuEdit() }" />
             <MChoiceItem v-if="gpuOptions.length" :model-value="gpuFriendlyName" icon="developer_board" :title="t.vddSettings.gpuBinding" :options="gpuOptions.map((g) => ({ value: g, label: g }))" :cancel-label="t.common.cancel" @update:model-value="(v) => { gpuFriendlyName = v; saveGpuEdit() }" />
             <MItem icon="monitor" :title="t.vddSettings.monitorCount" :text="t.vddSettings.monitorCountTip" :value="String(settings.monitors.count)" />
             <MSwitchItem v-model="settings.edid.Vrr" icon="sync" :title="t.vddSettings.vrr" :text="t.vddSettings.vrrTip" />
           </MGroup>
-          <MFooter>{{ ml.footer }}</MFooter>
         </MSection>
         <MSection :title="vp.displayRules">
           <MGroup>
@@ -218,6 +213,7 @@
         </MSection>
       </template>
 
+      <MModeListDialog v-model="modesOpen" :resolutions="resolutionList" :rates="rateList" :locale="locale" :note="t.vddSettings.modeListNote" @save="saveModes" />
       <MDialog v-model="confirm.open" :title="vp.confirmTitle.replace('{name}', confirm.name)" icon="warning" tone="warning">
         <p class="vdd-confirm__text">{{ confirm.text }}</p>
         <template #actions>
@@ -232,12 +228,11 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
-import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards, MDialog, MPrepArt, MValueItem, MSeg, MChip, MTile, MIcon, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, MPageLoading, useSubpage, vddPageTexts, vddTexts, VDD_PREP, VDD_RULES, vddOn } from 'foundation-ui/vue'
+import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards, MDialog, MPrepArt, MValueItem, MSeg, MChip, MTile, MIcon, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, MPageLoading, MModeListRow, MModeListDialog, modeListTexts, useSubpage, vddPageTexts, vddTexts, VDD_PREP, VDD_RULES, vddOn } from 'foundation-ui/vue'
 import { useHostVdd } from '../composables/useHostVdd.js'
 import DpiScaleSection from './m3e/DpiScaleSection.vue'
 import { usePanelPart } from '../composables/panelParts.js'
-import VddModeList from './m3e/VddModeList.vue'
-import { cleanList } from '../composables/vddModeList.js'
+import { cleanList } from 'foundation-ui/settings/modeList.js'
 import { useVddEdid } from '../composables/useVddEdid.js'
 import { useVddStatusLabel } from '../composables/useVddStatusLabel.js'
 import { installVddWithRecovery } from '../composables/vddInstallRecovery.js'
@@ -250,8 +245,6 @@ const vp = computed(() => vddPageTexts(locale.value))
 const vt = computed(() => vddTexts(locale.value))
 
 const DEFAULT_REFRESH_RATES = ['60', '120', '240']
-const suggestedResolutions = ['1280x720', '1920x1080', '2560x1440', '3840x2160']
-const suggestedRefreshRates = ['60', '120', '144', '240']
 const CHINESE_PATTERN = /[\u4e00-\u9fa5]/
 const COLOR_DEPTH_DEFAULT = 'default'
 const COLOR_DEPTH_SDR10 = 'sdr10'
@@ -483,7 +476,9 @@ const resolutionList = ref([])
 const rateList = ref([...DEFAULT_REFRESH_RATES])
 const setResolutionOptions = (values = []) => { resolutionList.value = cleanList('resolution', values) }
 const setRefreshRateOptions = (values = []) => { rateList.value = cleanList('rate', values) }
-const ml = computed(() => t.value.vddSettings.modeList)
+const mlt = computed(() => modeListTexts(locale.value))
+const modesOpen = ref(false)
+const saveModes = ({ resolutions, rates }) => { resolutionList.value = resolutions; rateList.value = rates }
 
 const gpuSummary = computed(() => gpuFriendlyName.value || t.value.vddSettings.unboundGpu)
 const presetSummary = computed(() => getVddText('presetsSummary', {

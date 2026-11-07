@@ -722,12 +722,12 @@ mod collect {
         let mut out = Vec::new();
         match crate::vdd::get_vdd_status().await {
             Ok(s) => out.push(DriverFact {
-                id: "vdd".into(), name: tr(lang, "ZakoDisplay", "杂鱼显示器"), checked: true, installed: s.installed,
+                id: "vdd".into(), name: tr(lang, "ZakoDisplay", "杂鱼虚拟显示器"), checked: true, installed: s.installed,
                 running: s.running && s.control_available, problem: None, version: s.installed_version.clone(), reboot: s.state == "reboot_required",
                 note: if s.installed && !s.version_match && !s.bundled_version.is_empty() { tr(lang, format!("the bundled driver is {}", s.bundled_version), format!("随附驱动是 {}", s.bundled_version)) } else { String::new() },
                 required: true,
             }),
-            Err(_) => out.push(DriverFact { id: "vdd".into(), name: tr(lang, "ZakoDisplay", "杂鱼显示器"), ..Default::default() }),
+            Err(_) => out.push(DriverFact { id: "vdd".into(), name: tr(lang, "ZakoDisplay", "杂鱼虚拟显示器"), ..Default::default() }),
         }
         match crate::vigem::get_vigem_status().await {
             Ok(s) => out.push(DriverFact {
@@ -791,7 +791,7 @@ pub async fn doctor_local(only: String, lang: Option<String>) -> Result<Value, S
         "service" => evaluate_service(&ServiceFacts::default(), lang),
         "install" => evaluate_install(&InstallFacts::default(), lang),
         "process" => evaluate_process(&ProcessFacts::default(), lang),
-        _ => evaluate_drivers(&[DriverFact { id: "vdd".into(), name: tr(lang, "ZakoDisplay", "杂鱼显示器"), ..Default::default() }], lang),
+        _ => evaluate_drivers(&[DriverFact { id: "vdd".into(), name: tr(lang, "ZakoDisplay", "杂鱼虚拟显示器"), ..Default::default() }], lang),
     };
     let checked_at = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
     Ok(report(&only, items, started.elapsed().as_millis() as u64, lang, &checked_at))
