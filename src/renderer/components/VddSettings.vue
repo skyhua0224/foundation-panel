@@ -82,35 +82,18 @@
             <span class="vdd-preview__note">{{ previewRefresh }} Hz{{ previewHdr ? ' · HDR' : '' }}</span>
           </div>
           <MGroup>
-            <MItem icon="aspect_ratio" :title="t.vddSettings.resolutionPresets" stack>
-              <template #control>
-                <div class="m-chips-edit">
-                  <span v-for="res in sortedResolutionOptions" :key="res" class="m-chip m-chip--x">{{ res }}<button type="button" :aria-label="t.vddSettings.removeResolution || res" @click="removeResolution(res)"><MIcon name="close" /></button></span>
-                  <input v-if="showResInput" ref="resInputRef" v-model="newResolution" class="m-inline-input" :placeholder="t.vddSettings.resPlaceholder" @keyup.enter="addResolution" @blur="handleResInputConfirm">
-                  <MButton v-else size="sm" variant="tonal" icon="add" @click="showResolutionInput">{{ t.vddSettings.addResolution }}</MButton>
-                </div>
-                <div class="m-chips-edit m-chips-edit--suggest">
-                  <button v-for="resolution in suggestedResolutions" :key="resolution" type="button" class="m-chip m-chip--pick" :disabled="resolutionOptions.has(resolution)" @click="quickAddResolution(resolution)">{{ resolution }}</button>
-                </div>
-              </template>
+            <MItem icon="aspect_ratio" :title="t.vddSettings.resolutionPresets" :text="ml.resolution.hint" stack data-cfg="vdd_resolution_list">
+              <template #control><VddModeList v-model="resolutionList" kind="resolution" :suggestions="suggestedResolutions" :texts="ml.resolution" /></template>
             </MItem>
-            <MItem icon="speed" :title="t.vddSettings.refreshRatePresets" stack>
-              <template #control>
-                <div class="m-chips-edit">
-                  <span v-for="rate in sortedRefreshRateOptions" :key="rate" class="m-chip m-chip--x">{{ rate }}Hz<button type="button" :aria-label="String(rate)" @click="removeRefreshRate(rate)"><MIcon name="close" /></button></span>
-                  <input v-if="showRateInput" ref="rateInputRef" v-model="newRefreshRate" class="m-inline-input" :placeholder="t.vddSettings.ratePlaceholder" @keyup.enter="addRefreshRate" @blur="handleRateInputConfirm">
-                  <MButton v-else size="sm" variant="tonal" icon="add" @click="showRefreshRateInput">{{ t.vddSettings.addRefreshRate }}</MButton>
-                </div>
-                <div class="m-chips-edit m-chips-edit--suggest">
-                  <button v-for="rate in suggestedRefreshRates" :key="rate" type="button" class="m-chip m-chip--pick" :disabled="refreshRateOptions.has(rate)" @click="quickAddRefreshRate(rate)">{{ rate }}Hz</button>
-                </div>
-              </template>
+            <MItem icon="speed" :title="t.vddSettings.refreshRatePresets" :text="ml.rate.hint" stack data-cfg="vdd_refresh_list">
+              <template #control><VddModeList v-model="rateList" kind="rate" :suggestions="suggestedRefreshRates" :texts="ml.rate" /></template>
             </MItem>
             <MValueItem v-if="!gpuOptions.length" :model-value="gpuFriendlyName" :label="t.vddSettings.gpuBinding" :placeholder="t.vddSettings.gpuPlaceholder" :ok-label="t.common.confirm" :cancel-label="t.common.cancel" @update:model-value="(v) => { gpuFriendlyName = v; saveGpuEdit() }" />
             <MChoiceItem v-if="gpuOptions.length" :model-value="gpuFriendlyName" icon="developer_board" :title="t.vddSettings.gpuBinding" :options="gpuOptions.map((g) => ({ value: g, label: g }))" :cancel-label="t.common.cancel" @update:model-value="(v) => { gpuFriendlyName = v; saveGpuEdit() }" />
             <MItem icon="monitor" :title="t.vddSettings.monitorCount" :text="t.vddSettings.monitorCountTip" :value="String(settings.monitors.count)" />
             <MSwitchItem v-model="settings.edid.Vrr" icon="sync" :title="t.vddSettings.vrr" :text="t.vddSettings.vrrTip" />
           </MGroup>
+          <MFooter>{{ ml.footer }}</MFooter>
         </MSection>
         <MSection :title="vp.displayRules">
           <MGroup>
@@ -253,7 +236,8 @@ import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards,
 import { useHostVdd } from '../composables/useHostVdd.js'
 import DpiScaleSection from './m3e/DpiScaleSection.vue'
 import { usePanelPart } from '../composables/panelParts.js'
-import { useEditableOptionField } from '../composables/useEditableOptionField.js'
+import VddModeList from './m3e/VddModeList.vue'
+import { cleanList } from '../composables/vddModeList.js'
 import { useVddEdid } from '../composables/useVddEdid.js'
 import { useVddStatusLabel } from '../composables/useVddStatusLabel.js'
 import { installVddWithRecovery } from '../composables/vddInstallRecovery.js'
@@ -268,8 +252,6 @@ const vt = computed(() => vddTexts(locale.value))
 const DEFAULT_REFRESH_RATES = ['60', '120', '240']
 const suggestedResolutions = ['1280x720', '1920x1080', '2560x1440', '3840x2160']
 const suggestedRefreshRates = ['60', '120', '144', '240']
-const RESOLUTION_PATTERN = /^\d+x\d+$/
-const REFRESH_RATE_PATTERN = /^\d+(\.\d+)?$/
 const CHINESE_PATTERN = /[\u4e00-\u9fa5]/
 const COLOR_DEPTH_DEFAULT = 'default'
 const COLOR_DEPTH_SDR10 = 'sdr10'
@@ -431,7 +413,7 @@ const vulkanView = computed(() => {
 const confirm = reactive({ open: false, name: '', text: '', apply: null })
 const confirmThen = (riskKey, name, apply) => { Object.assign(confirm, { open: true, name, text: vp.value.risk[riskKey] || '', apply }) }
 const confirmApply = () => { const run = confirm.apply; confirm.open = false; confirm.apply = null; if (run) run() }
-const displaySummary = computed(() => [`${sortedResolutionOptions.value.length} ${t.value.vddSettings.resolutionPresets}`, `${sortedRefreshRateOptions.value.length} ${t.value.vddSettings.refreshRatePresets}`].join(' · '))
+const displaySummary = computed(() => [`${resolutionList.value.length} ${t.value.vddSettings.resolutionPresets}`, `${rateList.value.length} ${t.value.vddSettings.refreshRatePresets}`].join(' · '))
 const edidProfileOptions = computed(() => ['auto', 'legacy', 'modern'].map((value) => ({ value, label: vp.value.edidProfiles[value].title })))
 const cursorMaxOptions = computed(() => [...new Set([64, 128, 256, Number(settings.cursor.CursorMaxX) || 128])].sort((x, y) => x - y).map((value) => ({ value, label: `${value} × ${value}` })))
 const xorLevelOptions = computed(() => [0, 1, 2, 3].map((value) => ({ value, label: vp.value.xorLevels[value] })))
@@ -496,87 +478,23 @@ const {
   removeEdidFile: removeEdidFileAction,
 } = useVddEdid({ t, settings })
 
-const compareResolutions = (a, b) => {
-  const [aWidth, aHeight] = a.split('x').map(Number)
-  const [bWidth, bHeight] = b.split('x').map(Number)
-  return aWidth * aHeight - bWidth * bHeight || aWidth - bWidth || aHeight - bHeight
-}
-
-const compareRefreshRates = (a, b) => parseFloat(a) - parseFloat(b)
-
-const {
-  options: resolutionOptions,
-  draft: newResolution,
-  visible: showResInput,
-  inputRef: resInputRef,
-  sortedOptions: sortedResolutionOptions,
-  setValues: setResolutionOptions,
-  showInput: showResolutionInput,
-  addDraft: addResolution,
-  addValue: quickAddResolution,
-  confirmInput: handleResInputConfirm,
-  removeValue: removeResolution,
-} = useEditableOptionField({
-  compare: compareResolutions,
-  validate: (value) => {
-    if (!RESOLUTION_PATTERN.test(value)) {
-      return false
-    }
-
-    const [width, height] = value.split('x').map(Number)
-    return width > 0 && height > 0
-  },
-  messages: {
-    invalid: { type: 'warning', text: () => t.value.vddSettings.resolutionFormatError },
-    exists: { type: 'info', text: () => t.value.vddSettings.resolutionExists },
-    added: { type: 'success', text: (value) => getVddText('resolutionAdded', { value }) },
-    removed: { type: 'info', text: (value) => getVddText('resolutionRemoved', { value }) },
-    minOne: { type: 'error', text: () => t.value.vddSettings.resolutionMinOne },
-  },
-})
-
-const {
-  options: refreshRateOptions,
-  draft: newRefreshRate,
-  visible: showRateInput,
-  inputRef: rateInputRef,
-  sortedOptions: sortedRefreshRateOptions,
-  setValues: setRefreshRateOptions,
-  showInput: showRefreshRateInput,
-  addDraft: addRefreshRate,
-  addValue: quickAddRefreshRate,
-  confirmInput: handleRateInputConfirm,
-  removeValue: removeRefreshRate,
-} = useEditableOptionField({
-  initialValues: DEFAULT_REFRESH_RATES,
-  compare: compareRefreshRates,
-  validate: (value) => {
-    if (!REFRESH_RATE_PATTERN.test(value)) {
-      return false
-    }
-
-    const rate = parseFloat(value)
-    return rate >= 1 && rate <= 480
-  },
-  messages: {
-    invalid: { type: 'warning', text: () => t.value.vddSettings.refreshRateInvalidExt },
-    exists: { type: 'warning', text: () => t.value.vddSettings.refreshRateExists },
-    added: { type: 'success', text: (value) => getVddText('refreshRateAdded', { value }) },
-    removed: { type: 'info', text: (value) => getVddText('refreshRateRemoved', { value }) },
-    minOne: { type: 'error', text: () => t.value.vddSettings.refreshRateMinOne },
-  },
-})
+// the two mode lists of the driver, in the person's own order (the editor moves, edits, adds, removes; sorting is a button, never automatic)
+const resolutionList = ref([])
+const rateList = ref([...DEFAULT_REFRESH_RATES])
+const setResolutionOptions = (values = []) => { resolutionList.value = cleanList('resolution', values) }
+const setRefreshRateOptions = (values = []) => { rateList.value = cleanList('rate', values) }
+const ml = computed(() => t.value.vddSettings.modeList)
 
 const gpuSummary = computed(() => gpuFriendlyName.value || t.value.vddSettings.unboundGpu)
 const presetSummary = computed(() => getVddText('presetsSummary', {
-  resolutions: sortedResolutionOptions.value.length,
-  rates: sortedRefreshRateOptions.value.length,
+  resolutions: resolutionList.value.length,
+  rates: rateList.value.length,
 }))
 const traceDisplayPath = computed(() => traceStatus.value.latest_file || t.value.vddSettings.vddTraceNoFile)
 const hasCustomEdidIssue = computed(() => settings.edid.CustomEdid && !edidFileExists.value)
 // the configured resolutions drawn as displays in their real proportions (the widest is 168 px), with the highest refresh rate and the colour profile
-const previewScreens = computed(() => sortedResolutionOptions.value.map((res) => { const m = /^(\d{3,5})\s*[x×]\s*(\d{3,5})/i.exec(String(res)); return m ? { key: res, w: Number(m[1]), h: Number(m[2]) } : null }).filter(Boolean).slice(0, 6).map((x, _i, all) => ({ ...x, px: Math.max(56, Math.round((x.w / Math.max(...all.map((a) => a.w))) * 168)) })))
-const previewRefresh = computed(() => Math.max(...sortedRefreshRateOptions.value.map(Number).filter(Number.isFinite), 0))
+const previewScreens = computed(() => resolutionList.value.map((res) => { const m = /^(\d{3,5})\s*[x×]\s*(\d{3,5})/i.exec(String(res)); return m ? { key: res, w: Number(m[1]), h: Number(m[2]) } : null }).filter(Boolean).slice(0, 6).map((x, _i, all) => ({ ...x, px: Math.max(56, Math.round((x.w / Math.max(...all.map((a) => a.w))) * 168)) })))
+const previewRefresh = computed(() => Math.max(...rateList.value.map(Number).filter(Number.isFinite), 0))
 const previewHdr = computed(() => !!settings.colour.HDRPlus)
 const isColorDepthConflict = computed(() => settings.colour.SDR10bit && settings.colour.HDRPlus)
 const colorDepthProfile = computed({
@@ -630,10 +548,10 @@ const buildSettingsPayload = () => ({
     friendlyname: gpuFriendlyName.value.trim(),
   },
   global: {
-    g_refresh_rate: [...sortedRefreshRateOptions.value],
+    g_refresh_rate: [...rateList.value],
   },
   resolutions: {
-    resolution: sortedResolutionOptions.value.map((res) => {
+    resolution: resolutionList.value.map((res) => {
       const [width, height] = res.split('x').map(Number)
       return { width, height }
     }),

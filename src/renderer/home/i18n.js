@@ -30,8 +30,8 @@ export const translations = {
         },
         {
           icon: '🖥️',
-          title: '基地显示器（ZakoVDD）',
-          description: '内置基地显示器管理，无需额外软件即可创建和管理虚拟显示器'
+          title: '杂鱼显示器',
+          description: '内置杂鱼显示器管理，无需额外软件即可创建和管理虚拟显示器'
         },
         {
           icon: '🎤',
@@ -138,8 +138,8 @@ export const translations = {
         },
         {
           icon: '🖥️',
-          title: 'Virtual Display',
-          description: 'Built-in virtual display management without additional software'
+          title: 'ZakoDisplay',
+          description: 'Built-in ZakoDisplay management, a virtual display, without additional software'
         },
         {
           icon: '🎤',
