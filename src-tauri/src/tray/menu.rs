@@ -261,7 +261,12 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
         true,
         None::<&str>,
     )?;
-    let rtss_control = MenuItem::with_id(app, "rtss_control", s.rtss_control, true, None::<&str>)?;
+    // RivaTuner Statistics Server is optional: its entry exists only where it is installed (the same `installed` as get_rtss_status)
+    let rtss_control = if crate::rtss::is_rtss_installed() {
+        Some(MenuItem::with_id(app, "rtss_control", s.rtss_control, true, None::<&str>)?)
+    } else {
+        None
+    };
     #[cfg(any(debug_assertions, feature = "beta"))]
     let web_stream = MenuItem::with_id(app, "web_stream", s.web_stream, true, None::<&str>)?;
     let tools_separator = PredefinedMenuItem::separator(app)?;
@@ -270,8 +275,10 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
     let debug_page = MenuItem::with_id(app, "debug_page", s.debug_page, true, None::<&str>)?;
 
     #[allow(unused_mut)]
-    let mut tools_items: Vec<&dyn tauri::menu::IsMenuItem<R>> =
-        vec![&show_toolbar, &host_performance, &rtss_control];
+    let mut tools_items: Vec<&dyn tauri::menu::IsMenuItem<R>> = vec![&show_toolbar, &host_performance];
+    if let Some(rtss_control) = &rtss_control {
+        tools_items.push(rtss_control);
+    }
     #[cfg(any(debug_assertions, feature = "beta"))]
     tools_items.push(&web_stream);
     tools_items.push(&tools_separator);
