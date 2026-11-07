@@ -1,3 +1,4 @@
+import '../../../src-tauri/inject-traces.js'  // no trace of a browser: drag ghosts, browser keys and menus, zoom, selected chrome
 // The latency test clock's own window, full screen on the display the stream captures (useTools.openLatencyClockOnStream): the face alone, ?mode=dark|light,
 // ?locale=zh|en; Esc closes the window.
 import { createApp, h } from 'vue'

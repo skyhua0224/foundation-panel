@@ -223,32 +223,7 @@
     },
   }
 
-  // 环境检测
-  const isProduction = () => window.TAURI_PRODUCTION === true && window.isTauri === true
-
-  // 禁用右键菜单和开发者工具快捷键（仅在生产环境）
-  const disableContextMenu = () => {
-    if (!isProduction()) return
-
-    const preventDefault = (e) => (e.preventDefault(), false)
-
-    document.addEventListener('contextmenu', preventDefault, true)
-    document.addEventListener(
-      'keydown',
-      (e) => {
-        const { keyCode, ctrlKey, shiftKey } = e
-        // F12 | Ctrl+Shift+I/J | Ctrl+U
-        if (
-          keyCode === 123 ||
-          (ctrlKey && shiftKey && (keyCode === 73 || keyCode === 74)) ||
-          (ctrlKey && !shiftKey && keyCode === 85)
-        ) {
-          return preventDefault(e)
-        }
-      },
-      true
-    )
-  }
+  // The right-click menu, the browser keys and the drag ghosts are closed by inject-traces.js, which the proxy puts in front of this script (it keeps the paste menu of a text field).
 
   // 导航检测
   const initNavigation = () => {
@@ -266,7 +241,6 @@
       if (newPath !== lastPath) {
         postToParent('navigation-start', { path: newPath + hash })
         lastPath = newPath
-        setTimeout(disableContextMenu, 200)
       }
     })
   }
@@ -344,7 +318,6 @@
   const init = () => {
     initReports()
     followPanelScheme()
-    disableContextMenu()
     initNavigation()
     postToParent('request-theme')
     // the panel keeps the frame covered until the page has painted: its load event comes 50 to 100 ms before the first frame (measured, Skyindows panel)

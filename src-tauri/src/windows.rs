@@ -154,32 +154,10 @@ fn constrain_tool_window_to_visible_area(
     Ok(())
 }
 
-/// 禁用窗口的右键菜单（仅在生产环境）
+/// The right-click menu, the browser keys and the drag ghosts are closed by the guard script of every page (src-tauri/inject-traces.js: the panel windows bundle it,
+/// the framed Web pages get it from the proxy), which keeps the paste menu of a text field. The engine side is `harden_browser_surface`.
 #[cfg(not(debug_assertions))]
-pub fn disable_context_menu<R: Runtime>(window: &WebviewWindow<R>) {
-    const DISABLE_CONTEXT_MENU_SCRIPT: &str = r#"
-        (function() {
-            document.addEventListener('contextmenu', e => { e.preventDefault(); return false; }, true);
-            document.addEventListener('keydown', e => {
-                if (e.keyCode === 123 || // F12
-                    (e.ctrlKey && e.shiftKey && (e.keyCode === 73 || e.keyCode === 74)) || // Ctrl+Shift+I/J
-                    (e.ctrlKey && e.keyCode === 85)) { // Ctrl+U
-                    e.preventDefault();
-                    return false;
-                }
-            }, true);
-        })();
-    "#;
-
-    let window_clone = window.clone();
-    tauri::async_runtime::spawn(async move {
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-        match window_clone.eval(DISABLE_CONTEXT_MENU_SCRIPT) {
-            Ok(_) => debug!("✅ 已禁用右键菜单（生产环境）"),
-            Err(e) => debug!("⚠️ 禁用右键菜单脚本注入失败: {}", e),
-        }
-    });
-}
+pub fn disable_context_menu<R: Runtime>(_window: &WebviewWindow<R>) {}
 
 /// 开发环境不执行任何操作
 #[cfg(debug_assertions)]
@@ -935,6 +913,8 @@ pub(crate) fn configure_webview_security<R: Runtime>(window: &WebviewWindow<R>) 
                 return;
             };
 
+            harden_browser_surface(&core_webview, &settings, &label);
+
             // Cast 到 Settings4（WebView2 SDK 1.0.902+，所有现代版本均支持）
             match settings.cast::<ICoreWebView2Settings4>() {
                 Ok(settings4) => {
@@ -954,6 +934,115 @@ pub(crate) fn configure_webview_security<R: Runtime>(window: &WebviewWindow<R>) 
             }
         }
     });
+}
+
+/// The WebView is the engine of the panel, never a browser the person can see. Closes what WebView2 shows of its browser: the address bubble over a hovered link,
+/// the built-in error page, zoom (keys, wheel, pinch), the browser keys (reload, print, find, view source; the DevTools keys stay in debug builds), the native
+/// right-click menu (the page cancels it except in a text field or over a selection, where only cut, copy, paste, select all, undo and redo are left), swipe navigation, new windows (a target=_blank link opens the system browser) and
+/// the download bubble.
+#[cfg(target_os = "windows")]
+unsafe fn harden_browser_surface(
+    core_webview: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2,
+    settings: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings,
+    label: &str,
+) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        ICoreWebView2_4, ICoreWebView2_11, ICoreWebView2Settings3, ICoreWebView2Settings5,
+        ICoreWebView2Settings6,
+    };
+    use webview2_com::{
+        ContextMenuRequestedEventHandler, DownloadStartingEventHandler,
+        NewWindowRequestedEventHandler, take_pwstr,
+    };
+    use wv2_windows_core::Interface;
+
+    unsafe {
+        let _ = settings.SetIsStatusBarEnabled(false);
+        let _ = settings.SetIsZoomControlEnabled(false);
+        let _ = settings.SetIsBuiltInErrorPageEnabled(false);
+        if let Ok(settings3) = settings.cast::<ICoreWebView2Settings3>() {
+            // Debug builds keep F12 and Ctrl+Shift+I for the developer; a release build has no browser key.
+            let _ = settings3.SetAreBrowserAcceleratorKeysEnabled(cfg!(debug_assertions));
+        }
+        if let Ok(settings5) = settings.cast::<ICoreWebView2Settings5>() {
+            let _ = settings5.SetIsPinchZoomEnabled(false);
+        }
+        if let Ok(settings6) = settings.cast::<ICoreWebView2Settings6>() {
+            let _ = settings6.SetIsSwipeNavigationEnabled(false);
+        }
+
+        let new_window = NewWindowRequestedEventHandler::create(Box::new(|_, args| {
+            if let Some(args) = args {
+                let mut uri = wv2_windows_core::PWSTR::null();
+                args.Uri(&mut uri)?;
+                let target = take_pwstr(uri);
+                args.SetHandled(true)?;
+                // Only a page of someone else opens in the system browser: the address of the proxy itself never leaves the panel.
+                let own = proxy_server::get_proxy_url();
+                let outside = !own.is_empty() && !target.starts_with(own.as_str());
+                let web = target.starts_with("http://") || target.starts_with("https://");
+                if outside && web {
+                    crate::utils::open_url_in_browser(&target);
+                }
+            }
+            Ok(())
+        }));
+        let mut token = 0;
+        if let Err(error) = core_webview.add_NewWindowRequested(&new_window, &mut token) {
+            log::warn!("[{label}] new-window guard failed to attach: {error}");
+        }
+
+        // The native menu of a text field or a selection keeps the edit entries only (no Back, Reload, Save as, Print, Inspect, Search, spelling).
+        if let Ok(core11) = core_webview.cast::<ICoreWebView2_11>() {
+            let menu = ContextMenuRequestedEventHandler::create(Box::new(|_, args| {
+                if let Some(args) = args {
+                    let items = args.MenuItems()?;
+                    let mut count = 0u32;
+                    items.Count(&mut count)?;
+                    let mut removed = Vec::new();
+                    for index in (0..count).rev() {
+                        let item = items.GetValueAtIndex(index)?;
+                        let mut name = wv2_windows_core::PWSTR::null();
+                        item.Name(&mut name)?;
+                        let name = take_pwstr(name);
+                        const KEEP: [&str; 7] = [
+                            "cut",
+                            "copy",
+                            "paste",
+                            "pasteAsPlainText",
+                            "selectAll",
+                            "undo",
+                            "redo",
+                        ];
+                        if !KEEP.contains(&name.as_str()) {
+                            removed.push(name);
+                            items.RemoveValueAtIndex(index)?;
+                        }
+                    }
+                    log::debug!("[traces] context menu: removed {removed:?}");
+                }
+                Ok(())
+            }));
+            let mut token = 0;
+            if let Err(error) = core11.add_ContextMenuRequested(&menu, &mut token) {
+                log::warn!("[{label}] context menu guard failed to attach: {error}");
+            }
+        }
+
+        // A file the page sends is saved to the default place without the download bubble of the browser.
+        if let Ok(core4) = core_webview.cast::<ICoreWebView2_4>() {
+            let download = DownloadStartingEventHandler::create(Box::new(|_, args| {
+                if let Some(args) = args {
+                    args.SetHandled(true)?;
+                }
+                Ok(())
+            }));
+            let mut token = 0;
+            if let Err(error) = core4.add_DownloadStarting(&download, &mut token) {
+                log::warn!("[{label}] download guard failed to attach: {error}");
+            }
+        }
+    }
 }
 
 fn sunshine_certificate_allowed(request: &str, target: &str) -> bool {

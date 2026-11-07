@@ -259,6 +259,7 @@ pub async fn refresh_sunshine_target() -> Result<String, String> {
 const INJECT_STYLES: &str = include_str!("../inject-styles.css");
 
 /// 注入的 JavaScript 脚本（编译时从文件读取）
+const INJECT_TRACES: &str = include_str!("../inject-traces.js");
 const INJECT_SCRIPT: &str = include_str!("../inject-script.js");
 
 /// 调皮的404页面（当Sunshine未启动时显示，编译时从文件读取）
@@ -1509,7 +1510,7 @@ fn inject_theme_script(html: String) -> String {
         "window.TAURI_PRODUCTION = false;"
     };
 
-    let inject_size = INJECT_STYLES.len() + INJECT_SCRIPT.len() + production_flag.len() + 150;
+    let inject_size = INJECT_STYLES.len() + INJECT_TRACES.len() + INJECT_SCRIPT.len() + production_flag.len() + 150;
     let mut result = String::with_capacity(html.len() + inject_size);
 
     result.push_str(&html[..pos]);
@@ -1517,6 +1518,8 @@ fn inject_theme_script(html: String) -> String {
     result.push_str(INJECT_STYLES);
     result.push_str("\n</style>\n<!-- Tauri 功能脚本 -->\n<script>\n");
     result.push_str(production_flag);
+    result.push_str("\n");
+    result.push_str(INJECT_TRACES);
     result.push_str("\n");
     result.push_str(INJECT_SCRIPT);
     result.push_str("\n</script>\n");

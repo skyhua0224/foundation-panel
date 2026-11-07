@@ -518,6 +518,8 @@ pub fn create_toolbar_window_internal<R: Runtime>(app: &AppHandle<R>) -> Result<
         Ok(win) => {
             // 在生产环境禁用右键菜单
             windows::disable_context_menu(&win);
+            #[cfg(target_os = "windows")]
+            windows::configure_webview_security(&win);
             crate::power::refresh_ecoqos_state(app);
 
             // 延迟 500ms 检查窗口尺寸（WebView2 初始化可能意外扩大窗口）。
