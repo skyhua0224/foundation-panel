@@ -860,11 +860,7 @@ Output only one short sentence, no explanation. Reply in English.`,
   vddSettings: {
     title: 'ZakoDisplay Settings',
     removeResolution: 'Remove',
-    modeList: {
-      resolution: { add: 'Add resolution', placeholder: 'e.g. 1920x1080', hint: 'Written to the driver in the order you set', edit: 'Edit resolution', save: 'OK', cancel: 'Cancel', up: 'Move up', down: 'Move down', remove: 'Remove', sort: 'Sort by size', errors: { invalid: 'Use “width x height”, for example 1920x1080', range: 'Width and height must each be between {min} and {max}', exists: 'This resolution is already in the list', minOne: 'Keep at least one resolution', full: 'The list holds at most 64 entries' } },
-      rate: { add: 'Add refresh rate', placeholder: 'e.g. 120 or 59.94', hint: 'Applied to every resolution above', edit: 'Edit refresh rate', save: 'OK', cancel: 'Cancel', up: 'Move up', down: 'Move down', remove: 'Remove', sort: 'Sort by size', errors: { invalid: 'Enter a number with up to three decimals, for example 60 or 59.94', range: 'The refresh rate must be between {min} and {max} Hz', exists: 'This refresh rate is already in the list', minOne: 'Keep at least one refresh rate', full: 'The list holds at most 64 entries' } },
-      footer: 'After a change, press Save: the panel writes vdd_settings.xml and asks the driver to reload. A ZakoDisplay that is already running has to be created again (reconnect the stream) before it shows the new list; if nothing changes, use “Reload Driver” on the Driver page, or restart the adapter or Windows.',
-    },
+    modeListNote: 'After you press Save in the bar, the panel writes vdd_settings.xml and asks the driver to reload. A ZakoDisplay that is already running has to be created again (reconnect the stream) before it shows the new lists; if nothing changes, use “Reload Driver” on the Driver page, or restart the adapter or Windows.',
     driverPrerequisiteTitle: 'ZakoDisplay Driver',
     driverPrerequisiteDesc: 'Install and verify the bundled ZakoDisplay driver before using ZakoDisplay.',
     driverDetectionKicker: 'ZAKODISPLAY // DRIVER CHECK',

@@ -30,8 +30,8 @@ export const translations = {
         },
         {
           icon: '🖥️',
-          title: '杂鱼显示器',
-          description: '内置杂鱼显示器管理，无需额外软件即可创建和管理虚拟显示器'
+          title: '杂鱼虚拟显示器',
+          description: '内置杂鱼虚拟显示器管理，无需额外软件即可创建和管理虚拟显示器'
         },
         {
           icon: '🎤',
