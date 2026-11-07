@@ -22,33 +22,10 @@ pub struct SunshineConfig {
 // 缓存 Sunshine 路径，避免重复查找和记录日志
 static SUNSHINE_PATH_CACHE: LazyLock<Mutex<Option<PathBuf>>> = LazyLock::new(|| Mutex::new(None));
 static RUNTIME_SUNSHINE_URL: LazyLock<RwLock<Option<String>>> = LazyLock::new(|| RwLock::new(None));
-static HTTPS_CLIENT: LazyLock<Result<reqwest::Client, String>> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))
-});
-// Local tray reads bypass environment proxies and have a shorter deadline.
+// Local host requests carry the current credential. The client is rebuilt per
+// request so direct callers observe a host-side credential rotation.
 pub(crate) const TRAY_STATE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(3);
-static TRAY_HTTPS_CLIENT: LazyLock<Result<reqwest::Client, String>> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .no_proxy()
-        .danger_accept_invalid_certs(true)
-        .redirect(reqwest::redirect::Policy::none())
-        .timeout(TRAY_STATE_TIMEOUT)
-        .build()
-        .map_err(|error| format!("Create tray status HTTP client failed: {error}"))
-});
 const MAX_CONFIG_SAVE_RESPONSE_BYTES: usize = 64 * 1024;
-static SSE_HTTPS_CLIENT: LazyLock<Result<reqwest::Client, String>> = LazyLock::new(|| {
-    reqwest::Client::builder()
-        .danger_accept_invalid_certs(true)
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .build()
-        .map_err(|e| format!("Create Sunshine event client failed: {}", e))
-});
 
 pub const TRAY_PROTOCOL_VERSION: u32 = 1;
 const CORE_COMPATIBILITY_CHECK_ARG: &str = "--check-core-compatibility";
@@ -238,11 +215,16 @@ pub async fn get_sunshine_version() -> Result<String, String> {
 
 /// The build identity of sunshine.exe (crate::build_identity): the VERSIONINFO keys first (no process), then
 /// `sunshine.exe --version --json`; `None` for a host that predates both. Cached like the version.
-static SUNSHINE_BUILD: crate::probe_cache::ProbeCache<Option<crate::build_identity::BuildIdentity>> =
-    crate::probe_cache::ProbeCache::new("sunshine build identity", std::time::Duration::from_secs(600));
+static SUNSHINE_BUILD: crate::probe_cache::ProbeCache<
+    Option<crate::build_identity::BuildIdentity>,
+> = crate::probe_cache::ProbeCache::new(
+    "sunshine build identity",
+    std::time::Duration::from_secs(600),
+);
 
 #[tauri::command]
-pub async fn get_sunshine_build_info() -> Result<Option<crate::build_identity::BuildIdentity>, String> {
+pub async fn get_sunshine_build_info()
+-> Result<Option<crate::build_identity::BuildIdentity>, String> {
     SUNSHINE_BUILD
         .get(|| async {
             tokio::task::spawn_blocking(read_sunshine_build_info)
@@ -260,15 +242,18 @@ fn read_sunshine_build_info() -> Option<crate::build_identity::BuildIdentity> {
     }
     let has_uninstaller = std::fs::read_dir(&install_dir)
         .map(|entries| {
-            entries
-                .flatten()
-                .any(|entry| crate::build_identity::is_inno_uninstaller(&entry.file_name().to_string_lossy()))
+            entries.flatten().any(|entry| {
+                crate::build_identity::is_inno_uninstaller(&entry.file_name().to_string_lossy())
+            })
         })
         .unwrap_or(false);
 
     #[cfg(target_os = "windows")]
-    if let Some(info) = crate::device_probe::file_version_strings(&sunshine_exe, &crate::build_identity::VERSIONINFO_KEYS)
-        .and_then(|strings| crate::build_identity::from_versioninfo(&strings, has_uninstaller))
+    if let Some(info) = crate::device_probe::file_version_strings(
+        &sunshine_exe,
+        &crate::build_identity::VERSIONINFO_KEYS,
+    )
+    .and_then(|strings| crate::build_identity::from_versioninfo(&strings, has_uninstaller))
     {
         return Some(info);
     }
@@ -988,7 +973,7 @@ pub async fn get_tray_state() -> Result<TrayState, String> {
 }
 
 async fn request_tray_state(tray_state_url: &str) -> Result<TrayState, String> {
-    let client = TRAY_HTTPS_CLIENT.as_ref().map_err(Clone::clone)?;
+    let client = create_https_client()?;
     let response = client
         .get(tray_state_url)
         .send()
@@ -1057,11 +1042,49 @@ pub async fn post_client_fingerprint_rules(
 }
 
 pub fn create_https_client() -> Result<reqwest::Client, String> {
-    HTTPS_CLIENT.as_ref().cloned().map_err(Clone::clone)
+    let token = read_local_auth_token()?;
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert(
+        "X-Sunshine-Local-Token",
+        reqwest::header::HeaderValue::from_str(&token)
+            .map_err(|error| format!("Invalid local host credential: {error}"))?,
+    );
+    reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .redirect(reqwest::redirect::Policy::none())
+        .timeout(std::time::Duration::from_secs(10))
+        .default_headers(headers)
+        .build()
+        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))
 }
 
 pub fn create_sse_https_client() -> Result<reqwest::Client, String> {
-    SSE_HTTPS_CLIENT.as_ref().cloned().map_err(Clone::clone)
+    let token = read_local_auth_token()?;
+    let mut headers = reqwest::header::HeaderMap::new();
+    headers.insert(
+        "X-Sunshine-Local-Token",
+        reqwest::header::HeaderValue::from_str(&token)
+            .map_err(|error| format!("Invalid local host credential: {error}"))?,
+    );
+    reqwest::Client::builder()
+        .danger_accept_invalid_certs(true)
+        .connect_timeout(std::time::Duration::from_secs(10))
+        .default_headers(headers)
+        .build()
+        .map_err(|e| format!("Create Sunshine event client failed: {}", e))
+}
+
+fn read_local_auth_token() -> Result<String, String> {
+    // Read at client construction time so direct host callers follow a token
+    // rotation without keeping the previous value in a process-wide client
+    // [panel-rust-read-to-string-20261107] [panel-reqwest-request-builder-20261107].
+    let token = std::fs::read_to_string(config_dir().join("local-auth.token"))
+        .map_err(|_| "Local host credential is unavailable".to_string())?;
+    let token = token.trim();
+    if token.len() != 64 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("Local host credential is invalid".to_string());
+    }
+    Ok(token.to_string())
 }
 
 fn validate_config_save_response(body: &str) -> Result<(), String> {
@@ -1389,8 +1412,13 @@ pub async fn is_sunshine_running_in_user_mode() -> Result<bool, String> {
 #[tauri::command]
 pub async fn toggle_sunshine_mode(acknowledge_live_stream: Option<bool>) -> Result<String, String> {
     crate::host_facts::expect_stop(180_000);
-    let mode = crate::sunshine_service::toggle_host_mode(acknowledge_live_stream.unwrap_or(false)).await?;
-    let mode_name = if mode == "user" { "用户模式" } else { "服务模式" };
+    let mode =
+        crate::sunshine_service::toggle_host_mode(acknowledge_live_stream.unwrap_or(false)).await?;
+    let mode_name = if mode == "user" {
+        "用户模式"
+    } else {
+        "服务模式"
+    };
     info!("✅ 已切换到{}", mode_name);
     Ok(format!("已切换到{}", mode_name))
 }
@@ -1398,7 +1426,9 @@ pub async fn toggle_sunshine_mode(acknowledge_live_stream: Option<bool>) -> Resu
 /// 重启 Sunshine through the hardened elevated helper (or, without the service, as the current user); see
 /// sunshine_service::restart_host.
 #[tauri::command]
-pub async fn restart_sunshine_service(acknowledge_live_stream: Option<bool>) -> Result<String, String> {
+pub async fn restart_sunshine_service(
+    acknowledge_live_stream: Option<bool>,
+) -> Result<String, String> {
     // the stop that follows is asked for: the panel must not call it a crash
     crate::host_facts::expect_stop(180_000);
     info!("🔄 开始重启 Sunshine 服务...");
@@ -1408,7 +1438,9 @@ pub async fn restart_sunshine_service(acknowledge_live_stream: Option<bool>) -> 
 /// 以用户模式重启 Sunshine（非服务模式，但需要管理员权限）
 /// @deprecated 使用 sunshine::toggle_sunshine_mode 代替
 #[tauri::command]
-pub async fn restart_sunshine_in_user_mode(acknowledge_live_stream: Option<bool>) -> Result<String, String> {
+pub async fn restart_sunshine_in_user_mode(
+    acknowledge_live_stream: Option<bool>,
+) -> Result<String, String> {
     toggle_sunshine_mode(acknowledge_live_stream).await
 }
 
@@ -1476,14 +1508,26 @@ mod direct_read_tests {
         use std::os::windows::process::CommandExt;
         let exe = get_sunshine_path().join("sunshine.exe");
         let t = std::time::Instant::now();
-        let resource = crate::device_probe::file_version_string(&exe).and_then(|text| crate::device_probe::plain_host_version(&text));
+        let resource = crate::device_probe::file_version_string(&exe)
+            .and_then(|text| crate::device_probe::plain_host_version(&text));
         let resource_ms = t.elapsed().as_secs_f64() * 1000.0;
         let t = std::time::Instant::now();
-        let output = Command::new(&exe).arg("--version").creation_flags(0x08000000).output().unwrap();
+        let output = Command::new(&exe)
+            .arg("--version")
+            .creation_flags(0x08000000)
+            .output()
+            .unwrap();
         let (stdout, stderr) = crate::text_encoding::decode_output(&output);
-        println!("version: resource {resource_ms:.1} ms {resource:?}; --version {:.1} ms {:?}", t.elapsed().as_secs_f64() * 1000.0, format!("{stdout}{stderr}").trim());
+        println!(
+            "version: resource {resource_ms:.1} ms {resource:?}; --version {:.1} ms {:?}",
+            t.elapsed().as_secs_f64() * 1000.0,
+            format!("{stdout}{stderr}").trim()
+        );
         let printed = format!("{stdout}{stderr}");
         let resource = resource.expect("the version resource is the plain form");
-        assert!(printed.contains(&resource), "--version prints {printed:?}, the resource says {resource}");
+        assert!(
+            printed.contains(&resource),
+            "--version prints {printed:?}, the resource says {resource}"
+        );
     }
 }
