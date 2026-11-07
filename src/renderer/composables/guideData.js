@@ -1,6 +1,7 @@
 import { reactive } from 'vue'
 import { guideEntry, isSetupCompleted, mergeSetupConfig, normalizeClients, normalizeSessions, setupStateFromConfig } from 'foundation-ui/vue/guide.js'
 import { endpointsOfConfig } from 'foundation-ui/settings'
+import { restoreDefaultBuiltInApps } from 'foundation-ui/apps'
 
 export const GUIDE_STORAGE_KEY = 'foundation.guide.panel'
 export const GUIDE_DISMISSED_KEY = 'foundation.guide.dismissed'
@@ -242,8 +243,23 @@ export function createGuideData(deps) {
     } catch (error) { return { ok: false, error: error?.message || '' } }
   }
 
+  /**
+   * 「还原内置应用」 on the apps step, in the flow: the same restore as the Web UI's apps page (foundation-ui/apps) over GET and POST /api/apps; the guide shows the result where the button is.
+   * { ok, result: 'done' | 'none' } or { ok: false, error }. The names of the default menu commands stay English (the panel has no Web UI language pack).
+   */
+  async function restoreApps() {
+    try {
+      const [{ apps = [] }, config] = await Promise.all([getJson('/api/apps'), getJson('/api/config')])
+      const result = restoreDefaultBuiltInApps(apps, config.platform || 'windows')
+      if (result.changed === 0) return { ok: true, result: 'none' }
+      const { response } = await postJson('/api/apps', { apps: result.apps, editApp: null })
+      return response.ok ? { ok: true, result: 'done' } : { ok: false }
+    } catch (error) { return { ok: false, error: error?.message || '' } }
+  }
+
   const callbacks = {
     scanGames,
+    restoreApps,
     addGames,
     openTools: () => deps.openTools?.(),
     openLink: (link) => deps.openUrl(link),

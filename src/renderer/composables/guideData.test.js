@@ -249,3 +249,30 @@ test('the check of the guide passes an unsaved address on to the shared check', 
   await data.callbacks.checkReach(true, { test: 'home.example.net' })
   assert.deepEqual(seen, [[true, { test: 'home.example.net' }]])
 })
+
+test('「还原内置应用」 in the flow restores through the host API and answers in place, without leaving the guide', async () => {
+  const calls = []
+  const saved = []
+  const routes = {
+    '/api/apps': (path, init) => { if (init.method === 'POST') { saved.push(JSON.parse(init.body)); return { status: 'true' } } return { apps: [{ name: 'Desktop', cmd: 'broken.exe' }, { name: 'Mine', cmd: 'mine.exe' }] } },
+    '/api/config': { platform: 'windows' },
+  }
+  const asked = []
+  const data = make(routes, { openApps: (mode) => asked.push(mode) }, calls)
+  assert.equal(typeof data.callbacks.restoreApps, 'function', 'with it the flow never leaves for the apps page')
+  assert.deepEqual(await data.callbacks.restoreApps(), { ok: true, result: 'done' })
+  assert.deepEqual(asked, [], 'the Web UI page is not opened')
+  assert.equal(saved.length, 1)
+  assert.equal(saved[0].editApp, null)
+  assert.deepEqual(saved[0].apps.map((a) => a.name), ['Desktop', 'Mine', 'Steam Big Picture', 'Xbox Game'], 'the person\'s own app stays; the missing built-ins are added')
+  assert.equal(saved[0].apps[0].cmd, undefined, 'Desktop is back to its default')
+  // already as the defaults: nothing is written, the flow says so
+  const { getDefaultBuiltInApps } = await import('foundation-ui/apps')
+  const same = make({ ...routes, '/api/apps': (path, init) => { if (init.method === 'POST') throw new Error('must not write'); return { apps: getDefaultBuiltInApps('windows') } } })
+  assert.deepEqual(await same.callbacks.restoreApps(), { ok: true, result: 'none' })
+  // the host refuses or is gone: the flow shows the failure
+  const refuse = make({ ...routes, '/api/apps': (path, init) => (init.method === 'POST' ? new Response('no', { status: 500 }) : { apps: [] }) })
+  assert.deepEqual(await refuse.callbacks.restoreApps(), { ok: false })
+  const down = createGuideData({ proxyUrl: async () => 'http://proxy', fetchImpl: async () => { throw new Error('offline') } })
+  assert.deepEqual(await down.callbacks.restoreApps(), { ok: false, error: 'offline' })
+})
