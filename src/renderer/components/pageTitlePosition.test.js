@@ -61,4 +61,6 @@ test('title left equals content left: the pages of the panel that sit in the det
   assert.doesNotMatch(ai, /\(100% - var\(--m-column/)
   const host = readFileSync(join(root, 'components/PanelWebHost.vue'), 'utf8')
   assert.match(host, /\.panel-web__cover > \.m-pageload \{ width: min\(100%, 960px\); margin-inline: 0; \}/)
+  assert.match(host, /\.panel-web \{ --m-gutter: 32px;/)
+  assert.match(host, /\.panel-web__bar \{ padding: 8px var\(--m-gutter\) 0; flex: none; \}/)
 })
