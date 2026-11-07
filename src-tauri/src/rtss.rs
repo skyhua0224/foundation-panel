@@ -69,6 +69,8 @@ struct RtssSharedMemoryHeader {
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RtssStatus {
+    /// RivaTuner Statistics Server is installed (detect_rtss_install_dir finds it): an optional third-party component, the panel shows its page only then
+    pub installed: bool,
     pub running: bool,
     pub version: String,
     pub osd_slot_count: u32,
@@ -557,6 +559,7 @@ pub async fn get_rtss_status() -> Result<RtssStatus, String> {
         };
 
         Ok(RtssStatus {
+            installed: !install_dir.is_empty(),
             running,
             version,
             osd_slot_count,
@@ -569,6 +572,7 @@ pub async fn get_rtss_status() -> Result<RtssStatus, String> {
     #[cfg(not(target_os = "windows"))]
     {
         Ok(RtssStatus {
+            installed: false,
             running: false,
             version: String::new(),
             osd_slot_count: 0,

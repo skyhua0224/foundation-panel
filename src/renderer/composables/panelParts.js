@@ -1,4 +1,5 @@
 import { nextTick, ref, watch } from 'vue'
+import { rtssInstalled } from './rtssInstall.js'
 
 // The pages another window opens in the main window (the floating toolbar's menu, toolbar.rs emits `open-panel-page`): the route, and the part
 // of the page to show there (route ids of useRouter.js ROUTES, as strings: this module is loaded by tests without the UI framework). SidebarMenu navigates; the page takes its part once it shows (a section scrolls into view, a sheet opens).
@@ -43,6 +44,7 @@ const wanted = ref('')
 export function requestPanelPage(page) {
   const target = PANEL_PAGES[page]
   if (!target) return null
+  if (page === 'rtss' && rtssInstalled.value === false) return null // third-party component that is not installed: no page (unknown yet: the page bounces back once the read says so)
   wanted.value = target.part
   return target.route
 }

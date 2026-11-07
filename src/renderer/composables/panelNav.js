@@ -61,7 +61,8 @@ export function pageItems(t, rail, runtime = {}) {
       { id: ROUTES.LATENCY_CLOCK, icon: 'speed', tone: 'primary', label: t.sidebar.latencyClock, text: lines['latency-clock'] },
       { id: ROUTES.TEST_TOOLS, icon: 'science', tone: 'secondary', label: t.sidebar.testTools, text: lines['test-tools'] },
       { id: ROUTES.STREAM_TIMER, icon: 'timer', tone: 'tertiary', label: t.sidebar.streamTimer, text: lines['stream-timer'] },
-      { id: ROUTES.RTSS, icon: 'speed', tone: 'tertiary', label: c.rtss.title, text: lines.rtss },
+      // RivaTuner Statistics Server is a third-party component: the row exists only where it is installed (rtssInstall.js)
+      ...(runtime.rtssInstalled ? [{ id: ROUTES.RTSS, icon: 'speed', tone: 'tertiary', label: c.rtss.title, text: lines.rtss }] : []),
       ...developer,
     ],
   }

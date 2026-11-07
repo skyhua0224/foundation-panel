@@ -737,6 +737,7 @@ export const zh = {
     checking: '检测中...',
     running: '运行中',
     notRunning: 'RTSS 未运行，请先启动 RivaTuner Statistics Server',
+    notInstalled: '未安装 RivaTuner Statistics Server（可选组件，安装后这里才有帧率限制和 OSD）',
     refresh: '刷新状态',
     cliNotFound: '帧率限制 / OSD 设置需要 rtss-cli.exe',
     downloadCli: '前往下载',

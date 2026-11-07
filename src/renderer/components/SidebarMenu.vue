@@ -182,6 +182,7 @@ import PanelPending from './PanelPending.vue'
 import { recordUpdateCheck } from '../composables/useUpdateCheckTime.js'
 import { useHostReach } from '../composables/useHostReach.js'
 import { ROW_OF_ROUTE, railItems, pageItems, barItems, barCurrent } from '../composables/panelNav.js'
+import { rtssInstalled, readRtssInstall } from '../composables/rtssInstall.js'
 import { rowKeywords } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { useDualSenseStatus } from '../composables/useDualSenseStatus.js'
@@ -212,6 +213,8 @@ useGuideAutoOpen(openWelcome)
 onMounted(() => {
   initClipboardSyncStatus()
   refreshRuntime()
+  // RivaTuner Statistics Server is optional: read once whether it is installed, the RTSS page exists only then
+  import('@tauri-apps/api/core').then(({ invoke }) => readRtssInstall(invoke)).catch(() => { rtssInstalled.value = false })
 })
 
 const openWebUi = (path) => {
@@ -352,14 +355,14 @@ const railLabel = (id) => t.value.m3e.nav[id]
 // Developer mode (seven taps on the version in 关于): the row of 开发者选项 in 系统, and the overlays the page chose, applied at start
 const developerMode = useDeveloperMode()
 watch(developerMode.enabled, (on) => { if (on) developerOverlays(); else if (!on) developerOverlays().set({ ...DEFAULT_FLAGS }) }, { immediate: true })
-const runtimeView = computed(() => ({ ...runtime, developer: developerMode.enabled.value, developerTitle: developerTexts(locale.value).title, lines: settingsList.lines.value, statusTitle: statusTexts(locale.value).title, serviceTitle: serviceTexts(locale.value).title, diagTitle: diagnosticsTexts(locale.value).title, doctorTitle: doctorTexts(locale.value).title }))
+const runtimeView = computed(() => ({ ...runtime, developer: developerMode.enabled.value, developerTitle: developerTexts(locale.value).title, rtssInstalled: rtssInstalled.value === true, lines: settingsList.lines.value, statusTitle: statusTexts(locale.value).title, serviceTitle: serviceTexts(locale.value).title, diagTitle: diagnosticsTexts(locale.value).title, doctorTitle: doctorTexts(locale.value).title }))
 const listItems = (id) => pageItems(t.value, id, runtimeView.value)
 // The stream settings are the shared model (categories in groups with a live line, search of every setting, recently used)
 const hostConfig = ref(null)
 const dualsenseKeys = ref([])
 const hostClients = ref([])
 const hostApps = ref([])
-const settingsList = useSettingsList({ locale, config: hostConfig, dualsenseKeys, sources: { clients: hostClients, apps: hostApps, components: computed(() => componentStatus.rows.value), ds: computed(() => runtime.ds), mic: computed(() => runtime.mic), usb: computed(() => runtime.usb) } })
+const settingsList = useSettingsList({ locale, config: hostConfig, dualsenseKeys, sources: { clients: hostClients, apps: hostApps, components: computed(() => componentStatus.rows.value), rtss: computed(() => ({ installed: rtssInstalled.value === true })), ds: computed(() => runtime.ds), mic: computed(() => runtime.mic), usb: computed(() => runtime.usb) } })
 // the settings used last belong to the host this window manages: the proxy target is this machine's host while it is a loopback address, and the origin of the host it points at
 // otherwise (the panel accepts a --url that turns the whole window to another host); the first scoping keeps the list this window already has
 onMounted(async () => {
@@ -676,6 +679,8 @@ watch(
     if (to !== from) emit('route-change', { from, to })
   },
 )
+// the RTSS page of a machine without RivaTuner (a link, or a refresh that finds it gone) leaves for the first page of 系统
+watch([rtssInstalled, () => router.currentRoute.value], ([installed, route]) => { if (installed === false && route === ROUTES.RTSS) router.navigate(ROUTES.SUNSHINE_SERVICE) })
 // a page another window opens here (the toolbar menu: toolbar.rs `open-panel-page`, SunshineFrame passes it on)
 const openPanelPage = (page) => {
   const route = requestPanelPage(page)
