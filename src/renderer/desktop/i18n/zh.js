@@ -860,7 +860,7 @@ export const zh = {
   vddSettings: {
     title: '杂鱼虚拟显示器设置',
     removeResolution: '移除',
-    modeListNote: '点击保存条里的“保存”后，面板写入 vdd_settings.xml 并请求驱动重新加载。已经在用的杂鱼虚拟显示器要重新创建（重新连接串流）才会出现新列表；仍没变化时，在“驱动”页点“重新加载驱动”，或重启适配器、重启 Windows。',
+    modeListNote: '点“保存”后，面板写入 vdd_settings.xml 并请求驱动重新加载。已经在用的杂鱼虚拟显示器要重新创建（重新连接串流）才会出现新列表；仍没变化时，在“驱动”页点“重新加载驱动”，或重启适配器、重启 Windows。',
     driverPrerequisiteTitle: '杂鱼虚拟显示器驱动',
     driverPrerequisiteDesc: '杂鱼虚拟显示器是 Sunshine 的虚拟屏幕功能，使用前需要先安装并验证随附的杂鱼虚拟显示器驱动。',
     driverDetectionKicker: '杂鱼虚拟显示器 // 核心握手',

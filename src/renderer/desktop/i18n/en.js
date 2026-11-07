@@ -860,7 +860,7 @@ Output only one short sentence, no explanation. Reply in English.`,
   vddSettings: {
     title: 'ZakoDisplay Settings',
     removeResolution: 'Remove',
-    modeListNote: 'After you press Save in the bar, the panel writes vdd_settings.xml and asks the driver to reload. A ZakoDisplay that is already running has to be created again (reconnect the stream) before it shows the new lists; if nothing changes, use “Reload Driver” on the Driver page, or restart the adapter or Windows.',
+    modeListNote: 'After you press Save, the panel writes vdd_settings.xml and asks the driver to reload. A ZakoDisplay that is already running has to be created again (reconnect the stream) before it shows the new lists; if nothing changes, use “Reload Driver” on the Driver page, or restart the adapter or Windows.',
     driverPrerequisiteTitle: 'ZakoDisplay Driver',
     driverPrerequisiteDesc: 'Install and verify the bundled ZakoDisplay driver before using ZakoDisplay.',
     driverDetectionKicker: 'ZAKODISPLAY // DRIVER CHECK',

@@ -9,7 +9,13 @@ test('the display page shows the two lists as read-only rows and edits them in t
   assert.match(page, /<MModeListRow kind="resolution" :values="resolutionList"/)
   assert.match(page, /<MModeListRow kind="rate" :values="rateList"/)
   assert.match(page, /<MModeListDialog v-model="modesOpen" :resolutions="resolutionList" :rates="rateList"/)
-  assert.match(page, /const saveModes = \(\{ resolutions, rates \}\) => \{ resolutionList\.value = resolutions; rateList\.value = rates \}/)
+  assert.match(page, /:saver="saveModes"/)
+  assert.match(page, /const saveModes = async \(\{ resolutions, rates \}\) =>/)
+  // the popup saves for real: read the file again, put in only the two lists, write (the Rust save writes vdd_settings.xml and asks the driver to reload)
+  assert.match(page, /vdd\.loadSettings\(\)[\s\S]*data\.global = [\s\S]*g_refresh_rate: rates\.slice\(\)[\s\S]*resolution: nodes[\s\S]*vdd\.saveSettings\(data\)/)
+  // success updates the saved snapshot of those two lists only, a failure returns the error and nothing else changes
+  assert.match(page, /lastSavedSnapshot\.value = JSON\.stringify\(saved\)/)
+  assert.match(page, /if \(!result\?\.success\) return t\.value\.vddSettings\.saveFailed/)
   assert.doesNotMatch(page, /VddModeList|useEditableOptionField|sortedResolutionOptions|sortedRefreshRateOptions/)
 })
 
