@@ -2005,6 +2005,68 @@ mod vdd_probe_tests {
         assert_eq!(inf_driver_version(b"[Version]\r\n"), None);
     }
 
+    // ---- the mode lists in vdd_settings.xml (format: https://github.com/qiin2333/zako-vdd, README + shipped vdd_settings.xml) ----
+    //VDDLISTS-BEGIN
+    const UPSTREAM_STYLE_XML: &str = r#"<?xml version='1.0' encoding='utf-8'?>
+<vdd_settings>
+    <monitors><count>1</count></monitors>
+    <gpu><friendlyname>default</friendlyname></gpu>
+    <global>
+        <!--These are global refreshrates, any you add in here, will be replicated to all resolutions-->
+        <g_refresh_rate>144</g_refresh_rate>
+        <g_refresh_rate>60</g_refresh_rate>
+        <g_refresh_rate>59.94</g_refresh_rate>
+    </global>
+    <resolutions>
+        <resolution><width>2560</width><height>1440</height><refresh_rate>30</refresh_rate></resolution>
+        <resolution><width>800</width><height>600</height></resolution>
+        <resolution><width>1920</width><height>1080</height></resolution>
+    </resolutions>
+</vdd_settings>
+"#;
+
+    fn mode_lists(settings: &VddSettings) -> (Vec<(u32, u32)>, Vec<String>) {
+        (
+            settings.resolutions.resolution.iter().map(|r| (r.width, r.height)).collect(),
+            settings.global.g_refresh_rate.clone(),
+        )
+    }
+
+    #[test]
+    fn mode_lists_keep_the_persons_order_through_a_write_and_a_read() {
+        let settings: VddSettings = from_str(UPSTREAM_STYLE_XML).unwrap();
+        let before = mode_lists(&settings);
+        assert_eq!(before.0, vec![(2560, 1440), (800, 600), (1920, 1080)]);
+        assert_eq!(before.1, vec!["144", "60", "59.94"]);
+
+        let xml = serialize_vdd_settings(&settings).unwrap();
+        // the shape the driver and Sunshine read: one <resolution> per mode with <width> and <height>, one <g_refresh_rate> per rate
+        assert!(xml.contains("<resolution>"));
+        assert!(xml.contains("<width>2560</width>"));
+        assert!(xml.contains("<height>1440</height>"));
+        assert_eq!(xml.matches("<g_refresh_rate>").count(), 3);
+        assert!(xml.find("<width>2560</width>").unwrap() < xml.find("<width>800</width>").unwrap());
+        assert!(xml.find("<g_refresh_rate>144</g_refresh_rate>").unwrap() < xml.find("<g_refresh_rate>60</g_refresh_rate>").unwrap());
+
+        let again: VddSettings = from_str(&xml).unwrap();
+        assert_eq!(mode_lists(&again), before);
+    }
+
+    #[test]
+    fn an_edited_list_round_trips_and_a_per_resolution_refresh_rate_is_not_written() {
+        let mut settings: VddSettings = from_str(UPSTREAM_STYLE_XML).unwrap();
+        settings.resolutions.resolution.swap(0, 2);
+        settings.resolutions.resolution.push(Resolution { width: 3840, height: 2160 });
+        settings.global.g_refresh_rate = vec!["120".to_string(), "119.88".to_string()];
+        let xml = serialize_vdd_settings(&settings).unwrap();
+        let again: VddSettings = from_str(&xml).unwrap();
+        assert_eq!(mode_lists(&again).0, vec![(1920, 1080), (800, 600), (2560, 1440), (3840, 2160)]);
+        assert_eq!(mode_lists(&again).1, vec!["120", "119.88"]);
+        // known limit: the optional per-resolution <refresh_rate> of the driver's file is not part of the panel's model, so a save drops it (the global list covers every resolution)
+        assert!(!xml.contains("<refresh_rate>"));
+    }
+    //VDDLISTS-END
+
     /// Run on a machine with the driver installed: `cargo test --bin sunshine-gui -- --ignored vdd_direct_read_matches_the_script`.
     #[test]
     #[ignore]
