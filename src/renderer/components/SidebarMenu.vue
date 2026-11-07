@@ -497,6 +497,8 @@ const actionHandlers = {
   quitHost: () => hostAction('/api/boom', diagnosticsTexts(locale.value).boom, 'GET'),
   openDesktop: () => openBigScreenWithNotice((m) => useNotify().snack(m), t.value.sidebar.openBigScreenFailed),
   doctor: () => openDoctor(),
+  // 反馈: the form of MErrorHost (mounted below, so it is always there); the help page has the same row
+  feedback: () => { useErrors().reportFeedback() },
 }
 const searchDocs = computed(() => [
   ...settingDocs(searchItems.value, { prefix: settingsPlace, locale: locale.value }),
