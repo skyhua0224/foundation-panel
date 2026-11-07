@@ -5,7 +5,7 @@ use crate::tray;
 use crate::update;
 use crate::windows;
 use log::{debug, error, info, warn};
-use tauri::{App, AppHandle, Manager};
+use tauri::{App, AppHandle, Emitter, Manager};
 
 pub(crate) const TOOLBAR_SHORTCUT: &str = "CmdOrCtrl+Shift+Alt+T";
 
@@ -41,6 +41,13 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
     }
     let agent_only = args.iter().any(|arg| arg == "--hidden");
     let explicit_minimized = args.iter().any(|arg| arg == "--minimized");
+    // `--start-guide` is the installer's "open the start guide" button. It shows the main window
+    // even when the panel is set to start minimized. `--hidden` stays an agent with no window.
+    // panel-tauri-single-instance-20261107: a second launch is delivered in handle_single_instance.
+    let start_guide = !agent_only && crate::start_guide::requests_start_guide(&args);
+    if start_guide {
+        crate::start_guide::queue_start_guide();
+    }
     let desktop_settings = crate::desktop_settings::load_desktop_settings_from_disk();
     let send_to_client_paths = crate::file_transfer::parse_send_to_client_args(&args);
     let is_send_to_client = !send_to_client_paths.is_empty();
@@ -64,7 +71,9 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
     #[cfg(target_os = "windows")]
     crate::vdd::start_hardware_cursor_migration();
     // a measurement instance (SUNSHINE_GUI_TEST_OFFSCREEN) shows its window, off screen, whatever the person's setting: a page of a hidden window sleeps
-    let start_minimized = (explicit_minimized || desktop_settings.start_minimized) && !windows::test_offscreen();
+    let start_minimized = (explicit_minimized || desktop_settings.start_minimized)
+        && !windows::test_offscreen()
+        && !start_guide;
 
     // Agent-only startup keeps tray and session services alive without
     // allocating a hidden WebView. UI windows are created on demand.
@@ -81,6 +90,16 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
     } else if !show_toolbar && !url_contains_pin && !is_send_to_client && !is_quick_share_folder {
         if start_minimized {
             windows::create_main_window_hidden(&app_handle)?;
+        } else {
+            windows::create_main_window(&app_handle)?;
+        }
+    }
+
+    if start_guide {
+        info!("--start-guide: opening the start guide at its first step");
+        if let Some(window) = app_handle.get_webview_window("main") {
+            windows::show_and_activate_window(&window);
+            let _ = window.emit("start-guide-pending", ());
         } else {
             windows::create_main_window(&app_handle)?;
         }
@@ -317,6 +336,23 @@ pub fn handle_single_instance(app: &AppHandle, args: Vec<String>) {
 
     if args.iter().any(|arg| arg == "--hidden") {
         info!("User agent is already running; ignoring duplicate hidden startup");
+        return;
+    }
+
+    if crate::start_guide::requests_start_guide(&args) {
+        info!("--start-guide: forwarding to the running panel");
+        crate::start_guide::queue_start_guide();
+        if app.get_webview_window("main").is_none() {
+            if let Err(e) = windows::create_main_window(app) {
+                error!("failed to open the panel for --start-guide: {e}");
+                return;
+            }
+        } else {
+            windows::activate_main_window(app, None);
+        }
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.emit("start-guide-pending", ());
+        }
         return;
     }
 

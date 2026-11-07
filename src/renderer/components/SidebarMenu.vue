@@ -33,7 +33,7 @@
         <!-- while the host cannot be used the status page (the overlay) is the whole content area; a page that needs the host is not drawn under it -->
         <template v-if="offlineShown && !isWebPage" />
         <PanelHome v-else-if="entry.id === ROUTES.HOME" :runtime="runtime" :update-available="!!updateInfo" @open="openDestination" @webui-navigate="openWebUi" />
-        <Welcome v-else-if="entry.id === ROUTES.WELCOME" @close="closeWelcome" @webui-navigate="openWebUi" />
+        <Welcome v-else-if="entry.id === ROUTES.WELCOME" :key="guideRun" @close="closeWelcome" @webui-navigate="openWebUi" />
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
@@ -142,6 +142,7 @@ import PanelBusyLayer from './PanelBusyLayer.vue'
 import PanelWebHost from './PanelWebHost.vue'
 import VddSettings from './VddSettings.vue'
 import Welcome from './welcome.vue'
+import { armStartGuide } from '../composables/startGuide.js'
 import WebStreamSettings from './WebStreamSettings.vue'
 import AiAssistant from './AiAssistant.vue'
 import { mitaState } from '../composables/mitaState.js'
@@ -212,6 +213,13 @@ const {
 const { runtime, refresh: refreshRuntime } = useDeviceRuntime()
 // First run: the guide opens by itself when the host has no setup and no paired client
 useGuideAutoOpen(openWelcome)
+// `--start-guide`: a new key remounts the guide so it reads the cleared progress at the first step
+const guideRun = ref(0)
+const openStartGuide = () => {
+  armStartGuide()
+  guideRun.value += 1
+  openWelcome()
+}
 onMounted(() => {
   initClipboardSyncStatus()
   refreshRuntime()
@@ -694,7 +702,7 @@ const openPanelPage = (page) => {
   router.navigate(route)
 }
 defineExpose({
-  openVddSettings, openWelcome, openWebStream, openAiAssistant, openControllers, openRtxHdr, openPanelPage,
+  openVddSettings, openWelcome, openWebStream, openAiAssistant, openControllers, openRtxHdr, openPanelPage, openStartGuide,
   goHome, checkForUpdates: handleCheckForUpdates, router,
 })
 </script>
