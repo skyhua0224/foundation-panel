@@ -1794,6 +1794,37 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn local_request_retries_once_after_unauthorized() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        tokio::spawn(async move {
+            for response in [
+                b"HTTP/1.1 401 Unauthorized\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    .as_slice(),
+                b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+                    .as_slice(),
+            ] {
+                let (mut stream, _) = listener.accept().await.unwrap();
+                let mut request = [0_u8; 1024];
+                let _ = stream.read(&mut request).await;
+                stream.write_all(response).await.unwrap();
+            }
+        });
+
+        let response = send_local_authenticated_request(
+            &build_http_client(DEFAULT_PROXY_TIMEOUT_SECS),
+            &format!("http://{address}/api/config"),
+            &axum::http::Method::GET,
+            &axum::http::HeaderMap::new(),
+            &Bytes::new(),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(response.status(), reqwest::StatusCode::NO_CONTENT);
+    }
+
+    #[tokio::test]
     async fn proxy_health_requires_the_current_process_challenge() {
         let check = get_proxy_health_check();
         let valid_request = axum::http::Request::builder()
