@@ -37,6 +37,7 @@
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
+        <StreamHubPage v-else-if="entry.id === ROUTES.STREAM_HUB" :runtime="runtimeView" :add-label="homeTexts(locale)['c_act-add-app']" @open="onListNavigate" @add="openDestination('apps:add')" />
         <SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" :groups="settingsList.groups.value" :runtime="runtimeView" @open="onListNavigate" />
         <HdrEnhancedManager v-else-if="entry.id === ROUTES.HDR_ENHANCED" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
         <AppearancePage v-else-if="entry.id === ROUTES.CFG_APPEARANCE" />
@@ -145,6 +146,7 @@ import WebStreamSettings from './WebStreamSettings.vue'
 import AiAssistant from './AiAssistant.vue'
 import { mitaState } from '../composables/mitaState.js'
 import SettingsHubPage from './m3e/SettingsHubPage.vue'
+import StreamHubPage from './m3e/StreamHubPage.vue'
 import HdrEnhancedManager from './HdrEnhancedManager.vue'
 import ControlPanelPage from './ControlPanelPage.vue'
 import MicrophonePage from './m3e/MicrophonePage.vue'
@@ -174,7 +176,7 @@ import { useWindowControls } from '../composables/useWindowControls.js'
 import { useTools } from '../composables/useTools.js'
 import { useTouchWindowDrag } from '../composables/useTouchWindowDrag.js'
 import { createUtilityTools } from '../composables/toolsRegistry.js'
-import { ROUTES, PAGES, routeForWebPath, routeOfPlace, webPathOf } from '../composables/useRouter.js'
+import { ROUTES, PAGES, routeForWebPath, routeOfPlace, webPathOf, isPhone } from '../composables/useRouter.js'
 import { PANEL_PAGE_PATHS, requestPanelPage } from '../composables/panelParts.js'
 import { proxyBlock } from '../composables/proxyBlock.js'
 import { createGuideData } from '../composables/guideData.js'
@@ -260,7 +262,7 @@ const sponsorSections = computed(() => [
 const actions_openExternal = (url) => openExternalUrl(url)
 const nav = router.nav
 // the back stack mirrors into the window's history (as in the Web UI): the back arrow of a pushed page, Esc, the mouse's back button and the browser's agree; without it the arrow only went back in the history and the page stayed
-onMounted(() => nav.attach())
+onMounted(() => { nav.widen(); nav.attach() })
 onBeforeUnmount(() => nav.detach())
 const isWebPage = computed(() => !!webPathOf(router.currentRoute.value))
 // The frame shows the page of the route. Callers that open a Web page tell the frame themselves; a route that is set any other way (a link, a deep link, a caller that only
@@ -409,7 +411,8 @@ const searchItems = computed(() => [
 ])
 // ---- the unified search: one entry in the caption bar (an icon and a full-screen view on a narrow window) over everything a person can look for ----
 const compactSearch = ref(typeof window !== 'undefined' && window.innerWidth < 600)
-const onSearchResize = () => { compactSearch.value = window.innerWidth < 600 }
+let wasPhone = isPhone()
+const onSearchResize = () => { compactSearch.value = window.innerWidth < 600; const now = isPhone(); if (now !== wasPhone) { wasPhone = now; if (now) nav.narrow(); else nav.widen() } }
 onMounted(() => window.addEventListener('resize', onSearchResize))
 onBeforeUnmount(() => window.removeEventListener('resize', onSearchResize))
 const searchT = computed(() => searchTexts(locale.value))
@@ -584,7 +587,7 @@ const onRail = (item) => {
   if (item.id === 'more') { moreOpen.value = true; return }
   if (item.id === 'config') { loadHostData(); openConfig({ tab: 'general' }); router.navigate(ROUTES.CAT_CONFIG); return }
   // the stream rail opens on its first page: the frame has to show it
-  if (item.id === 'stream') { router.navigate(ROUTES.CAT_STREAM); emit('webui-navigate', webPathOf(ROUTES.WEB_CLIENTS)); return }
+  if (item.id === 'stream') { router.navigate(ROUTES.CAT_STREAM); if (!isPhone()) emit('webui-navigate', webPathOf(ROUTES.WEB_CLIENTS)); return } // a phone has the stream hub: no page opens by itself
   router.navigate({ overview: ROUTES.HOME, settings: ROUTES.PANEL_SETTINGS, help: ROUTES.HELP, stream: ROUTES.CAT_STREAM, input: ROUTES.CAT_INPUT, audio: ROUTES.CAT_AUDIO, display: ROUTES.CAT_DISPLAY, system: ROUTES.CAT_SYSTEM, assistant: ROUTES.AI_ASSISTANT }[item.id])
   const first = nav.list.value && nav.defaultDetailOf(nav.list.value)
   const path = first && webPathOf(first.id)
@@ -702,7 +705,8 @@ defineExpose({
 .panel-caption__brand { align-self: center; padding-inline-start: 16px; pointer-events: none; }
 .panel-caption__controls { display: flex; justify-self: end; }
 .panel-caption__search { display: flex; align-items: center; justify-content: center; min-width: 0; padding: 0 12px; }
-@media (max-width: 599.98px) { .panel-caption { grid-template-columns: minmax(max-content, 1fr) auto auto; } .panel-caption__search { padding: 0 4px; } }
+/* the caption bar of a phone is the Web UI's: the brand gives way (it was max-content and pushed the buttons out of a 360 px window), search and the action buttons touch (the shared icon sizes are m3e's layout.css) */
+@media (max-width: 599.98px) { .panel-caption { grid-template-columns: minmax(0, 1fr) auto auto; } .panel-caption__brand { min-width: 0; overflow: hidden; padding-inline-start: 12px; } .panel-caption__search { padding: 0; } }
 .panel-caption__btn { display: grid; place-items: center; width: 46px; height: 48px; padding: 0; border: 0; background: transparent; color: var(--md-sys-color-on-surface); font-size: 18px; cursor: default; transition: background-color 120ms linear, color 120ms linear; }
 .panel-caption__btn:hover { background: color-mix(in srgb, var(--md-sys-color-on-surface) 9%, transparent); }
 .panel-caption__btn:active { background: color-mix(in srgb, var(--md-sys-color-on-surface) 14%, transparent); }

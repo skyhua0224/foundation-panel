@@ -18,6 +18,7 @@ export const ROUTES = {
   TEST_TOOLS: 'test-tools', // 测试工具 (patterns, frame pacing, A/V sync, channels, input, keep awake), opened from the toolbox
   PANEL_SETTINGS: 'panel-settings',
   SETTINGS_HUB: 'settings-hub', // the bottom bar's one entry for 主机设置, 输入与外设, 显示 and 系统: a list of those four
+  STREAM_HUB: 'stream-hub', // 串流 of a narrow window: the pages of the stream rail as one page of grouped rows, like SETTINGS_HUB (the rail's list page does not exist on a phone)
   HELP: 'help',
   ABOUT: 'about',
   DEVELOPER: 'developer', // 开发者选项: a pushed page, reachable once developer mode is on
@@ -103,6 +104,7 @@ export const PAGES = {
   [ROUTES.ABOUT]: { rail: 'help', rootRail: 'about', list: false, push: true }, // pushed from 帮助与关于 (Back); a first-level page from the rail's About button (`root`, no Back, no rail item lit)
   [ROUTES.DEVELOPER]: { rail: 'system', list: false, push: true },
   [ROUTES.ANNOUNCEMENTS]: { rail: 'overview', list: false, push: true },
+  [ROUTES.STREAM_HUB]: { rail: 'stream', list: false }, // after the pages of its rail: the first page of 串流 stays 客户端
 }
 export const RAILS = ['overview', 'stream', 'config', 'input', 'audio', 'display', 'system', 'assistant', 'settings', 'help']
 
@@ -159,8 +161,13 @@ const routes = {}
 for (const rail of new Set(Object.values(PAGES).filter((p) => p.list !== false).map((p) => p.rail))) routes[`${rail}:list`] = { role: 'list', rail }
 for (const [id, p] of Object.entries(PAGES)) routes[id] = { role: 'detail', rail: p.rail, list: p.list, supporting: p.supporting, push: p.push, rootRail: p.rootRail }
 
+// a phone has no list pages of the rails: 串流 is the stream hub, every other category is in the 设置 hub; Back from a page is that hub, whatever way the page was reached (as in the Web UI)
+export const HUB_OF = { stream: ROUTES.STREAM_HUB, config: ROUTES.SETTINGS_HUB, input: ROUTES.SETTINGS_HUB, audio: ROUTES.SETTINGS_HUB, display: ROUTES.SETTINGS_HUB, system: ROUTES.SETTINGS_HUB }
+export const PHONE_MAX = 600
+export const isPhone = () => typeof window !== 'undefined' && window.innerWidth < PHONE_MAX
+
 let nav = null
-const shared = () => (nav ||= createNav({ routes, home: ROUTES.HOME }))
+const shared = () => (nav ||= createNav({ routes, home: ROUTES.HOME, compact: isPhone, hubOf: HUB_OF }))
 
 /** Navigation of the panel: one back stack for the whole window. */
 export function useRouter() {

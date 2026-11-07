@@ -15,6 +15,6 @@ test('the frame follows every route that has a Web path', () => {
 
 // the back stack mirrors into the window's history, or the back arrow of a pushed page (关于, 公告) goes back in the history and the page stays
 test('the shell attaches the back stack to the window history', () => {
-  assert.match(shell, /onMounted\(\(\) => nav\.attach\(\)\)/)
+  assert.match(shell, /onMounted\(\(\) => \{ nav\.widen\(\); nav\.attach\(\) \}\)/)
   assert.match(shell, /onBeforeUnmount\(\(\) => nav\.detach\(\)\)/)
 })
