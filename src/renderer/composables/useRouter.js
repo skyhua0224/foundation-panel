@@ -100,7 +100,7 @@ export const PAGES = {
   [ROUTES.PANEL_SETTINGS]: { rail: 'settings', list: false },
   [ROUTES.SETTINGS_HUB]: { rail: 'config', list: false },
   [ROUTES.HELP]: { rail: 'help', list: false },
-  [ROUTES.ABOUT]: { rail: 'help', list: false, push: true },
+  [ROUTES.ABOUT]: { rail: 'help', rootRail: 'about', list: false, push: true }, // pushed from 帮助与关于 (Back); a first-level page from the rail's About button (`root`, no Back, no rail item lit)
   [ROUTES.DEVELOPER]: { rail: 'system', list: false, push: true },
   [ROUTES.ANNOUNCEMENTS]: { rail: 'overview', list: false, push: true },
 }
@@ -157,7 +157,7 @@ export const webPathOf = (route) => ({
 
 const routes = {}
 for (const rail of new Set(Object.values(PAGES).filter((p) => p.list !== false).map((p) => p.rail))) routes[`${rail}:list`] = { role: 'list', rail }
-for (const [id, p] of Object.entries(PAGES)) routes[id] = { role: 'detail', rail: p.rail, list: p.list, supporting: p.supporting, push: p.push }
+for (const [id, p] of Object.entries(PAGES)) routes[id] = { role: 'detail', rail: p.rail, list: p.list, supporting: p.supporting, push: p.push, rootRail: p.rootRail }
 
 let nav = null
 const shared = () => (nav ||= createNav({ routes, home: ROUTES.HOME }))
@@ -166,11 +166,12 @@ const shared = () => (nav ||= createNav({ routes, home: ROUTES.HOME }))
 export function useRouter() {
   const { t } = useI18n()
   const stack = shared()
-  const navigate = (name, params) => {
+  // opts.root: the page of a push route (关于) as a first-level page, from the rail's footer: no back arrow
+  const navigate = (name, params, opts) => {
     const to = ALIAS[name] || name
     if (CATEGORY[to]) return stack.selectRail(CATEGORY[to])
     if (!PAGES[to]) { console.warn(`route ${name} does not exist`); return }
-    stack.go(to, params)
+    stack.go(to, params, opts)
   }
   const currentRoute = computed(() => stack.current.value)
   const goHome = () => navigate(ROUTES.HOME)
