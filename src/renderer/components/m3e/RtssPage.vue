@@ -103,6 +103,7 @@ import { MPage, MGroup, MSection, MItem, MSwitchItem, MSliderItem, MChoiceItem, 
 import { useI18n } from '../../desktop/i18n/index.js'
 import { FPS_LIMITS, FPS_PRESETS, FONT_SIZES, ZOOMS, INTERVALS, OSD_OWNER, insertText, wrapTag, colorTag, sizeTag, metricGroups, filterSensors, loadMonitoringConfig, saveMonitoringConfig } from '../../composables/rtssTools.js'
 import { useHwInfoInject } from '../../composables/useHwInfoInject.js'
+import { noteRtssStatus } from '../../composables/rtssInstall.js'
 
 // RTSS 叠加: everything of the old RTSS tool window (status, frame-rate limit, OSD text, OSD settings, stream monitoring, HWiNFO) on one page of 系统.
 const { t, locale } = useI18n()
@@ -113,7 +114,7 @@ const fail = (e) => say(String(e))
 const loading = ref(true), loaded = ref(false)
 const status = ref({ running: false, version: '', cli_path: '' })
 async function loadStatus() {
-  try { status.value = (await invoke('get_rtss_status')) || { running: false, version: '', cli_path: '' } } catch { status.value = { ...status.value, running: false } }
+  try { status.value = (await invoke('get_rtss_status')) || { running: false, version: '', cli_path: '' }; noteRtssStatus(status.value) } catch { status.value = { ...status.value, running: false } }
 }
 async function loadAll() {
   loading.value = true
