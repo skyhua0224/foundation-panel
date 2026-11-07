@@ -58,6 +58,11 @@ const FAST_FAIL_COOLDOWN_SECS: u64 = 3;
 /// 默认代理超时：用于 Sunshine 普通页面/API，保持界面快速失败。
 const DEFAULT_PROXY_TIMEOUT_SECS: u64 = 5;
 
+/// Health and live-session snapshots can run encoder/session probes while the
+/// host is streaming. Give those bounded routes the time they need without
+/// weakening the failure budget of ordinary page requests.
+const SLOW_API_PROXY_TIMEOUT_SECS: u64 = 15;
+
 /// AI 请求会携带日志、应用列表等上下文，模型首 token 可能明显慢于普通 API。
 const AI_PROXY_TIMEOUT_SECS: u64 = 120;
 
@@ -904,6 +909,15 @@ fn long_poll_timeout(method: &axum::http::Method, url: &str) -> Option<std::time
     Some(std::time::Duration::from_secs(wait.min(60) + 5))
 }
 
+fn slow_api_timeout(method: &axum::http::Method, url: &str) -> Option<std::time::Duration> {
+    if method != axum::http::Method::GET {
+        return None;
+    }
+    let path = url::Url::parse(url).ok()?.path().to_string();
+    matches!(path.as_str(), "/api/doctor" | "/api/runtime/sessions")
+        .then_some(std::time::Duration::from_secs(SLOW_API_PROXY_TIMEOUT_SECS))
+}
+
 const ERROR_LOG_WINDOW: std::time::Duration = std::time::Duration::from_secs(60);
 
 /// `None` when a failure of the same kind on the same path was written less than a window ago (it is counted instead); otherwise the number of
@@ -1369,6 +1383,12 @@ fn get_ai_http_client() -> &'static reqwest::Client {
     CLIENT.get_or_init(|| build_http_client(AI_PROXY_TIMEOUT_SECS))
 }
 
+fn get_slow_api_http_client() -> &'static reqwest::Client {
+    use std::sync::OnceLock;
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    CLIENT.get_or_init(|| build_http_client(SLOW_API_PROXY_TIMEOUT_SECS))
+}
+
 fn get_streaming_http_client() -> &'static reqwest::Client {
     use std::sync::OnceLock;
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
@@ -1386,10 +1406,15 @@ fn get_streaming_http_client() -> &'static reqwest::Client {
 }
 
 fn build_http_client(timeout_secs: u64) -> reqwest::Client {
+    // reqwest keeps the connect phase separate from the bounded request/read
+    // budget, so a busy local host can be given more response time without
+    // making a missing listener slow every ordinary request
+    // [panel-reqwest-client-builder-20261107].
     reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
         .pool_max_idle_per_host(20)
         .timeout(std::time::Duration::from_secs(timeout_secs))
+        .read_timeout(std::time::Duration::from_secs(timeout_secs))
         .connect_timeout(std::time::Duration::from_millis(PROXY_CONNECT_TIMEOUT_MS))
         .build()
         .expect("Failed to create HTTP client")
@@ -1484,25 +1509,42 @@ async fn fetch_and_proxy(
     is_ai_api: bool,
 ) -> Result<Response, Box<dyn std::error::Error + Send + Sync>> {
     let response_body_limit = proxy_response_body_limit(url, method, headers);
+    let slow_api = slow_api_timeout(method, url);
     let client = if response_body_limit.is_none() {
         get_streaming_http_client()
     } else if is_ai_api {
         get_ai_http_client()
+    } else if slow_api.is_some() {
+        get_slow_api_http_client()
     } else {
         get_http_client()
     };
 
     // 尝试请求，HTTPS 失败时降级到 HTTP（仅限非连接错误）
     let long_poll = long_poll_timeout(method, url);
+    let upstream_timeout = long_poll.or(slow_api);
     let response =
-        match send_local_authenticated_request(client, url, method, headers, body, long_poll).await
+        match send_local_authenticated_request(
+            client,
+            url,
+            method,
+            headers,
+            body,
+            upstream_timeout,
+        )
+        .await
         {
             Ok(resp) => resp,
             Err(e) if url.starts_with("https://") && !is_connection_error(&e.to_string()) => {
                 let http_url = url.replace("https://", "http://");
                 warn!("⚠️  HTTPS 连接失败，尝试 HTTP: {}", http_url);
                 send_local_authenticated_request(
-                    client, &http_url, method, headers, body, long_poll,
+                    client,
+                    &http_url,
+                    method,
+                    headers,
+                    body,
+                    upstream_timeout,
                 )
                 .await?
             }
@@ -1946,6 +1988,29 @@ mod tests {
                 &axum::http::Method::POST,
                 "https://x/api/pairing/pending?wait=25"
             ),
+            None
+        );
+    }
+
+    #[test]
+    fn slow_health_routes_have_a_separate_upstream_budget() {
+        let get = axum::http::Method::GET;
+        assert_eq!(
+            slow_api_timeout(&get, "https://127.0.0.1:57990/api/doctor?only=vdd&lang=zh")
+                .map(|duration| duration.as_secs()),
+            Some(SLOW_API_PROXY_TIMEOUT_SECS)
+        );
+        assert_eq!(
+            slow_api_timeout(&get, "https://127.0.0.1:57990/api/runtime/sessions")
+                .map(|duration| duration.as_secs()),
+            Some(SLOW_API_PROXY_TIMEOUT_SECS)
+        );
+        assert_eq!(
+            slow_api_timeout(&get, "https://127.0.0.1:57990/api/config"),
+            None
+        );
+        assert_eq!(
+            slow_api_timeout(&axum::http::Method::POST, "https://127.0.0.1:57990/api/doctor"),
             None
         );
     }

@@ -1052,6 +1052,8 @@ pub fn create_https_client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
         .redirect(reqwest::redirect::Policy::none())
+        .connect_timeout(std::time::Duration::from_millis(500))
+        .read_timeout(std::time::Duration::from_secs(10))
         .timeout(std::time::Duration::from_secs(10))
         .default_headers(headers)
         .build()
