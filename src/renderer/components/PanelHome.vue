@@ -104,7 +104,7 @@ const sampleAll = () => {
   const s = session.value, p = perfSession.value
   history.sample('cpu', state.sys.cpu); history.sample('gpu', state.sys.gpu)
   if (state.memory?.system_total_memory) history.sample('mem', ((state.memory.system_total_memory - (state.memory.system_available_memory || 0)) / state.memory.system_total_memory) * 100)
-  if (s) { history.sample('bitrate', s.bitrate); history.sample('fps', p?.frame_rates?.encoded?.fps ?? s.fps); history.sample('latency', p?.host_latency?.avg_ms); history.sample('loss', s.packet_loss); history.sample('dropped', s.dropped_frames) } else for (const k of ['bitrate', 'fps', 'latency', 'loss', 'dropped']) history.clear(k)
+  if (s) { history.sample('bitrate', Number.isFinite(s.measured_bitrate_kbps) ? s.measured_bitrate_kbps : s.bitrate); history.sample('fps', p?.frame_rates?.encoded?.fps ?? s.fps); history.sample('latency', p?.host_latency?.avg_ms); history.sample('loss', s.packet_loss); history.sample('dropped', s.dropped_frames) } else for (const k of ['bitrate', 'fps', 'latency', 'loss', 'dropped']) history.clear(k)
   historyTick.value += 1
 }
 let sampler = 0
