@@ -213,7 +213,7 @@
         </MSection>
       </template>
 
-      <MModeListDialog v-model="modesOpen" :resolutions="resolutionList" :rates="rateList" :locale="locale" :note="t.vddSettings.modeListNote" @save="saveModes" />
+      <MModeListDialog v-model="modesOpen" :resolutions="resolutionList" :rates="rateList" :locale="locale" :note="t.vddSettings.modeListNote" :saver="saveModes" />
       <MDialog v-model="confirm.open" :title="vp.confirmTitle.replace('{name}', confirm.name)" icon="warning" tone="warning">
         <p class="vdd-confirm__text">{{ confirm.text }}</p>
         <template #actions>
@@ -232,7 +232,7 @@ import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards,
 import { useHostVdd } from '../composables/useHostVdd.js'
 import DpiScaleSection from './m3e/DpiScaleSection.vue'
 import { usePanelPart } from '../composables/panelParts.js'
-import { cleanList } from 'foundation-ui/settings/modeList.js'
+import { cleanList, toResolutionNodes } from 'foundation-ui/settings/modeList.js'
 import { useVddEdid } from '../composables/useVddEdid.js'
 import { useVddStatusLabel } from '../composables/useVddStatusLabel.js'
 import { installVddWithRecovery } from '../composables/vddInstallRecovery.js'
@@ -478,7 +478,29 @@ const setResolutionOptions = (values = []) => { resolutionList.value = cleanList
 const setRefreshRateOptions = (values = []) => { rateList.value = cleanList('rate', values) }
 const mlt = computed(() => modeListTexts(locale.value))
 const modesOpen = ref(false)
-const saveModes = ({ resolutions, rates }) => { resolutionList.value = resolutions; rateList.value = rates }
+// the popup's 保存 saves for real, as the save bar does: the file is read again, only the two lists are put in, the file is written and the driver asked to reload
+// (the page's other unsaved edits stay in the bar). '' on success, else the error text for the popup.
+const saveModes = async ({ resolutions, rates }) => {
+  try {
+    const loaded = await vdd.loadSettings()
+    if (!loaded?.success) return t.value.vddSettings.saveFailed.replace('{error}', t.value.vddSettings.loadFailed)
+    const data = JSON.parse(JSON.stringify(loaded.data))
+    const nodes = toResolutionNodes(resolutions)
+    data.global = { ...(data.global || {}), g_refresh_rate: rates.slice() }
+    data.resolutions = { ...(data.resolutions || {}), resolution: nodes }
+    const result = await vdd.saveSettings(data)
+    if (!result?.success) return t.value.vddSettings.saveFailed.replace('{error}', result?.message || t.value.vddSettings.unknownError)
+    resolutionList.value = resolutions.slice()
+    rateList.value = rates.slice()
+    const saved = JSON.parse(lastSavedSnapshot.value || '{}')
+    saved.global = { ...(saved.global || {}), g_refresh_rate: rates.slice() }
+    saved.resolutions = { ...(saved.resolutions || {}), resolution: nodes }
+    lastSavedSnapshot.value = JSON.stringify(saved)
+    return ''
+  } catch (error) {
+    return t.value.vddSettings.saveFailed.replace('{error}', getErrorMessage(error, t.value.vddSettings.unknownError))
+  }
+}
 
 const gpuSummary = computed(() => gpuFriendlyName.value || t.value.vddSettings.unboundGpu)
 const presetSummary = computed(() => getVddText('presetsSummary', {
