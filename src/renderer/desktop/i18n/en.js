@@ -414,7 +414,7 @@ export const en = {
     systemStatus: 'System Status',
     gpu: 'Detected GPUs',
     encoder: 'Encoder',
-    network: 'Local Web UI connection',
+    network: 'WebUI panel connection',
     firewall: 'Remote access and firewall',
     status: {
       notTested: 'Not tested',
@@ -422,8 +422,8 @@ export const en = {
       encoderNotTested: 'Encoder initialization and encoding capability have not been tested',
       remoteNotTested: 'Client connectivity and firewall rules have not been tested',
       enumerated: 'Detected',
-      localReachable: 'Local Web UI configuration endpoint returned a valid response',
-      localUnconfirmed: 'Local Web UI access unconfirmed. Check the service, authentication or local proxy',
+      localReachable: 'WebUI panel configuration endpoint returned a valid response',
+      localUnconfirmed: 'WebUI panel access unconfirmed. Check the service, authentication or local proxy',
       reachable: 'Accessible',
 
       detecting: 'Detecting',

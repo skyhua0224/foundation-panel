@@ -414,7 +414,7 @@ export const zh = {
     systemStatus: '系统状态',
     gpu: '已识别显卡',
     encoder: '编码器',
-    network: '本机 WebUI 连接',
+    network: 'WebUI 面板连接',
     firewall: '远端连接与防火墙',
     status: {
       notTested: '未执行此项检测',
@@ -422,8 +422,8 @@ export const zh = {
       encoderNotTested: '未测试编码器初始化或实际编码能力',
       remoteNotTested: '未测试客户端连接或防火墙规则',
       enumerated: '已识别',
-      localReachable: '本机 WebUI 配置接口响应有效',
-      localUnconfirmed: '未确认本机 WebUI 可达，请检查服务、登录或本机代理',
+      localReachable: 'WebUI 面板配置接口响应有效',
+      localUnconfirmed: '未确认 WebUI 面板可达，请检查服务、登录或本机代理',
       reachable: '可访问',
 
       detecting: '检测中',
