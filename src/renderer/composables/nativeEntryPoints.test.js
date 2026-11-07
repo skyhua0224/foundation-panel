@@ -5,6 +5,15 @@ import { readFileSync } from 'node:fs'
 const root = new URL('../../../', import.meta.url)
 const read = (path) => readFileSync(new URL(path, root), 'utf8')
 
+test('the RTSS entry of the tray tools menu exists only where RivaTuner is installed', () => {
+  const menu = read('src-tauri/src/tray/menu.rs')
+  const rtss = read('src-tauri/src/rtss.rs')
+  assert.match(rtss, /pub\(crate\) fn is_rtss_installed\(\) -> bool/)
+  assert.match(menu, /if crate::rtss::is_rtss_installed\(\) \{\s*Some\(MenuItem::with_id\(app, "rtss_control"/)
+  assert.match(menu, /if let Some\(rtss_control\) = &rtss_control \{\s*tools_items\.push\(rtss_control\)/)
+  assert.doesNotMatch(menu, /vec!\[&show_toolbar, &host_performance, &rtss_control\]/)
+})
+
 test('native About, pairing, and log entries target the main shell pages', () => {
   const rust = read('src-tauri/src/windows.rs')
   const parts = read('src/renderer/composables/panelParts.js')

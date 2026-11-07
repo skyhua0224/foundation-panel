@@ -269,6 +269,11 @@ fn detect_rtss_install_dir() -> Option<String> {
     None
 }
 
+/// RivaTuner Statistics Server is installed: the same answer as `RtssStatus::installed`. Entries that open its page (the tray menu) are offered only then.
+pub(crate) fn is_rtss_installed() -> bool {
+    detect_rtss_install_dir().is_some_and(|dir| !dir.is_empty())
+}
+
 /// 执行 rtss-cli 命令
 #[cfg(target_os = "windows")]
 fn run_rtss_cli(args: &[&str]) -> Result<String, String> {
