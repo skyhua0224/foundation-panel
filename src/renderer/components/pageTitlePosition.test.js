@@ -62,5 +62,6 @@ test('title left equals content left: the pages of the panel that sit in the det
   const host = readFileSync(join(root, 'components/PanelWebHost.vue'), 'utf8')
   assert.match(host, /\.panel-web__cover > \.m-pageload \{ width: min\(100%, 960px\); margin-inline: 0; \}/)
   assert.match(host, /\.panel-web \{ --m-gutter: 32px;/)
-  assert.match(host, /\.panel-web__bar \{ padding: 8px var\(--m-gutter\) 0; flex: none; \}/)
+  assert.match(host, /\.panel-web__bar \{ padding: 8px var\(--m-gutter\); flex: none; \}/)
+  assert.match(host, /@container \(max-width: 560px\) \{ \.panel-web__bar, \.panel-web__cover \{ --m-gutter: 12px; \} \}/)
 })
