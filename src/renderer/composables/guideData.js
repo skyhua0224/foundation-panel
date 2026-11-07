@@ -164,6 +164,16 @@ export function createGuideData(deps) {
     }
   }
 
+  /** A cheap read of the host, the proof of a restart: the start time of its process (`/api/version`); a host without it answers 404/444, then any answer of the listener route is "it is up". The proxy answers 503 while the core is away. */
+  async function probeHost() {
+    try {
+      return { ok: true, startedAt: String((await getJson('/api/version'))?.process_started_at || '') }
+    } catch (error) {
+      if (/HTTP (404|444)$/.test(String(error?.message))) { try { await getJson('/api/network/listeners'); return { ok: true, startedAt: '' } } catch { return { ok: false } } }
+      return { ok: false }
+    }
+  }
+
   /** The QR window of the host: opened by the pair step and given back when the step goes away. */
   const pairQr = {
     start: async () => { const { data } = await postJson('/api/qr-pair', {}); if (!okStatus(data.status)) throw new Error(data.error || 'qr'); return data },
@@ -247,10 +257,11 @@ export function createGuideData(deps) {
     loadNetwork,
     loadWebAccess,
     saveWebAccess,
-    checkReach: (force) => deps.reach?.refresh(force),
+    checkReach: (force, options) => deps.reach?.refresh(force, options),
     setUpnp,
     setPublicEndpoints,
     restartHost,
+    probeHost,
     pairQr,
     pair,
     openApps: (mode) => deps.openApps(mode),

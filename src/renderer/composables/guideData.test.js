@@ -231,3 +231,21 @@ test('the test tools are opened through the injected navigation', () => {
   make({}, { openTools: () => asked.push('tools') }).callbacks.openTools()
   assert.deepEqual(asked, ['tools'])
 })
+
+test('probeHost reads the start time of the host process; an older host without /api/version still counts as up; a host that is away does not', async () => {
+  const a = make({ '/api/version': { process_started_at: '2026-11-07T05:00:00Z' } })
+  assert.deepEqual(await a.callbacks.probeHost(), { ok: true, startedAt: '2026-11-07T05:00:00Z' })
+  const old = make({ '/api/network/listeners': { status: true } })
+  assert.deepEqual(await old.callbacks.probeHost(), { ok: true, startedAt: '' })
+  const away = make({ '/api/version': () => new Response('', { status: 503 }) })
+  assert.deepEqual(await away.callbacks.probeHost(), { ok: false })
+  const dead = createGuideData({ proxyUrl: async () => 'http://proxy', fetchImpl: async () => { throw new Error('refused') }, navigate() {} })
+  assert.deepEqual(await dead.callbacks.probeHost(), { ok: false })
+})
+
+test('the check of the guide passes an unsaved address on to the shared check', async () => {
+  const seen = []
+  const data = make({}, { reach: { view: { report: null, status: 'idle' }, refresh: async (force, options) => { seen.push([force, options]) } } })
+  await data.callbacks.checkReach(true, { test: 'home.example.net' })
+  assert.deepEqual(seen, [[true, { test: 'home.example.net' }]])
+})
