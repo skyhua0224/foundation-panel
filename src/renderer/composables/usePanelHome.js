@@ -2,8 +2,9 @@ import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { sunshine } from '@/tauri-adapter.js'
 import { pickHardware } from './hardwareReadings.js'
-import { parseSessionLog, parseErrorLog } from 'foundation-ui/vue'
+import { parseSessionLog, parseErrorLog, realSession } from 'foundation-ui/vue'
 import { readLogResponse } from 'foundation-ui/diagnostics'
+import { pollDelay, boostUntilFor, hasStartingSession } from './pollPlan.js'
 
 const HISTORY = 60
 const safe = async (fn, fallback = null) => { try { return await fn() } catch { return fallback } }
@@ -59,6 +60,7 @@ export function usePanelHome() {
     state.now = Date.now()
     const body = await safe(() => fetchJson('/api/runtime/sessions'))
     state.sessions = (body && Array.isArray(body.sessions) ? body.sessions : (await safe(() => sunshine.getActiveSessions(), []))) || []
+    if (hasStartingSession(state.sessions)) boostUntil = boostUntilFor(Date.now(), 'starting', boostUntil)
     const s = state.sessions[0]
     if (s) {
       push(state.series.bitrate, s.bitrate)
@@ -127,17 +129,23 @@ export function usePanelHome() {
     state.hw.available = hwAvailable === true
     remember()
   }
-  let t1 = 0, t2 = 0
+  let timer = 0, t2 = 0, boostUntil = 0, nudge = () => {}
+  const onSeen = () => { if (document.visibilityState !== 'hidden') nudge('returned') }
   onMounted(async () => {
     proxy.value = (await safe(() => sunshine.getProxyUrl(), '')) || proxy.value
     await Promise.all([facts(), slow()])
     await Promise.all([fast(), hardware()])
-    t1 = setInterval(fast, 3000)
+    // the poll follows pollPlan.js: three seconds, one second for a few seconds after the panel is looked at again and while a session is starting
+    const loop = async () => { await fast(); timer = setTimeout(loop, pollDelay(Date.now(), boostUntil)) }
+    nudge = (reason) => { boostUntil = boostUntilFor(Date.now(), reason, boostUntil); clearTimeout(timer); loop() }
+    timer = setTimeout(loop, pollDelay(Date.now(), boostUntil))
+    document.addEventListener('visibilitychange', onSeen); window.addEventListener('focus', onSeen)
     t2 = setInterval(() => { slow(); hardware() }, 15000)
   })
-  onBeforeUnmount(() => { clearInterval(t1); clearInterval(t2) })
+  onBeforeUnmount(() => { clearTimeout(timer); clearInterval(t2); document.removeEventListener('visibilitychange', onSeen); window.removeEventListener('focus', onSeen) })
 
-  const session = computed(() => state.sessions[0] || null)
+  // the session with the real name of its client (realSession: the placeholder 「Named Zako」 becomes the paired device's name, else the client family), the same rule in every tile
+  const session = computed(() => realSession(state.sessions[0] || null, state.clients))
   const uptimeMs = computed(() => (state.startMs ? Math.max(0, state.now - state.startMs) : 0))
   const perfSession = computed(() => state.perf?.sessions?.find((x) => x.active) || state.perf?.sessions?.[0] || null)
   const share = computed(() => memoryShare(state.memory))
