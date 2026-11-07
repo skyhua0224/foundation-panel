@@ -27,3 +27,10 @@ test('usePanelHome polls on that plan, not on a fixed interval', async () => {
   assert.match(src, /visibilitychange/)
   assert.doesNotMatch(src, /setInterval\(fast, 3000\)/)
 })
+
+test('usePanelHome takes the measured bitrate from sessions[] or perf/current and keeps the budget apart (mock data: the real host does not send it yet)', async () => {
+  const fs = await import('node:fs')
+  const src = fs.readFileSync(new URL('./usePanelHome.js', import.meta.url), 'utf8')
+  assert.match(src, /s\.measured_bitrate_kbps = psess\.measured_bitrate_kbps/)
+  assert.match(src, /push\(state\.series\.bitrate, Number\.isFinite\(s\.measured_bitrate_kbps\) \? s\.measured_bitrate_kbps : s\.bitrate\)/)
+})

@@ -63,11 +63,14 @@ export function usePanelHome() {
     if (hasStartingSession(state.sessions)) boostUntil = boostUntilFor(Date.now(), 'starting', boostUntil)
     const s = state.sessions[0]
     if (s) {
-      push(state.series.bitrate, s.bitrate)
       push(state.series.loss, s.packet_loss); push(state.series.dropped, s.dropped_frames)
       const perf = await safe(() => fetchJson('/api/perf/current'))
       state.perf = perf
       state.perfAt = Date.now() // the instant the host's uptime_ms was read: the session clock counts from it (useSessionClock)
+      const psess = perf?.sessions?.find((x) => x.active) || perf?.sessions?.[0]
+      // the measured bitrate comes in sessions[] or in perf/current (a newer host); `bitrate` stays the session's budget
+      if (!Number.isFinite(s.measured_bitrate_kbps) && Number.isFinite(psess?.measured_bitrate_kbps)) s.measured_bitrate_kbps = psess.measured_bitrate_kbps
+      push(state.series.bitrate, Number.isFinite(s.measured_bitrate_kbps) ? s.measured_bitrate_kbps : s.bitrate)
       const ps = perf?.sessions?.find((x) => x.active) || perf?.sessions?.[0]
       push(state.series.latency, ps?.host_latency?.avg_ms)
       push(state.series.fps, ps?.frame_rates?.encoded?.fps ?? ps?.host_latency?.recent_fps ?? s.fps)
