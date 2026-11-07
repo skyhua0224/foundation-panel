@@ -16,5 +16,6 @@ test('only pages opened over another page are pushed (they alone show Back besid
 
 test('the panel draws its own Back bar only where the scene says so, and not while the framed page has a Back of its own', () => {
   const host = read('../components/PanelWebHost.vue')
-  assert.ok(host.includes('v-if="scene?.canBack.value && !sub"'))
+  // the decision is ownBackBar (frameBack.js): where the scene says so, not on a sub-page, and not where the page drew the arrow in its title row (frameBack.test.js)
+  assert.ok(host.includes('v-if="ownBackBar({ canBack: scene?.canBack.value, sub, inline: inlineBack })"'))
 })

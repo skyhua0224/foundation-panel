@@ -3,9 +3,11 @@ import { inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { MIcon, MPageLoading } from 'foundation-ui/vue'
 import { invoke } from '@tauri-apps/api/core'
 import { revealReport } from '../composables/frameReport.js'
+import { ownBackBar, panelBackMessage, readFrameBack } from '../composables/frameBack.js'
 
 // The embedded Web UI frame lives here for the whole session (so it never reloads when the window is resized). Where the
-// list is hidden behind the page (single pane) a small bar carries the way back.
+// list is hidden behind the page (single pane) the way back is the arrow in the page's own title row: the page draws it and says so (frameBack.js); only a page that does not say it (an older Web, a page
+// without a title row) gets the small bar of the panel's own.
 const scene = inject('m-scene', null)
 // a page of the frame that is on a sub-page has its own back bubble: the way back to the list waits until it is on its first page
 const props = defineProps({
@@ -51,9 +53,27 @@ const cover = () => {
 // 50 to 100 ms before that, and a frame shown at load showed 4 to 6 frames with nothing in them. Where no such message comes (a page the proxy does not change) the load
 // event shows the frame after a longer settle.
 const onLoad = () => { if (!waitLoad && !covered.value) return; clearTimeout(settle); settle = setTimeout(() => uncover('load'), 450) }
+// Back of the frame: the page draws the arrow in its title row when it has said so (`inlineBack`); the panel tells it when Back applies and goes back when the arrow is pressed.
+const inlineBack = ref(false)
+const frameEl = () => host.value?.querySelector('iframe')
+const pushBack = () => {
+  const frame = frameEl()
+  try {
+    const url = new URL(frame?.src || '', window.location.href)
+    if (frame?.contentWindow && /^https?:$/.test(url.protocol)) frame.contentWindow.postMessage(panelBackMessage(scene?.canBack.value === true), url.origin)
+  } catch { /* a frame with no address has nobody to tell */ }
+}
+watch(() => scene?.canBack.value === true, pushBack)
 const onMessage = (event) => {
+  if (event.source !== frameEl()?.contentWindow) return
+  const back = readFrameBack(event.data)
+  if (back) {
+    if (back.kind === 'inline') { inlineBack.value = back.drawn; pushBack() }
+    else if (back.kind === 'request') pushBack()
+    else if (back.kind === 'click' && scene?.canBack.value === true && !props.sub) scene.back()
+    return
+  }
   if (event.data?.type !== 'panel-painted' || !covered.value) return
-  if (event.source !== host.value?.querySelector('iframe')?.contentWindow) return
   clearTimeout(settle)
   const fcp = event.data?.fcp
   requestAnimationFrame(() => uncover('painted', fcp))
@@ -82,7 +102,7 @@ onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); w
 
 <template>
   <div ref="host" class="panel-web" :class="{ 'is-covered': covered, 'is-veil': covered && veil, 'is-first': first }">
-    <div v-if="scene?.canBack.value && !sub" class="panel-web__bar">
+    <div v-if="ownBackBar({ canBack: scene?.canBack.value, sub, inline: inlineBack })" class="panel-web__bar">
       <button type="button" class="m-page__back" @click="scene.back()"><MIcon name="arrow_back" /></button>
     </div>
     <div class="panel-web__frame">
