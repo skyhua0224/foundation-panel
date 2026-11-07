@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import { isSetupCompleted, mergeSetupConfig, normalizeClients, normalizeSessions, setupStateFromConfig, shouldAutoOpen } from 'foundation-ui/vue/guide.js'
+import { guideEntry, isSetupCompleted, mergeSetupConfig, normalizeClients, normalizeSessions, setupStateFromConfig } from 'foundation-ui/vue/guide.js'
 import { endpointsOfConfig } from 'foundation-ui/settings'
 
 export const GUIDE_STORAGE_KEY = 'foundation.guide.panel'
@@ -211,7 +211,31 @@ export function createGuideData(deps) {
     }
   }
 
+  /** The scan of the game libraries on the host (POST /api/apps/scan): { ok, games: [{ key, name, platform, cmd, 'working-dir' }] }, or why not. */
+  async function scanGames(sources) {
+    try {
+      const { response, data } = await postJson('/api/apps/scan', { sources })
+      if (response.status === 404 || response.status === 501) return { ok: false, unsupported: true }
+      if (response.status === 409) return { ok: false, busy: true }
+      if (!response.ok || !Array.isArray(data.games)) return { ok: false, error: typeof data.error === 'string' ? data.error : '' }
+      return { ok: true, games: data.games.map((g, i) => ({ key: g.install_dir || g.id || `${g.name}|${i}`, name: g.name, platform: g.platform || '', cmd: g.launch || g.exe || '', 'working-dir': g.install_dir || '' })) }
+    } catch { return { ok: false } }
+  }
+
+  /** Adds the chosen games (or the one typed by hand) to the apps list: a name, the program and its folder. */
+  async function addGames(games) {
+    try {
+      const list = (await getJson('/api/apps')).apps || []
+      const added = games.map((g) => ({ name: g.name, cmd: g.cmd || '', 'working-dir': g['working-dir'] || '', 'image-path': '' }))
+      const { response } = await postJson('/api/apps', { apps: [...list, ...added], editApp: null })
+      return response.ok ? { ok: true, added: added.length } : { ok: false }
+    } catch (error) { return { ok: false, error: error?.message || '' } }
+  }
+
   const callbacks = {
+    scanGames,
+    addGames,
+    openTools: () => deps.openTools?.(),
     openLink: (link) => deps.openUrl(link),
     copy: (text) => deps.copy(text),
     loadSetup,
@@ -235,11 +259,12 @@ export function createGuideData(deps) {
 }
 
 /**
- * First run on this panel: the host reports setup not completed, nobody is paired, the guide is not finished and not closed this
- * session; or the guide was started and not finished (it opens again where it was). Reads the host through the same proxy; an unreadable answer never opens the guide.
+ * What the guide does when the panel starts: a first run (the host reports setup not completed, nobody is paired, the guide is not finished and not closed this session, or it was
+ * started and not finished: it opens again where it was), or, for a host that is set up, once per new version of the panel (`version`; the version is stored when the guide is
+ * closed, skipped or finished). Reads the host through the same proxy; an unreadable answer never opens the guide. Without a version only a first run opens it.
  */
-export async function shouldOpenGuide({ proxyUrl, fetchImpl, progress, dismissed = false }) {
-  if (dismissed || progress?.finished) return false
+export async function shouldOpenGuide({ proxyUrl, fetchImpl, progress, dismissed = false, version = '' }) {
+  if (dismissed || (progress?.finished && !version)) return false
   const get = fetchImpl || ((...args) => globalThis.fetch(...args))
   try {
     const base = await proxyUrl()
@@ -250,11 +275,11 @@ export async function shouldOpenGuide({ proxyUrl, fetchImpl, progress, dismissed
     const config = await configResponse.json()
     const completed = isSetupCompleted(config)
     const resuming = !!progress && !progress.finished && progress.visited?.length > 0
-    if (completed && !resuming) return false
+    if (completed && !resuming && !version) return false
     const clientsResponse = await get(`${base}/api/clients/list`)
     if (!clientsResponse.ok) return false
     const clients = normalizeClients(await clientsResponse.json())
-    return shouldAutoOpen({ setupCompleted: completed, pairedCount: clients ? clients.length : null, finished: false, resuming })
+    return !!guideEntry({ progress, version, setupCompleted: completed, pairedCount: clients ? clients.length : null, configExists: true })
   } catch {
     return false
   }

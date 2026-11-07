@@ -1,6 +1,7 @@
 import { onBeforeUnmount, onMounted } from 'vue'
 import { readProgress } from 'foundation-ui/vue/guide.js'
 import { sunshine } from '../tauri-adapter.js'
+import { panelVersion } from './panelVersion.js'
 import { GUIDE_DISMISSED_KEY, GUIDE_STORAGE_KEY, shouldOpenGuide } from './guideData.js'
 
 /**
@@ -14,7 +15,7 @@ export function useGuideAutoOpen(open, { retryMs = 8000 } = {}) {
     if (opened) return
     let dismissed = false
     try { dismissed = window.sessionStorage.getItem(GUIDE_DISMISSED_KEY) === '1' } catch { /* not remembered */ }
-    if (await shouldOpenGuide({ proxyUrl: () => sunshine.getProxyUrl(), progress: readProgress(null, GUIDE_STORAGE_KEY), dismissed })) {
+    if (await shouldOpenGuide({ proxyUrl: () => sunshine.getProxyUrl(), progress: readProgress(null, GUIDE_STORAGE_KEY), dismissed, version: await panelVersion() })) {
       opened = true
       open()
     }
