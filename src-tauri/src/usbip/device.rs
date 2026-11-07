@@ -104,6 +104,44 @@ fn is_vhci_hardware_id(value: &str) -> bool {
     value.eq_ignore_ascii_case(r"ROOT\USBIP_WIN2\UDE")
 }
 
+/// CONFIGFLAG_DISABLED from the Windows device-installation flags. A disabled
+/// devnode remains under Enum and does not publish a present VHCI interface, so
+/// usbip.exe does not treat it as a second host controller.
+const CONFIGFLAG_DISABLED: u32 = 0x0000_0001;
+
+/// One usbip-win2 host-controller devnode. Older installs use ROOT\USB; a
+/// later root uses ROOT\ALKAIDUSB. Both keep the same hardware ID.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct TransportNode {
+    pub instance_id: String,
+    pub disabled: bool,
+}
+
+/// Whether the transport must be reported not ready.
+///
+/// usbip.exe fails when more than one present VHCI interface exists. An enabled
+/// registry node with the usbip-win2 hardware ID and no present interface is the
+/// phantom an interrupted uninstall leaves behind, and that still blocks. A
+/// disabled node does not: it is the previous enumerator (ROOT\USB after the
+/// controller moved to ROOT\ALKAIDUSB, or the reverse) and the single present
+/// interface is the live controller. No recorded node and no present interface
+/// stays clear, matching the previous check.
+pub(super) fn transport_not_ready(interfaces: &[String], nodes: &[TransportNode]) -> bool {
+    if interfaces.len() > 1 {
+        return true;
+    }
+    if interfaces.is_empty() {
+        return !nodes.is_empty();
+    }
+    let live = instance_id_from_interface_path(&interfaces[0]);
+    nodes.iter().any(|node| {
+        !node.disabled
+            && live
+                .as_ref()
+                .is_none_or(|id| !node.instance_id.eq_ignore_ascii_case(id))
+    })
+}
+
 fn registry_optional<T>(result: std::io::Result<T>) -> Result<Option<T>, String> {
     match result {
         Ok(value) => Ok(Some(value)),
@@ -118,14 +156,30 @@ fn registry_optional<T>(result: std::io::Result<T>) -> Result<Option<T>, String>
 /// Read its immutable hardware ID so cleanup can remove only usbip-win2 nodes.
 #[cfg(target_os = "windows")]
 pub(super) fn enumerate_vhci_devnodes() -> Result<Vec<String>, String> {
+    Ok(read_transport_nodes(r"ROOT\USB")?
+        .into_iter()
+        .map(|node| node.instance_id)
+        .collect())
+}
+
+/// Host-controller nodes under either enumerator. Cleanup still removes only
+/// ROOT\USB phantoms plus whatever interface is present; this list is for the
+/// readiness decision and must see a controller that lives at ROOT\ALKAIDUSB.
+#[cfg(target_os = "windows")]
+pub(super) fn enumerate_transport_nodes() -> Result<Vec<TransportNode>, String> {
+    let mut nodes = read_transport_nodes(r"ROOT\USB")?;
+    nodes.extend(read_transport_nodes(r"ROOT\ALKAIDUSB")?);
+    Ok(nodes)
+}
+
+#[cfg(target_os = "windows")]
+fn read_transport_nodes(enumerator: &str) -> Result<Vec<TransportNode>, String> {
     use winreg::RegKey;
     use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ};
 
     let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let Some(root) = registry_optional(
-        hklm.open_subkey_with_flags(r"SYSTEM\CurrentControlSet\Enum\ROOT\USB", KEY_READ),
-    )?
-    else {
+    let path = format!(r"SYSTEM\CurrentControlSet\Enum\{enumerator}");
+    let Some(root) = registry_optional(hklm.open_subkey_with_flags(&path, KEY_READ))? else {
         return Ok(Vec::new());
     };
     let mut nodes = Vec::new();
@@ -140,20 +194,14 @@ pub(super) fn enumerate_vhci_devnodes() -> Result<Vec<String>, String> {
             continue;
         };
         if hardware_ids.iter().any(|value| is_vhci_hardware_id(value)) {
-            nodes.push(format!(r"ROOT\USB\{name}"));
+            let flags = registry_optional(key.get_value::<u32, _>("ConfigFlags"))?.unwrap_or(0);
+            nodes.push(TransportNode {
+                instance_id: format!(r"{enumerator}\{name}"),
+                disabled: (flags & CONFIGFLAG_DISABLED) != 0,
+            });
         }
     }
     Ok(nodes)
-}
-
-pub(super) fn has_vhci_residual(interfaces: &[String], devnodes: &[String]) -> bool {
-    interfaces.len() > 1
-        || devnodes.iter().any(|node| {
-            !interfaces
-                .iter()
-                .filter_map(|path| instance_id_from_interface_path(path))
-                .any(|instance| instance.eq_ignore_ascii_case(node))
-        })
 }
 
 /// Splits a registry command line such as `"C:\dir\unins000.exe" /flag` into
@@ -425,17 +473,67 @@ mod tests {
     fn phantom_nodes_are_detected_alongside_a_live_interface() {
         let interfaces =
             vec![r"\\?\ROOT#USB#0001#{b4030c06-dc5f-4fcc-87eb-e5515a0935c0}".to_string()];
-        assert!(!has_vhci_residual(&interfaces, &[r"root\usb\0001".into()]));
-        assert!(has_vhci_residual(
+        assert!(!transport_not_ready(
             &interfaces,
-            &[r"ROOT\USB\0001".into(), r"ROOT\USB\0002".into()]
+            &[node(r"root\usb\0001", false)]
         ));
-        assert!(has_vhci_residual(&[], &[r"ROOT\USB\0002".into()]));
-        assert!(!has_vhci_residual(&[], &[]));
-        assert!(has_vhci_residual(
+        assert!(transport_not_ready(
+            &interfaces,
+            &[node(r"ROOT\USB\0001", false), node(r"ROOT\USB\0002", false)]
+        ));
+        assert!(transport_not_ready(&[], &[node(r"ROOT\USB\0002", false)]));
+        assert!(!transport_not_ready(&[], &[]));
+        assert!(transport_not_ready(
             &[interfaces[0].clone(), interfaces[0].clone()],
             &[]
         ));
+    }
+
+    fn node(instance_id: &str, disabled: bool) -> TransportNode {
+        TransportNode {
+            instance_id: instance_id.to_string(),
+            disabled,
+        }
+    }
+
+    #[test]
+    fn a_disabled_previous_root_does_not_block_either_live_name() {
+        let alk =
+            vec![r"\\?\ROOT#ALKAIDUSB#0000#{b4030c06-dc5f-4fcc-87eb-e5515a0935c0}".to_string()];
+        assert!(!transport_not_ready(
+            &alk,
+            &[
+                node(r"ROOT\USB\0000", true),
+                node(r"ROOT\ALKAIDUSB\0000", false),
+            ]
+        ));
+        let usb = vec![r"\\?\ROOT#USB#0000#{b4030c06-dc5f-4fcc-87eb-e5515a0935c0}".to_string()];
+        assert!(!transport_not_ready(
+            &usb,
+            &[
+                node(r"ROOT\USB\0000", false),
+                node(r"ROOT\ALKAIDUSB\0000", true),
+            ]
+        ));
+    }
+
+    #[test]
+    fn a_broken_controller_still_blocks() {
+        assert!(transport_not_ready(&[], &[node(r"ROOT\USB\0000", true)]));
+        assert!(transport_not_ready(
+            &[],
+            &[node(r"ROOT\ALKAIDUSB\0000", true)]
+        ));
+        let live = vec![r"\\?\ROOT#USB#0001#{b4030c06-dc5f-4fcc-87eb-e5515a0935c0}".to_string()];
+        assert!(transport_not_ready(
+            &live,
+            &[node(r"ROOT\USB\0001", false), node(r"ROOT\USB\0002", false)]
+        ));
+        assert!(transport_not_ready(
+            &[live[0].clone(), live[0].clone()],
+            &[]
+        ));
+        assert!(!transport_not_ready(&[], &[]));
     }
 
     #[test]
@@ -445,6 +543,12 @@ mod tests {
                 r"\\?\ROOT#USB#0001#{b4030c06-dc5f-4fcc-87eb-e5515a0935c0}"
             ),
             Some("ROOT\\USB\\0001".to_string())
+        );
+        assert_eq!(
+            instance_id_from_interface_path(
+                r"\\?\ROOT#ALKAIDUSB#0000#{b4030c06-dc5f-4fcc-87eb-e5515a0935c0}"
+            ),
+            Some("ROOT\\ALKAIDUSB\\0000".to_string())
         );
         assert_eq!(instance_id_from_interface_path(r"\\?\ROOT#USB#0001"), None);
         assert_eq!(instance_id_from_interface_path(r"\\?\#{guid}"), None);
