@@ -9,10 +9,12 @@ use axum::{
 use bytes::Bytes;
 use futures_util::StreamExt;
 use log::{debug, error, info, warn};
+use std::fs;
+use std::path::Path;
 use std::sync::LazyLock;
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use tauri::{AppHandle, Manager, Runtime};
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore};
 use tower_http::cors::{AllowOrigin, Any, CorsLayer};
@@ -42,6 +44,10 @@ static PROXY_REQUEST_PERMITS: LazyLock<Arc<Semaphore>> =
 static PROXY_PENDING_PERMITS: LazyLock<Arc<Semaphore>> =
     LazyLock::new(|| Arc::new(Semaphore::new(MAX_PENDING_PROXY_REQUESTS)));
 static PROXY_HEALTH_TOKEN: LazyLock<String> = LazyLock::new(|| uuid::Uuid::new_v4().to_string());
+
+#[cfg(test)]
+static TEST_LOCAL_AUTH_TOKEN: LazyLock<Mutex<Option<String>>> =
+    LazyLock::new(|| Mutex::new(Some("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef".to_string())));
 
 /// 快速失败冷却时间（秒）- 在此时间内不重试，超过后会重新尝试连接
 const FAST_FAIL_COOLDOWN_SECS: u64 = 3;
@@ -129,8 +135,10 @@ pub fn get_proxy_health_check() -> ProxyHealthCheck {
 pub async fn probe_sunshine_host(timeout_ms: Option<u64>) -> Result<u16, String> {
     let timeout = std::time::Duration::from_millis(timeout_ms.unwrap_or(2500).clamp(500, 10_000));
     let url = format!("{}/", get_sunshine_target().trim_end_matches('/'));
+    let local_token = read_local_auth_token()?;
     get_http_client()
         .get(url)
+        .header("X-Sunshine-Local-Token", local_token)
         .timeout(timeout)
         .send()
         .await
@@ -1161,7 +1169,7 @@ async fn handle_steam_api(
 
     // 发送请求并构建响应
     let client = get_http_client();
-    match send_request(client, &target_url, method, headers, &body, None).await {
+    match send_request(client, &target_url, method, headers, &body, None, None).await {
         Ok(response) => build_filtered_proxy_response(response).await,
         Err(e) => {
             error!("❌ Steam API 请求失败: {}", e);
@@ -1283,7 +1291,7 @@ async fn handle_external_proxy(
 
     // 发送请求
     let client = get_http_client();
-    match send_request(client, &target_url, method, headers, &body, None).await {
+    match send_request(client, &target_url, method, headers, &body, None, None).await {
         Ok(response) => build_filtered_proxy_response(response).await,
         Err(e) => {
             error!("❌ 外部代理请求失败: {}", e);
@@ -1301,6 +1309,29 @@ async fn handle_external_proxy(
                 .into_response()
         }
     }
+}
+
+fn read_local_auth_token_from(path: &Path) -> Result<String, String> {
+    // The host publishes this file with an explicit Windows DACL or owner-only
+    // POSIX mode. Read it for each upstream request so a host restart rotates
+    // the credential without retaining an old value
+    // [panel-rust-read-to-string-20261107] [panel-reqwest-request-builder-20261107].
+    let token = fs::read_to_string(path)
+        .map_err(|_| "Local host credential is unavailable".to_string())?;
+    let token = token.trim();
+    if token.len() != 64 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return Err("Local host credential is invalid".to_string());
+    }
+    Ok(token.to_string())
+}
+
+fn read_local_auth_token() -> Result<String, String> {
+    #[cfg(test)]
+    if let Some(token) = TEST_LOCAL_AUTH_TOKEN.lock().unwrap().clone() {
+        return Ok(token);
+    }
+
+    read_local_auth_token_from(&crate::sunshine::config_dir().join("local-auth.token"))
 }
 
 /// 创建共享的 HTTP 客户端（连接复用，性能优化）
@@ -1351,6 +1382,7 @@ async fn send_request(
     headers: &axum::http::HeaderMap,
     body: &Bytes,
     timeout: Option<std::time::Duration>,
+    local_token: Option<&str>,
 ) -> Result<reqwest::Response, reqwest::Error> {
     let mut req_builder = match method.as_str() {
         "GET" => client.get(url),
@@ -1367,12 +1399,15 @@ async fn send_request(
         let key_str = key.as_str();
         if !matches!(
             key_str,
-            "host" | "connection" | "content-length" | "transfer-encoding"
+            "host" | "connection" | "content-length" | "transfer-encoding" | "x-sunshine-local-token"
         ) {
             if let Ok(value_str) = value.to_str() {
                 req_builder = req_builder.header(key_str, value_str);
             }
         }
+    }
+    if let Some(token) = local_token {
+        req_builder = req_builder.header("X-Sunshine-Local-Token", token);
     }
 
     if !body.is_empty() {
@@ -1393,6 +1428,7 @@ async fn fetch_and_proxy(
     body: &Bytes,
     is_ai_api: bool,
 ) -> Result<Response, Box<dyn std::error::Error + Send + Sync>> {
+    let local_token = read_local_auth_token().map_err(std::io::Error::other)?;
     let response_body_limit = proxy_response_body_limit(url, method, headers);
     let client = if response_body_limit.is_none() {
         get_streaming_http_client()
@@ -1404,12 +1440,12 @@ async fn fetch_and_proxy(
 
     // 尝试请求，HTTPS 失败时降级到 HTTP（仅限非连接错误）
     let long_poll = long_poll_timeout(method, url);
-    let response = match send_request(client, url, method, headers, body, long_poll).await {
+    let response = match send_request(client, url, method, headers, body, long_poll, Some(&local_token)).await {
         Ok(resp) => resp,
         Err(e) if url.starts_with("https://") && !is_connection_error(&e.to_string()) => {
             let http_url = url.replace("https://", "http://");
             warn!("⚠️  HTTPS 连接失败，尝试 HTTP: {}", http_url);
-            send_request(client, &http_url, method, headers, body, long_poll).await?
+            send_request(client, &http_url, method, headers, body, long_poll, Some(&local_token)).await?
         }
         Err(e) => return Err(e.into()),
     };
@@ -1628,6 +1664,67 @@ mod tests {
         });
 
         format!("http://{}", addr)
+    }
+
+    #[test]
+    fn local_auth_token_file_requires_a_fixed_length_hex_value() {
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("local-auth.token");
+        let valid = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        std::fs::write(&path, format!("{valid}\n")).unwrap();
+        assert_eq!(read_local_auth_token_from(&path).unwrap(), valid);
+
+        std::fs::write(&path, "not-a-token").unwrap();
+        assert!(read_local_auth_token_from(&path).is_err());
+    }
+
+    #[tokio::test]
+    async fn upstream_local_token_replaces_a_forwarded_header() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = listener.local_addr().unwrap();
+        let (request_seen, request_received) = tokio::sync::oneshot::channel();
+        tokio::spawn(async move {
+            let (mut stream, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            let mut chunk = [0_u8; 1024];
+            loop {
+                let count = stream.read(&mut chunk).await.unwrap();
+                if count == 0 {
+                    break;
+                }
+                request.extend_from_slice(&chunk[..count]);
+                if request.windows(4).any(|window| window == b"\r\n\r\n") {
+                    break;
+                }
+            }
+            let _ = request_seen.send(String::from_utf8_lossy(&request).into_owned());
+            stream
+                .write_all(b"HTTP/1.1 204 No Content\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                .await
+                .unwrap();
+        });
+
+        let mut headers = axum::http::HeaderMap::new();
+        headers.insert(
+            "X-Sunshine-Local-Token",
+            axum::http::HeaderValue::from_static("attacker-value"),
+        );
+        let client = build_http_client(DEFAULT_PROXY_TIMEOUT_SECS);
+        let response = send_request(
+            &client,
+            &format!("http://{address}/api/config"),
+            &axum::http::Method::GET,
+            &headers,
+            &Bytes::new(),
+            None,
+            Some("expected-value"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(response.status(), reqwest::StatusCode::NO_CONTENT);
+        let request = request_received.await.unwrap().to_ascii_lowercase();
+        assert!(request.contains("x-sunshine-local-token: expected-value"));
+        assert!(!request.contains("attacker-value"));
     }
 
     #[tokio::test]
