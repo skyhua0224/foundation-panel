@@ -93,11 +93,14 @@ onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); w
 </template>
 
 <style>
-.panel-web { --m-gutter: 32px; display: flex; flex-direction: column; height: 100%; min-height: 0; }
-/* the inset of every page (foundation-ui layout.css): the Back bubble of a framed first page, the loading cover and the framed page's own title share one left edge */
-@container (max-width: 700px) { .panel-web { --m-gutter: 16px; } }
-@container (max-width: 560px) { .panel-web { --m-gutter: 12px; } }
-.panel-web__bar { padding: 8px var(--m-gutter) 0; flex: none; }
+.panel-web { --m-gutter: 32px; display: flex; flex-direction: column; height: 100%; min-height: 0; container-type: inline-size; }
+/* the inset of every page (foundation-ui layout.css): the Back bubble of a framed first page, the loading cover and the framed page's own title share one left edge. The host is the container of
+   its own bar and cover: the panel puts it outside the scene (no .m-scene__inner above it), so a query that looked upwards never matched and the Back bubble stayed at 32 px while the framed page
+   (it answers its own width) starts its title and cards at 12 px. */
+@container (max-width: 700px) { .panel-web__bar, .panel-web__cover { --m-gutter: 16px; } }
+@container (max-width: 560px) { .panel-web__bar, .panel-web__cover { --m-gutter: 12px; } }
+/* 8 px under the bubble as well: a page that scrolls is clipped at the top of the frame, and its cards must not seem to slide under the bubble */
+.panel-web__bar { padding: 8px var(--m-gutter); flex: none; }
 .panel-web__frame { position: relative; flex: 1; min-height: 0; }
 .panel-web__frame .iframe-container, .panel-web__frame .sunshine-iframe { height: 100%; width: 100%; }
 .panel-web__frame iframe { transition: opacity 140ms linear; }
