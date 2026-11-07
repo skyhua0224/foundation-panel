@@ -26,12 +26,13 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import QRCode from 'qrcode'
 import { invoke } from '@tauri-apps/api/core'
-import { MGuideFlow, MLoading, MOnboardWindow, buildGuideSteps, guideEntry, readProgress, upgradeSkips, useTelemetryConsent } from 'foundation-ui/vue'
+import { MGuideFlow, MLoading, MOnboardWindow, buildGuideSteps, clearProgress, guideEntry, readProgress, upgradeSkips, useTelemetryConsent } from 'foundation-ui/vue'
 import { supportedLocales, setLocaleChoice as setWelcomeChoice, localeChoice, systemLocale, useWelcomeI18n } from '../../i18n/index.js'
 import { useI18n as useDesktopI18n } from '../desktop/i18n/index.js'
 import { telemetryApi } from '../composables/telemetryApi.js'
 import { openExternalUrl, sunshine } from '../tauri-adapter.js'
 import { GUIDE_DISMISSED_KEY, GUIDE_STORAGE_KEY, createGuideData } from '../composables/guideData.js'
+import { consumeStartGuide, guideOnLaunch } from '../composables/startGuide.js'
 import { panelVersion } from '../composables/panelVersion.js'
 import { useHostReach } from '../composables/useHostReach.js'
 import { useUpdateSource } from '../composables/useUpdateSource.js'
@@ -106,8 +107,15 @@ const closeGuide = () => {
 }
 
 onMounted(async () => {
+  // `--start-guide` (the installer's done page, or a second launch forwarded here): the first-run flow from its first step, whatever was saved.
+  const fromStart = consumeStartGuide()
+  if (fromStart) clearProgress(null, GUIDE_STORAGE_KEY)
   await Promise.all([probeAccount(), telemetry.refresh().then(() => { consentShow.value = telemetry.consent.value === 'ask' }), panelVersion().then((v) => { version.value = v })])
   if (state.account.exists) await Promise.all([callbacks.loadSetup?.(), callbacks.refreshClients?.()])
+  if (fromStart) {
+    entry.value = guideOnLaunch({ fromStart: true })
+    return
+  }
   const pairedCount = Array.isArray(state.clients) ? state.clients.length : null
   const found = state.account.exists ? guideEntry({ progress: readProgress(null, GUIDE_STORAGE_KEY), version: version.value, setupCompleted: !!state.setup.completed, pairedCount, configExists: true }) : null
   entry.value = found?.mode === 'upgrade' ? { mode: 'upgrade', skip: upgradeSkips({ accountExists: true, setupCompleted: !!state.setup.completed, pairedCount }) } : { mode: 'fresh', skip: [] }

@@ -26,6 +26,7 @@ import { followRoot } from '../composables/frameRoot.js'
 import { ElMessage } from '../composables/notifyMessage.js'
 import { invoke } from '@tauri-apps/api/core'
 import { deliverPendingPanelPage } from '../composables/panelParts.js'
+import { deliverPendingStartGuide } from '../composables/startGuide.js'
 import { sunshine } from '@/tauri-adapter.js'
 import { checkLocalProxyHealth } from '../utils/proxyHealth.js'
 import { isNativeControlPanelMessage, isTrustedNativeControlPanelMessage } from '../composables/nativeBridge.js'
@@ -572,12 +573,16 @@ onMounted(async () => {
     const takePanelPage = () => deliverPendingPanelPage(invoke, (page) => sidebarMenuRef.value?.openPanelPage?.(page))
     await currentWindow.listen('panel-page-pending', takePanelPage)
 
+    const takeStartGuide = () => deliverPendingStartGuide(invoke, () => sidebarMenuRef.value?.openStartGuide?.())
+    await currentWindow.listen('start-guide-pending', takeStartGuide)
+
     await currentWindow.listen('open-web-stream', () => {
       sidebarMenuRef.value?.openWebStream?.()
     })
 
     await currentWindow.listen('open-welcome', openWelcome)
     await takePanelPage()
+    await takeStartGuide()
     await invoke('main_panel_ready')
   } catch (error) {
     console.error('初始化失败:', error)
