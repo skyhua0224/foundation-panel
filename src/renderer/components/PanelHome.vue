@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { firstImage, micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, useNotify, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
-import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, useSystemInfo, reachProblemOf, registeredComponentStatus, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf, recentKeys, rememberRecent, isLoopbackHost, createQueuedCalls, createSerialCalls } from 'foundation-ui/vue'
+import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, useSessionClock, useSystemInfo, reachProblemOf, registeredComponentStatus, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf, recentKeys, rememberRecent, isLoopbackHost, createQueuedCalls, createSerialCalls } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
 import { usePanelHome } from '../composables/usePanelHome.js'
@@ -21,6 +21,8 @@ const emit = defineEmits(['open', 'webui-navigate'])
 const { t, locale } = useI18n()
 const h = computed(() => t.value.m3e.home)
 const { state, proxyUrl, session, uptimeMs, perfSession, restart, stopAll, openTool } = usePanelHome()
+// the running time of the stream ticks every second from the session's start (a poll of three seconds only corrects it)
+const sessionClock = useSessionClock({ live: () => !!session.value, report: () => { const u = perfSession.value?.uptime_ms; return Number.isFinite(u) ? { uptimeMs: u, at: state.perfAt || Date.now() } : null } })
 const pad = useGamepadType()
 
 const dashTexts = computed(() => ({ ...homeTexts(locale.value), done: h.value.done, hide: h.value.remove }))
@@ -132,7 +134,7 @@ const catalogueInput = computed(() => {
     reach: hostReach.view.report, reachChecking: hostReach.view.status === 'loading',
     sysinfo: nics.info.value,
     host: { version: state.version, update: props.updateAvailable ? h.value.update : '' },
-    session: s ? { ...s, fpsMeasured: p?.frame_rates?.encoded?.fps, latencyMs: p?.host_latency?.avg_ms, latencyP95Ms: p?.host_latency?.p95_ms, uptimeMs: p?.uptime_ms ?? s.uptimeMs } : null,
+    session: s ? { ...s, fpsMeasured: p?.frame_rates?.encoded?.fps, latencyMs: p?.host_latency?.avg_ms, latencyP95Ms: p?.host_latency?.p95_ms, uptimeMs: sessionClock.uptimeMs.value ?? p?.uptime_ms ?? s.uptimeMs } : null,
     history: { samples: history.samples, sessions: history.sessions, days: history.days, last: () => history.last() },
     sys: model.value.info.some((i) => i.id === 'memory') && state.memory ? { memTotal: state.memory.system_total_memory, memAvail: state.memory.system_available_memory } : null,
     recent: recentKeys.value, canRuntime: canRuntime.value, ds5Keys: ds5Keys.value,
@@ -160,7 +162,7 @@ const smartSignals = computed(() => ({
   wifiHost: nics.defaultNic.value?.type === 'wifi', linkSlowMbps: nics.defaultNic.value?.link_speed_mbps && nics.defaultNic.value.link_speed_mbps < 1000 ? nics.defaultNic.value.link_speed_mbps : 0,
   reachBad: reachProblem.value, updateAvailable: props.updateAvailable,
 }))
-const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value, star: star.visible.value, starNames: (state.clients || []).map((c) => c.name), clientList: (state.clients || []).map((c) => ({ name: c.name, uuid: c.uuid, family: c.family, official: c.official, os: c.os, version: c.version, last_seen: c.last_seen })), sessionClient: session.value ? { uuid: session.value.client_cert_uuid || session.value.uuid || session.value.client_uuid || '', name: session.value.client_name || '' } : null, signals: smartSignals.value }))
+const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value, star: star.visible.value, starNames: (state.clients || []).map((c) => c.name), clientList: (state.clients || []).map((c) => ({ name: c.name, uuid: c.uuid, family: c.family, official: c.official, os: c.os, version: c.version, last_seen: c.last_seen })), sessionClient: session.value ? { uuid: session.value.client_cert_uuid || session.value.uuid || session.value.client_uuid || '', name: session.value.client_name || '', family: session.value.client_family || '', os: session.value.client_os || '', official: session.value.client_official } : null, signals: smartSignals.value }))
 
 // the date of a post in the 资讯 tile, YYYY-MM-DD
 const dateOfPost = (at) => { if (!at) return ''; const d = new Date(at); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }

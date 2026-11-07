@@ -65,6 +65,7 @@ export function usePanelHome() {
       push(state.series.loss, s.packet_loss); push(state.series.dropped, s.dropped_frames)
       const perf = await safe(() => fetchJson('/api/perf/current'))
       state.perf = perf
+      state.perfAt = Date.now() // the instant the host's uptime_ms was read: the session clock counts from it (useSessionClock)
       const ps = perf?.sessions?.find((x) => x.active) || perf?.sessions?.[0]
       push(state.series.latency, ps?.host_latency?.avg_ms)
       push(state.series.fps, ps?.frame_rates?.encoded?.fps ?? ps?.host_latency?.recent_fps ?? s.fps)
