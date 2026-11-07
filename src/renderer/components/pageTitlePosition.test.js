@@ -3,8 +3,9 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import test from 'node:test'
 
-// Every page title sits at one position (foundation-ui layout.css: one band, one row height, one size). The panel only places pages in the detail pane; a rule of its own
-// that moves, resizes or re-pads the title row of one kind of page is how the titles of 手柄 and USB 转发 came to sit in different places.
+// Every page has one left edge (foundation-ui layout.css): the title and the content start at the pane's inset, whatever the width of the page. The panel only places pages in
+// the detail pane; a rule of its own that moves, resizes or re-pads the title row of one kind of page, or centres a page by its own margin, is how the titles of 手柄 and
+// USB 转发 came to sit in different places and the content at another x than the title.
 const root = new URL('../', import.meta.url).pathname
 const files = []
 const walk = (dir) => {
@@ -37,4 +38,27 @@ test('a framed page starts where a panel page starts: the injected stylesheet re
   assert.match(inject, /html\[data-sunshine-navigation='unified'\] body \{[^}]*padding-top: 0 !important;/)
   const menu = readFileSync(join(root, 'components/SidebarMenu.vue'), 'utf8')
   assert.match(menu, /\.panel-body \.m-scene__pane--detail \{ scrollbar-width: none; \}/)
+})
+
+test('no band, offset or centred column of the old rule is left in the panel', () => {
+  for (const f of files) {
+    const text = readFileSync(f, 'utf8')
+    assert.doesNotMatch(text, /--m-title-(band|off|gutter)/, `${f.slice(root.length)} uses a variable of the removed rule`)
+  }
+})
+
+test('title left equals content left: the pages of the panel that sit in the detail pane start at the inset, not at the middle of the pane', () => {
+  const compat = readFileSync(join(root, 'styles/m3e-compat.less'), 'utf8')
+  assert.doesNotMatch(compat, /margin: 0 auto/, 'a legacy page centres itself')
+  const ai = readFileSync(join(root, 'components/AiAssistant.css'), 'utf8')
+  // the chat's header, conversation and input take the inset of the pages (--m-gutter, the same container rules), and nothing is centred by max()/calc() around --m-column
+  assert.match(ai, /\.ai-shell \{ --m-gutter: 32px;/)
+  assert.match(ai, /@container \(max-width: 700px\) \{ \.ai-shell \{ --m-gutter: 16px; \} \}/)
+  assert.match(ai, /\.ai-head \{[^}]*padding: 16px var\(--m-gutter\) 8px;/)
+  assert.match(ai, /\.ai-col \{[^}]*margin: 0; padding: 8px var\(--m-gutter\) 16px;/)
+  assert.match(ai, /\.ai-dock \{[^}]*padding: 8px var\(--m-gutter\) 16px;/)
+  assert.match(ai, /\.ai-composer \{ max-width: calc\(var\(--m-column, 960px\) - 2 \* var\(--m-gutter\)\); margin: 0;/)
+  assert.doesNotMatch(ai, /\(100% - var\(--m-column/)
+  const host = readFileSync(join(root, 'components/PanelWebHost.vue'), 'utf8')
+  assert.match(host, /\.panel-web__cover > \.m-pageload \{ width: min\(100%, 960px\); margin-inline: 0; \}/)
 })

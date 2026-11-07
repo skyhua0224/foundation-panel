@@ -1,7 +1,10 @@
 /* AI assistant chat: tokens only (no accent of its own). */
 /* the chat fills the pane: the header, the conversation (the only part that scrolls) and the input pinned under it */
-.ai-shell { position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; }
-.ai-head { flex: none; display: flex; align-items: center; gap: 14px; padding: 16px max(16px, calc((100% - var(--m-column, 720px)) / 2 + 16px)) 8px; min-height: 80px; position: relative; isolation: isolate; background: transparent; }
+.ai-shell { --m-gutter: 32px; position: absolute; inset: 0; display: flex; flex-direction: column; min-height: 0; }
+/* the same inset as every page (layout.css of foundation-ui): the header, the conversation and the input start at the pane's left edge */
+@container (max-width: 700px) { .ai-shell { --m-gutter: 16px; } }
+@container (max-width: 560px) { .ai-shell { --m-gutter: 12px; } }
+.ai-head { flex: none; display: flex; align-items: center; gap: 14px; padding: 16px var(--m-gutter) 8px; min-height: 80px; position: relative; isolation: isolate; background: transparent; }
 /* the same top app bar behaviour as the pages: the header takes the page's material, a little more opaque, when the conversation scrolls under it, with a soft fade below */
 .ai-head::before { content: ''; position: absolute; left: 0; right: 0; top: 0; bottom: -24px; z-index: -1; pointer-events: none; opacity: 0; background: color-mix(in srgb, var(--m-page-solid) 90%, transparent); backdrop-filter: blur(12px); -webkit-mask-image: linear-gradient(#000 calc(100% - 24px), transparent); mask-image: linear-gradient(#000 calc(100% - 24px), transparent); transition: opacity 200ms var(--m-spring-default-effects, ease); }
 .ai-head.is-scrolled::before { opacity: 1; }
@@ -11,9 +14,9 @@
 .ai-head__line { margin: 0; font: var(--m-body-medium); color: var(--md-sys-color-on-surface); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-head__actions { flex: none; display: flex; gap: 4px; }
 .ai-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; display: flex; flex-direction: column; }
-.ai-col { width: 100%; max-width: var(--m-column, 720px); margin: 0 auto; padding: 8px 16px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; flex: 1 0 auto; }
+.ai-col { width: 100%; max-width: var(--m-column, 960px); margin: 0; padding: 8px var(--m-gutter) 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; flex: 1 0 auto; }
 .ai-hint { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px 8px; text-align: center; color: var(--md-sys-color-on-surface); }
-.ai-dock { flex: none; padding: 8px max(16px, calc((100% - var(--m-column, 720px)) / 2 + 16px)) 16px; background: linear-gradient(to bottom, transparent, var(--m-page) 14px); }
+.ai-dock { flex: none; padding: 8px var(--m-gutter) 16px; background: linear-gradient(to bottom, transparent, var(--m-page) 14px); }
 .ai-examples { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
 .ai-example { height: 36px; padding: 0 16px; border: 0; border-radius: 18px; cursor: pointer; font: var(--m-label-large); background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); transition: border-radius var(--m-spring-fast-spatial-duration) var(--m-spring-fast-spatial), filter 120ms linear; }
 .ai-example:hover:not(:disabled) { filter: brightness(.96); } .ai-example:active:not(:disabled) { border-radius: 10px; }
@@ -28,7 +31,7 @@
 .ai-text :where(p) { margin: 0 0 6px; } .ai-text :where(p:last-child) { margin-bottom: 0; } .ai-text :where(pre, code) { font-family: var(--m-font-mono); font-size: .9em; } .ai-text :where(pre) { overflow: auto; padding: 8px 12px; border-radius: 12px; background: var(--md-sys-color-surface-container-highest); }
 .ai-action { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font: var(--m-body-small); color: var(--md-sys-color-on-surface-variant); }
 .ai-time { font: var(--m-label-small); color: var(--md-sys-color-on-surface-variant); }
-.ai-composer { max-width: var(--m-column, 720px); margin: 0 auto; display: flex; align-items: flex-end; gap: 8px; padding: 8px 8px 8px 20px; border-radius: 28px; background: var(--md-sys-color-surface-container-highest); box-shadow: 0 4px 16px color-mix(in srgb, var(--md-sys-color-shadow) 14%, transparent); }
+.ai-composer { max-width: calc(var(--m-column, 960px) - 2 * var(--m-gutter)); margin: 0; display: flex; align-items: flex-end; gap: 8px; padding: 8px 8px 8px 20px; border-radius: 28px; background: var(--md-sys-color-surface-container-highest); box-shadow: 0 4px 16px color-mix(in srgb, var(--md-sys-color-shadow) 14%, transparent); }
 .ai-composer textarea { flex: 1; min-height: 40px; max-height: 128px; resize: none; border: 0; outline: 0; background: transparent; color: var(--md-sys-color-on-surface); font: var(--m-body-large); padding: 10px 0; field-sizing: content; }
 .ai-composer textarea::placeholder { color: var(--md-sys-color-on-surface-variant); }
 
