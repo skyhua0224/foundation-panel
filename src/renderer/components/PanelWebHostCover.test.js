@@ -25,5 +25,6 @@ test('the Back bubble and the loading cover take the inset from the host\'s own 
   assert.doesNotMatch(src, /@container \([^)]*\) \{ \.panel-web \{/, 'a query on the host itself looks at an ancestor that is not there')
 })
 test('the bar of the Back bubble has air under it, so the scrolled page is clipped below the bubble and not at its edge', () => {
-  assert.match(src, /\.panel-web__bar \{ padding: 8px var\(--m-gutter\); flex: none; \}/)
+  // the column of the pages: the inset under the maximum, centred beyond it (pageTitlePosition.test.js), and the 8 px under the bubble stay
+  assert.match(src, /\.panel-web__bar \{ padding: 8px max\(var\(--m-gutter\), calc\(\(100% - 960px\) \/ 2\)\); flex: none; \}/)
 })
