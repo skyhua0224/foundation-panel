@@ -1,3 +1,4 @@
+import '../../../src-tauri/inject-traces.js'  // no trace of a browser: drag ghosts, browser keys and menus, zoom, selected chrome
 import { createApp, watchEffect } from 'vue';
 import 'foundation-ui/all.css';
 import { useI18n } from '../desktop/i18n/index.js';
