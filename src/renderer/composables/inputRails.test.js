@@ -43,7 +43,7 @@ test('the list of a rail has its title at the top left where the list is a page 
 test('更多 of the bottom bar lists 关于 (the update check is on that page): 检查更新 is two presses away on a phone', () => {
   const menu = read('../components/SidebarMenu.vue')
   const sheet = menu.slice(menu.indexOf('<MSheet v-model="moreOpen"'), menu.indexOf('<MAnnouncementPopup'))
-  assert.ok(sheet.includes('icon="info" :title="aboutTexts(locale).title"') && sheet.includes('router.navigate(ROUTES.ABOUT)'))
+  assert.ok(sheet.includes('icon="info" :title="aboutTexts(locale).title"') && sheet.includes('router.navigate(ROUTES.ABOUT, undefined, { root: true })'))
   assert.ok(sheet.indexOf('icon="info"') < sheet.indexOf('icon="help"'))
 })
 

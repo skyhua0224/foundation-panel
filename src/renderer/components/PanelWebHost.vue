@@ -1,6 +1,6 @@
 <script setup>
 import { inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { MPageLoading } from 'foundation-ui/vue'
+import { MIcon, MPageLoading } from 'foundation-ui/vue'
 import { invoke } from '@tauri-apps/api/core'
 import { revealReport } from '../composables/frameReport.js'
 
@@ -83,7 +83,7 @@ onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); w
 <template>
   <div ref="host" class="panel-web" :class="{ 'is-covered': covered, 'is-veil': covered && veil, 'is-first': first }">
     <div v-if="scene?.canBack.value && !sub" class="panel-web__bar">
-      <button type="button" class="m-page__back" @click="scene.back()"><svg class="m-icon" viewBox="0 -960 960 960" aria-hidden="true"><path d="M313-440l224 224-57 56-320-320 320-320 57 56-224 224h487v80H313Z" /></svg></button>
+      <button type="button" class="m-page__back" @click="scene.back()"><MIcon name="arrow_back" /></button>
     </div>
     <div class="panel-web__frame">
       <slot />
