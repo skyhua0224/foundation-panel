@@ -63,7 +63,7 @@
       return true
     }
     // Back and forward by keyboard: only when the page did not take the key for itself (the check is made after the page's handlers, in the bubble phase).
-    if (event.altKey && !ctrl && (key === 'arrowleft' || key === 'arrowright') && !event.defaultPrevented) return !isEditable(event.target)
+    if (event.altKey && !ctrl && (key === 'arrowleft' || key === 'arrowright') && !event.defaultPrevented) return true
     if (key === 'browserback' || key === 'browserforward' || key === 'browserrefresh' || key === 'browsersearch' || key === 'browserfavorites' || key === 'browserhome' || key === 'browserstop') return true
     return false
   }
@@ -71,6 +71,17 @@
     if (browserKeyHit(event)) {
       event.preventDefault()
     }
+  }
+
+  // A file dropped on a place that takes no drop would be opened by the engine (the window navigates to it: a PDF or an image shows up in a browser view).
+  // The places that take a drop (the theme editor, the file transfer) cancel dragover and drop themselves; what is left over gets the no-drop cursor and no navigation.
+  const onDragOver = (event) => {
+    if (event.defaultPrevented) return
+    event.preventDefault()
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'none'
+  }
+  const onDrop = (event) => {
+    if (!event.defaultPrevented) event.preventDefault()
   }
 
   // Ctrl+wheel and a pinch (Chromium sends a pinch as Ctrl+wheel) zoom the page.
@@ -126,6 +137,8 @@
   const install = () => {
     root.__noBrowserTraces = { dragIsOurs, browserKeyHit, CSS }
     doc.addEventListener('dragstart', onDragStart, true)
+    doc.addEventListener('dragover', onDragOver, false)
+    doc.addEventListener('drop', onDrop, false)
     doc.addEventListener('contextmenu', onContextMenu, false)
     root.addEventListener('keydown', onKeyDown, false)
     root.addEventListener('wheel', onWheel, { capture: true, passive: false })

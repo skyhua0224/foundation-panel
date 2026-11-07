@@ -109,6 +109,20 @@ test('the right-click menu is cancelled except in a text field or over a selecti
   assert.equal(over.defaultPrevented, false, 'a selected value can be copied from the native menu (windows.rs keeps Copy only)')
 })
 
+test('a file dropped where nothing takes a drop is not opened by the engine; a place that takes the drop keeps it', () => {
+  const { on } = load()
+  const over = event({ dataTransfer: { dropEffect: 'copy' } })
+  on('dragover').fn(over)
+  assert.equal(over.defaultPrevented, true)
+  assert.equal(over.dataTransfer.dropEffect, 'none', 'the cursor says no drop here')
+  const drop = event({})
+  on('drop').fn(drop)
+  assert.equal(drop.defaultPrevented, true)
+  const taken = event({ defaultPrevented: true, dataTransfer: { dropEffect: 'copy' } })
+  on('dragover').fn(taken)
+  assert.equal(taken.dataTransfer.dropEffect, 'copy', 'the theme editor and the file transfer accept their drops')
+})
+
 test('Ctrl+wheel and the pinch gestures cannot zoom the page', () => {
   const { on } = load()
   for (const e of [event({ ctrlKey: true }), event({ metaKey: true })]) { on('wheel', 'window').fn(e); assert.equal(e.defaultPrevented, true) }
