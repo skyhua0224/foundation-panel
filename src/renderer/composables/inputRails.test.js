@@ -102,7 +102,7 @@ test('the list of 串流 has no 添加应用: adding an app is on the page 串�
   const menu = read('../components/SidebarMenu.vue')
   assert.ok(!menu.includes('m-navlist__add') && !menu.includes("#top"), 'no button in the list pane')
   assert.ok(!menu.includes("c_act-add-app"))
-  assert.ok(menu.includes("addApp: () => { emit('webui-navigate', '/apps#guide-add'); router.navigate(ROUTES.WEB_APPS) }"), 'the search action still opens the page to add')
+  assert.ok(menu.includes("addApp: () => jumps.jump(() => { emit('webui-navigate', '/apps#guide-add'); router.navigate(ROUTES.WEB_APPS) })"), 'the search action still opens the page to add, as a jump so the back chip appears')
 })
 
 // fs52-gamepad-test-rumble: the panel's gamepad tool rumbles a stream's pad through the host
