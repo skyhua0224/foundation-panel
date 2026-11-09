@@ -8,6 +8,14 @@
     <template v-else>
       <SettingsNotice :notice="saveNotice" />
 
+      <MSection v-if="currentSession" :title="t.stream.hostAudio">
+        <MGroup>
+          <MItem icon="volume_up" :title="t.stream.hostAudio" :text="t.stream.hostAudioDesc">
+            <template #trail><MSwitch :model-value="currentSession.host_audio === true" :disabled="audioBusy" :label="t.stream.hostAudio" @update:model-value="setHostAudio" /></template>
+          </MItem>
+        </MGroup>
+      </MSection>
+
       <!-- the same rows as the Web UI and the phone: the bitrate is one row with the shared control (value, steps, slider, chips) -->
       <MSection>
         <MGroup>
@@ -18,7 +26,7 @@
               <MIconButton icon="add" :label="`${t.stream.bitrateLimit} +`" @click="nudgeBitrate(NUDGE_MBPS)" />
             </template>
             <template #control>
-              <MSlider :model-value="bitrateSliderMbps(bitrateKbps)" :min="0" :max="SLIDER_MAX_MBPS" :step="1" unit=" Mbps" :off-text="t.stream.bitrateAuto" size="m" :label="t.stream.bitrateLimit" @update:model-value="(v) => setCfg('max_bitrate', String(bitrateFromMbps(v)))" />
+              <MSlider :model-value="bitrateSliderProgress(bitrateKbps)" :min="0" :max="SLIDER_MAX_PROGRESS" :step="1" unit="" :marks="bitrateSegmentMarks" :off-text="t.stream.bitrateAuto" size="m" :label="t.stream.bitrateLimit" @update:model-value="(v) => setCfg('max_bitrate', String(bitrateFromProgress(v)))" />
               <MSeg :model-value="bitrateKbps" block :label="t.stream.bitrateLimit" :options="BITRATE_PRESETS" @update:model-value="(v) => setCfg('max_bitrate', String(v))" />
             </template>
           </MItem>
@@ -70,9 +78,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { MGroup, MIconButton, MItem, MLoading, MSection, MSeg, MSlider, createSerialCalls, saveSettingKey } from 'foundation-ui/vue'
-import { appliesText, bitrateChips, bitrateFromMbps, bitrateKbps as parseBitrateKbps, bitrateNudge, bitrateSliderMbps, bitrateText } from 'foundation-ui/settings/index.js'
+import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
+import { MGroup, MIconButton, MItem, MLoading, MSection, MSeg, MSlider, MSwitch, createSerialCalls, saveSettingKey } from 'foundation-ui/vue'
+import { appliesText, bitrateChips, bitrateFromProgress, bitrateKbps as parseBitrateKbps, bitrateNudge, bitrateSliderProgress, bitrateText, bitrateSegmentMarks, BITRATE_SLIDER_MAX_PROGRESS } from 'foundation-ui/settings/index.js'
 import DeskPage from '../components/DeskPage.vue'
 import PanelLinkSection from '../components/PanelLinkSection.vue'
 import SettingsNotice from '../components/settings/SettingsNotice.vue'
@@ -91,13 +99,16 @@ const saveMsg = ref(null)
 const autoLaunchDesktop = ref(false)
 const appsData = ref(null) // apps.json as read
 const hostPlatform = ref('')
+const liveSessions = ref([])
+const audioBusy = ref(false)
+const currentSession = computed(() => liveSessions.value.find((s) => s?.state === 'RUNNING') || null)
 
 // max_bitrate: the host's own default is 0 (自动, the client decides) and a config file that never wrote the key does not send it, so 0 is what shows then
 const configData = ref({ hevc_mode: 2, av1_mode: 0, max_bitrate: '0', hdr_prep: 'automatic' })
 const INTEGER_KEYS = ['hevc_mode', 'av1_mode']
 
 const bitrateKbps = computed(() => parseBitrateKbps(configData.value.max_bitrate))
-const SLIDER_MAX_MBPS = 200
+const SLIDER_MAX_PROGRESS = BITRATE_SLIDER_MAX_PROGRESS
 const NUDGE_MBPS = 5
 const bitrateDisplay = computed(() => bitrateText(bitrateKbps.value, t.value.stream.bitrateAuto))
 
@@ -123,7 +134,7 @@ function say(type, text) {
 }
 
 // the step buttons beside the value (the slider itself moves by the pad's left and right, useFocusNav): 5 Mbps inside the slider's range; automatic steps up to 5 and 5 steps back to automatic
-const nudgeBitrate = (delta) => setCfg('max_bitrate', String(bitrateNudge(bitrateKbps.value, delta, SLIDER_MAX_MBPS)))
+const nudgeBitrate = (delta) => setCfg('max_bitrate', String(bitrateNudge(bitrateKbps.value, delta, 800)))
 
 async function initTauri() {
   try {
@@ -139,6 +150,22 @@ async function initTauri() {
 async function apiFetch(path, options = {}) {
   const response = await fetch(`${proxyUrl.value}${path}`, options)
   return await response.json()
+}
+async function refreshRuntimeSessions() {
+  try {
+    const data = await apiFetch('/api/runtime/sessions')
+    liveSessions.value = Array.isArray(data?.sessions) ? data.sessions : []
+  } catch { liveSessions.value = [] }
+}
+async function setHostAudio(enabled) {
+  const session = currentSession.value
+  if (!session || audioBusy.value) return
+  audioBusy.value = true
+  try {
+    const data = await apiFetch('/api/runtime/audio', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ clientname: session.client_name, enabled }) })
+    if (!data?.success) throw new Error(data?.status_message || 'host audio')
+    await refreshRuntimeSessions()
+  } catch (e) { say('error', e?.message || t.value.stream.msg.connectionError) } finally { audioBusy.value = false }
 }
 const hostApi = {
   getJson: (path) => apiFetch(path),
@@ -241,7 +268,11 @@ async function saveDesktopLaunchMode() {
 onMounted(async () => {
   await initTauri()
   await loadSettings()
+  await refreshRuntimeSessions()
+  runtimeTimer = setInterval(refreshRuntimeSessions, 3000)
 })
+let runtimeTimer = null
+onBeforeUnmount(() => clearInterval(runtimeTimer))
 </script>
 
 <style scoped>

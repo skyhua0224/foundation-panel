@@ -24,7 +24,7 @@ test('0 is 自动 everywhere on the page: the number, the chip and the slider; n
   assert.equal(zh.stream.bitrateAuto, '自动'); assert.equal(en.stream.bitrateAuto, 'Auto')
   assert.equal(zh.stream.bitrateUnlimited, undefined); assert.equal(en.stream.bitrateUnlimited, undefined)
   assert.doesNotMatch(view, /∞|bitrateUnlimited/)
-  assert.match(view, /<MSlider :model-value="bitrateSliderMbps\(bitrateKbps\)" :min="0" :max="SLIDER_MAX_MBPS" :step="1" unit=" Mbps" :off-text="t\.stream\.bitrateAuto"/)
+  assert.match(view, /<MSlider :model-value="bitrateSliderProgress\(bitrateKbps\)" :min="0" :max="SLIDER_MAX_PROGRESS" :step="1" unit=""/)
   assert.match(view, /bitrateChips\(bitrateKbps\.value, t\.value\.stream\.bitrateAuto, \[20, 50, 100, 0\]\)/)
   assert.deepEqual(bitrateChips(undefined, '自动', [20, 50, 100, 0]).map((c) => [c.value, c.label]), [[0, '自动'], [20000, '20 Mbps'], [50000, '50 Mbps'], [100000, '100 Mbps']])
 })
@@ -32,11 +32,11 @@ test('0 is 自动 everywhere on the page: the number, the chip and the slider; n
 test('a stored value is shown as it is and written as it is: custom values get a chip, the slider writes whole Kbps, strings from the host work', () => {
   assert.deepEqual(bitrateChips('65432', '自动', [20, 50, 100, 0]).map((c) => c.value), [0, 20000, 50000, 65432, 100000])
   assert.equal(bitrateText('65432', '自动'), '65.4 Mbps'); assert.equal(bitrateSliderMbps('65432'), 65)
-  assert.equal(bitrateFromMbps(80), 80000); assert.match(view, /setCfg\('max_bitrate', String\(bitrateFromMbps\(v\)\)\)/)
+  assert.equal(bitrateFromMbps(80), 80000); assert.match(view, /setCfg\('max_bitrate', String\(bitrateFromProgress\(v\)\)\)/)
   assert.match(view, /<MSeg :model-value="bitrateKbps" block/)
 })
 
 test('the step buttons keep the slider range: automatic steps up to 5 Mbps and 5 Mbps back to automatic, never to the top', () => {
   assert.equal(bitrateNudge(0, 5, 200), 5000); assert.equal(bitrateNudge(5000, -5, 200), 0); assert.equal(bitrateNudge(200000, 5, 200), 200000)
-  assert.match(view, /String\(bitrateNudge\(bitrateKbps\.value, delta, SLIDER_MAX_MBPS\)\)/)
+  assert.match(view, /String\(bitrateNudge\(bitrateKbps\.value, delta, 800\)\)/)
 })
