@@ -400,7 +400,9 @@ fn shutdown_sunshine<R: Runtime>(app: &AppHandle<R>) {
             let shutdown_handle = app_handle.clone();
             tauri::async_runtime::spawn(async move {
                 match sunshine::post_tray_action("shutdown", None).await {
-                    Ok(response) if response.status => shutdown_handle.exit(0),
+                    Ok(response) if response.status => {
+                        shutdown_handle.exit(crate::gui_agent_exit::GUI_AGENT_DELIBERATE_QUIT_EXIT_CODE)
+                    }
                     Ok(response) => {
                         let message = if response.error.is_empty() {
                             "Sunshine shutdown was rejected".to_string()
