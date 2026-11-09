@@ -10,7 +10,7 @@ export const PANEL_PAGES = Object.freeze({
   quality: { route: 'hdr-enhanced', part: '' },
   rtss: { route: 'rtss', part: '' },
   vdd: { route: 'vdd-settings', part: '' }, // 虚拟显示器 (toolbar, tray)
-  'desktop-scale': { route: 'vdd-settings', part: 'desktop-scale' }, // 调整 DPI -> 显示与视频 › 虚拟显示器 › 桌面缩放
+  'desktop-scale': { route: 'web-display-output', part: '' }, // 调整 DPI -> 显示与视频 › 显示器 › 显示模式 (the scaling slider)
   'live-session': { route: 'live-session', part: '' }, // 码率调整 -> 串流 › 当前串流
   shortcuts: { route: 'help', part: 'shortcuts' }, // 快捷键手册 -> 帮助与关于 › 快捷键手册
   pet: { route: 'panel-settings', part: 'pet' }, // 桌宠设置 -> 面板设置 › 桌宠

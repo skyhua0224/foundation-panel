@@ -4,26 +4,22 @@ import { readFileSync } from 'node:fs'
 
 const read = (p) => readFileSync(new URL(p, import.meta.url), 'utf8')
 
-test('the display page shows the two lists as read-only rows and edits them in the shared popup', () => {
+test('the page of the virtual display has no list of its own: the modes are the one list on 分辨率与刷新率, and the page links there', () => {
   const page = read('../components/VddSettings.vue')
-  assert.match(page, /<MModeListRow kind="resolution" :values="resolutionList"/)
-  assert.match(page, /<MModeListRow kind="rate" :values="rateList"/)
-  assert.match(page, /<MModeListDialog v-model="modesOpen" :resolutions="resolutionList" :rates="rateList"/)
-  assert.match(page, /:saver="saveModes"/)
-  assert.match(page, /const saveModes = async \(\{ resolutions, rates \}\) =>/)
-  // the popup saves for real: read the file again, put in only the two lists, write (the Rust save writes vdd_settings.xml and asks the driver to reload)
-  assert.match(page, /vdd\.loadSettings\(\)[\s\S]*data\.global = [\s\S]*g_refresh_rate: rates\.slice\(\)[\s\S]*resolution: nodes[\s\S]*vdd\.saveSettings\(data\)/)
-  // success updates the saved snapshot of those two lists only, a failure returns the error and nothing else changes
-  assert.match(page, /lastSavedSnapshot\.value = JSON\.stringify\(saved\)/)
-  assert.match(page, /if \(!result\?\.success\) return t\.value\.vddSettings\.saveFailed/)
-  assert.doesNotMatch(page, /VddModeList|useEditableOptionField|sortedResolutionOptions|sortedRefreshRateOptions/)
-})
-
-test('the lists keep the persons order into the payload and back', () => {
-  const page = read('../components/VddSettings.vue')
+  assert.doesNotMatch(page, /<MModeListRow|<MModeListDialog|const saveModes|const modesOpen/)
+  assert.match(page, /emit\('webui-navigate', '\/config#tab=display&sub=modes'\)/)
+  // the lists are still read from and written back to the driver's file with the page's own save (they are not lost), in the order the person gave
   assert.match(page, /g_refresh_rate: \[\.\.\.rateList\.value\]/)
   assert.match(page, /resolution: resolutionList\.value\.map/)
   assert.match(page, /setResolutionOptions = \(values = \[\]\) => \{ resolutionList\.value = cleanList\('resolution', values\) \}/)
+  assert.doesNotMatch(page, /VddModeList|useEditableOptionField|sortedResolutionOptions|sortedRefreshRateOptions/)
+})
+
+test('the page of the virtual display is the device card, keep, headless and the way to modes, calibration and scaling; nothing of those is drawn twice', () => {
+  const page = read('../components/VddSettings.vue')
+  assert.match(page, /<MVddDevice/)
+  for (const gone of ['DpiScaleSection', "activeSection === 'calibration'", 'launchPhysicalHdrCalibration()', 'MChoiceCards v-model="prepModel"']) assert.ok(!page.includes(gone), gone)
+  for (const link of ['sub=modes', 'sub=hdr', 'sub=output']) assert.ok(page.includes(link), link)
 })
 
 test('the product is named 基地虚拟显示器 in Chinese and Foundation Virtual Display in English, never the short Chinese form or 基地显示器', () => {
