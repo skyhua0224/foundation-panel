@@ -104,13 +104,19 @@ test('the environment is gathered from the commands that exist and survives one 
 
 // the wiring is read from the sources (the router and the shell need the bundler)
 const read = (p) => fs.readFileSync(new URL(p, import.meta.url), 'utf8')
-test('the developer page is a pushed page of 系统, the row is only there in developer mode, and 关于 keeps its entry', () => {
+test('the developer pages are the rail 开发者 (only in developer mode), 开发者选项 is one of them, 系统 and 关于 keep their entries', () => {
   const router = read('./useRouter.js'); const nav = read('./panelNav.js'); const shell = read('../components/SidebarMenu.vue'); const about = read('../components/m3e/AboutPage.vue'); const options = read('../components/m3e/DeveloperOptions.vue')
-  assert.match(router, /\[ROUTES\.DEVELOPER\]: \{ rail: 'system', list: false, push: true \}/)
+  assert.match(router, /\[ROUTES\.DEV_ISSUES\]: \{ rail: 'developer' \}/, 'Issue 与 PR is the first page of the rail')
+  assert.match(router, /\[ROUTES\.DEVELOPER\]: \{ rail: 'developer' \}/)
+  assert.ok(router.indexOf('[ROUTES.DEV_ISSUES]: {') < router.indexOf('[ROUTES.DEVELOPER]: {'))
+  assert.match(router, /RAILS = \[[^\]]*'assistant', 'developer', 'settings', 'help'\]/, 'above 面板设置 and 帮助与关于')
   assert.match(nav, /const developer = runtime\.developer \?/)
-  assert.match(nav, /\.\.\.developer,/)
-  assert.match(shell, /<DeveloperPage v-else-if="entry\.id === ROUTES\.DEVELOPER"/)
+  assert.match(nav, /\.\.\.developer,/, 'the 系统 list keeps its link')
+  assert.match(nav, /if \(!runtime\.developer \|\| !D\) return \[\]/, 'no rows while developer mode is off')
+  assert.match(shell, /<DeveloperPages v-else-if="DEV_PAGES\.includes\(entry\.id\)"/)
+  assert.match(shell, /filter\(\(item\) => item\.id !== 'developer' \|\| developerMode\.enabled\.value\)/, 'the rail item is there only in developer mode')
   assert.match(shell, /NEEDS_NO_HOST = new Set\(\[[^\]]*ROUTES\.DEVELOPER,/, 'the page stays reachable while a host loss is simulated')
+  assert.match(shell, /ROUTES\.DEV_ISSUES, ROUTES\.DEV_LOGS/)
   assert.match(shell, /@open-developer="router\.navigate\(ROUTES\.DEVELOPER\)"/)
   assert.match(about, /emit\('open-developer'\)/)
   assert.match(options, /data-panel-option="developer-page"/)
@@ -118,7 +124,7 @@ test('the developer page is a pushed page of 系统, the row is only there in de
 test('every command of the page is local-only and granted to the main window', () => {
   const build = read('../../../src-tauri/build.rs'); const cap = JSON.parse(read('../../../src-tauri/capabilities/main-developer.json')); const main = read('../../../src-tauri/src/main.rs')
   const commands = [...main.matchAll(/dev_tools::(dev_\w+),/g)].map((m) => m[1])
-  assert.equal(commands.length, 8)
+  assert.equal(commands.length, 9)
   for (const c of commands) {
     assert.ok(build.includes(`"${c}"`), `${c} is local-only`)
     assert.ok(cap.permissions.includes(`allow-${c.replaceAll('_', '-')}`), `${c} is granted`)

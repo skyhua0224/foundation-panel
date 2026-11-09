@@ -396,6 +396,7 @@ fn main() {
             dev_tools::dev_set_cold_cloak,
             dev_tools::dev_simulate_dpi,
             dev_tools::dev_open_devtools,
+            dev_tools::dev_capture_window,
             dev_tools::dev_clear_webview_cache,
             dev_tools::dev_reset_desktop_settings,
             dev_tools::dev_environment,

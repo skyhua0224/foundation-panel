@@ -9,7 +9,7 @@ test('运行体检 is 全部检查, 打开 Web UI is the address of the host in 
   assert.ok(menu.includes("doctor: () => { componentStatus.openPage(); void componentStatus.checkAll() }"))
   assert.ok(menu.includes("openWebUi: async () => { const base = String((await sunshine.getUrl()) || ''); if (base) await openExternalUrl(base) }"))
   assert.ok(menu.includes("get pet() { return [{ id: 'pet-settings', label: contextTexts(locale.value).petSettings, icon: 'pets', run: () => openPanelPage('pet') }] }"), 'the label follows the language')
-  assert.ok(menu.includes('<MContextProvider :locale="locale" :callbacks="ctxCallbacks" :capabilities="{ product: \'panel\' }" />'))
+  assert.ok(menu.includes('<MContextProvider :locale="locale" :callbacks="ctxCallbacks" :capabilities="{ product: \'panel\', developer: developerMode.enabled.value }" />'))
 })
 
 test('the rows of the list pane that have a tile on the overview offer 固定到概览 through the functions of the search results\' pin', () => {

@@ -33,6 +33,7 @@ const LOCAL_ONLY_COMMANDS: &[&str] = &[
     "dev_set_cold_cloak",
     "dev_simulate_dpi",
     "dev_open_devtools",
+    "dev_capture_window",
     "dev_clear_webview_cache",
     "dev_reset_desktop_settings",
     "dev_environment",

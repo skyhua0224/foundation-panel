@@ -9,7 +9,7 @@ const router = fs.readFileSync(new URL('./useRouter.js', import.meta.url), 'utf8
 const nav = fs.readFileSync(new URL('./panelNav.js', import.meta.url), 'utf8')
 
 test('米塔 AI is a destination of the rail, the chat takes the whole width, and it has left the 系统 list', () => {
-  assert.match(router, /export const RAILS = \[[^\]]*'system', 'assistant', 'settings'/)
+  assert.match(router, /export const RAILS = \[[^\]]*'system', 'assistant', 'developer', 'settings'/)
   assert.match(router, /\[ROUTES\.AI_ASSISTANT\]: \{ rail: 'assistant', list: false \}/)
   const system = nav.slice(nav.indexOf('system: ['), nav.indexOf('],', nav.indexOf('system: [')))
   assert.ok(!/AI_ASSISTANT/.test(system), 'not in the 系统 list')
