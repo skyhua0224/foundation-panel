@@ -20,9 +20,9 @@
             <span class="dsk-bit__unit">{{ bitrateUnit }}</span>
           </div>
           <div class="dsk-stream__range">
-            <MIconButton icon="remove" tonal :label="`${t.stream.bitrateLimit} −`" @click="nudgeBitrate(-5000)" />
-            <MSlider :model-value="bitrateKbps" :min="1000" :max="200000" :step="1000" size="m" :label="t.stream.bitrateLimit" @update:model-value="(v) => setCfg('max_bitrate', String(v))" />
-            <MIconButton icon="add" tonal :label="`${t.stream.bitrateLimit} +`" @click="nudgeBitrate(5000)" />
+            <MIconButton icon="remove" tonal :label="`${t.stream.bitrateLimit} −`" @click="nudgeBitrate(-NUDGE_MBPS)" />
+            <MSlider :model-value="bitrateSliderMbps(bitrateKbps)" :min="0" :max="SLIDER_MAX_MBPS" :step="1" unit=" Mbps" :off-text="t.stream.bitrateAuto" size="m" :label="t.stream.bitrateLimit" @update:model-value="(v) => setCfg('max_bitrate', String(bitrateFromMbps(v)))" />
+            <MIconButton icon="add" tonal :label="`${t.stream.bitrateLimit} +`" @click="nudgeBitrate(NUDGE_MBPS)" />
           </div>
           <MSeg :model-value="bitrateKbps" block :label="t.stream.bitrateLimit" :options="BITRATE_PRESETS" @update:model-value="(v) => setCfg('max_bitrate', String(v))" />
           <p class="dsk-applies">{{ applies('max_bitrate') }}</p>
@@ -79,7 +79,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { MIcon, MIconButton, MLoading, MSeg, MSlider, MSwitch, createSerialCalls, saveSettingKey } from 'foundation-ui/vue'
-import { appliesText } from 'foundation-ui/settings/index.js'
+import { appliesText, bitrateChips, bitrateFromMbps, bitrateKbps as parseBitrateKbps, bitrateNudge, bitrateSliderMbps, bitrateText } from 'foundation-ui/settings/index.js'
 import DeskPage from '../components/DeskPage.vue'
 import PanelLinkSection from '../components/PanelLinkSection.vue'
 import SettingsNotice from '../components/settings/SettingsNotice.vue'
@@ -98,13 +98,16 @@ const autoLaunchDesktop = ref(false)
 const appsData = ref(null) // apps.json as read
 const hostPlatform = ref('')
 
-const configData = ref({ hevc_mode: 2, av1_mode: 0, max_bitrate: '50000', hdr_prep: 'automatic' })
+// max_bitrate: the host's own default is 0 (自动, the client decides) and a config file that never wrote the key does not send it, so 0 is what shows then
+const configData = ref({ hevc_mode: 2, av1_mode: 0, max_bitrate: '0', hdr_prep: 'automatic' })
 const INTEGER_KEYS = ['hevc_mode', 'av1_mode']
 
-const bitrateKbps = computed(() => parseInt(configData.value.max_bitrate) || 0)
-const bitrateNumber = computed(() => (bitrateKbps.value <= 0 ? '∞' : bitrateKbps.value >= 1000 ? String(Math.round(bitrateKbps.value / 1000)) : String(bitrateKbps.value)))
-const bitrateUnit = computed(() => (bitrateKbps.value <= 0 ? t.value.stream.bitrateUnlimited : bitrateKbps.value >= 1000 ? 'Mbps' : 'Kbps'))
-const bitrateDisplay = computed(() => (bitrateKbps.value <= 0 ? t.value.stream.bitrateUnlimited : `${bitrateNumber.value} ${bitrateUnit.value}`))
+const bitrateKbps = computed(() => parseBitrateKbps(configData.value.max_bitrate))
+const SLIDER_MAX_MBPS = 200
+const NUDGE_MBPS = 5
+const bitrateNumber = computed(() => (bitrateKbps.value <= 0 ? t.value.stream.bitrateAuto : String(Math.round(bitrateKbps.value / 100) / 10)))
+const bitrateUnit = computed(() => (bitrateKbps.value <= 0 ? '' : 'Mbps'))
+const bitrateDisplay = computed(() => bitrateText(bitrateKbps.value, t.value.stream.bitrateAuto))
 
 const codecs = computed(() => [
   { key: 'hevc_mode', name: t.value.stream.codec.hevc, desc: t.value.stream.codec.hevcDesc },
@@ -115,12 +118,8 @@ const codecModes = computed(() => [
   { value: 2, label: t.value.stream.codec.always },
   { value: 3, label: t.value.stream.codec.alwaysHdr },
 ])
-const BITRATE_PRESETS = computed(() => [
-  { value: 20000, label: '20 Mbps' },
-  { value: 50000, label: '50 Mbps' },
-  { value: 100000, label: '100 Mbps' },
-  { value: 0, label: t.value.stream.bitrateUnlimited },
-])
+// the chips: the presets (a value that is none of them gets a chip of its own, so the stored value is always one of the choices)
+const BITRATE_PRESETS = computed(() => bitrateChips(bitrateKbps.value, t.value.stream.bitrateAuto, [20, 50, 100, 0]))
 
 // the hero's fact: what is in force now
 const activeCodecs = computed(() => codecs.value.filter((codec) => configData.value[codec.key] > 0).map((codec) => codec.name))
@@ -134,8 +133,8 @@ function say(type, text) {
   noticeTimer = setTimeout(() => { saveMsg.value = null }, 5000)
 }
 
-// the step buttons beside the slider (a pad cannot drag): 5 Mbps, inside the slider's range
-const nudgeBitrate = (delta) => setCfg('max_bitrate', String(Math.min(200000, Math.max(1000, (bitrateKbps.value || 200000) + delta))))
+// the step buttons beside the slider (a pad cannot drag): 5 Mbps inside the slider's range; automatic steps up to 5 and 5 steps back to automatic
+const nudgeBitrate = (delta) => setCfg('max_bitrate', String(bitrateNudge(bitrateKbps.value, delta, SLIDER_MAX_MBPS)))
 
 async function initTauri() {
   try {

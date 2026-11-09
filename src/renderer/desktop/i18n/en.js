@@ -157,7 +157,7 @@ export const en = {
       alwaysHdr: 'Always + HDR',
     },
     bitrateLimit: 'Bitrate Limit',
-    bitrateUnlimited: 'Unlimited',
+    bitrateAuto: 'Auto',
     hdr: 'HDR',
     hdrAutoSwitch: 'Auto HDR Switching',
     hdrAutoSwitchDesc: 'Automatically enable/disable HDR during streaming',
