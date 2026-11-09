@@ -68,6 +68,30 @@ const CURSOR_SPEED = 16
 export const GAMEPAD_ACTION_EVENT = 'fd-gamepad-action'
 
 /**
+ * Native bridges use these names when a host-side controller changes. The browser event is
+ * still the primary source; native wakeups simply make us rescan immediately. See
+ * panel-w3c-gamepad-20261109 (Gamepad API sections 12, 16 and 17) and
+ * panel-tauri-frontend-events-20261109 (listen/unlisten lifecycle).
+ */
+export const NATIVE_GAMEPAD_EVENTS = [
+  'gamepad-connected',
+  'gamepad-disconnected',
+  'native-gamepad-connected',
+  'native-gamepad-disconnected',
+]
+
+/** Install the browser connection events as one disposable unit; this is also the seam used
+ * by renderer regression tests to simulate a late connection without a physical controller. */
+export function bindGamepadConnectionEvents(target, { onConnected, onDisconnected } = {}) {
+  target.addEventListener('gamepadconnected', onConnected)
+  target.addEventListener('gamepaddisconnected', onDisconnected)
+  return () => {
+    target.removeEventListener('gamepadconnected', onConnected)
+    target.removeEventListener('gamepaddisconnected', onDisconnected)
+  }
+}
+
+/**
  * 手柄状态是模块级单例：大屏 shell 只会有一个 `useGamepad` 实例，而侧边栏、
  * 应用库这些组件都需要知道「现在是不是在用手柄」来决定要不要抢焦点。
  */
@@ -117,6 +141,9 @@ export function useGamepad(options = {}) {
   const releaseArmed = new Set()
   let shortcutState = { captureActive: false, settings: {} }
   let stopShortcutListener, disposed = false
+  const nativeUnlisteners = []
+  let nativePadConnected = false
+  let removeBrowserGamepadEvents = null
   const repeatTimers = {}
   let backHoldTimer = null
   let backHoldRaf = null
@@ -314,7 +341,7 @@ export function useGamepad(options = {}) {
 
   function poll() {
     const pads = connectedPads()
-    gamepadConnected.value = pads.length > 0
+    gamepadConnected.value = pads.length > 0 || nativePadConnected
     applyPollRate(pads.length > 0)
 
     if (pads.length === 0) {
@@ -431,10 +458,13 @@ export function useGamepad(options = {}) {
   }
 
   function onGamepadConnected(event) {
+    nativePadConnected = false
     gamepadConnected.value = true
     // 尚无活跃手柄时先用接入者的 id，提示条不用等第一次输入才识别布局
     if (!gamepadName.value && event?.gamepad?.id) { gamepadName.value = event.gamepad.id; gamepadMapping.value = event.gamepad.mapping || '' }
+    markActive()
     startPolling(POLL_INTERVAL_MS)
+    poll()
   }
 
   function onGamepadDisconnected(event) {
@@ -445,11 +475,23 @@ export function useGamepad(options = {}) {
       releaseArmed.clear()
     }
     if (connectedPads().length === 0) {
-      gamepadConnected.value = false
-      gamepadActive.value = false
+      gamepadConnected.value = nativePadConnected
+      if (!nativePadConnected) gamepadActive.value = false
       stopAllRepeats()
       clearBackHold()
     }
+  }
+
+  function onNativeGamepadEvent(event) {
+    const payload = event?.payload
+    const connected = typeof payload === 'boolean'
+      ? payload
+      : payload?.connected ?? payload?.gamepad?.connected ?? payload?.state === 'connected'
+    if (connected === false) nativePadConnected = false
+    else if (connected === true || connected === undefined) nativePadConnected = true
+    markActive()
+    startPolling(POLL_INTERVAL_MS)
+    poll()
   }
 
   function onMouseMove(event) {
@@ -470,11 +512,21 @@ export function useGamepad(options = {}) {
   }
 
   onMounted(async () => {
-    window.addEventListener('gamepadconnected', onGamepadConnected)
-    window.addEventListener('gamepaddisconnected', onGamepadDisconnected)
+    removeBrowserGamepadEvents = bindGamepadConnectionEvents(window, {
+      onConnected: onGamepadConnected,
+      onDisconnected: onGamepadDisconnected,
+    })
     window.addEventListener('mousemove', onMouseMove)
     document.addEventListener('visibilitychange', onVisibilityChange)
     startPolling()
+
+    for (const eventName of NATIVE_GAMEPAD_EVENTS) {
+      try {
+        const stop = await listen(eventName, onNativeGamepadEvent)
+        if (disposed) stop()
+        else nativeUnlisteners.push(stop)
+      } catch { /* Native bridge events are unavailable in a browser preview. */ }
+    }
 
     let revision = 0
     try {
@@ -492,8 +544,8 @@ export function useGamepad(options = {}) {
   onUnmounted(() => {
     disposed = true
     stopShortcutListener?.()
-    window.removeEventListener('gamepadconnected', onGamepadConnected)
-    window.removeEventListener('gamepaddisconnected', onGamepadDisconnected)
+    nativeUnlisteners.splice(0).forEach((stop) => stop())
+    removeBrowserGamepadEvents?.()
     window.removeEventListener('mousemove', onMouseMove)
     document.removeEventListener('visibilitychange', onVisibilityChange)
     stopPolling()

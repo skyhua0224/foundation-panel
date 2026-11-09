@@ -158,6 +158,8 @@ export const zh = {
     },
     bitrateLimit: '码率上限',
     bitrateAuto: '自动',
+    hostAudio: '在主机播放音频',
+    hostAudioDesc: '当前串流中即时切换；是否生效取决于主机音频路径。',
     hdr: 'HDR',
     hdrAutoSwitch: '自动 HDR 切换',
     hdrAutoSwitchDesc: '串流时自动开启/关闭 HDR',

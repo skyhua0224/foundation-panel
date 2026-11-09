@@ -154,6 +154,8 @@ export const pt_BR = {
     },
     bitrateLimit: "Limite de taxa de bits",
     bitrateAuto: "Automático",
+    hostAudio: "Tocar áudio no host",
+    hostAudioDesc: "Vale para a transmissão atual sem reconectar, se o caminho de áudio permitir.",
     hdr: "HDR",
     hdrAutoSwitch: "Troca automática HDR",
     hdrAutoSwitchDesc: "Ativar/desativar automaticamente HDR durante a transmissão",

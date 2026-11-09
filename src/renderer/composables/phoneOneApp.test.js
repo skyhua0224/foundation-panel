@@ -11,7 +11,7 @@ const hub = read('../components/m3e/SettingsHubPage.vue')
 const layout = fs.readFileSync(new URL('../../../node_modules/foundation-ui/src/css/layout.css', import.meta.url), 'utf8')
 
 test('a phone has no list pages of the rails: the nav is told which hub stands for which rail, and the window size', () => {
-  assert.match(router, /export const HUB_OF = \{ stream: ROUTES\.STREAM_HUB, config: ROUTES\.SETTINGS_HUB, input: ROUTES\.SETTINGS_HUB, audio: ROUTES\.SETTINGS_HUB, display: ROUTES\.SETTINGS_HUB, system: ROUTES\.SETTINGS_HUB \}/)
+  assert.match(router, /export const HUB_OF = \{ stream: ROUTES\.STREAM_HUB, config: ROUTES\.SETTINGS_HUB, input: ROUTES\.SETTINGS_HUB, audio: ROUTES\.SETTINGS_HUB, display: ROUTES\.SETTINGS_HUB, system: ROUTES\.SETTINGS_HUB, developer: ROUTES\.DEV_HUB \}/)
   assert.match(router, /createNav\(\{ routes, home: ROUTES\.HOME, compact: isPhone, hubOf: HUB_OF \}\)/)
   assert.match(router, /export const isPhone = \(\) => typeof window !== 'undefined' && window\.innerWidth < PHONE_MAX/)
   assert.match(router, /PHONE_MAX = 600/)

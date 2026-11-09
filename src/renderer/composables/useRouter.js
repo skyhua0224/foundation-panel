@@ -21,7 +21,15 @@ export const ROUTES = {
   STREAM_HUB: 'stream-hub', // 串流 of a narrow window: the pages of the stream rail as one page of grouped rows, like SETTINGS_HUB (the rail's list page does not exist on a phone)
   HELP: 'help',
   ABOUT: 'about',
-  DEVELOPER: 'developer', // 开发者选项: a pushed page, reachable once developer mode is on
+  DEVELOPER: 'developer', // 开发者选项: a page of the 开发者 rail (developer mode on); 系统 and 关于 link to it
+  DEV_ISSUES: 'dev-issues', // Issue 与 PR of our own repositories (the first page of the 开发者 rail)
+  DEV_LOGS: 'dev-logs', // 实时日志
+  DEV_API: 'dev-api', // API 检查器
+  DEV_FLAGS: 'dev-flags', // 功能开关: the overlays and the animation speed
+  DEV_BUILD: 'dev-build', // 构建与组件
+  DEV_TESTS: 'dev-tests', // 测试工具 of the developers: the error dialog, a host that is away, the telemetry check
+  DEV_HUB: 'dev-hub', // 开发者 of a narrow window: the pages as one list
+  CAT_DEVELOPER: 'cat-developer',
   ANNOUNCEMENTS: 'announcements', // 公告: every announcement, opened from the bell of the caption bar
   CAT_STREAM: 'cat-stream',
   CAT_INPUT: 'cat-input',
@@ -103,15 +111,24 @@ export const PAGES = {
   [ROUTES.SETTINGS_HUB]: { rail: 'config', list: false },
   [ROUTES.HELP]: { rail: 'help', list: false },
   [ROUTES.ABOUT]: { rail: 'help', rootRail: 'about', list: false, push: true }, // pushed from 帮助与关于 (Back); a first-level page from the rail's About button (`root`, no Back, no rail item lit)
-  [ROUTES.DEVELOPER]: { rail: 'system', list: false, push: true },
+  // the 开发者 rail exists only while developer mode is on (seven taps on the version); its first page is Issue 与 PR
+  [ROUTES.DEV_ISSUES]: { rail: 'developer' },
+  [ROUTES.DEV_LOGS]: { rail: 'developer' },
+  [ROUTES.DEV_API]: { rail: 'developer' },
+  [ROUTES.DEV_FLAGS]: { rail: 'developer' },
+  [ROUTES.DEV_BUILD]: { rail: 'developer' },
+  [ROUTES.DEV_TESTS]: { rail: 'developer' },
+  [ROUTES.DEVELOPER]: { rail: 'developer' },
+  [ROUTES.DEV_HUB]: { rail: 'developer', list: false },
   [ROUTES.ANNOUNCEMENTS]: { rail: 'overview', list: false, push: true },
   [ROUTES.STREAM_HUB]: { rail: 'stream', list: false }, // after the pages of its rail: the first page of 串流 stays 客户端
 }
-export const RAILS = ['overview', 'stream', 'config', 'input', 'audio', 'display', 'system', 'assistant', 'settings', 'help']
+// 开发者 sits above 面板设置 and 帮助与关于, the bottom group, so the rail above it is the same with developer mode off (the shell leaves the item out then)
+export const RAILS = ['overview', 'stream', 'config', 'input', 'audio', 'display', 'system', 'assistant', 'developer', 'settings', 'help']
 
 // the old component page is part of the component status page now
 const ALIAS = { [ROUTES.CONTROLLERS]: ROUTES.GAMEPAD, [ROUTES.COMPONENTS]: ROUTES.COMPONENT_STATUS, [ROUTES.WEB_TROUBLESHOOTING]: ROUTES.DIAGNOSTICS, [ROUTES.WEB_DISPLAY_VIDEO]: ROUTES.WEB_DISPLAY_ADVANCED }
-const CATEGORY = { [ROUTES.CAT_CONFIG]: 'config', [ROUTES.CAT_STREAM]: 'stream', [ROUTES.CAT_INPUT]: 'input', [ROUTES.CAT_AUDIO]: 'audio', [ROUTES.CAT_DISPLAY]: 'display', [ROUTES.CAT_SYSTEM]: 'system' }
+const CATEGORY = { [ROUTES.CAT_CONFIG]: 'config', [ROUTES.CAT_STREAM]: 'stream', [ROUTES.CAT_INPUT]: 'input', [ROUTES.CAT_AUDIO]: 'audio', [ROUTES.CAT_DISPLAY]: 'display', [ROUTES.CAT_SYSTEM]: 'system', [ROUTES.CAT_DEVELOPER]: 'developer' }
 // The panel destination of a place of the display and audio tabs (the same places as foundation-ui's DISPLAY_PLACES and AUDIO_PLACES): the virtual display and the microphone are pages of the panel itself
 const PLACE_ROUTE = {
   'display:output': ROUTES.WEB_DISPLAY_OUTPUT, 'display:modes': ROUTES.WEB_DISPLAY_MODES, 'display:encoders': ROUTES.WEB_DISPLAY_ENCODERS, 'display:advanced': ROUTES.WEB_DISPLAY_ADVANCED, 'display:video': ROUTES.WEB_DISPLAY_ADVANCED, 'display:hdr': ROUTES.WEB_DISPLAY_HDR, 'display:virtual': ROUTES.VDD_SETTINGS, 'display:quality': ROUTES.HDR_ENHANCED, 'display:quality': ROUTES.HDR_ENHANCED,
@@ -163,7 +180,7 @@ for (const rail of new Set(Object.values(PAGES).filter((p) => p.list !== false).
 for (const [id, p] of Object.entries(PAGES)) routes[id] = { role: 'detail', rail: p.rail, list: p.list, supporting: p.supporting, push: p.push, rootRail: p.rootRail }
 
 // a phone has no list pages of the rails: 串流 is the stream hub, every other category is in the 设置 hub; Back from a page is that hub, whatever way the page was reached (as in the Web UI)
-export const HUB_OF = { stream: ROUTES.STREAM_HUB, config: ROUTES.SETTINGS_HUB, input: ROUTES.SETTINGS_HUB, audio: ROUTES.SETTINGS_HUB, display: ROUTES.SETTINGS_HUB, system: ROUTES.SETTINGS_HUB }
+export const HUB_OF = { stream: ROUTES.STREAM_HUB, config: ROUTES.SETTINGS_HUB, input: ROUTES.SETTINGS_HUB, audio: ROUTES.SETTINGS_HUB, display: ROUTES.SETTINGS_HUB, system: ROUTES.SETTINGS_HUB, developer: ROUTES.DEV_HUB }
 export const PHONE_MAX = 600
 export const isPhone = () => typeof window !== 'undefined' && window.innerWidth < PHONE_MAX
 

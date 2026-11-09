@@ -158,6 +158,8 @@ export const en = {
     },
     bitrateLimit: 'Bitrate Limit',
     bitrateAuto: 'Auto',
+    hostAudio: 'Play audio on host',
+    hostAudioDesc: 'Apply to the current stream without reconnecting when the host audio path supports it.',
     hdr: 'HDR',
     hdrAutoSwitch: 'Auto HDR Switching',
     hdrAutoSwitchDesc: 'Automatically enable/disable HDR during streaming',

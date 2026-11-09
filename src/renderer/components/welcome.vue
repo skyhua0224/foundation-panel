@@ -60,6 +60,7 @@ const data = createGuideData({
   openApps: (mode) => emit('webui-navigate', `/apps#guide-${mode}`),
   openTools: () => emit('webui-navigate', '/#test-tools'),
   openDiagnostics: () => emit('open-doctor'),
+  locale: () => locale.value,
 })
 const { state, probeAccount, loadGuideHost } = data
 const hostProgress = ref(null) // what the host remembers of the guide, read once before the flow opens

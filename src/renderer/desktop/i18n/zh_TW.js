@@ -158,6 +158,8 @@ export const zh_TW = {
     },
     bitrateLimit: '位元率上限',
     bitrateUnlimited: '不限制',
+    hostAudio: "在主機播放音訊",
+    hostAudioDesc: "目前串流中立即切換；是否生效取決於主機音訊路徑。",
     hdr: 'HDR',
     hdrAutoSwitch: '自動 HDR 切換',
     hdrAutoSwitchDesc: '串流時自動開啟/關閉 HDR',

@@ -404,6 +404,21 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
         true,
         None::<&str>,
     )?;
+    // the support line at the foot of the help submenu: website, Bilibili, a star, and a sponsor submenu with the three developers (the same line as the popup menu's help page)
+    let support_separator = PredefinedMenuItem::separator(app)?;
+    let visit_site = MenuItem::with_id(app, "visit_site", s.visit_site, true, None::<&str>)?;
+    let visit_bilibili = MenuItem::with_id(app, "visit_bilibili", s.visit_bilibili, true, None::<&str>)?;
+    let star_github = MenuItem::with_id(app, "star_github", s.star_github, true, None::<&str>)?;
+    let sponsor_qiin = MenuItem::with_id(app, "sponsor_qiin", "qiin2333", true, None::<&str>)?;
+    let sponsor_yundi339 = MenuItem::with_id(app, "sponsor_yundi339", "Yundi339", true, None::<&str>)?;
+    let sponsor_skyhua = MenuItem::with_id(app, "sponsor_skyhua", "skyhua0224", true, None::<&str>)?;
+    let sponsor_submenu = Submenu::with_id_and_items(
+        app,
+        "sponsor",
+        s.sponsor_menu,
+        true,
+        &[&sponsor_qiin, &sponsor_yundi339, &sponsor_skyhua],
+    )?;
     let help_submenu = Submenu::with_id_and_items(
         app,
         "help",
@@ -416,6 +431,11 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
             &star_project,
             &visit_project_sunshine,
             &visit_project_moonlight,
+            &support_separator,
+            &visit_site,
+            &visit_bilibili,
+            &star_github,
+            &sponsor_submenu,
         ],
     )?;
 

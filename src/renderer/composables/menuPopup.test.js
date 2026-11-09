@@ -113,7 +113,7 @@ test('wiring: the shell installs the presenter and answers its frames; the menu 
   const sidebar = src('../components/SidebarMenu.vue')
   assert.ok(sidebar.includes("installMenuPopup({ invoke, listen, backLabel: () => contextTexts(locale.value).backToMenu })"))
   assert.ok(sidebar.includes("popupMenu?.frameMessage(event, frame)"))
-  assert.ok(sidebar.includes('<MContextProvider :locale="locale" :callbacks="ctxCallbacks" :capabilities="{ product: \'panel\' }" />'), 'the window\'s own menu is still the Material menu')
+  assert.ok(sidebar.includes('<MContextProvider :locale="locale" :callbacks="ctxCallbacks" :capabilities="{ product: \'panel\', developer: developerMode.enabled.value }" />'), 'the window\'s own menu is still the Material menu')
   const vite = src('../../../vite.config.js')
   assert.ok(vite.includes("ctxMenu: resolve(rendererSrcPath, 'ctxmenu/index.html')"))
   const main = src('../ctxmenu/main.js'); assert.ok(main.includes("from 'foundation-ui/popup'") && main.includes("foundation-ui/all.css"))

@@ -61,7 +61,8 @@
         />
         <DoctorPage v-else-if="entry.id === ROUTES.DOCTOR" :autostart="entry.params?.autostart || false" @go="goDoctorTarget" @restart="hostConn.restart('service')" @ai="askMita" />
         <MAnnouncementPage v-else-if="entry.id === ROUTES.ANNOUNCEMENTS" :items="announcements.list.value" :locale="locale" :acked-at="ackedAt" :open-id="entry.params?.id || ''" :on-refresh="() => announcements.refresh(true)" @dismiss="announcements.dismiss" @read="announcements.read" @open-url="actions_openExternal" @back="back" />
-        <DeveloperPage v-else-if="entry.id === ROUTES.DEVELOPER" :locale="locale" :version="currentVersion" :consent="telemetry.consent.value" :error-context="errorContext" :simulate-host="simulateHost" @disabled="back" />
+        <DevHub v-else-if="entry.id === ROUTES.DEV_HUB" :locale="locale" :pages="devHubPages" @open="(p) => openRoute(p.route)" />
+        <DeveloperPages v-else-if="DEV_PAGES.includes(entry.id)" :key="entry.id" :page="entry.id" :locale="locale" :version="currentVersion" :consent="telemetry.consent.value" :error-context="errorContext" :simulate-host="simulateHost" @disabled="leaveDeveloper" @notify="(text) => useNotify().snack(text)" />
         <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" :on-refresh="() => announcements.refresh(true)" :consent="telemetry.consent.value" @consent="telemetry.answer" :include-prerelease="includePrerelease" @channel-change="setIncludePrerelease" @open-update="showUpdateDialog = true" @open="actions_openExternal" @open-developer="router.navigate(ROUTES.DEVELOPER)" />
         <ControlPanelPage
           v-else-if="entry.id === ROUTES.PANEL_SETTINGS || entry.id === ROUTES.HELP"
@@ -92,16 +93,18 @@
     </MScene>
     </div>
     <MContextMenu ref="contextMenu" @select="onContextSelect" />
-    <MContextProvider :locale="locale" :callbacks="ctxCallbacks" :capabilities="{ product: 'panel' }" />
+    <MContextProvider :locale="locale" :callbacks="ctxCallbacks" :capabilities="{ product: 'panel', developer: developerMode.enabled.value }" />
+    <DevReportHost :locale="locale" />
     <!-- every uncaught error is drawn in our own surface: the way back, the restart of Sunshine, then copy, download and the report to the developers -->
     <MTelemetryConsent v-model="consentOpen" :locale="locale" @answer="telemetry.answer" />
-    <MErrorHost :locale="locale" :can-go-back="nav.canPop.value" :host-online="hostConn.state.status === 'online'" :restart="() => hostConn.restart('service')" :doctor="openDoctor" :open-url="actions_openExternal" @back="errorBack" />
+    <MErrorHost :locale="locale" report-sheet :can-go-back="nav.canPop.value" :host-online="hostConn.state.status === 'online'" :restart="() => hostConn.restart('service')" :doctor="openDoctor" :open-url="actions_openExternal" @back="errorBack" />
     <!-- 更多 of the bottom bar: what the bar has no room for -->
     <MSheet v-model="moreOpen" :title="t.m3e.nav.moreTitle" side="end" :close-label="t.m3e.home.done">
       <div class="panel-more-version"><MBrand :size="20" /><MCaptionVersion :version="currentVersion" :build="buildInfo" :os="osName()" :locale="locale" :update="notice.version" @copied="onVersionCopied" @open-update="moreGo(openUpdates)" /></div>
       <MGroup>
         <MItem action icon="search" :title="t.m3e.search" @click="moreGo(() => uni.show())" />
         <MItem action icon="settings" :title="t.m3e.nav.settings" :text="settingsList.lines.value.panel" :tone="notice.dot ? 'warn' : ''" @click="moreGo(() => onRail({ id: 'settings' }))" />
+        <MItem v-if="developerMode.enabled.value" action icon="terminal" :title="devmodeTexts(locale).rail" @click="moreGo(() => router.navigate(ROUTES.DEV_HUB))" />
         <MItem action icon="palette" :title="appearanceLabel" @click="moreGo(() => router.navigate(ROUTES.CFG_APPEARANCE))" />
         <MItem action icon="info" :title="aboutTexts(locale).title" :text="currentVersion" @click="moreGo(() => router.navigate(ROUTES.ABOUT, undefined, { root: true }))" />
         <MItem action icon="help" :title="t.m3e.nav.help" :text="settingsList.lines.value.help" @click="moreGo(() => onRail({ id: 'help' }))" />
@@ -133,11 +136,12 @@ import { computed, defineAsyncComponent, getCurrentInstance, ref, toRef, watch, 
 import { sunshine, sunshineService, tools, openExternalUrl } from '../tauri-adapter.js'
 import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
+import { invoke } from '@tauri-apps/api/core'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
 import { openBigScreenWithNotice } from '../composables/openBigScreen.js'
 import { installMenuPopup } from '../composables/menuPopup.js'
 import { installTrayTheme } from '../composables/trayTheme.js'
-import { MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MCaptionVersion, MCaptionBack, MBackChip, useCaptionRoom, createJumpHistory, useBackVariant, showsButton, showsChip, captionTexts, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, doctorTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode, useDialogs } from 'foundation-ui/vue'
+import { MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MCaptionVersion, MCaptionBack, MBackChip, useCaptionRoom, createJumpHistory, useBackVariant, showsButton, showsChip, captionTexts, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, doctorTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode, useDialogs, DevReportHost, DevHub, openDevReport, devmodeTexts, useDevActivity } from 'foundation-ui/vue'
 import { developerOverlays, developerTexts, DEFAULT_FLAGS } from 'foundation-ui/developer'
 import { afterCheck, afterOpened, noticeView, readNotice, writeNotice } from 'foundation-ui/update'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
@@ -159,7 +163,8 @@ import MicrophonePage from './m3e/MicrophonePage.vue'
 import AppearancePage from './m3e/AppearancePage.vue'
 import UsbPage from './m3e/UsbPage.vue'
 import AboutPage from './m3e/AboutPage.vue'
-import DeveloperPage from './m3e/DeveloperPage.vue'
+import DeveloperPages from './m3e/DeveloperPages.vue'
+import { registerPanelReport } from '../composables/developerReport.js'
 import ComponentStatusPage from './m3e/ComponentStatusPage.vue'
 import SunshineServicePage from './m3e/SunshineServicePage.vue'
 import { serviceTexts } from 'foundation-ui/service'
@@ -379,7 +384,7 @@ window.addEventListener('panel-force-host-state', forceHostState)
 window.addEventListener('panel-force-proxy-state', forceProxyState)
 onBeforeUnmount(() => { window.removeEventListener('panel-force-host-state', forceHostState); window.removeEventListener('panel-force-proxy-state', forceProxyState) })
 // the pages of the panel itself, which work without the host: 面板设置, 个性化, 帮助与关于, 公告 (from the announcement feed), the diagnostics, 米塔 AI, the guide
-const NEEDS_NO_HOST = new Set([ROUTES.DOCTOR, ROUTES.SUNSHINE_SERVICE, ROUTES.DEVELOPER, ROUTES.PANEL_SETTINGS, ROUTES.CFG_APPEARANCE, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.ANNOUNCEMENTS, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME])
+const NEEDS_NO_HOST = new Set([ROUTES.DOCTOR, ROUTES.SUNSHINE_SERVICE, ROUTES.DEVELOPER, ROUTES.PANEL_SETTINGS, ROUTES.CFG_APPEARANCE, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.ANNOUNCEMENTS, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME, ROUTES.DEV_ISSUES, ROUTES.DEV_LOGS, ROUTES.DEV_API, ROUTES.DEV_FLAGS, ROUTES.DEV_BUILD, ROUTES.DEV_TESTS, ROUTES.DEV_HUB])
 // The host cannot be used for one of three causes, and the content area is then ONE status page (MScene status): the host is down, it runs and does not answer, or the panel's own proxy does not answer the window.
 // The rail and the caption bar stay: the pages of the panel itself (NEEDS_NO_HOST) still work and open as always. What needs the host does not look live: the pages give way to the status page and are inert, the
 // frame stays mounted but hidden, so an unsaved edit is there when the connection is back, and 连接设备 (it pairs through the host) is disabled.
@@ -409,6 +414,11 @@ const recentLogText = ref('')
 const refreshLogs = async () => { try { const r = await fetch(`${String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')}/api/logs`); if (r.ok) recentLogText.value = (await r.text()).split('\n').slice(-60).join('\n') } catch { /* a report without log lines */ } }
 const errorContext = () => ({ product: 'panel', version: currentVersion.value || '', os: osName(), page: String(router.currentRoute.value || ''), locale: String(locale.value), logs: String(recentLogText.value || '').split('\n').slice(-40).join('\n'), components: `panel=${currentVersion.value || '?'}` })
 setErrorContext(errorContext)
+// the report and sign-in sheets of foundation-ui get what only this window has (the capture, the log, the environment, saving a file, the browser, the anonymous send)
+registerPanelReport({ locale: () => locale.value, version: () => currentVersion.value || '', errorContext, hostNames: () => [hostConfig.value?.sunshine_name, ...hostClients.value.map((c) => c.name)].filter(Boolean) })
+const DEV_PAGES = [ROUTES.DEV_ISSUES, ROUTES.DEV_LOGS, ROUTES.DEV_API, ROUTES.DEV_FLAGS, ROUTES.DEV_BUILD, ROUTES.DEV_TESTS, ROUTES.DEVELOPER]
+const devHubPages = computed(() => [{ id: 'issues', route: ROUTES.DEV_ISSUES }, { id: 'logs', route: ROUTES.DEV_LOGS }, { id: 'api', route: ROUTES.DEV_API }, { id: 'flags', route: ROUTES.DEV_FLAGS }, { id: 'build', route: ROUTES.DEV_BUILD }, { id: 'tests', route: ROUTES.DEV_TESTS }, { id: 'options', route: ROUTES.DEVELOPER }])
+const leaveDeveloper = () => router.navigate(ROUTES.HOME)
 let removeErrorHandlers = null
 const shellApp = getCurrentInstance()?.appContext.app
 // the remote access tutorials (help page, and the fix of a reason of the reachability check)
@@ -423,13 +433,14 @@ const announcements = useAnnouncements({ locale, version: announceVersion })
 const appearanceLabel = computed(() => labelOf(locale.value, 'shell.appearance'))
 const announcementsUnread = announcements.unread
 // a dot on the help rail while an update is waiting (the about page checks and opens the update sheet)
-const rail = computed(() => railItems(t.value).map((item) => (item.id === 'overview' && announcementsUnread.value ? { ...item, badge: announcementsUnread.value } : item.id === 'settings' && notice.value.dot ? { ...item, badge: 'dot' } : item.id === 'assistant' && mitaState.unread ? { ...item, badge: 'dot' } : item)))
+const rail = computed(() => railItems(t.value, { developer: devmodeTexts(locale.value).rail }).filter((item) => item.id !== 'developer' || developerMode.enabled.value).map((item) => (item.id === 'overview' && announcementsUnread.value ? { ...item, badge: announcementsUnread.value } : item.id === 'settings' && notice.value.dot ? { ...item, badge: 'dot' } : item.id === 'assistant' && mitaState.unread ? { ...item, badge: 'dot' } : item.id === 'developer' && devActivity.unseen.value ? { ...item, badge: 'dot' } : item)))
 // the one-time thank-you line after the guided first run
-const railLabel = (id) => t.value.m3e.nav[id]
+const railLabel = (id) => (id === 'developer' ? devmodeTexts(locale.value).rail : t.value.m3e.nav[id])
 // Developer mode (seven taps on the version in 关于): the row of 开发者选项 in 系统, and the overlays the page chose, applied at start
 const developerMode = useDeveloperMode()
-watch(developerMode.enabled, (on) => { if (on) developerOverlays(); else if (!on) developerOverlays().set({ ...DEFAULT_FLAGS }) }, { immediate: true })
-const runtimeView = computed(() => ({ ...runtime, developer: developerMode.enabled.value, developerTitle: developerTexts(locale.value).title, rtssInstalled: rtssInstalled.value === true, lines: settingsList.lines.value, statusTitle: statusTexts(locale.value).title, serviceTitle: serviceTexts(locale.value).title, diagTitle: diagnosticsTexts(locale.value).title, doctorTitle: doctorTexts(locale.value).title }))
+const devActivity = useDevActivity() // the dot of the 开发者 rail: something new in the host's repository since the last look at Issue 与 PR
+watch(developerMode.enabled, (on) => { if (on) { developerOverlays(); devActivity.start() } else if (!on) { devActivity.stop(); developerOverlays().set({ ...DEFAULT_FLAGS }); if (nav.rail.value === 'developer') leaveDeveloper() } }, { immediate: true })
+const runtimeView = computed(() => ({ ...runtime, developer: developerMode.enabled.value, dev: devmodeTexts(locale.value), developerTitle: developerTexts(locale.value).title, rtssInstalled: rtssInstalled.value === true, lines: settingsList.lines.value, statusTitle: statusTexts(locale.value).title, serviceTitle: serviceTexts(locale.value).title, diagTitle: diagnosticsTexts(locale.value).title, doctorTitle: doctorTexts(locale.value).title }))
 const listItems = (id) => pageItems(t.value, id, runtimeView.value)
 // The stream settings are the shared model (categories in groups with a live line, search of every setting, recently used)
 const hostConfig = ref(null)
@@ -669,7 +680,7 @@ const onRail = (item) => {
   if (item.id === 'config') { loadHostData(); openConfig({ tab: 'general' }); router.navigate(ROUTES.CAT_CONFIG); return }
   // the stream rail opens on its first page: the frame has to show it
   if (item.id === 'stream') { router.navigate(ROUTES.CAT_STREAM); if (!isPhone()) emit('webui-navigate', webPathOf(ROUTES.WEB_CLIENTS)); return } // a phone has the stream hub: no page opens by itself
-  router.navigate({ overview: ROUTES.HOME, settings: ROUTES.PANEL_SETTINGS, help: ROUTES.HELP, stream: ROUTES.CAT_STREAM, input: ROUTES.CAT_INPUT, audio: ROUTES.CAT_AUDIO, display: ROUTES.CAT_DISPLAY, system: ROUTES.CAT_SYSTEM, assistant: ROUTES.AI_ASSISTANT }[item.id])
+  router.navigate({ overview: ROUTES.HOME, settings: ROUTES.PANEL_SETTINGS, help: ROUTES.HELP, stream: ROUTES.CAT_STREAM, input: ROUTES.CAT_INPUT, audio: ROUTES.CAT_AUDIO, display: ROUTES.CAT_DISPLAY, system: ROUTES.CAT_SYSTEM, assistant: ROUTES.AI_ASSISTANT, developer: ROUTES.CAT_DEVELOPER }[item.id])
   const first = nav.list.value && nav.defaultDetailOf(nav.list.value)
   const path = first && webPathOf(first.id)
   if (path) emit('webui-navigate', path)
@@ -726,6 +737,8 @@ const ctxCallbacks = {
   search: (text) => { uni.query.value = text; uni.show() }, connect: () => { connect.open.value = true }, notice: (m) => useNotify().snack(m), openExternal: (u) => openExternalUrl(u), restartHost: () => hostConn.restart('service'),
   doctor: () => { componentStatus.openPage(); void componentStatus.checkAll() },
   openWebUi: async () => { const base = String((await sunshine.getUrl()) || ''); if (base) await openExternalUrl(base) },
+  openDevtools: () => { invoke('dev_open_devtools').catch(() => useNotify().snack(devmodeTexts(locale.value).ctxDevtoolsFail)) },
+  reportHere: ({ route, place, text }) => { void openDevReport({ kind: 'feedback', draft: { title: '', description: `${devmodeTexts(locale.value).ctxReport}: ${route}${place ? ` (${place})` : ''}${text ? ` — ${text}` : ''}\n\n` } }) },
   get pet() { return [{ id: 'pet-settings', label: contextTexts(locale.value).petSettings, icon: 'pets', run: () => openPanelPage('pet') }] },
 }
 // the rows that have a tile on the overview that opens them: 固定到概览 pins that tile (the same functions as the pin of the search results)

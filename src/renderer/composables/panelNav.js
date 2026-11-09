@@ -4,10 +4,10 @@ import { ROUTES, RAILS } from './useRouter.js'
  * What the list pane of the panel shows: the pages of a category with the icon, tone and a second line (`runtime.lines`, from foundation-ui's rowLines: the live
  * state where the page has one, otherwise what is inside; never blank).
  */
-export function railItems(t) {
+export function railItems(t, labels = {}) {
   const n = t.m3e.nav
-  const icons = { overview: 'home', stream: 'cast_connected', config: 'tune', input: 'sports_esports', audio: 'volume_up', display: 'desktop_windows', system: 'build', assistant: 'smart_toy', settings: 'settings', help: 'help' }
-  return RAILS.map((id) => ({ id, icon: icons[id], label: n[id] }))
+  const icons = { overview: 'home', stream: 'cast_connected', config: 'tune', input: 'sports_esports', audio: 'volume_up', display: 'desktop_windows', system: 'build', assistant: 'smart_toy', settings: 'settings', help: 'help', developer: 'terminal' }
+  return RAILS.map((id) => ({ id, icon: icons[id], label: labels[id] ?? n[id] }))
 }
 
 /** The row id of foundation-ui's rowLines for a page of the list panes (the second line and the search words of the page). */
@@ -24,6 +24,21 @@ export function pageItems(t, rail, runtime = {}) {
   const c = t.m3e
   const lines = runtime.lines || {}
   const developer = runtime.developer ? [{ id: ROUTES.DEVELOPER, icon: 'code', tone: 'tertiary', label: runtime.developerTitle || 'Developer options', text: runtime.developerLine || '' }] : []
+  // 开发者: only while developer mode is on; the words are foundation-ui's devmodeTexts (`runtime.dev`)
+  if (rail === 'developer') {
+    const D = runtime.dev
+    if (!runtime.developer || !D) return []
+    const row = (id, route, icon, tone) => ({ id: route, icon, tone, label: D.pages[id], text: D.lines[id] })
+    return [
+      row('issues', ROUTES.DEV_ISSUES, 'bug_report', 'primary'),
+      row('logs', ROUTES.DEV_LOGS, 'terminal', 'secondary'),
+      row('api', ROUTES.DEV_API, 'api', 'tertiary'),
+      row('flags', ROUTES.DEV_FLAGS, 'flag', 'warn'),
+      row('build', ROUTES.DEV_BUILD, 'deployed_code', 'success'),
+      row('tests', ROUTES.DEV_TESTS, 'science', 'secondary'),
+      row('options', ROUTES.DEVELOPER, 'code', 'tertiary'),
+    ]
+  }
   const pages = {
     stream: [
       { id: ROUTES.WEB_CLIENTS, icon: 'devices', tone: 'tertiary', label: c.stream.clients[0], text: lines.clients },
@@ -71,7 +86,7 @@ export function pageItems(t, rail, runtime = {}) {
 
 // The bottom bar of a narrow window (the Material navigation bar takes three to five destinations; nine crammed their labels): the overview, the stream,
 // ONE entry for the four settings categories (it opens a list of them), 米塔 AI, and 更多 (panel settings, help and about, search, sponsor).
-export const BAR_GROUP_OF = { overview: 'overview', stream: 'stream', config: 'settings-hub', input: 'settings-hub', audio: 'settings-hub', display: 'settings-hub', system: 'settings-hub', assistant: 'assistant', settings: 'more', help: 'more', appearance: 'more' }
+export const BAR_GROUP_OF = { overview: 'overview', stream: 'stream', config: 'settings-hub', input: 'settings-hub', audio: 'settings-hub', display: 'settings-hub', system: 'settings-hub', assistant: 'assistant', settings: 'more', help: 'more', appearance: 'more', developer: 'more' }
 export function barItems(t) {
   const n = t.m3e.nav
   return [
