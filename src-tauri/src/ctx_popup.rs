@@ -47,6 +47,8 @@ struct Open {
     monitor: MonitorInfo,
     ready: Option<tokio::sync::oneshot::Sender<()>>,
     shown: bool,
+    /// Where the menu surface is (physical px): another level of the same menu keeps its corner there, so the menu does not jump when a submenu replaces its items.
+    surface: Option<Rect>,
     /// The window has had the focus: from then on losing it ends the menu.
     armed: bool,
     shown_at: Option<Instant>,
@@ -201,7 +203,7 @@ pub async fn ctx_popup_open(owner: WebviewWindow, request: OpenRequest) -> Resul
     let (_, room_h) = room_css(monitor.work, monitor.scale, MARGIN_CSS);
 
     let (tx, rx) = tokio::sync::oneshot::channel();
-    *state() = Some(Open { token: request.token, owner: owner.label().to_string(), anchor, monitor, ready: Some(tx), shown: false, armed: false, shown_at: None });
+    *state() = Some(Open { token: request.token, owner: owner.label().to_string(), anchor, monitor, ready: Some(tx), shown: false, surface: None, armed: false, shown_at: None });
 
     // the window waits on the monitor of the pointer, as large as the work area allows, cloaked: the page lays the menu out in a window that renders, at the scale it will have
     let measure = Rect::new(
@@ -248,10 +250,15 @@ pub async fn ctx_popup_ready(app: AppHandle, token: u64, width: f64, height: f64
         let open = guard.as_mut().filter(|o| o.token == token).ok_or("no such menu")?;
         let first = !open.shown;
         open.shown = true;
-        (open.anchor, open.monitor, first, open.ready.take())
+        // the first level opens at the pointer; the next ones where the surface is
+        let at = open.surface.map(|r| (r.x, r.y)).unwrap_or(open.anchor);
+        (at, open.monitor, first, open.ready.take())
     };
     let size = (css_to_physical(width.max(1.0), monitor.scale), css_to_physical(height.max(1.0), monitor.scale));
     let placed = place_surface(anchor, size, monitor.work, css_to_physical(MARGIN_CSS, monitor.scale));
+    if let Some(open) = state().as_mut().filter(|o| o.token == token) {
+        open.surface = Some(placed.rect);
+    }
     let window = placed.rect.grow(css_to_physical(PAD_CSS, monitor.scale));
     debug!("[ctxpop] menu {}x{} css at {:?} -> surface {:?} window {:?} (scale {})", width, height, anchor, placed.rect, window, monitor.scale);
     apply_rect(&popup, window);
