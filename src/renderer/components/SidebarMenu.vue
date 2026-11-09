@@ -90,7 +90,7 @@
       <template #overlay>
         <!-- the frame stays mounted while the host is away (it only is hidden): it loads again when the host is back -->
         <div v-show="!offlineShown" class="panel-web-keep" :inert="offlineShown ? '' : undefined"><PanelWebHost :sub="frameSub" :page="isWebPage ? router.currentRoute.value : ''"><slot /></PanelWebHost></div>
-        <MHostOffline v-if="offlineShown" :cause="offlineCause" :state="offlineState" :locale="locale" :port="hostPort" :can-restart="offlineCause !== 'proxy'" :can-user-mode="offlineCause !== 'proxy'" can-logs can-doctor @retry="retryOffline" @restart="confirmedRestart('service')" @user-mode="confirmedRestart('user')" @logs="router.navigate(ROUTES.DIAGNOSTICS)" @doctor="openDoctor" />
+        <MHostOffline v-if="offlineShown" :cause="offlineCause" :state="offlineState" :locale="locale" :port="hostPort" :can-restart="offlineCause !== 'proxy'" :can-user-mode="offlineCause !== 'proxy'" can-logs can-doctor @retry="retryOffline" @restart="confirmedRestart('service')" @user-mode="confirmedRestart('user')" @logs="jumpTo(ROUTES.DIAGNOSTICS)" @doctor="openDoctor" />
       </template>
     </MScene>
     </div>
@@ -115,7 +115,7 @@
     <MCoachMarks :locale="locale" storage-key="foundation.coach.panel" guide-key="foundation.guide.panel" />
     <MRemoteWindow v-model="remoteOpen" :locale="locale" :state="remoteData.state" :callbacks="remoteData.callbacks" />
     <MConnectDialog v-model="connect.open.value" v-model:tab="connect.tab.value" v-model:os="connect.os.value" :assets-of="connect.assetsOf" :version-of="connect.versionOf" :locale="locale" :qr="connect.matrix" :pair-qr="connect.pairQr" :count="hostClients.length" :latest="hostClients.length ? hostClients[hostClients.length - 1].name : ''" :close-label="t.m3e.home.done"
-      @pair-pin="(e) => connect.pairPin(e.pin, e.name)" @pair-qr-begin="connect.qrBegin()" @pair-qr-stop="connect.qrStop()" @open-url="actions_openExternal" @open-downloads="() => { connect.open.value = false; openRoute(ROUTES.WEB_DOWNLOADS) }" />
+      @pair-pin="(e) => connect.pairPin(e.pin, e.name)" @pair-qr-begin="connect.qrBegin()" @pair-qr-stop="connect.qrStop()" @open-url="actions_openExternal" @open-downloads="() => { connect.open.value = false; jumps.jump(() => openRoute(ROUTES.WEB_DOWNLOADS)) }" />
     <MPairPrompt :requests="pairing.requests.value" :locale="locale" @submit="onPairSubmit" @reject="(id) => pairing.reject(id)" @install="connect.show('install')" />
     <PanelPending :locale="locale" @go="onPendingGo" />
     <PanelBusyLayer />
@@ -185,6 +185,7 @@ import { useTools } from '../composables/useTools.js'
 import { useTouchWindowDrag } from '../composables/useTouchWindowDrag.js'
 import { createUtilityTools } from '../composables/toolsRegistry.js'
 import { ROUTES, PAGES, routeForWebPath, routeOfPlace, webPathOf, isPhone } from '../composables/useRouter.js'
+import { framedMove } from '../composables/frameFollow.js'
 import { PANEL_PAGE_PATHS, requestPanelPage } from '../composables/panelParts.js'
 import { proxyBlock } from '../composables/proxyBlock.js'
 import { createGuideData } from '../composables/guideData.js'
@@ -193,7 +194,7 @@ import { recordUpdateCheck } from '../composables/useUpdateCheckTime.js'
 import { useHostReach } from '../composables/useHostReach.js'
 import { ROW_OF_ROUTE, railItems, pageItems, barItems, barCurrent } from '../composables/panelNav.js'
 import { rtssInstalled, readRtssInstall } from '../composables/rtssInstall.js'
-import { rowKeywords } from 'foundation-ui/settings/index.js'
+import { rowKeywords, parseSettingsHash, SEARCH_INDEX } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { useDualSenseStatus } from '../composables/useDualSenseStatus.js'
 import { useDualSenseText } from '../composables/useDualSenseText.js'
@@ -260,7 +261,7 @@ const toolsMenuItems = computed(() => createUtilityTools(toolsCtx))
 // the component status: one controller for the page and for the home cards the catalogue offers
 const componentStatus = useComponentStatus({
   locale,
-  go: { vdd: () => router.navigate(ROUTES.VDD_SETTINGS), components: () => router.navigate(ROUTES.COMPONENTS), microphone: () => router.navigate(ROUTES.MICROPHONE), page: () => router.navigate(ROUTES.COMPONENT_STATUS) },
+  go: { vdd: () => jumpTo(ROUTES.VDD_SETTINGS), components: () => jumpTo(ROUTES.COMPONENTS), microphone: () => jumpTo(ROUTES.MICROPHONE), page: () => jumpTo(ROUTES.COMPONENT_STATUS) },
   update: () => ({ state: updateInfo.value ? (updateInfo.value.is_latest ? 'latest' : 'available') : '', next: updateInfo.value?.version || '' }),
   check: () => handleCheckForUpdates(),
 })
@@ -269,7 +270,7 @@ const componentStatus = useComponentStatus({
 useSystemNotices({
   status: componentStatus,
   locale,
-  go: { components: () => router.navigate(ROUTES.COMPONENTS), microphone: () => router.navigate(ROUTES.MICROPHONE), vdd: () => router.navigate(ROUTES.VDD_SETTINGS), update: () => { showUpdateDialog.value = true } },
+  go: { components: () => jumpTo(ROUTES.COMPONENTS), microphone: () => jumpTo(ROUTES.MICROPHONE), vdd: () => jumpTo(ROUTES.VDD_SETTINGS), update: () => { showUpdateDialog.value = true } },
   update: () => ({ state: updateInfo.value && !updateInfo.value.is_latest ? 'available' : '', next: updateInfo.value?.version || '' }),
 })
 const sponsorSections = computed(() => [
@@ -290,7 +291,7 @@ watch(updateInfo, (info) => { if (info) remember(afterCheck(noticeState.value, {
 // The sheet the updater opens by itself when it finds an update is not the person opening it: the dot stays.
 const updatesOpen = computed(() => router.currentRoute.value === ROUTES.PANEL_SETTINGS || router.currentRoute.value === ROUTES.ABOUT)
 watch([updatesOpen, () => notice.value.version], ([open]) => { if (open && noticeState.value.available) remember(afterOpened(noticeState.value)) }, { immediate: true })
-const openUpdates = () => { router.navigate(ROUTES.PANEL_SETTINGS) }
+const openUpdates = () => { jumpTo(ROUTES.PANEL_SETTINGS) }
 const onVersionCopied = (text) => useNotify().snack(text ? captionTexts(locale.value).copiedNote : captionTexts(locale.value).copyFailed)
 // ---- the global back: the places a person left by a jump (体检 → 网络, a home tile → its settings); the person's own moves clear it
 const jumps = createJumpHistory({
@@ -316,6 +317,13 @@ const restorePlace = (place) => {
   const path = webPathOf(place.id)
   if (path) emit('webui-navigate', path)
   router.navigate(place.id, place.params)
+}
+// The frame moved by itself (a link inside a Web page, an address, a place set by the page's hash): the route follows what is displayed, so the rail, the list row and the title are those of the page that is
+// shown (composables/frameFollow.js decides; it is a jump, so Back returns to the page the link was on). Only while the frame IS what is displayed: behind a page of the panel it may load whatever it likes.
+const followFrame = (path) => {
+  if (!isWebPage.value) return
+  const move = framedMove(path, { route: router.currentRoute.value, params: nav.detail.value?.params }, { routeForWebPath, routeOfPlace, parseHash: (hash) => parseSettingsHash(hash, SEARCH_INDEX), configRoute: ROUTES.WEB_CONFIG })
+  if (move) jumps.jump(() => router.navigate(move.route, move.params))
 }
 // the back stack mirrors into the window's history (as in the Web UI): the back arrow of a pushed page, Esc, the mouse's back button and the browser's agree; without it the arrow only went back in the history and the page stayed
 onMounted(() => { nav.widen(); nav.attach() })
@@ -551,11 +559,11 @@ const actionHandlers = {
   restartDriver: () => tools.restartGraphicsDriver(),
   connect: () => connect.show('pair'),
   download: () => connect.show('install'),
-  exportDiag: () => router.navigate(ROUTES.DIAGNOSTICS),
+  exportDiag: () => jumpTo(ROUTES.DIAGNOSTICS),
   checkUpdate: () => handleCheckForUpdates(),
-  logs: () => router.navigate(ROUTES.DIAGNOSTICS),
-  addApp: () => { emit('webui-navigate', '/apps#guide-add'); router.navigate(ROUTES.WEB_APPS) },
-  scanGames: () => { emit('webui-navigate', '/apps#guide-scan'); router.navigate(ROUTES.WEB_APPS) },
+  logs: () => jumpTo(ROUTES.DIAGNOSTICS),
+  addApp: () => jumps.jump(() => { emit('webui-navigate', '/apps#guide-add'); router.navigate(ROUTES.WEB_APPS) }),
+  scanGames: () => jumps.jump(() => { emit('webui-navigate', '/apps#guide-scan'); router.navigate(ROUTES.WEB_APPS) }),
   stopApp: () => hostAction('/api/apps/close', diagnosticsTexts(locale.value).forceClose),
   resetDisplay: () => hostAction('/api/reset-display-device-persistence', diagnosticsTexts(locale.value).resetDisplay),
   setupGuide: () => openWelcome(),
@@ -770,7 +778,7 @@ const openPanelPage = (page) => {
 }
 defineExpose({
   openVddSettings, openWelcome, openWebStream, openAiAssistant, openControllers, openRtxHdr, openPanelPage, openStartGuide,
-  goHome, checkForUpdates: handleCheckForUpdates, router,
+  goHome, checkForUpdates: handleCheckForUpdates, router, followFrame,
 })
 </script>
 

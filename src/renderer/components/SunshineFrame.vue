@@ -52,6 +52,17 @@ const frameKey = ref(0)
 // The Web in the frame says (once, after it mounted) that it can be told the page: from then on a request for another framed page is a message to this frame (handleWebuiNavigate), not a new address. A new frame has not said it yet.
 let frameGoReady = false
 watch(sunshineUrl, () => { frameKey.value++; frameGoReady = false }, { flush: 'sync' })
+// A link inside a Web page moves the frame without `sunshineUrl` (the address the panel last gave it) changing. Asked later for the address it remembers (Back to the page the link was on), the same
+// value would change nothing and the frame would stay on the page the link led to, with the route and the list already on the other one. `setFrameUrl` loads it again in that case.
+let frameMovedAway = false
+const setFrameUrl = (url) => {
+  const again = sunshineUrl.value === url && frameMovedAway
+  frameMovedAway = false
+  if (again) { frameKey.value++; frameGoReady = false } else sunshineUrl.value = url
+}
+const notePath = (path) => {
+  try { const asked = new URL(sunshineUrl.value, window.location.href); if (/^https?:$/.test(asked.protocol) && path.split('#')[0] !== asked.pathname + asked.search) frameMovedAway = true } catch { /* about:blank: nothing to compare */ }
+}
 const currentPath = ref('/')
 const sunshineIframe = ref(null)
 const sidebarMenuRef = ref(null)
@@ -181,7 +192,7 @@ const handleNavigateFrame = (event) => {
   }
 
   beginLoading()
-  sunshineUrl.value = url
+  setFrameUrl(url)
 }
 
 // 路由切换：离开 HOME 时休眠 iframe，返回时恢复
@@ -227,7 +238,7 @@ const handleWebuiNavigate = (path) => {
   currentPath.value = next.currentPath
   if (next.url === null && sunshineUrl.value && sunshineUrl.value !== BLANK) return
   beginLoading()
-  if (next.url) sunshineUrl.value = next.url
+  if (next.url) setFrameUrl(next.url)
 }
 
 // the overview and the pages of the panel itself: the frame sleeps behind them and wakes with the overview; a Web page is never shown over a sleeping frame (frameRoute.js)
@@ -235,7 +246,7 @@ const handleRouteChange = ({ from, to }) => {
   const decision = routeChanged({ from, to }, { currentPath: currentPath.value, url: sunshineUrl.value, saved: savedIframeUrl }, { urlOf: frameUrlOf, webPathOf, routeForWebPath })
   if (decision) {
     if (decision.kind !== 'resume') beginLoading()
-    sunshineUrl.value = decision.url
+    setFrameUrl(decision.url)
     savedIframeUrl = decision.saved
     if (decision.currentPath) currentPath.value = decision.currentPath
     console.log(`[SunshineFrame] route ${from} -> ${to}: iframe ${decision.kind}`)
@@ -308,6 +319,9 @@ const createMessageHandler = () => {
     },
     'path-update': (data) => {
       currentPath.value = data.path
+      notePath(data.path)
+      // the document that was loaded is the page that is shown: the panel's route is made to agree (SidebarMenu.followFrame)
+      sidebarMenuRef.value?.followFrame?.(data.path)
     },
     'navigation-start': (data) => {
       if (data.path) {
@@ -317,6 +331,9 @@ const createMessageHandler = () => {
           return
         }
         currentPath.value = data.path
+        notePath(data.path)
+        // a link, an address or a place of the page's hash moved the frame by itself: the rail, the list and the title follow (SidebarMenu.followFrame)
+        sidebarMenuRef.value?.followFrame?.(data.path)
       }
       beginLoading()
     },
