@@ -10,6 +10,7 @@
     "allow-dev-set-cold-cloak",
     "allow-dev-simulate-dpi",
     "allow-dev-open-devtools",
+    "allow-dev-capture-window",
     "allow-dev-clear-webview-cache",
     "allow-dev-reset-desktop-settings",
     "allow-dev-environment"

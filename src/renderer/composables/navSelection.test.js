@@ -35,7 +35,7 @@ test('navigating to a page selects exactly that page and its rail (the stack com
 })
 
 test('every page of a rail with a list is a row of that list (the row that is lit is the page that is shown)', () => {
-  const rowsOf = (rail) => pageItems(zh, rail, { developer: true, rtssInstalled: true }).map((i) => i.id)
+  const rowsOf = (rail) => pageItems(zh, rail, { developer: true, rtssInstalled: true, dev: { pages: {}, lines: {} } }).map((i) => i.id)
   for (const [route, page] of Object.entries(PAGES)) {
     if (ALIASED.has(route) || page.list === false || page.push) continue
     if (page.rail === 'config') continue // the settings rows come from the shared settings list (places), not from pageItems

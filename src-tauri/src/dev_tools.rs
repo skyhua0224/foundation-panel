@@ -175,6 +175,50 @@ pub async fn dev_clear_webview_cache(window: tauri::WebviewWindow) -> Result<(),
     }
 }
 
+/// The `data` of a `Page.captureScreenshot` answer (the PNG in base64); an answer without it is an error.
+fn capture_data(json: &str) -> Result<String, String> {
+    let value: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
+    value.get("data").and_then(|d| d.as_str()).filter(|d| !d.is_empty()).map(str::to_string).ok_or_else(|| "the capture has no image".to_string())
+}
+
+/// A PNG of the whole window as WebView2 draws it (the embedded Web UI frame included), in base64: the report sheet attaches it, taken before the sheet is drawn. Asks WebView2 through the DevTools protocol.
+#[tauri::command]
+pub async fn dev_capture_window(window: tauri::WebviewWindow) -> Result<String, String> {
+    #[cfg(target_os = "windows")]
+    {
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<String, String>>();
+        let tx = std::sync::Arc::new(std::sync::Mutex::new(Some(tx)));
+        let on_start = tx.clone();
+        window
+            .with_webview(move |webview| unsafe {
+                use webview2_com::CallDevToolsProtocolMethodCompletedHandler;
+                use windows::core::w;
+                let answer = tx.clone();
+                let handler = CallDevToolsProtocolMethodCompletedHandler::create(Box::new(move |result, json| {
+                    let out = result.map_err(|e| e.to_string()).and_then(|_| capture_data(&json));
+                    if let Some(tx) = answer.lock().unwrap().take() {
+                        let _ = tx.send(out);
+                    }
+                    Ok(())
+                }));
+                let started = webview.controller().CoreWebView2().and_then(|core| core.CallDevToolsProtocolMethod(w!("Page.captureScreenshot"), w!("{\"format\":\"png\"}"), &handler));
+                if let Err(error) = started {
+                    log::warn!("[developer] the window capture failed to start: {error}");
+                    if let Some(tx) = on_start.lock().unwrap().take() {
+                        let _ = tx.send(Err(error.to_string()));
+                    }
+                }
+            })
+            .map_err(|e| e.to_string())?;
+        tokio::time::timeout(std::time::Duration::from_secs(5), rx).await.map_err(|_| "no answer from WebView2".to_string())?.map_err(|_| "the request was dropped".to_string())?
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = window;
+        Err("windows only".to_string())
+    }
+}
+
 /// The settings file of the window goes back to its defaults (the page then clears what the window itself stores and reloads).
 #[tauri::command]
 pub async fn dev_reset_desktop_settings(app: tauri::AppHandle) -> Result<(), String> {
@@ -199,6 +243,14 @@ pub fn dev_environment() -> DevEnvironment {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_capture_answer_gives_its_image_or_an_error() {
+        assert_eq!(capture_data(r#"{"data":"iVBORw0KGgo="}"#), Ok("iVBORw0KGgo=".to_string()));
+        assert!(capture_data("{}").is_err());
+        assert!(capture_data(r#"{"data":""}"#).is_err());
+        assert!(capture_data("not json").is_err());
+    }
 
     #[test]
     fn a_damaged_file_gives_the_defaults() {
