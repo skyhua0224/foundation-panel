@@ -1314,9 +1314,16 @@ export const zh_TW = {
       "fallback": "已改用 VB-CABLE",
       "fallbackReason": "原因：{reason}",
       "problem": "麥克風出現問題",
+      "howToTest": "空閒時點「測試麥克風」播放一段測試音；串流中對用戶端麥克風說話，在這裡看用戶端麥克風電平。",
+      "level": "用戶端麥克風電平",
+      "levelActive": "正在收到用戶端聲音",
+      "levelSilent": "最近幾秒沒有收到用戶端聲音",
+
       "test": "測試麥克風",
       "testing": "正在測試…",
       "testSuccess": "測試聲音已通過“{backend}”送出，請在 Windows 的錄音裝置裡確認。",
+      "testLive": "串流正在透過「{backend}」使用麥克風通道；對用戶端麥克風說話，看電平。",
+
       "testFailed": "測試沒有完成（使用的後端：{backend}）：{reason}",
       "testFailedNoBackend": "測試沒有完成：{reason}",
       "defaultsNote": "Windows 的預設錄音和播放裝置不會被更改。",

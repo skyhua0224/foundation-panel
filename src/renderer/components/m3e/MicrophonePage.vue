@@ -18,6 +18,13 @@
       <span v-if="status.buffered_bytes != null" class="mic-flow__buffer"><MProgress :value="Math.min(1, bufferedMs / 200)" :label="t.m3e.micFlow.buffer" /><small>{{ t.m3e.micFlow.buffer }} {{ Math.round(bufferedMs) }} ms</small></span>
     </div>
 
+    <!-- live client microphone level: the only meaningful mic test while a stream runs -->
+    <MGroup v-if="!loadError && liveInput">
+      <MItem icon="graphic_eq" :title="text.level" :text="inputFresh ? text.levelActive : text.levelSilent">
+        <template #trail><MProgress :value="levelShown" :label="text.level" /></template>
+      </MItem>
+    </MGroup>
+
     <MSection>
       <MGroup>
         <MItem icon="tune" :title="text.backend" :text="text.backendHints[backendChoice]" stack>
@@ -30,6 +37,7 @@
 
     <MSection>
       <MStatusPills :items="pills" :label="t.deviceHub.tabs.microphone" />
+      <MFooter>{{ text.howToTest }}</MFooter>
       <MFooter>{{ text.defaultsNote }}</MFooter>
     </MSection>
 
@@ -54,7 +62,8 @@ import { virtualMicrophone } from '../../tauri-adapter.js'
 import { micStatusChannel } from '../../composables/deviceStatusStore.js'
 import {
   MICROPHONE_BACKENDS, canTestMicrophone, microphoneBufferedMs, microphoneComponentMissing,
-  microphoneOverviewState, microphoneStatusTone, microphoneUsesUsbip,
+  microphoneOverviewState, microphoneStatusTone, microphoneUsesUsbip, microphoneInputFresh,
+  microphoneInputLevel, microphoneTestIsLive,
 } from '../../composables/deviceHubStatus.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
@@ -80,6 +89,10 @@ const flow = computed(() => [
 const usesUsbip = computed(() => microphoneUsesUsbip(status))
 const componentMissing = computed(() => microphoneComponentMissing(status))
 const bufferedMs = computed(() => microphoneBufferedMs(status))
+const liveInput = computed(() => Number(status.input_frames) > 0)
+const inputFresh = computed(() => microphoneInputFresh(status))
+const levelShown = ref(0)
+let levelTimer
 const backendChoice = ref('auto')
 const savingBackend = ref(false)
 // 错误码只翻译不外露；未知码给出通用说明。
@@ -131,7 +144,9 @@ async function runTest() {
     const result = await virtualMicrophone.test()
     const answer = result?.success ? result.data : null
     const backend = answer?.backend ? text.value.backends[answer.backend] || answer.backend : ''
-    if (answer?.success) {
+    if (answer?.success && microphoneTestIsLive(answer)) {
+      ElMessage.success(text.value.testLive.replace('{backend}', backend))
+    } else if (answer?.success) {
       ElMessage.success(text.value.testSuccess.replace('{backend}', backend))
     } else {
       const reason = errorText(answer?.error_code)
@@ -170,6 +185,16 @@ const startPolling = () => {
   if (pollTimer || disposed) return
   pollTimer = window.setInterval(refresh, 3000)
 }
+watch(() => status.input_peak, () => {
+  const peak = microphoneInputLevel(status)
+  if (peak > levelShown.value) levelShown.value = peak
+})
+onMounted(() => {
+  // Peak-hold with decay so a 3 s poll still shows one spoken phrase as a visible bump.
+  levelTimer = window.setInterval(() => {
+    levelShown.value = Math.max(0, levelShown.value - 0.04)
+  }, 250)
+})
 const stopPolling = () => {
   if (pollTimer) {
     window.clearInterval(pollTimer)
@@ -186,7 +211,7 @@ onActivated(() => {
   startPolling()
 })
 onDeactivated(stopPolling)
-onUnmounted(() => { disposed = true; stopPolling() })
+onUnmounted(() => { disposed = true; stopPolling(); window.clearInterval(levelTimer) })
 
 const heroTone = computed(() => ({ 'state-ready': 'success', 'state-active': 'success' }[statusTone.value] || 'neutral'))
 const heroIcon = computed(() => (loadError.value ? 'error' : state.value === 'idle' || state.value === 'unknown' ? 'mic' : 'check_circle'))

@@ -8,6 +8,9 @@ import {
   microphoneOverviewState,
   microphoneStatusTone,
   microphoneUsesUsbip,
+  microphoneInputFresh,
+  microphoneInputLevel,
+  microphoneTestIsLive,
 } from './deviceHubStatus.js'
 
 const usb = { configured_backend: 'usbip_experimental', component_available: true, active_backend: 'usbip_experimental' }
@@ -69,4 +72,23 @@ test('VB-Cable and automatic fallback remain testable without usbip-win2', () =>
   }
   assert.equal(microphoneOverviewState({ configured_backend: 'disabled', device_created: true }), 'disabled')
   assert.equal(canTestMicrophone({ configured_backend: 'vb_cable', state: 'unsupported' }), false)
+})
+
+test('the live client microphone level is clamped and its freshness has a bounded window', () => {
+  assert.equal(microphoneInputLevel({ input_peak: 0.42 }), 0.42)
+  assert.equal(microphoneInputLevel({ input_peak: 4 }), 1)
+  assert.equal(microphoneInputLevel({ input_peak: -1 }), 0)
+  assert.equal(microphoneInputLevel({}), 0)
+  assert.equal(microphoneInputLevel({ input_peak: 'broken' }), 0)
+  assert.equal(microphoneInputFresh({ input_active_ms: 250 }), true)
+  assert.equal(microphoneInputFresh({ input_active_ms: 2999 }), true)
+  assert.equal(microphoneInputFresh({ input_active_ms: 3000 }), false)
+  assert.equal(microphoneInputFresh({ input_active_ms: -1 }), false)
+  assert.equal(microphoneInputFresh({}), false)
+})
+
+test('a live test answer is recognized regardless of its backend', () => {
+  assert.equal(microphoneTestIsLive({ mode: 'live', backend: 'vb_cable', success: true }), true)
+  assert.equal(microphoneTestIsLive({ mode: 'tone', backend: 'usbip_experimental', success: true }), false)
+  assert.equal(microphoneTestIsLive({}), false)
 })
