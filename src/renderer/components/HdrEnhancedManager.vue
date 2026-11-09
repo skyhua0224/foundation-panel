@@ -2,36 +2,44 @@
   <MPage :title="current === 'session' ? text.session : current === 'keys' ? text.keys : text.title" :back="!!current" :back-label="t.m3e.back" @back="goBack">
     <MBanner v-if="error" tone="error" icon="error">{{ enhancementError(text, error) }}</MBanner>
 
-    <!-- Overlay: what is running, the overlay as it looks in the game, its two controls, the shortcuts as keys -->
+    <!-- 画质增强: the noise reduction of the stream in progress (switch and strength), the components behind it; the overlay and its keys are in 高级 -->
     <template v-if="!current">
+      <MSection :title="dt.sections.quality.nr">
+        <NrSessionControls v-if="pipeline && parts.liveControls" :pipeline="pipeline" :online="online" @changed="pollOnce" @error="error = $event" />
+        <MGroup v-else>
+          <MItem icon="wand_stars" :title="dt.quality.nr" :text="online ? text.noSession : text.disconnected" plain />
+        </MGroup>
+      </MSection>
+
       <MGroup>
-        <MItem action icon="cast_connected" :title="text.session" :value="pipelines.length ? `${text.stream} #${pipelines[0].id}` : text.noSession" @click="open('session')">
-          <template #trail><MChip v-if="pipelines.length" tone="ok" icon="check_circle">{{ text.connected }}</MChip></template>
-        </MItem>
         <MItem action icon="extension" :title="text.components" :value="missing.length ? `${missing.join(' · ')} · ${text.needsInstall}` : 'DLSS NR · RTX HDR'" @click="emit('manage-components')">
           <template v-if="missing.length" #trail><MChip tone="warn" icon="warning">{{ text.needsInstall }}</MChip></template>
         </MItem>
       </MGroup>
 
-      <MBanner v-if="missing.length" tone="info" icon="extension">{{ text.componentsMissing }}<template #actions><MButton variant="text" size="sm" @click="emit('manage-components')">{{ text.openComponents }}</MButton></template></MBanner>
-
-      <MGroup v-if="parts.overlay">
-        <MSwitchItem :model-value="visible" icon="picture_in_picture" :title="text.show" :text="text.showHint" :disabled="saving || !loaded" @update:model-value="setVisibility" />
-        <MSliderItem v-model="draftOpacity" icon="opacity" :title="text.opacity" :min="35" :max="95" :step="1" :decimals="0" unit="%" size="m" icon-start="brightness_medium" icon-end="brightness_6" :disabled="saving || !loaded" @commit="save({ opacity: draftOpacity })" />
-      </MGroup>
-
-      <MSection v-if="parts.keys" :title="text.keys">
+      <MExpander v-model:open="advancedOpen" :title="dt.sections.encoders.advanced">
         <MGroup>
-          <MItem action icon="visibility" :title="text.visibilityKey" @click="open('keys')">
-            <template #trail><span class="m-qkeys"><kbd v-for="k in keysOf(displayShortcut(settings.overlayShortcut))" :key="k">{{ k }}</kbd><kbd v-if="!settings.overlayShortcut" class="is-unset">{{ text.unset }}</kbd><kbd v-if="settings.overlayGamepad" class="is-pad"><MIcon name="sports_esports" />{{ displayGamepadShortcut(settings.overlayGamepad) }}</kbd></span></template>
-          </MItem>
-          <MItem action icon="wand_stars" :title="text.nrKey" @click="open('keys')">
-            <template #trail><span class="m-qkeys"><kbd v-for="k in keysOf(displayShortcut(settings.nrShortcut))" :key="k">{{ k }}</kbd><kbd v-if="!settings.nrShortcut" class="is-unset">{{ text.unset }}</kbd><kbd v-if="settings.nrGamepad" class="is-pad"><MIcon name="sports_esports" />{{ displayGamepadShortcut(settings.nrGamepad) }}</kbd></span></template>
+          <MItem action icon="cast_connected" :title="text.session" :value="pipelines.length ? `${text.stream} #${pipelines[0].id}` : text.noSession" @click="open('session')">
+            <template #trail><MChip v-if="pipelines.length" tone="ok" icon="check_circle">{{ text.connected }}</MChip></template>
           </MItem>
         </MGroup>
-        <MFooter>{{ text.keyHint }}</MFooter>
-      </MSection>
-      <MFooter v-if="parts.overlay">{{ saved ? text.saved : text.local }}</MFooter>
+        <MGroup v-if="parts.overlay">
+          <MSwitchItem :model-value="visible" icon="picture_in_picture" :title="text.show" :text="text.showHint" :disabled="saving || !loaded" @update:model-value="setVisibility" />
+          <MSliderItem v-model="draftOpacity" icon="opacity" :title="text.opacity" :min="35" :max="95" :step="1" :decimals="0" unit="%" size="m" icon-start="brightness_medium" icon-end="brightness_6" :disabled="saving || !loaded" @commit="save({ opacity: draftOpacity })" />
+        </MGroup>
+        <MSection v-if="parts.keys" :title="text.keys">
+          <MGroup>
+            <MItem action icon="visibility" :title="text.visibilityKey" @click="open('keys')">
+              <template #trail><span class="m-qkeys"><kbd v-for="k in keysOf(displayShortcut(settings.overlayShortcut))" :key="k">{{ k }}</kbd><kbd v-if="!settings.overlayShortcut" class="is-unset">{{ text.unset }}</kbd></span></template>
+            </MItem>
+            <MItem action icon="wand_stars" :title="text.nrKey" @click="open('keys')">
+              <template #trail><span class="m-qkeys"><kbd v-for="k in keysOf(displayShortcut(settings.nrShortcut))" :key="k">{{ k }}</kbd><kbd v-if="!settings.nrShortcut" class="is-unset">{{ text.unset }}</kbd></span></template>
+            </MItem>
+          </MGroup>
+          <MFooter>{{ text.keyHint }}</MFooter>
+        </MSection>
+        <MFooter v-if="parts.overlay">{{ saved ? text.saved : text.local }}</MFooter>
+      </MExpander>
     </template>
 
     <!-- Current session -->
