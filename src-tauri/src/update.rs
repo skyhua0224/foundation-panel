@@ -2591,7 +2591,10 @@ pub async fn install_update(
             tokio::time::sleep(Duration::from_secs(2)).await;
             emit_install_progress(&app_clone, "app-exiting", None, false);
             tokio::time::sleep(Duration::from_secs(1)).await;
-            app_clone.exit(0);
+            // Deliberate handoff: the installer starts the next GUI. Exit code 0
+            // would make the host treat this as a killed agent and launch another
+            // copy while the installer is replacing files.
+            app_clone.exit(crate::gui_agent_exit::GUI_AGENT_DELIBERATE_QUIT_EXIT_CODE);
         });
 
         Ok(())

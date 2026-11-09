@@ -166,6 +166,9 @@ pub async fn restart_as_admin(app_handle: tauri::AppHandle) -> Result<String, St
 
         tokio::spawn(async move {
             info!("Exiting current GUI instance");
+            // Exit 0, not the deliberate-quit code. The elevated process is
+            // already running and waits for this one, so the host attaches to
+            // it instead of launching a third copy.
             app_handle.exit(0);
         });
 
