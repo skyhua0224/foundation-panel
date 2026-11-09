@@ -6,7 +6,7 @@
       <template #version><MCaptionVersion :version="currentVersion" :build="buildInfo" :os="osName()" :locale="locale" :update="notice.version" @copied="onVersionCopied" @open-update="openUpdates" /></template>
       <template #brand><MBrand class="panel-caption__brand" :size="20" data-tauri-drag-region /></template>
       <template #announcements><UpdateDownloadChip @open="showUpdateDialog = true" /><MStatusBell :locale="locale" /><MAnnouncementButton :unread="announcements.unread.value" :locale="locale" @open="router.navigate(ROUTES.ANNOUNCEMENTS)" /></template>
-      <template #search><div class="panel-caption__search" data-tauri-drag-region><MUnifiedSearch :search="uni" :texts="searchT" :compact="compactSearch || narrowCaption" :height="38" /></div></template>
+      <template #search><div class="panel-caption__search" data-tauri-drag-region><MUnifiedSearch :search="uni" :texts="searchT" :compact="compactSearch || caption.tight.value" :height="38" /></div></template>
       <template #connect><button type="button" class="m-caption-connect" :aria-label="connectT.title" :data-tip="connectT.title" :disabled="hostUnusable" @click="connect.show('pair')"><MIcon name="person_add" /><span>{{ connectT.title }}</span></button></template>
       <template #controls><div class="panel-caption__controls">
         <button type="button" class="panel-caption__btn" :aria-label="t.sidebar.minimize" :data-tip="t.sidebar.minimize" @click="minimizeWindow"><MIcon name="remove" /></button>
@@ -138,7 +138,7 @@ import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
 import { openBigScreenWithNotice } from '../composables/openBigScreen.js'
-import { MButton, homeTexts, MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MCaptionVersion, MCaptionBack, MBackChip, createJumpHistory, useBackVariant, showsButton, showsChip, captionTexts, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, doctorTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode, useDialogs } from 'foundation-ui/vue'
+import { MButton, homeTexts, MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MCaptionVersion, MCaptionBack, MBackChip, useCaptionRoom, createJumpHistory, useBackVariant, showsButton, showsChip, captionTexts, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, doctorTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode, useDialogs } from 'foundation-ui/vue'
 import { developerOverlays, developerTexts, DEFAULT_FLAGS } from 'foundation-ui/developer'
 import { afterCheck, afterOpened, noticeView, readNotice, writeNotice } from 'foundation-ui/update'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
@@ -307,7 +307,7 @@ const backPage = computed(() => {
   const place = jumps.top.value
   if (!place) return ''
   if (place.params?.tab) return labelOf(locale.value, `tabs.${place.params.tab}`) || railLabel(place.rail)
-  const row = ['stream', 'config', 'input', 'audio', 'display', 'system', 'settings', 'help'].flatMap((r) => pageItems(t.value, r, {})).find((i) => i.id === place.id)
+  const row = ['stream', 'input', 'audio', 'display', 'system', 'settings', 'help'].flatMap((r) => listItems(r)).find((i) => i.id === place.id)
   return row?.label || (place.id === ROUTES.HOME ? t.value.m3e.nav.overview : '') || railLabel(place.rail)
 })
 const restorePlace = (place) => {
@@ -470,10 +470,10 @@ const searchItems = computed(() => [
 ])
 // ---- the unified search: one entry in the caption bar (an icon and a full-screen view on a narrow window) over everything a person can look for ----
 const compactSearch = ref(typeof window !== 'undefined' && window.innerWidth < 600)
-// the caption bar carries the version beside the name: below this width the search is its icon (as on a phone), so the bar never cuts the search field
-const narrowCaption = ref(typeof window !== 'undefined' && window.innerWidth < 900)
+// the version sits beside the name: when what is left of the bar cannot show the search field with its hint, the search is its icon (as on a phone) instead of being cut
+const caption = useCaptionRoom()
 let wasPhone = isPhone()
-const onSearchResize = () => { compactSearch.value = window.innerWidth < 600; narrowCaption.value = window.innerWidth < 900; const now = isPhone(); if (now !== wasPhone) { wasPhone = now; if (now) nav.narrow(); else nav.widen() } }
+const onSearchResize = () => { compactSearch.value = window.innerWidth < 600; const now = isPhone(); if (now !== wasPhone) { wasPhone = now; if (now) nav.narrow(); else nav.widen() } }
 onMounted(() => window.addEventListener('resize', onSearchResize))
 onBeforeUnmount(() => window.removeEventListener('resize', onSearchResize))
 const searchT = computed(() => searchTexts(locale.value))

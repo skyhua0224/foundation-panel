@@ -41,9 +41,9 @@ test('the jumps: pages and tiles open as jumps, the rail and the list rows do no
   // a place is restored through the panel's own openers: a Web page also needs its frame told
   assert.match(sidebar, /const restorePlace = \(place\) => \{[\s\S]*?openConfig\(place\.params[\s\S]*?emit\('webui-navigate', path\)[\s\S]*?router\.navigate\(place\.id, place\.params\)/)
 })
-test('the narrow caption: below 900 px the search is its icon, so the version never cuts the search field', () => {
-  assert.match(sidebar, /:compact="compactSearch \|\| narrowCaption"/)
-  assert.match(sidebar, /narrowCaption\.value = window\.innerWidth < 900/)
+test('the search is its icon when the version leaves it no room (measured), so the bar never cuts the field', () => {
+  assert.match(sidebar, /:compact="compactSearch \|\| caption\.tight\.value"/)
+  assert.match(sidebar, /const caption = useCaptionRoom\(\)/)
 })
 test('the panel scenario: 体检 → 网络 → back lands on 体检 with its token; a rail move clears it; the notice walks through its four states', () => {
   const at = { value: { id: 'doctor', params: { autostart: 17 }, rail: 'system' } }
