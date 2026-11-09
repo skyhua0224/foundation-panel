@@ -37,10 +37,28 @@ struct Host {
     shown: AtomicBool,
 }
 
+/// One line to the shell, "type" first. serde_json orders keys alphabetically, so {"action":{"type":..},"type":..}
+/// would put the nested "type" first, and a shell that reads the first "type" (every shell before
+/// installer_json.h) dropped every action: the owner's blocker of 2026-11-09.
+fn wire_line(message: Value) -> String {
+    match message {
+        Value::Object(mut map) => match map.remove("type") {
+            Some(kind) => {
+                let whole = Value::Object(map).to_string();
+                let rest = whole.strip_prefix('{').and_then(|r| r.strip_suffix('}')).unwrap_or("");
+                if rest.is_empty() { format!("{{\"type\":{kind}}}") } else { format!("{{\"type\":{kind},{rest}}}") }
+            }
+            None => Value::Object(map).to_string(),
+        },
+        other => other.to_string(),
+    }
+}
+
 impl Host {
     fn send(&self, message: Value) {
+        let line = wire_line(message);
         if let Ok(mut out) = self.out.lock() {
-            let _ = writeln!(out, "{message}");
+            let _ = writeln!(out, "{line}");
             let _ = out.flush();
         }
     }
@@ -472,4 +490,25 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("the setup UI could not start");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::wire_line;
+    use serde_json::{json, Value};
+
+    #[test]
+    fn the_type_is_the_first_key_and_the_line_is_the_same_json() {
+        for v in [
+            json!({"type": "action", "action": {"type": "toggle-component", "id": "usbip"}}),
+            json!({"type": "action", "action": {"type": "ready"}}),
+            json!({"type": "loaded"}),
+            json!({"type": "hello", "hwnd": 12}),
+            json!({"type": "log", "text": "a \"b\" {c}"}),
+        ] {
+            let line = wire_line(v.clone());
+            assert!(line.starts_with(&format!("{{\"type\":{}", v["type"])), "{line}");
+            assert_eq!(serde_json::from_str::<Value>(&line).unwrap(), v);
+        }
+    }
 }
