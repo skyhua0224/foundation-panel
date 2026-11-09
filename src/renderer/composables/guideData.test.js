@@ -276,3 +276,30 @@ test('「还原内置应用」 in the flow restores through the host API and ans
   const down = createGuideData({ proxyUrl: async () => 'http://proxy', fetchImpl: async () => { throw new Error('offline') } })
   assert.deepEqual(await down.callbacks.restoreApps(), { ok: false, error: 'offline' })
 })
+
+test('the address step reads the port the host runs and the one it saved, and the name clients list', async () => {
+  const data = make({ '/api/network/listeners': { status: true, active: { port: 47989, upnp: false }, saved: { port: 48989, upnp: false }, addresses: [{ name: '以太网', address: '192.168.1.5' }] }, '/api/config': { sunshine_name: 'SKY-PC', external_endpoints: '' } })
+  await data.callbacks.loadNetwork()
+  assert.deepEqual([data.state.network.port, data.state.network.activePort, data.state.host.name], [48989, 47989, 'SKY-PC'])
+  const old = make({ '/api/network/listeners': { status: true, active: { port: 47989 }, saved: {}, addresses: [] }, '/api/config': {} })
+  await old.callbacks.loadNetwork()
+  assert.deepEqual([old.state.network.port, old.state.network.activePort, old.state.host.name], [47989, 47989, ''])
+})
+
+test('setPort saves the base port in the configuration through the host route, nothing else changes', async () => {
+  const calls = []
+  const data = make({ '/api/config': (path, init) => (init.method === 'POST' ? { status: true } : { sunshine_name: 'SKY-PC', port: 47989, upnp: 'enabled' }) }, {}, calls)
+  assert.deepEqual(await data.callbacks.setPort(48989), { ok: true })
+  const post = calls.find((c) => c.method === 'POST')
+  assert.equal(post.path, '/api/config'); assert.deepEqual(post.body, { sunshine_name: 'SKY-PC', port: 48989, upnp: 'enabled' })
+  assert.equal(data.state.network.port, 48989)
+  const refused = make({ '/api/config': (path, init) => (init.method === 'POST' ? new Response(JSON.stringify({ status: false, error: 'port out of range' }), { status: 400 }) : {}) })
+  assert.deepEqual(await refused.callbacks.setPort(80), { ok: false, error: 'port out of range' })
+})
+
+test('the address step opens the diagnostics through the panel', async () => {
+  let opened = 0
+  const data = make({}, { openDiagnostics: () => { opened += 1 } })
+  data.callbacks.openDiagnostics(); assert.equal(opened, 1)
+  assert.doesNotThrow(() => make({}).callbacks.openDiagnostics())
+})

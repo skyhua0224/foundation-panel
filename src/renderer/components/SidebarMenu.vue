@@ -36,7 +36,7 @@
         <!-- while the host cannot be used the status page (the overlay) is the whole content area; a page that needs the host is not drawn under it -->
         <template v-if="offlineShown && !isWebPage" />
         <PanelHome v-else-if="entry.id === ROUTES.HOME" :runtime="runtime" :update-available="!!updateInfo" @open="openDestination" @webui-navigate="openWebUi" />
-        <Welcome v-else-if="entry.id === ROUTES.WELCOME" :key="guideRun" @close="closeWelcome" @webui-navigate="openWebUi" />
+        <Welcome v-else-if="entry.id === ROUTES.WELCOME" :key="guideRun" @close="closeWelcome" @webui-navigate="openWebUi" @open-doctor="openDoctor" />
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
