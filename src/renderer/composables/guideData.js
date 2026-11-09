@@ -14,14 +14,14 @@ const okStatus = (value) => value === true || value === 'true' || value === 1 ||
  * value. All outside access is injected, so the rules can be tested without a window.
  *
  * deps: { proxyUrl(): Promise<string>, fetchImpl, vddStatus(): Promise<object>, activeSessions(): Promise<array>,
- *         openUrl(url), copy(text), openApps(mode), reach (the shared reachability check, composables/useHostReach.js) }
+ *         openUrl(url), copy(text), openApps(mode), openDiagnostics() (the address step's link to 体检), reach (the shared reachability check, composables/useHostReach.js) }
  */
 export function createGuideData(deps) {
   const fetchImpl = deps.fetchImpl || ((...args) => globalThis.fetch(...args))
   const state = reactive({
     account: { exists: null },
     setup: { completed: false, locale: '', showLanguage: true, adapters: [], displayDevices: [], adapter: '', display: '', prep: 'ensure_only_display', virtual: true },
-    host: { platform: '', addresses: null },
+    host: { platform: '', name: '', addresses: null },
     network: { port: 47989, activePort: 0, upnpActive: null, upnpSaved: null, loaded: false, endpoints: '' },
     webAccess: { scope: 'lan', bind: '', active: null, saved: null },
     reach: deps.reach ? deps.reach.view : { report: null, status: 'idle' },
@@ -106,7 +106,11 @@ export function createGuideData(deps) {
       if (!okStatus(data.status)) throw new Error('listeners')
       Object.assign(state.network, { port: Number(data.saved?.port || data.active?.port) || 47989, activePort: Number(data.active?.port) || 0, upnpActive: !!data.active?.upnp, upnpSaved: !!data.saved?.upnp, loaded: true })
       state.host.addresses = Array.isArray(data.addresses) ? data.addresses : state.host.addresses
-      try { state.network.endpoints = endpointsOfConfig(await getJson('/api/config')).join(', ') } catch { /* the field stays as it was */ }
+      try {
+        const config = await getJson('/api/config')
+        state.network.endpoints = endpointsOfConfig(config).join(', ')
+        state.host.name = String(config.sunshine_name || '') // the name clients list (the address step)
+      } catch { /* the fields stay as they were */ }
     } catch {
       state.network.loaded = false
     }
@@ -275,6 +279,7 @@ export function createGuideData(deps) {
     saveWebAccess,
     checkReach: (force, options) => deps.reach?.refresh(force, options),
     setUpnp,
+    openDiagnostics: () => deps.openDiagnostics?.(),
     setPublicEndpoints,
     restartHost,
     probeHost,

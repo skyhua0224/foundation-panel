@@ -39,7 +39,7 @@ import { useUpdateSource } from '../composables/useUpdateSource.js'
 
 // The guided first run of the panel. It opens by itself on a first run, when the host serves its account page (no account yet), and from
 // the help page. The account step is part of the flow only while the host has no account.
-const emit = defineEmits(['close', 'webui-navigate'])
+const emit = defineEmits(['close', 'webui-navigate', 'open-doctor'])
 const { t, locale } = useWelcomeI18n()
 
 // The language is chosen on the first screen of the flow (跟随系统 by default) and applies at once, to the flow and to the shell; the usage-count question is the step after it, only where it was not answered before
@@ -57,6 +57,7 @@ const data = createGuideData({
   // The apps page of the Web UI takes the request from the address (#guide-scan, #guide-add, #guide-restore)
   openApps: (mode) => emit('webui-navigate', `/apps#guide-${mode}`),
   openTools: () => emit('webui-navigate', '/#test-tools'),
+  openDiagnostics: () => emit('open-doctor'),
 })
 const { state, probeAccount } = data
 // the update method (the last step): the same source and CDK the 更新 page keeps; the CDK itself stays in the native side
