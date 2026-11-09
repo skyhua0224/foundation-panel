@@ -65,7 +65,16 @@ fn reveal(window: &WebviewWindow, host: &Host) {
     }
     #[cfg(windows)]
     set_cloak(window, false);
-    let _ = window.set_focus();
+    if !test_offscreen() {
+        let _ = window.set_focus();
+    }
+}
+
+/// Test switch, as the Panel's SUNSHINE_GUI_TEST_OFFSCREEN: FOUNDATION_SETUP_TEST_OFFSCREEN=1 opens the window at
+/// 6000,100 (outside every monitor), shown, never activated, so a guarded measurement instance in a person's session
+/// never covers their screen or takes their focus. Never set by the installer.
+fn test_offscreen() -> bool {
+    std::env::var_os("FOUNDATION_SETUP_TEST_OFFSCREEN").is_some_and(|v| v == "1")
 }
 
 /// Evidence for tests (never set in a real install): FOUNDATION_SETUP_UI_SHOTS=<dir> writes a PNG of the page
@@ -206,7 +215,7 @@ fn main() {
                 .transparent(false)
                 .shadow(true)
                 .visible(false)
-                .center()
+                .focused(!test_offscreen())
                 .disable_drag_drop_handler()
                 .on_page_load(|window, payload| {
                     if payload.event() == tauri::webview::PageLoadEvent::Finished {
@@ -220,6 +229,7 @@ fn main() {
                         });
                     }
                 });
+            builder = if test_offscreen() { builder.position(6000.0, 100.0) } else { builder.center() };
             if let Some(dir) = data_dir.clone() {
                 builder = builder.data_directory(dir);
             }
@@ -257,7 +267,7 @@ fn main() {
                         "minimise" => {
                             let _ = window.minimize();
                         }
-                        "focus" => {
+                        "focus" if !test_offscreen() => {
                             let _ = window.unminimize();
                             let _ = window.set_focus();
                         }
