@@ -10,8 +10,8 @@
         <!-- 码率 -->
         <MSection :title="l.bitrate">
           <MGroup>
-            <MChoiceItem v-if="live.length > 1" v-model="client" icon="devices" :title="l.client" :options="live.map((s) => ({ value: s.client_name, label: sessionLabel(s) }))" :disabled="applying" :cancel-label="l.cancel" />
-            <MItem v-else icon="devices" :title="live[0].client_name" :value="modeOf(live[0])" />
+            <MChoiceItem v-if="live.length > 1" data-redact="client" v-model="client" icon="devices" :title="l.client" :options="live.map((s) => ({ value: s.client_name, label: sessionLabel(s) }))" :disabled="applying" :cancel-label="l.cancel" />
+            <MItem v-else data-redact="client" icon="devices" :title="live[0].client_name" :value="modeOf(live[0])" />
             <MItem v-if="current?.bitrate" icon="network_check" :title="l.current" :value="formatBitrate(current.bitrate)" />
             <MSliderItem v-model="bitrate" icon="speed" :title="l.target" :min="BITRATE.min" :max="BITRATE.max" :step="BITRATE.step" :decimals="0" :readout-text="formatBitrate(bitrate)" :disabled="applying" />
             <MItem stack :title="l.presets"><template #control><MChipSet v-model="bitrate" :label="l.presets" :options="BITRATE_PRESETS.map((v) => ({ value: v, label: formatBitrate(v) }))" :disabled="applying" /></template></MItem>

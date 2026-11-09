@@ -27,7 +27,7 @@
         <div v-else class="mini-placeholder">{{ app.name?.[0] || '?' }}</div>
       </div>
       <div class="list-info">
-        <span class="list-name">{{ app.name }}</span>
+        <span class="list-name" data-redact="text">{{ app.name }}</span>
         <span class="list-cmd" v-if="app.cmd">{{ app.cmd }}</span>
       </div>
       <div class="list-tags">

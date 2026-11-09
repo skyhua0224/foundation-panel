@@ -5,7 +5,7 @@
 
       <div class="running-info">
         <span class="running-label">{{ t.gameSession.nowPlaying }}</span>
-        <span class="running-name" :title="game.appName">{{ game.appName }}</span>
+        <span class="running-name" data-redact="text" :title="game.appName">{{ game.appName }}</span>
       </div>
 
       <div class="running-meta">

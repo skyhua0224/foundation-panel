@@ -26,7 +26,7 @@
           />
           <div v-else class="mini-placeholder">{{ app.name?.[0] || '?' }}</div>
         </div>
-        <span class="recent-name">{{ app.name }}</span>
+        <span class="recent-name" data-redact="text">{{ app.name }}</span>
       </div>
     </div>
   </section>
