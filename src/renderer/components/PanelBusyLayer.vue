@@ -36,6 +36,15 @@ onBeforeUnmount(() => { if (layer.value?.open) layer.value.close() })
 
 <style scoped>
 .panel-busy {
+  /* The shell resets the margin of every element (sunshine-frame.html), which
+     removes the UA centring of a modal dialog and pinned this card to the
+     window's top-left corner. State both axes here: it is the panel window's
+     centre, on whichever monitor the panel is. */
+  position: fixed;
+  inset: 0;
+  width: fit-content;
+  height: fit-content;
+  margin: auto;
   border: 0;
   padding: 0;
   background: transparent;

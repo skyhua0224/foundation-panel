@@ -136,6 +136,7 @@ fn build_download_sources(original_url: &str) -> Result<Vec<DownloadSource>, Str
 fn create_download_client(
     request: &DownloadRequest<'_>,
     policy: DownloadClientPolicy,
+    proxy: Option<&str>,
 ) -> Result<reqwest::Client, String> {
     let builder = reqwest::Client::builder()
         .connect_timeout(request.connect_timeout)
@@ -143,6 +144,15 @@ fn create_download_client(
         .redirect(reqwest::redirect::Policy::limited(10))
         .no_gzip()
         .no_deflate();
+    // Adding a proxy replaces reqwest's own matcher, so it is only added when
+    // the environment has no proxy of its own (see windows_proxy.rs).
+    let builder = match proxy {
+        Some(proxy) => builder.proxy(
+            reqwest::Proxy::all(proxy)
+                .map_err(|error| format!("invalid system proxy {proxy}: {error}"))?,
+        ),
+        None => builder,
+    };
     let builder = match policy {
         DownloadClientPolicy::HttpsOnly => builder.https_only(true),
         #[cfg(test)]
@@ -435,17 +445,21 @@ async fn download_from_sources<F>(
 where
     F: FnMut(DownloadProgress),
 {
-    let client =
-        create_download_client(&request, client_policy).map_err(|detail| DownloadError {
-            kind: DownloadErrorKind::Setup,
-            detail,
-        })?;
     let overall_deadline = request
         .overall_timeout
         .map(|timeout| Instant::now() + timeout);
     let mut errors = Vec::new();
 
     for (index, source) in sources.iter().enumerate() {
+        // The Windows proxy is resolved for this address: a PAC file can route
+        // the CNB and GitHub hosts through different proxies.
+        let proxy = crate::windows_proxy::resolve_for_url(&source.url).await;
+        let client = create_download_client(&request, client_policy, proxy.as_deref()).map_err(
+            |detail| DownloadError {
+                kind: DownloadErrorKind::Setup,
+                detail,
+            },
+        )?;
         let remaining_budget = match overall_deadline {
             Some(deadline) => {
                 let remaining = deadline.saturating_duration_since(Instant::now());
@@ -559,7 +573,8 @@ mod tests {
             url: format!("http://{address}/html"),
         };
         let client =
-            create_download_client(&request, DownloadClientPolicy::AllowHttpForTests).unwrap();
+            create_download_client(&request, DownloadClientPolicy::AllowHttpForTests, None)
+                .unwrap();
         let error = request_source(&client, &source, &request, None)
             .await
             .unwrap_err();
@@ -709,7 +724,7 @@ mod tests {
             name: "insecure",
             url: "http://127.0.0.1/asset".to_string(),
         };
-        let client = create_download_client(&request, DownloadClientPolicy::HttpsOnly).unwrap();
+        let client = create_download_client(&request, DownloadClientPolicy::HttpsOnly, None).unwrap();
 
         assert!(
             request_source(&client, &source, &request, None)

@@ -1887,6 +1887,8 @@ export const zh = {
     downloading: '正在下载更新...',
     downloadProgress: '正在下载 {progress}%',
     downloadConnecting: '正在连接可用下载源...',
+    downloadChipLabel: '正在下载更新 {progress}%',
+    downloadChipReady: '更新已下载',
     downloadRetrying: '当前下载源已中断，正在切换...',
     downloadVerifying: '下载完成，正在校验文件...',
     viewInBrowser: '在浏览器中查看',

@@ -3,7 +3,7 @@
     <!-- slim caption bar over the whole window: draggable, the window controls at the end; the pages start below it -->
     <MCaption bem="panel-caption" data-tauri-drag-region @pointerdown="onTouchWindowDragStart">
       <template #brand><MBrand class="panel-caption__brand" :size="20" data-tauri-drag-region /></template>
-      <template #announcements><MStatusBell :locale="locale" /><MAnnouncementButton :unread="announcements.unread.value" :locale="locale" @open="router.navigate(ROUTES.ANNOUNCEMENTS)" /></template>
+      <template #announcements><UpdateDownloadChip @open="showUpdateDialog = true" /><MStatusBell :locale="locale" /><MAnnouncementButton :unread="announcements.unread.value" :locale="locale" @open="router.navigate(ROUTES.ANNOUNCEMENTS)" /></template>
       <template #search><div class="panel-caption__search" data-tauri-drag-region><MUnifiedSearch :search="uni" :texts="searchT" :compact="compactSearch" :height="38" /></div></template>
       <template #connect><button type="button" class="m-caption-connect" :aria-label="connectT.title" :data-tip="connectT.title" :disabled="hostUnusable" @click="connect.show('pair')"><MIcon name="person_add" /><span>{{ connectT.title }}</span></button></template>
       <template #controls><div class="panel-caption__controls">
@@ -139,6 +139,7 @@ import { developerOverlays, developerTexts, DEFAULT_FLAGS } from 'foundation-ui/
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelBusyLayer from './PanelBusyLayer.vue'
+import UpdateDownloadChip from './UpdateDownloadChip.vue'
 import PanelWebHost from './PanelWebHost.vue'
 import VddSettings from './VddSettings.vue'
 import Welcome from './welcome.vue'

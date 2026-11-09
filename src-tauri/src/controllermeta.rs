@@ -162,13 +162,6 @@ pub async fn controllermeta_get_status() -> Result<ControllerMetaStatus, String>
 
 #[tauri::command]
 pub async fn controllermeta_check_release() -> Result<ControllerMetaRelease, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(5))
-        .connect_timeout(std::time::Duration::from_secs(3))
-        .user_agent("sunshine-control-panel")
-        .build()
-        .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
-
     // 依次试探：直连 → 代理 1 → 代理 2……
     let mut urls = vec![GITHUB_API_LATEST.to_string()];
     for proxy in API_PROXY_PREFIXES {
@@ -177,6 +170,22 @@ pub async fn controllermeta_check_release() -> Result<ControllerMetaRelease, Str
 
     let mut last_err = String::from("未尝试");
     for url in &urls {
+        // The user's Windows proxy (WinINet/WinHTTP, including a PAC) applies
+        // to the component check as well; an environment proxy keeps priority.
+        let proxy = crate::windows_proxy::resolve_for_url(url).await;
+        let mut builder = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(5))
+            .connect_timeout(std::time::Duration::from_secs(3))
+            .user_agent("sunshine-control-panel");
+        if let Some(proxy) = proxy.as_deref() {
+            builder = builder.proxy(
+                reqwest::Proxy::all(proxy)
+                    .map_err(|error| format!("系统代理地址无效 {proxy}: {error}"))?,
+            );
+        }
+        let client = builder
+            .build()
+            .map_err(|e| format!("创建 HTTP 客户端失败: {}", e))?;
         debug!("📦 查询 ControllerMeta 最新版本: {}", url);
         let result = client
             .get(url)
@@ -258,13 +267,6 @@ pub async fn controllermeta_download(
 
     info!("📥 开始下载 ControllerMeta: {}", url);
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(600))
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .user_agent("sunshine-control-panel")
-        .build()
-        .map_err(|e| format!("创建客户端失败: {}", e))?;
-
     // 构造下载 URL 列表：代理优先（国内直连 GitHub Releases 常常超时），最后直连
     let mut urls: Vec<String> = DOWNLOAD_PROXY_PREFIXES
         .iter()
@@ -276,6 +278,22 @@ pub async fn controllermeta_download(
     let mut response_opt = None;
     for try_url in &urls {
         debug!("🔗 尝试下载: {}", try_url);
+        // 系统代理（含 PAC）按每个候选地址解析；环境变量代理优先，
+        // 与更新下载使用同一套规则（windows_proxy.rs）。
+        let proxy = crate::windows_proxy::resolve_for_url(try_url).await;
+        let mut builder = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(600))
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .user_agent("sunshine-control-panel");
+        if let Some(proxy) = proxy.as_deref() {
+            builder = builder.proxy(
+                reqwest::Proxy::all(proxy)
+                    .map_err(|error| format!("系统代理地址无效 {proxy}: {error}"))?,
+            );
+        }
+        let client = builder
+            .build()
+            .map_err(|e| format!("创建客户端失败: {}", e))?;
         match client
             .get(try_url)
             .header("Accept", "application/octet-stream")

@@ -36,6 +36,68 @@ const UPDATE_CACHE_MARKER_FILE: &str = "sunshine-update-cache.json";
 /// 已下载安装包的最长保留期，超过后随临时目录清理一起删除。
 const UPDATE_CACHE_MAX_AGE_SECS: u64 = 14 * 24 * 60 * 60;
 
+/// Progress of the update download, readable after the panel window was
+/// closed and opened again. The Rust task owns the transfer; the webview is
+/// only a viewer.
+#[derive(Clone, Debug, Serialize)]
+struct UpdateDownloadStatus {
+    active: bool,
+    phase: String,
+    progress: u32,
+    downloaded: u64,
+    total: u64,
+    source: Option<String>,
+    filename: String,
+    path: Option<String>,
+    error: Option<String>,
+}
+
+impl Default for UpdateDownloadStatus {
+    fn default() -> Self {
+        Self {
+            active: false,
+            phase: String::new(),
+            progress: 0,
+            downloaded: 0,
+            total: 0,
+            source: None,
+            filename: String::new(),
+            path: None,
+            error: None,
+        }
+    }
+}
+
+static UPDATE_DOWNLOAD_STATUS: OnceLock<Mutex<UpdateDownloadStatus>> = OnceLock::new();
+
+fn download_status() -> &'static Mutex<UpdateDownloadStatus> {
+    UPDATE_DOWNLOAD_STATUS.get_or_init(|| Mutex::new(UpdateDownloadStatus::default()))
+}
+
+fn set_download_status(change: impl FnOnce(&mut UpdateDownloadStatus)) {
+    if let Ok(mut status) = download_status().lock() {
+        change(&mut status);
+    }
+}
+
+/// The renderer calls this once on mount: a download started before the window
+/// was closed reports its current state instead of disappearing.
+#[tauri::command]
+pub fn download_update_status() -> serde_json::Value {
+    download_status()
+        .lock()
+        .ok()
+        .and_then(|status| serde_json::to_value(&*status).ok())
+        .unwrap_or_else(|| serde_json::json!({ "active": false }))
+}
+
+fn clear_tooltip_later(app_handle: AppHandle, delay: Duration) {
+    tauri::async_runtime::spawn(async move {
+        tokio::time::sleep(delay).await;
+        crate::tray::set_transient_tooltip(&app_handle, None);
+    });
+}
+
 // ========== 数据结构定义 ==========
 
 /// 更新信息，`is_latest` 决定前端以“查看更新内容”还是“下载新版本”模式展示。
@@ -1900,6 +1962,19 @@ pub async fn download_update(
         "清理旧的临时下载文件",
     )?;
 
+    set_download_status(|status| {
+        *status = UpdateDownloadStatus {
+            active: true,
+            phase: "connecting".to_string(),
+            filename: filename.clone(),
+            ..Default::default()
+        };
+    });
+    crate::tray::set_transient_tooltip(
+        &app_handle,
+        Some(crate::tray::download_progress_tooltip(0)),
+    );
+
     // 来源为 mirror 且 CDK 有效时，Mirror酱 的下载地址排在最前；
     // 任何失败（无 CDK、CDK 错误、离线、地址不合规）都静默回退 CNB → GitHub。
     let mirror_candidate = if preferences::update_source(&app_handle) == "mirror" {
@@ -1910,6 +1985,8 @@ pub async fn download_update(
     let candidates = download_candidates(mirror_candidate, &url, fallback_url.as_deref());
 
     let mut last_progress_percent = 0;
+    let mut last_tooltip_percent = 0u32;
+    let mut last_tooltip_at = std::time::Instant::now();
     let outcome = github_download::download_to_file_from_candidates(
         DownloadRequest {
             url: &url,
@@ -1925,17 +2002,42 @@ pub async fn download_update(
         },
         &candidates,
         |event| {
-            let Some(win) = window.as_ref() else {
-                return;
-            };
             match event.phase {
                 DownloadAttemptPhase::Connecting => {
                     last_progress_percent = 0;
-                    emit_download_progress(win, 0, event.total, 0, DownloadPhase::Connecting, None);
+                    set_download_status(|status| {
+                        status.phase = "connecting".to_string();
+                        status.progress = 0;
+                        status.total = event.total;
+                    });
+                    if let Some(win) = window.as_ref() {
+                        emit_download_progress(
+                            win,
+                            0,
+                            event.total,
+                            0,
+                            DownloadPhase::Connecting,
+                            None,
+                        );
+                    }
                 }
                 DownloadAttemptPhase::Retrying => {
                     last_progress_percent = 0;
-                    emit_download_progress(win, 0, event.total, 0, DownloadPhase::Retrying, None);
+                    set_download_status(|status| {
+                        status.phase = "retrying".to_string();
+                        status.progress = 0;
+                        status.total = event.total;
+                    });
+                    if let Some(win) = window.as_ref() {
+                        emit_download_progress(
+                            win,
+                            0,
+                            event.total,
+                            0,
+                            DownloadPhase::Retrying,
+                            None,
+                        );
+                    }
                 }
                 DownloadAttemptPhase::Downloading => {
                     let progress = if event.total == 0 {
@@ -1943,17 +2045,37 @@ pub async fn download_update(
                     } else {
                         (event.downloaded.saturating_mul(100) / event.total).min(99) as u32
                     };
+                    set_download_status(|status| {
+                        status.phase = "downloading".to_string();
+                        status.progress = progress;
+                        status.downloaded = event.downloaded;
+                        status.total = event.total;
+                        status.source = Some(event.source.to_string());
+                    });
+                    if progress != last_tooltip_percent
+                        && (progress >= last_tooltip_percent + 1
+                            || last_tooltip_at.elapsed() >= Duration::from_secs(1))
+                    {
+                        last_tooltip_percent = progress;
+                        last_tooltip_at = std::time::Instant::now();
+                        crate::tray::set_transient_tooltip(
+                            &app_handle,
+                            Some(crate::tray::download_progress_tooltip(progress)),
+                        );
+                    }
                     if event.total == 0 || progress > last_progress_percent || event.downloaded == 0
                     {
                         last_progress_percent = progress;
-                        emit_download_progress(
-                            win,
-                            progress,
-                            event.total,
-                            event.downloaded,
-                            DownloadPhase::Downloading,
-                            Some(event.source),
-                        );
+                        if let Some(win) = window.as_ref() {
+                            emit_download_progress(
+                                win,
+                                progress,
+                                event.total,
+                                event.downloaded,
+                                DownloadPhase::Downloading,
+                                Some(event.source),
+                            );
+                        }
                     }
                 }
             }
@@ -1961,6 +2083,16 @@ pub async fn download_update(
     )
     .await
     .map_err(|error| {
+        set_download_status(|status| {
+            status.active = false;
+            status.phase = "error".to_string();
+            status.error = Some(error.to_string());
+        });
+        crate::tray::set_transient_tooltip(
+            &app_handle,
+            Some(crate::tray::download_failed_tooltip().to_string()),
+        );
+        clear_tooltip_later(app_handle.clone(), Duration::from_secs(20));
         let code = if error.is_setup() {
             DownloadErrorCode::SetupFailed
         } else {
@@ -1976,6 +2108,16 @@ pub async fn download_update(
         asset_type.as_deref(),
     ) {
         let _ = tokio::fs::remove_file(&partial_path).await;
+        set_download_status(|status| {
+            status.active = false;
+            status.phase = "error".to_string();
+            status.error = Some(error.clone());
+        });
+        crate::tray::set_transient_tooltip(
+            &app_handle,
+            Some(crate::tray::download_failed_tooltip().to_string()),
+        );
+        clear_tooltip_later(app_handle.clone(), Duration::from_secs(20));
         return Err(DownloadCommandError::new(
             DownloadErrorCode::SourcesExhausted,
             error,
@@ -1994,6 +2136,16 @@ pub async fn download_update(
     }
     if let Err(error) = finalize_download_file(&partial_path, &file_path).await {
         let _ = tokio::fs::remove_file(&partial_path).await;
+        set_download_status(|status| {
+            status.active = false;
+            status.phase = "error".to_string();
+            status.error = Some(error.to_string());
+        });
+        crate::tray::set_transient_tooltip(
+            &app_handle,
+            Some(crate::tray::download_failed_tooltip().to_string()),
+        );
+        clear_tooltip_later(app_handle.clone(), Duration::from_secs(20));
         return Err(error);
     }
 
@@ -2009,6 +2161,21 @@ pub async fn download_update(
         "✅ 下载完成: {} bytes，来源: {}",
         outcome.downloaded, outcome.source
     );
+    set_download_status(|status| {
+        status.active = false;
+        status.phase = "complete".to_string();
+        status.progress = 100;
+        status.downloaded = outcome.downloaded;
+        status.total = outcome.total;
+        status.source = Some(outcome.source.to_string());
+        status.path = Some(file_path.to_string_lossy().to_string());
+        status.error = None;
+    });
+    crate::tray::set_transient_tooltip(
+        &app_handle,
+        Some(crate::tray::download_done_tooltip().to_string()),
+    );
+    clear_tooltip_later(app_handle.clone(), Duration::from_secs(10));
     if let Some(win) = window {
         emit_download_progress(
             &win,
