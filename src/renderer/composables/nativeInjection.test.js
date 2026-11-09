@@ -99,27 +99,13 @@ test('only the trusted native parent enables embedded navigation', () => {
   assert.equal(standalone.document.documentElement.dataset.sunshineNavigation, undefined)
 })
 
-test('account navigation opens the existing confirmation once, only after native context and component mount', () => {
+test('the Panel no longer drives the WebUI log out: #logout opens nothing and leaves the address alone', () => {
   const h = createHarness({ pathname: '/password', hash: '#logout' })
-  let confirmations = 0
+  h.setLogoutButton({ click: () => assert.fail('the Panel must not click the WebUI log out') })
   h.sendContext()
+  h.mutate()
   assert.equal(h.historyCalls.length, 0)
-  h.setLogoutButton({
-    click: () => {
-      confirmations++
-    },
-  })
-  h.mutate()
-  h.mutate()
-  assert.equal(confirmations, 1)
-  assert.equal(h.historyCalls.length, 1)
-  assert.equal(h.historyCalls[0][0], h.history.state)
-  assert.equal(h.historyCalls[0][2], '/password')
-
-  const unrelated = createHarness({ pathname: '/config', hash: '#logout' })
-  unrelated.setLogoutButton({ click: () => assert.fail('not an account destination') })
-  unrelated.sendContext()
-  assert.equal(unrelated.historyCalls.length, 0)
+  assert.doesNotMatch(script, /logout/i, 'the injected script has no log out branch left')
 })
 
 test('embedded config tabs scroll horizontally without moving the page and restore the original behavior on revocation', () => {

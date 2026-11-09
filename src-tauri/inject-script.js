@@ -41,13 +41,6 @@
         list.scrollTo({ left: Math.max(0, left), behavior })
       }
     })
-
-    if (!/^\/password(?:\.html)?$/.test(location.pathname) || location.hash !== '#logout') return
-    const logoutButton = document.querySelector('.account-menu .dropdown-item.text-danger')
-    if (!logoutButton) return
-    history.replaceState(history.state, '', location.pathname + location.search)
-    // Open the existing WebUI confirmation; never submit logout automatically.
-    logoutButton.click()
   }
 
   const handleNavigationContext = (event) => {

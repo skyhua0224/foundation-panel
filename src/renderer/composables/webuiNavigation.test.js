@@ -13,13 +13,14 @@ test('sidebar tracks WebUI aliases, nested pages, and query/hash navigation', ()
 })
 
 test('shell can request only known local destinations', () => {
-  for (const path of ['/', '/apps', '/pin', '/config', '/password', '/password#logout', '/troubleshooting'])
+  for (const path of ['/', '/apps', '/pin', '/config', '/password', '/troubleshooting'])
     assert.equal(isWebuiNavigationPath(path), true)
   for (const path of [
     'https://evil.example',
     '//evil.example',
     '/config/../../logout',
     '/unknown',
+    '/password#logout',
     '/password#logout-now',
     '/password?redirect=https://evil.example',
     null,
