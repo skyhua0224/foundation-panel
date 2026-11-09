@@ -351,14 +351,14 @@ const ZH_STRINGS: TrayStrings = TrayStrings {
     advanced_menu: "高级",
     help_menu: "帮助",
     open_sunshine: "Web 管理界面",
-    vdd_settings: "杂鱼虚拟显示器设置",
-    vdd_create: "创建杂鱼虚拟显示器",
-    vdd_create_confirm: "创建杂鱼虚拟显示器可能会更改 Windows 显示布局。是否继续？",
-    vdd_close: "关闭杂鱼虚拟显示器",
+    vdd_settings: "基地虚拟显示器设置",
+    vdd_create: "创建基地虚拟显示器",
+    vdd_create_confirm: "创建基地虚拟显示器可能会更改 Windows 显示布局。是否继续？",
+    vdd_close: "关闭基地虚拟显示器",
     vdd_keep: "串流结束后保留",
-    vdd_keep_confirm: "启用后，串流结束时将保留杂鱼虚拟显示器，并可能更改 Windows 显示布局。是否继续？",
+    vdd_keep_confirm: "启用后，串流结束时将保留基地虚拟显示器，并可能更改 Windows 显示布局。是否继续？",
     vdd_headless: "无头模式自动创建",
-    vdd_headless_confirm: "这是实验性恢复功能：未检测到显示器时会自动创建杂鱼虚拟显示器，并可能更改当前显示布局。是否继续？",
+    vdd_headless_confirm: "这是实验性恢复功能：未检测到显示器时会自动创建基地虚拟显示器，并可能更改当前显示布局。是否继续？",
     import_config: "导入配置",
     export_config: "导出配置",
     reset_config: "重置配置",
@@ -432,14 +432,14 @@ const EN_STRINGS: TrayStrings = TrayStrings {
     advanced_menu: "Advanced",
     help_menu: "Help",
     open_sunshine: "Web Management UI",
-    vdd_settings: "ZakoDisplay Settings",
-    vdd_create: "Create ZakoDisplay",
-    vdd_create_confirm: "This creates ZakoDisplay and may change the Windows display layout. Continue?",
-    vdd_close: "Close ZakoDisplay",
+    vdd_settings: "Foundation Virtual Display Settings",
+    vdd_create: "Create Foundation Virtual Display",
+    vdd_create_confirm: "This creates Foundation Virtual Display and may change the Windows display layout. Continue?",
+    vdd_close: "Close Foundation Virtual Display",
     vdd_keep: "Keep After Streaming",
-    vdd_keep_confirm: "Keep mode leaves ZakoDisplay enabled after streaming ends and may change the Windows display layout. Continue?",
+    vdd_keep_confirm: "Keep mode leaves Foundation Virtual Display enabled after streaming ends and may change the Windows display layout. Continue?",
     vdd_headless: "Auto-create When Headless",
-    vdd_headless_confirm: "This experimental recovery feature creates ZakoDisplay when no display is detected and may change the active display layout. Continue?",
+    vdd_headless_confirm: "This experimental recovery feature creates Foundation Virtual Display when no display is detected and may change the active display layout. Continue?",
     import_config: "Import Config",
     export_config: "Export Config",
     reset_config: "Reset Config",
@@ -1043,7 +1043,7 @@ mod tests {
 
     #[test]
     fn native_confirmations_use_localized_tray_text() {
-        assert!(ZH_STRINGS.vdd_create_confirm.contains("杂鱼虚拟显示器"));
+        assert!(ZH_STRINGS.vdd_create_confirm.contains("基地虚拟显示器"));
         assert!(ZH_STRINGS.vdd_keep_confirm.contains("串流结束"));
         assert!(ZH_STRINGS.vdd_headless_confirm.contains("实验性"));
         assert!(ZH_STRINGS.reset_config_confirm.contains("默认配置"));

@@ -786,7 +786,7 @@ mod collect {
 
     pub async fn drivers(lang: Lang) -> Vec<DriverFact> {
         let mut out = Vec::new();
-        let vdd_name = tr(lang, "ZakoDisplay", "杂鱼虚拟显示器");
+        let vdd_name = tr(lang, "Foundation Virtual Display", "基地虚拟显示器");
         match tokio::time::timeout(Duration::from_secs(8), crate::vdd::get_vdd_status()).await {
             Ok(Ok(s)) => out.push(DriverFact {
                 id: "vdd".into(), name: vdd_name.clone(), checked: true, installed: s.installed,
@@ -795,7 +795,7 @@ mod collect {
                 required: true, probe_error: String::new(),
             }),
             Err(_) => out.push(DriverFact { id: "vdd".into(), name: vdd_name, checked: true, required: true, probe_error: "no answer within 8 s".into(), ..Default::default() }),
-            Ok(Err(_)) => out.push(DriverFact { id: "vdd".into(), name: tr(lang, "ZakoDisplay", "杂鱼虚拟显示器"), ..Default::default() }),
+            Ok(Err(_)) => out.push(DriverFact { id: "vdd".into(), name: tr(lang, "Foundation Virtual Display", "基地虚拟显示器"), ..Default::default() }),
         }
         match tokio::time::timeout(Duration::from_secs(8), crate::vigem::get_vigem_status()).await {
             Ok(Ok(s)) => out.push(DriverFact {
@@ -863,7 +863,7 @@ pub async fn doctor_local(only: String, lang: Option<String>) -> Result<Value, S
         "service" => evaluate_service(&ServiceFacts::default(), lang),
         "install" => evaluate_install(&InstallFacts::default(), lang),
         "process" => evaluate_process(&ProcessFacts::default(), lang),
-        _ => evaluate_drivers(&[DriverFact { id: "vdd".into(), name: tr(lang, "ZakoDisplay", "杂鱼虚拟显示器"), ..Default::default() }], lang),
+        _ => evaluate_drivers(&[DriverFact { id: "vdd".into(), name: tr(lang, "Foundation Virtual Display", "基地虚拟显示器"), ..Default::default() }], lang),
     };
     let checked_at = chrono::Utc::now().format("%Y-%m-%dT%H:%M:%SZ").to_string();
     Ok(report(&only, items, started.elapsed().as_millis() as u64, lang, &checked_at))
@@ -1028,7 +1028,7 @@ mod tests {
     fn a_driver_probe_that_does_not_finish_is_a_warning_not_not_installed() {
         let drivers = [DriverFact {
             id: "vdd".into(),
-            name: "杂鱼虚拟显示器".into(),
+            name: "基地虚拟显示器".into(),
             checked: true,
             required: true,
             probe_error: "no answer within 8 s".into(),
