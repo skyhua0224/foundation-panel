@@ -329,3 +329,17 @@ test('the panel does not open the guide while a phone runs it, nor after it was 
   assert.equal(await ask({ guide_closed: '1.3.9' }), false)
   assert.equal(await ask({ guide_finished: 'true', guide_closed: '1.3.9' }), false)
 })
+
+test('the port check of the address step is the host 体检 (network group), in the language of the guide, through the proxy', async () => {
+  const calls = []
+  const report = { version: 1, checked_at: 'x', groups: [{ id: 'network', title: 'Network', items: ['network.lan', 'network.ports'] }], items: [{ id: 'network.lan', group: 'network', status: 'pass', title: 'Local network', detail: 'listening' }, { id: 'network.ports', group: 'network', status: 'fail', title: 'Ports', detail: 'UDP 47998' }] }
+  const data = make({ '/api/doctor?only=network&lang=en': report }, { locale: () => 'en-US' }, calls)
+  const r = await data.callbacks.checkPorts()
+  assert.equal(r.ok, true); assert.equal(r.worst, 'fail'); assert.deepEqual(r.items.map((i) => i.id), ['network.lan', 'network.ports'])
+  assert.deepEqual(calls.map((c) => c.path), ['/api/doctor?only=network&lang=en'])
+  const zh = await make({ '/api/doctor?only=network&lang=zh': report }, { locale: () => 'zh' }).callbacks.checkPorts()
+  assert.equal(zh.ok, true, 'a Chinese guide asks for Chinese words')
+  assert.deepEqual(await make({}, {}).callbacks.checkPorts(), { ok: false, unsupported: true }, 'a host without the route (404) is unsupported, not failed')
+  const down = createGuideData({ proxyUrl: async () => 'http://proxy', fetchImpl: async () => { throw new Error('away') }, vddStatus: async () => ({}), openUrl() {}, copy() {} })
+  assert.deepEqual(await down.callbacks.checkPorts(), { ok: false, unsupported: false })
+})

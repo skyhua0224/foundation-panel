@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import { createHostSaver, deviceId as guideDeviceId, guideEntry, hostProgressOf, isSetupCompleted, mergeSetupConfig, normalizeClients, normalizeSessions, setupStateFromConfig } from 'foundation-ui/vue/guide.js'
+import { checkPortsViaDoctor, createHostSaver, deviceId as guideDeviceId, guideEntry, hostProgressOf, isSetupCompleted, mergeSetupConfig, normalizeClients, normalizeSessions, setupStateFromConfig } from 'foundation-ui/vue/guide.js'
 import { endpointsOfConfig } from 'foundation-ui/settings'
 import { restoreDefaultBuiltInApps } from 'foundation-ui/apps'
 
@@ -14,7 +14,7 @@ const okStatus = (value) => value === true || value === 'true' || value === 1 ||
  * value. All outside access is injected, so the rules can be tested without a window.
  *
  * deps: { proxyUrl(): Promise<string>, fetchImpl, vddStatus(): Promise<object>, activeSessions(): Promise<array>,
- *         openUrl(url), copy(text), openApps(mode), openDiagnostics() (the address step's link to 体检), reach (the shared reachability check, composables/useHostReach.js) }
+ *         openUrl(url), copy(text), locale() (the language of the guide: the 体检 words its answer in it), openApps(mode), openDiagnostics() (the address step's link to 体检), reach (the shared reachability check, composables/useHostReach.js) }
  */
 export function createGuideData(deps) {
   const fetchImpl = deps.fetchImpl || ((...args) => globalThis.fetch(...args))
@@ -300,6 +300,10 @@ export function createGuideData(deps) {
     setUpnp,
     setPort,
     openDiagnostics: () => deps.openDiagnostics?.(),
+    // the port check of the address step is the host's own 体检 (network group), the answer of the diagnostics page
+    checkPorts: () => checkPortsViaDoctor(async (path) => {
+      try { const response = await fetchImpl(await url(path)); return { ok: response.ok, status: response.status, json: await response.json().catch(() => null) } } catch { return { ok: false, status: 0, json: null } }
+    }, /^zh/i.test(String(deps.locale?.() || '')) ? 'zh' : 'en'),
     setPublicEndpoints,
     restartHost,
     probeHost,
