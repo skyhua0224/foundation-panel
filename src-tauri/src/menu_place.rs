@@ -104,6 +104,78 @@ pub fn place_surface(anchor: (i32, i32), size: (i32, i32), work: Rect, margin: i
     Placed { rect: Rect::new(x, y, w, h), capped }
 }
 
+/// Where the taskbar is, as the side of the screen it takes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Edge {
+    Bottom,
+    Top,
+    Left,
+    Right,
+}
+
+impl Edge {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Edge::Bottom => "bottom",
+            Edge::Top => "top",
+            Edge::Left => "left",
+            Edge::Right => "right",
+        }
+    }
+}
+
+/// The side of its monitor the taskbar is on: the side where the work area is smaller than the monitor. A taskbar that hides itself leaves the work area as large as the monitor: then it is the side
+/// of the monitor the tray icon is nearest to.
+pub fn taskbar_edge(bounds: Rect, work: Rect, icon: Rect) -> Edge {
+    let (top, bottom) = (work.y - bounds.y, bounds.bottom() - work.bottom());
+    let (left, right) = (work.x - bounds.x, bounds.right() - work.right());
+    let most = top.max(bottom).max(left).max(right);
+    if most > 0 {
+        // the largest strip is the taskbar (a second strip, such as an app bar, is smaller)
+        return if bottom == most { Edge::Bottom } else if top == most { Edge::Top } else if right == most { Edge::Right } else { Edge::Left };
+    }
+    let (cx, cy) = (icon.x + icon.w / 2, icon.y + icon.h / 2);
+    let to = [(Edge::Top, cy - bounds.y), (Edge::Bottom, bounds.bottom() - cy), (Edge::Left, cx - bounds.x), (Edge::Right, bounds.right() - cx)];
+    to.iter().min_by_key(|(_, d)| *d).map(|(e, _)| *e).unwrap_or(Edge::Bottom)
+}
+
+/// One axis for a menu beside an icon: `lo..hi` is the free range (the work area less the margins), the menu is centred on `centre` and kept inside the range; one that does not fit is cut (capped).
+fn centred(centre: i32, size: i32, lo: i32, hi: i32) -> (i32, i32, bool) {
+    let free = (hi - lo).max(0);
+    if size >= free {
+        return (lo, free, true);
+    }
+    ((centre - size / 2).clamp(lo, hi - size), size, false)
+}
+
+/// The tray menu: it opens beside the tray icon, away from the taskbar. `icon` is the icon's rectangle (physical px), `size` the card as measured, `work` the work area of the icon's monitor,
+/// `edge` the side the taskbar is on, `margin` the room kept to the work area's edge and between the menu and the taskbar.
+///   Bottom taskbar: above the icon (its bottom `margin` over the taskbar), centred on the icon and kept inside the work area - an icon in the corner puts the menu against the right edge.
+///   Top: below the taskbar. Left / Right: beside it, its bottom at the icon's bottom (the tray is at the bottom of a vertical taskbar), kept inside the work area.
+pub fn place_beside_icon(icon: Rect, size: (i32, i32), work: Rect, edge: Edge, margin: i32) -> Placed {
+    let (w, h) = (size.0.max(1), size.1.max(1));
+    let (lo_x, hi_x) = (work.x + margin, work.right() - margin);
+    let (lo_y, hi_y) = (work.y + margin, work.bottom() - margin);
+    let free_h = (hi_y - lo_y).max(0);
+    let cx = icon.x + icon.w / 2;
+    let capped = h >= free_h;
+    let h = if capped { free_h } else { h };
+    match edge {
+        // the menu hangs from the work area's edge next to the taskbar, `margin` away from it, whatever the icon's own height is
+        Edge::Bottom | Edge::Top => {
+            let (x, w, _) = centred(cx, w, lo_x, hi_x);
+            let y = if edge == Edge::Bottom { hi_y - h } else { lo_y };
+            Placed { rect: Rect::new(x, y, w, h), capped }
+        }
+        Edge::Left | Edge::Right => {
+            let w = w.min((hi_x - lo_x).max(1));
+            let x = if edge == Edge::Left { lo_x } else { hi_x - w };
+            let y = if capped { lo_y } else { (icon.bottom() - h).clamp(lo_y, hi_y - h) };
+            Placed { rect: Rect::new(x, y, w, h), capped }
+        }
+    }
+}
+
 /// The room a menu may have (CSS pixels): the height of the work area less the margin at both ends, and the same for the width.
 pub fn room_css(work: Rect, scale: f64, margin_css: f64) -> (f64, f64) {
     (
@@ -254,6 +326,115 @@ mod tests {
         assert_eq!(client_to_screen((100, 50), (10.0, 20.0), 1.0), (110, 70));
         assert_eq!(client_to_screen((-1920, 100), (100.5, 40.0), 1.5), (-1769, 160));
         assert_eq!(client_to_screen((0, 0), (10.0, 10.0), 0.0), (10, 10));
+    }
+
+    // ---- the tray menu beside its icon: one test per side of the screen ----
+    const SCREEN: Rect = Rect::new(0, 0, 1920, 1080);
+    const ICON: Rect = Rect::new(1700, 1048, 24, 24); // an icon of the tray, in a 48 px taskbar at the bottom
+
+    #[test]
+    fn the_taskbar_is_where_the_work_area_is_smaller_than_the_monitor() {
+        assert_eq!(taskbar_edge(SCREEN, Rect::new(0, 0, 1920, 1032), ICON), Edge::Bottom);
+        assert_eq!(taskbar_edge(SCREEN, Rect::new(0, 48, 1920, 1032), Rect::new(1700, 12, 24, 24)), Edge::Top);
+        assert_eq!(taskbar_edge(SCREEN, Rect::new(64, 0, 1856, 1080), Rect::new(20, 1000, 24, 24)), Edge::Left);
+        assert_eq!(taskbar_edge(SCREEN, Rect::new(0, 0, 1856, 1080), Rect::new(1880, 1000, 24, 24)), Edge::Right);
+        // an app bar on top of a bottom taskbar: the larger strip is the taskbar
+        assert_eq!(taskbar_edge(SCREEN, Rect::new(0, 30, 1920, 1002), ICON), Edge::Bottom);
+    }
+
+    #[test]
+    fn a_taskbar_that_hides_itself_is_found_from_the_icon() {
+        assert_eq!(taskbar_edge(SCREEN, SCREEN, ICON), Edge::Bottom);
+        assert_eq!(taskbar_edge(SCREEN, SCREEN, Rect::new(900, 2, 24, 24)), Edge::Top);
+        assert_eq!(taskbar_edge(SCREEN, SCREEN, Rect::new(2, 500, 24, 24)), Edge::Left);
+        assert_eq!(taskbar_edge(SCREEN, SCREEN, Rect::new(1890, 500, 24, 24)), Edge::Right);
+    }
+
+    #[test]
+    fn at_the_bottom_it_sits_above_the_taskbar_centred_on_the_icon() {
+        let work = Rect::new(0, 0, 1920, 1032);
+        let p = place_beside_icon(ICON, (304, 500), work, Edge::Bottom, M);
+        assert_eq!(p.rect, Rect::new(1712 - 152, 1032 - M - 500, 304, 500));
+        assert!(!p.capped);
+    }
+
+    #[test]
+    fn an_icon_in_the_corner_puts_the_menu_against_the_right_edge() {
+        let work = Rect::new(0, 0, 1920, 1032);
+        let corner = Rect::new(1890, 1048, 24, 24);
+        let p = place_beside_icon(corner, (360, 400), work, Edge::Bottom, M);
+        assert_eq!((p.rect.x + p.rect.w, p.rect.y + p.rect.h), (1920 - M, 1032 - M));
+    }
+
+    #[test]
+    fn at_the_top_it_hangs_below_the_taskbar() {
+        let work = Rect::new(0, 48, 1920, 1032);
+        let p = place_beside_icon(Rect::new(1700, 12, 24, 24), (304, 500), work, Edge::Top, M);
+        assert_eq!(p.rect, Rect::new(1712 - 152, 48 + M, 304, 500));
+    }
+
+    #[test]
+    fn a_left_taskbar_puts_the_menu_beside_it_with_its_bottom_at_the_icon() {
+        let work = Rect::new(64, 0, 1856, 1080);
+        let p = place_beside_icon(Rect::new(20, 1030, 24, 24), (304, 500), work, Edge::Left, M);
+        assert_eq!(p.rect, Rect::new(64 + M, 1054 - 500, 304, 500));
+    }
+
+    #[test]
+    fn a_right_taskbar_puts_the_menu_against_it() {
+        let work = Rect::new(0, 0, 1856, 1080);
+        let p = place_beside_icon(Rect::new(1880, 1030, 24, 24), (304, 500), work, Edge::Right, M);
+        assert_eq!(p.rect.x + p.rect.w, 1856 - M);
+        assert_eq!(p.rect.y + p.rect.h, 1054.min(1080 - M));
+    }
+
+    #[test]
+    fn a_menu_taller_than_the_room_is_cut_and_scrolls_on_every_side() {
+        for (edge, work, icon) in [
+            (Edge::Bottom, Rect::new(0, 0, 1920, 1032), ICON),
+            (Edge::Top, Rect::new(0, 48, 1920, 1032), Rect::new(1700, 12, 24, 24)),
+            (Edge::Left, Rect::new(64, 0, 1856, 1080), Rect::new(20, 1030, 24, 24)),
+            (Edge::Right, Rect::new(0, 0, 1856, 1080), Rect::new(1880, 1030, 24, 24)),
+        ] {
+            let p = place_beside_icon(icon, (304, 5000), work, edge, M);
+            assert!(p.capped, "{edge:?}");
+            assert!(p.rect.y >= work.y + M && p.rect.y + p.rect.h <= work.y + work.h - M, "{edge:?}: {:?}", p.rect);
+        }
+    }
+
+    #[test]
+    fn it_never_leaves_the_work_area_wherever_the_icon_is_on_any_side() {
+        let sides = [
+            (Edge::Bottom, Rect::new(0, 0, 1920, 1032)),
+            (Edge::Top, Rect::new(0, 48, 1920, 1032)),
+            (Edge::Left, Rect::new(64, 0, 1856, 1080)),
+            (Edge::Right, Rect::new(0, 0, 1856, 1080)),
+        ];
+        for (edge, work) in sides {
+            for (w, h) in [(304, 300), (344, 700), (360, 480)] {
+                for x in (0..1920).step_by(131) {
+                    for y in (0..1080).step_by(97) {
+                        let r = place_beside_icon(Rect::new(x, y, 24, 24), (w, h), work, edge, M).rect;
+                        assert!(r.x >= work.x + M && r.x + r.w <= work.x + work.w - M, "{edge:?} {x},{y} {w}x{h}: {r:?}");
+                        assert!(r.y >= work.y + M && r.y + r.h <= work.y + work.h - M, "{edge:?} {x},{y} {w}x{h}: {r:?}");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn on_a_second_monitor_with_negative_coordinates_the_menu_stays_on_that_monitor() {
+        let work = Rect::new(-2560, 0, 2560, 1400); // a 1440p monitor on the left, 40 px taskbar at the bottom
+        let icon = Rect::new(-150, 1410, 28, 28);
+        let p = place_beside_icon(icon, (344, 600), work, Edge::Bottom, 12);
+        assert!(p.rect.x >= work.x && p.rect.x + p.rect.w <= 0, "{:?}", p.rect);
+        assert_eq!(p.rect.y + p.rect.h, 1400 - 12);
+    }
+
+    #[test]
+    fn the_edge_has_a_name_for_the_page() {
+        assert_eq!([Edge::Bottom, Edge::Top, Edge::Left, Edge::Right].map(Edge::as_str), ["bottom", "top", "left", "right"]);
     }
 
     #[test]

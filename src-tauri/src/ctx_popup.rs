@@ -14,12 +14,12 @@
 //!
 //! Without a window (it could not be created, the page did not answer, `SUNSHINE_GUI_CTX_POPUP=off`) `ctx_popup_open` fails and the page draws the menu inside itself, as before.
 
-use crate::menu_place::{MonitorInfo, Rect, client_to_screen, css_to_physical, pick_monitor, place_surface, room_css, sane_scale};
+use crate::menu_place::{Edge, MonitorInfo, Rect, client_to_screen, css_to_physical, pick_monitor, place_beside_icon, place_surface, room_css, sane_scale, taskbar_edge};
 use log::{debug, info, warn};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 use tauri::{AppHandle, Emitter, Manager, PhysicalPosition, PhysicalSize, WebviewWindow, Window, WindowEvent};
 
@@ -28,6 +28,8 @@ pub const POPUP_LABEL: &str = "ctxmenu";
 const PAD_CSS: f64 = 16.0;
 /// Room kept between the menu and the edge of the work area, in CSS px (the same 8 px as the in-page placement).
 const MARGIN_CSS: f64 = 8.0;
+/// Room kept between the tray menu and the taskbar and the work area's edge, in CSS px (a Windows 11 flyout sits 12 px from the taskbar).
+const TRAY_MARGIN_CSS: f64 = 12.0;
 /// Width of the window while the page measures the menu: the widest Material menu is 280 px, plus the room for the shadow.
 const MEASURE_WIDTH_CSS: f64 = 360.0;
 /// How long the page has to draw and measure a menu.
@@ -40,8 +42,17 @@ static LOADED: AtomicBool = AtomicBool::new(false);
 static SELFTEST: AtomicBool = AtomicBool::new(false);
 static STATE: Mutex<Option<Open>> = Mutex::new(None);
 
+/// A menu opened from the tray icon: where the icon is and which side of the monitor the taskbar is on. The window is placed beside the icon, away from the taskbar, on every `ready`.
+#[derive(Clone, Copy)]
+struct TrayAnchor {
+    icon: Rect,
+    edge: Edge,
+}
+
 struct Open {
     token: u64,
+    /// Some for the tray's menu: no owner window (the label is empty); the choice goes to the tray's own handler.
+    tray: Option<TrayAnchor>,
     owner: String,
     anchor: (i32, i32),
     monitor: MonitorInfo,
@@ -135,9 +146,64 @@ fn ensure_created(app: &AppHandle) -> Result<(), String> {
 
 /// The page of the menu window has installed its listeners: menus can be sent to it.
 #[tauri::command]
-pub fn ctx_popup_loaded() {
+pub fn ctx_popup_loaded(app: AppHandle) {
     LOADED.store(true, Ordering::SeqCst);
     info!("[ctxpop] menu page ready");
+    // the tray's own menu window is usable now: the native menu steps aside (unless the person asked for it)
+    crate::tray::refresh_menu_mode(&app);
+}
+
+/// The window can show menus: it exists and its page has loaded (the tray keeps the native menu until then).
+pub fn available() -> bool {
+    enabled() && LOADED.load(Ordering::SeqCst)
+}
+
+/// The app handle of the running application, kept for the tray icon's callbacks (they are generic over the runtime; the menu window is not).
+static APP: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
+pub fn remember_app(app: &AppHandle) {
+    let _ = APP.set(app.clone());
+}
+pub fn app() -> Option<AppHandle> {
+    APP.get().cloned()
+}
+
+/// The theme (colours, light or dark) of the main window as it was last seen: the tray's menu is opened without a main window to ask. Kept in memory and in a small file, so that a start that begins
+/// in the tray has the person's colours from the first menu.
+static THEME: Mutex<Value> = Mutex::new(Value::Null);
+fn theme_file() -> Option<std::path::PathBuf> {
+    dirs::config_dir().map(|dir| dir.join("Sunshine GUI").join("tray-theme.json"))
+}
+fn remember_theme(theme: &Value) {
+    if theme.is_null() {
+        return;
+    }
+    let mut guard = THEME.lock().unwrap_or_else(|p| p.into_inner());
+    if *guard != *theme {
+        *guard = theme.clone();
+    }
+}
+fn current_theme() -> Value {
+    let mut guard = THEME.lock().unwrap_or_else(|p| p.into_inner());
+    if guard.is_null() {
+        if let Some(text) = theme_file().and_then(|f| std::fs::read_to_string(f).ok()) {
+            *guard = serde_json::from_str(&text).unwrap_or(Value::Null);
+        }
+    }
+    guard.clone()
+}
+/// The main window reports its theme whenever the appearance changes.
+#[tauri::command]
+pub fn tray_popup_theme_set(theme: Value) {
+    if theme.is_null() {
+        return;
+    }
+    remember_theme(&theme);
+    if let (Some(file), Ok(text)) = (theme_file(), serde_json::to_string(&theme)) {
+        if let Some(dir) = file.parent() {
+            let _ = std::fs::create_dir_all(dir);
+        }
+        let _ = std::fs::write(file, text);
+    }
 }
 
 // ---- opening ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -191,6 +257,7 @@ pub async fn ctx_popup_open(owner: WebviewWindow, request: OpenRequest) -> Resul
     // the menu that is on is over: its owner is told
     finish(&app, None, Reason::Replaced);
 
+    remember_theme(&request.theme);
     let ratio = if request.ratio > 0.0 { request.ratio } else { owner.scale_factor().unwrap_or(1.0) };
     let anchor = request
         .pointer
@@ -203,7 +270,7 @@ pub async fn ctx_popup_open(owner: WebviewWindow, request: OpenRequest) -> Resul
     let (_, room_h) = room_css(monitor.work, monitor.scale, MARGIN_CSS);
 
     let (tx, rx) = tokio::sync::oneshot::channel();
-    *state() = Some(Open { token: request.token, owner: owner.label().to_string(), anchor, monitor, ready: Some(tx), shown: false, surface: None, armed: false, shown_at: None });
+    *state() = Some(Open { token: request.token, tray: None, owner: owner.label().to_string(), anchor, monitor, ready: Some(tx), shown: false, surface: None, armed: false, shown_at: None });
 
     // the window waits on the monitor of the pointer, as large as the work area allows, cloaked: the page lays the menu out in a window that renders, at the scale it will have
     let measure = Rect::new(
@@ -241,21 +308,125 @@ pub async fn ctx_popup_open(owner: WebviewWindow, request: OpenRequest) -> Resul
     Ok(())
 }
 
+// ---- the tray's menu --------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+static TRAY_TOKEN: AtomicU64 = AtomicU64::new(8_000_000_000);
+
+/// Where the tray icon is and what the taskbar around it looks like: the icon's rectangle (physical px of the virtual desktop).
+pub struct TrayTarget {
+    pub icon: Rect,
+}
+
+/// Opens one of the tray's menus beside the icon. Resolves when the menu is on screen; the choice comes back through `tray_popup_act` (the page calls it) and runs through the tray's own handler.
+/// An error means no window was shown: the caller falls back to the native menu.
+pub async fn open_tray(app: AppHandle, variant: crate::tray_prefs::Variant, menu_state: Value, target: TrayTarget) -> Result<(), String> {
+    if !enabled() {
+        return Err("the menu window is off".into());
+    }
+    let started = Instant::now();
+    let popup = app.get_webview_window(POPUP_LABEL).ok_or("the menu window does not exist")?;
+    if !LOADED.load(Ordering::SeqCst) {
+        return Err("the menu window has not loaded".into());
+    }
+    finish(&app, None, Reason::Replaced);
+
+    let icon = target.icon;
+    let centre = (icon.x + icon.w / 2, icon.y + icon.h / 2);
+    let monitors = popup.available_monitors().map_err(|e| e.to_string())?;
+    let infos: Vec<MonitorInfo> = monitors
+        .iter()
+        .map(|m| {
+            let w = m.work_area();
+            MonitorInfo { work: Rect::new(w.position.x, w.position.y, w.size.width as i32, w.size.height as i32), scale: sane_scale(m.scale_factor()) }
+        })
+        .collect();
+    let index = pick_monitor(&infos, centre).ok_or("no monitor")?;
+    let monitor = infos[index];
+    let bounds = Rect::new(monitors[index].position().x, monitors[index].position().y, monitors[index].size().width as i32, monitors[index].size().height as i32);
+    let edge = taskbar_edge(bounds, monitor.work, icon);
+    let (_, room_h) = room_css(monitor.work, monitor.scale, TRAY_MARGIN_CSS);
+
+    let token = TRAY_TOKEN.fetch_add(1, Ordering::SeqCst);
+    let (tx, rx) = tokio::sync::oneshot::channel();
+    *state() = Some(Open { token, tray: Some(TrayAnchor { icon, edge }), owner: String::new(), anchor: centre, monitor, ready: Some(tx), shown: false, surface: None, armed: false, shown_at: None });
+
+    // the window waits on the icon's monitor, as large as the work area allows and cloaked, while the page lays the card out at the scale it will have
+    let measure = Rect::new(
+        monitor.work.x,
+        monitor.work.y,
+        css_to_physical(variant.width_css() + 2.0 * PAD_CSS, monitor.scale).min(monitor.work.w),
+        css_to_physical(room_h + 2.0 * PAD_CSS, monitor.scale).min(monitor.work.h),
+    );
+    #[cfg(target_os = "windows")]
+    crate::windows::set_cloak(&popup, true);
+    apply_rect(&popup, measure);
+    let _ = popup.show();
+
+    app.emit_to(
+        POPUP_LABEL,
+        "tray-popup:open",
+        json!({ "token": token, "variant": variant.as_str(), "state": menu_state, "theme": current_theme(), "edge": edge.as_str(), "maxHeight": room_h }),
+    )
+    .map_err(|e| {
+        finish(&app, None, Reason::Failed);
+        e.to_string()
+    })?;
+
+    match tokio::time::timeout(READY_TIMEOUT, rx).await {
+        Ok(Ok(())) => {}
+        Ok(Err(_)) => return Err("the menu was closed before it was shown".into()),
+        Err(_) => {
+            warn!("[ctxpop] the tray menu page did not answer in {} ms", READY_TIMEOUT.as_millis());
+            finish(&app, None, Reason::Failed);
+            return Err("the menu window did not answer".into());
+        }
+    }
+    info!("[ctxpop] tray menu {} shown {} ms after the click (edge {}, token {})", variant.as_str(), started.elapsed().as_millis(), edge.as_str(), token);
+    watch(app, token);
+    Ok(())
+}
+
+/// The tray menu on screen (if any) has this token: an item was chosen; the window closes. Returns whether the token was the open menu's.
+pub fn pick_tray(app: &AppHandle, token: u64) -> bool {
+    if state().as_ref().is_some_and(|o| o.token == token && o.tray.is_some()) {
+        finish(app, None, Reason::Pick);
+        return true;
+    }
+    false
+}
+
+/// Sends a new state to the tray menu that is on (its host state changed while it was open).
+pub fn update_tray_state(app: &AppHandle, state_value: Value) {
+    let token = state().as_ref().filter(|o| o.tray.is_some()).map(|o| o.token);
+    if let Some(token) = token {
+        let _ = app.emit_to(POPUP_LABEL, "tray-popup:state", json!({ "token": token, "state": state_value }));
+    }
+}
+
+/// A menu of the tray is on screen.
+pub fn tray_menu_open() -> bool {
+    state().as_ref().is_some_and(|o| o.tray.is_some())
+}
+
 /// The page drew the menu (or drew another level of it) and measured it: size and place the window, show it.
 #[tauri::command]
 pub async fn ctx_popup_ready(app: AppHandle, token: u64, width: f64, height: f64) -> Result<(), String> {
     let popup = app.get_webview_window(POPUP_LABEL).ok_or("the menu window does not exist")?;
-    let (anchor, monitor, first, tx) = {
+    let (anchor, monitor, first, tx, tray) = {
         let mut guard = state();
         let open = guard.as_mut().filter(|o| o.token == token).ok_or("no such menu")?;
         let first = !open.shown;
         open.shown = true;
         // the first level opens at the pointer; the next ones where the surface is
         let at = open.surface.map(|r| (r.x, r.y)).unwrap_or(open.anchor);
-        (at, open.monitor, first, open.ready.take())
+        (at, open.monitor, first, open.ready.take(), open.tray)
     };
     let size = (css_to_physical(width.max(1.0), monitor.scale), css_to_physical(height.max(1.0), monitor.scale));
-    let placed = place_surface(anchor, size, monitor.work, css_to_physical(MARGIN_CSS, monitor.scale));
+    let placed = match tray {
+        // the tray's menu: beside the icon, away from the taskbar; a page of another height keeps the edge at the taskbar
+        Some(t) => place_beside_icon(t.icon, size, monitor.work, t.edge, css_to_physical(TRAY_MARGIN_CSS, monitor.scale)),
+        None => place_surface(anchor, size, monitor.work, css_to_physical(MARGIN_CSS, monitor.scale)),
+    };
     if let Some(open) = state().as_mut().filter(|o| o.token == token) {
         open.surface = Some(placed.rect);
     }
@@ -299,6 +470,10 @@ fn apply_rect(window: &WebviewWindow, rect: Rect) {
 /// Ends the menu on screen (if any): hides the window, gives the focus back, tells the owner. Returns whether there was a menu.
 fn finish(app: &AppHandle, path: Option<Vec<u32>>, reason: Reason) -> bool {
     let Some(open) = state().take() else { return false };
+    if open.tray.is_some() && reason == Reason::FocusLost {
+        // the press on the tray icon that took the focus is about to be released on the icon: that release must not open the menu again
+        crate::tray_prefs::note_closed_by_focus_loss();
+    }
     let popup = app.get_webview_window(POPUP_LABEL);
     let mut was_focused = false;
     if let Some(popup) = &popup {
@@ -312,13 +487,15 @@ fn finish(app: &AppHandle, path: Option<Vec<u32>>, reason: Reason) -> bool {
             }
         }
     }
-    let owner = app.get_webview_window(&open.owner);
-    if reason.gives_focus_back(was_focused) {
-        if let Some(owner) = &owner {
-            let _ = owner.set_focus();
+    if !open.owner.is_empty() {
+        let owner = app.get_webview_window(&open.owner);
+        if reason.gives_focus_back(was_focused) {
+            if let Some(owner) = &owner {
+                let _ = owner.set_focus();
+            }
         }
+        let _ = app.emit_to(open.owner.as_str(), "ctx-popup:result", json!({ "token": open.token, "path": path, "reason": format!("{reason:?}") }));
     }
-    let _ = app.emit_to(open.owner.as_str(), "ctx-popup:result", json!({ "token": open.token, "path": path, "reason": format!("{reason:?}") }));
     debug!("[ctxpop] closed token {} ({reason:?}) path {path:?}", open.token);
     true
 }
@@ -348,7 +525,8 @@ fn watch(app: AppHandle, token: u64) {
                 Some(o) => (o.owner.clone(), o.armed, o.shown_at),
                 None => return,
             };
-            let owner_ok = app.get_webview_window(&owner_label).is_some_and(|w| w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false));
+            // the tray's menu has no owner window to keep an eye on
+            let owner_ok = owner_label.is_empty() || app.get_webview_window(&owner_label).is_some_and(|w| w.is_visible().unwrap_or(false) && !w.is_minimized().unwrap_or(false));
             if !owner_ok {
                 finish(&app, None, Reason::OwnerGone);
                 return;

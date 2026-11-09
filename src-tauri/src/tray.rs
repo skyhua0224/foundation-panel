@@ -23,6 +23,7 @@ mod icons;
 mod main_panel;
 mod menu;
 mod notifications;
+pub(crate) mod popup_input;
 #[cfg(target_os = "windows")]
 mod vdd_confirmation;
 
@@ -351,14 +352,14 @@ const ZH_STRINGS: TrayStrings = TrayStrings {
     advanced_menu: "高级",
     help_menu: "帮助",
     open_sunshine: "Web 管理界面",
-    vdd_settings: "杂鱼虚拟显示器设置",
-    vdd_create: "创建杂鱼虚拟显示器",
-    vdd_create_confirm: "创建杂鱼虚拟显示器可能会更改 Windows 显示布局。是否继续？",
-    vdd_close: "关闭杂鱼虚拟显示器",
+    vdd_settings: "基地虚拟显示器设置",
+    vdd_create: "创建基地虚拟显示器",
+    vdd_create_confirm: "创建基地虚拟显示器可能会更改 Windows 显示布局。是否继续？",
+    vdd_close: "关闭基地虚拟显示器",
     vdd_keep: "串流结束后保留",
-    vdd_keep_confirm: "启用后，串流结束时将保留杂鱼虚拟显示器，并可能更改 Windows 显示布局。是否继续？",
+    vdd_keep_confirm: "启用后，串流结束时将保留基地虚拟显示器，并可能更改 Windows 显示布局。是否继续？",
     vdd_headless: "无头模式自动创建",
-    vdd_headless_confirm: "这是实验性恢复功能：未检测到显示器时会自动创建杂鱼虚拟显示器，并可能更改当前显示布局。是否继续？",
+    vdd_headless_confirm: "这是实验性恢复功能：未检测到显示器时会自动创建基地虚拟显示器，并可能更改当前显示布局。是否继续？",
     import_config: "导入配置",
     export_config: "导出配置",
     reset_config: "重置配置",
@@ -432,14 +433,14 @@ const EN_STRINGS: TrayStrings = TrayStrings {
     advanced_menu: "Advanced",
     help_menu: "Help",
     open_sunshine: "Web Management UI",
-    vdd_settings: "ZakoDisplay Settings",
-    vdd_create: "Create ZakoDisplay",
-    vdd_create_confirm: "This creates ZakoDisplay and may change the Windows display layout. Continue?",
-    vdd_close: "Close ZakoDisplay",
+    vdd_settings: "Foundation Virtual Display Settings",
+    vdd_create: "Create Foundation Virtual Display",
+    vdd_create_confirm: "This creates Foundation Virtual Display and may change the Windows display layout. Continue?",
+    vdd_close: "Close Foundation Virtual Display",
     vdd_keep: "Keep After Streaming",
-    vdd_keep_confirm: "Keep mode leaves ZakoDisplay enabled after streaming ends and may change the Windows display layout. Continue?",
+    vdd_keep_confirm: "Keep mode leaves Foundation Virtual Display enabled after streaming ends and may change the Windows display layout. Continue?",
     vdd_headless: "Auto-create When Headless",
-    vdd_headless_confirm: "This experimental recovery feature creates ZakoDisplay when no display is detected and may change the active display layout. Continue?",
+    vdd_headless_confirm: "This experimental recovery feature creates Foundation Virtual Display when no display is detected and may change the active display layout. Continue?",
     import_config: "Import Config",
     export_config: "Export Config",
     reset_config: "Reset Config",
@@ -730,17 +731,8 @@ fn build_owned_system_tray<R: Runtime + 'static>(app: &AppHandle<R>) -> tauri::R
         .tooltip(tooltip)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| handle_tray_menu_event(app, event.id().as_ref()))
-        .on_tray_icon_event(|tray, event| match event {
-            TrayIconEvent::Click {
-                button: MouseButton::Left,
-                ..
-            } => handle_tray_click(tray.app_handle()),
-            TrayIconEvent::DoubleClick {
-                button: MouseButton::Left,
-                ..
-            } => handle_tray_double_click(tray.app_handle()),
-            _ => {}
-        })
+        // what each gesture does is the person's choice (tray_prefs.rs, 个性化): popup_input.rs
+        .on_tray_icon_event(|_tray, event| popup_input::on_icon_event(event))
         .build(app)?;
 
     info!("GUI tray created for the current user session");
@@ -1043,7 +1035,7 @@ mod tests {
 
     #[test]
     fn native_confirmations_use_localized_tray_text() {
-        assert!(ZH_STRINGS.vdd_create_confirm.contains("杂鱼虚拟显示器"));
+        assert!(ZH_STRINGS.vdd_create_confirm.contains("基地虚拟显示器"));
         assert!(ZH_STRINGS.vdd_keep_confirm.contains("串流结束"));
         assert!(ZH_STRINGS.vdd_headless_confirm.contains("实验性"));
         assert!(ZH_STRINGS.reset_config_confirm.contains("默认配置"));
@@ -1252,15 +1244,6 @@ fn init_sunshine_user_mode_state<R: Runtime + 'static>(app: &AppHandle<R>) {
     });
 }
 
-/// 处理托盘单击事件
-pub fn handle_tray_click<R: Runtime>(app: &AppHandle<R>) {
-    open_main_panel_from_tray(app, "click");
-}
-/// 处理托盘双击事件
-pub fn handle_tray_double_click<R: Runtime>(app: &AppHandle<R>) {
-    open_main_panel_from_tray(app, "double click");
-}
-
 fn apply_next_tray_locale<R: Runtime>(app: &AppHandle<R>, locale: &str) -> (u64, String) {
     let locale = normalize_tray_locale(locale).to_string();
     let (revision, changed) = {
@@ -1311,8 +1294,11 @@ fn rebuild_tray_menu<R: Runtime>(app: &AppHandle<R>) {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         match build_tray_menu(app) {
             Ok(menu) => {
-                if let Err(e) = tray.set_menu(Some(menu)) {
-                    error!("❌ 重建托盘菜单失败: {}", e);
+                // while the menu window shows the menus, the icon has no native menu (it would open on a right click by itself)
+                if popup_input::use_native_menu() {
+                    if let Err(e) = tray.set_menu(Some(menu)) {
+                        error!("❌ 重建托盘菜单失败: {}", e);
+                    }
                 }
                 // 更新 tooltip
                 let tooltip = {
@@ -1332,11 +1318,38 @@ fn rebuild_tray_menu<R: Runtime>(app: &AppHandle<R>) {
             Err(e) => error!("❌ 构建托盘菜单失败: {}", e),
         }
     }
+    // a menu of the popup that is on screen shows the new state
+    popup_input::push_state_if_open();
 }
 
 /// Tauri 命令：前端通知 tray 同步语言
 pub fn refresh_menu<R: Runtime>(app: &AppHandle<R>) {
     rebuild_tray_menu(app);
+}
+
+/// The icon carries the native menu or none, as the settings and the state of the menu window say (see popup_input.rs).
+pub(crate) fn refresh_menu_mode<R: Runtime>(app: &AppHandle<R>) {
+    popup_input::apply_menu_mode(app);
+}
+
+/// 个性化: what the tray icon does.
+#[tauri::command]
+pub fn tray_prefs_get() -> crate::tray_prefs::TrayPrefs {
+    crate::tray_prefs::current()
+}
+
+#[tauri::command]
+pub fn tray_prefs_set(app: AppHandle, prefs: crate::tray_prefs::TrayPrefs) -> Result<crate::tray_prefs::TrayPrefs, String> {
+    let saved = crate::tray_prefs::save(prefs)?;
+    popup_input::reset_failures();
+    refresh_menu_mode(&app);
+    Ok(saved)
+}
+
+/// The tray menu's page chose an item (an id of the native menu): it runs through the same handler.
+#[tauri::command]
+pub fn tray_popup_act(app: AppHandle, token: u64, id: String) {
+    popup_input::act(&app, token, &id);
 }
 
 #[tauri::command]

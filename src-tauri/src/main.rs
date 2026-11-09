@@ -58,6 +58,7 @@ mod text_context;
 mod toolbar;
 mod tray;
 mod tray_config;
+mod tray_prefs;
 mod update;
 mod usbip;
 mod utils;
@@ -423,6 +424,10 @@ fn main() {
             hwinfo::hwinfo_get_readings,
             hwinfo::hwinfo_check_available,
             tray::set_locale_preferences,
+            tray::tray_prefs_get,
+            tray::tray_prefs_set,
+            tray::tray_popup_act,
+            ctx_popup::tray_popup_theme_set,
             tray::get_tray_locale,
             tray::main_panel_loading,
             tray::main_panel_ready,

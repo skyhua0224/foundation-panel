@@ -26,7 +26,7 @@ test('the lists keep the persons order into the payload and back', () => {
   assert.match(page, /setResolutionOptions = \(values = \[\]\) => \{ resolutionList\.value = cleanList\('resolution', values\) \}/)
 })
 
-test('the product is named 杂鱼虚拟显示器 in Chinese and ZakoDisplay in English, never the short Chinese form or 基地显示器', () => {
+test('the panel names the product 杂鱼虚拟显示器 / ZakoDisplay; the tray (owner 2026-11-09) says 基地虚拟显示器 / Foundation Virtual Display, never the short Chinese form', () => {
   const zh = read('../desktop/i18n/zh.js')
   const en = read('../desktop/i18n/en.js')
   assert.doesNotMatch(zh, /基地显示器|杂鱼显示器/)
@@ -35,9 +35,9 @@ test('the product is named 杂鱼虚拟显示器 in Chinese and ZakoDisplay in E
   assert.match(zh, /modeListNote: '/)
   assert.match(en, /modeListNote: '/)
   const tray = readFileSync(new URL('../../../src-tauri/src/tray.rs', import.meta.url), 'utf8')
-  assert.match(tray, /vdd_settings: "杂鱼虚拟显示器设置"/)
-  assert.match(tray, /vdd_settings: "ZakoDisplay Settings"/)
-  assert.doesNotMatch(tray, /基地显示器|杂鱼显示器/)
+  assert.match(tray, /vdd_settings: "基地虚拟显示器设置"/)
+  assert.match(tray, /vdd_settings: "Foundation Virtual Display Settings"/)
+  assert.doesNotMatch(tray, /基地显示器|杂鱼|Zako/)
   const doctor = readFileSync(new URL('../../../src-tauri/src/doctor_local.rs', import.meta.url), 'utf8')
   assert.match(doctor, /tr\(lang, "ZakoDisplay", "杂鱼虚拟显示器"\)/)
 })
