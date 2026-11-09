@@ -13,7 +13,7 @@
 .ai-head__title { margin: 0; font: var(--m-headline-large-emphasized, var(--m-headline-large)); font-variation-settings: "wght" 460; color: var(--md-sys-color-on-surface); }
 .ai-head__line { margin: 0; font: var(--m-body-medium); color: var(--md-sys-color-on-surface); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ai-head__actions { flex: none; display: flex; gap: 4px; }
-.ai-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: thin; display: flex; flex-direction: column; }
+.ai-scroll { flex: 1 1 0; min-height: 0; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; display: flex; flex-direction: column; }
 .ai-col { width: 100%; max-width: calc(var(--m-column, 960px) + 2 * var(--m-gutter)); margin: 0 auto; padding: 8px var(--m-gutter) 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; flex: 1 0 auto; }
 .ai-hint { margin: auto; display: flex; flex-direction: column; align-items: center; gap: 14px; padding: 16px 8px; text-align: center; color: var(--md-sys-color-on-surface); }
 .ai-dock { flex: none; padding: 8px max(var(--m-gutter), calc((100% - var(--m-column, 960px)) / 2)) 16px; background: linear-gradient(to bottom, transparent, var(--m-page) 14px); }

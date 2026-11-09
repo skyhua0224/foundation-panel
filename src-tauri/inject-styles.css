@@ -1,18 +1,15 @@
-/* 完全隐藏滚动条 */
+/* 滚动条：页面自身（文档与 .m-scene__pane 详情栏）在面板里不画滚动条，标题才和面板自己的页面对齐（SidebarMenu.vue 的详情栏同理）。
+   页面里的其他滚动容器（日志、对话框、列表）显示 foundation-ui 的统一细滚动条（css/scrollbar.css），不再一律隐藏。 */
 /* The GUI owns the iframe loading transition. */
 @view-transition {
   navigation: none;
 }
 
-::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
-}
-
-/* Firefox */
-* {
+html, body, .m-scene__pane {
   scrollbar-width: none;
+}
+html::-webkit-scrollbar, body::-webkit-scrollbar, .m-scene__pane::-webkit-scrollbar {
+  display: none;
 }
 
 /* IE/Edge */
