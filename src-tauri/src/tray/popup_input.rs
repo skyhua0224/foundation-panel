@@ -326,9 +326,21 @@ fn config_text(config: &serde_json::Map<String, Value>, key: &str) -> Option<Str
     config.get(key).and_then(|v| v.as_str().map(str::to_string).or_else(|| v.as_u64().map(|n| n.to_string())))
 }
 
+/// The displays listed a moment ago: the state is rebuilt on every change of the host's state and listing every mode of every display is not free. A slider that was set lists afresh.
+static OUTPUT_CACHE: Mutex<Option<(std::time::Instant, Vec<display_sliders::Output>)>> = Mutex::new(None);
+const OUTPUT_CACHE_FOR: Duration = Duration::from_millis(1500);
+
 /// The displays of the machine now (Win32, off the async threads) and what decides which of them the sliders change.
-async fn displays_and_facts(vdd_active: bool, stream: Option<(u32, u32, u32)>) -> (Vec<display_sliders::Output>, Facts, serde_json::Map<String, Value>) {
-    let outputs = tokio::time::timeout(DISPLAY_TIMEOUT, tokio::task::spawn_blocking(display_sliders::outputs)).await.ok().and_then(Result::ok).unwrap_or_default();
+async fn displays_and_facts(vdd_active: bool, stream: Option<(u32, u32, u32)>, fresh: bool) -> (Vec<display_sliders::Output>, Facts, serde_json::Map<String, Value>) {
+    let cached = if fresh { None } else { OUTPUT_CACHE.lock().unwrap_or_else(|p| p.into_inner()).as_ref().filter(|(at, _)| at.elapsed() < OUTPUT_CACHE_FOR).map(|(_, list)| list.clone()) };
+    let outputs = match cached {
+        Some(list) => list,
+        None => {
+            let list: Vec<display_sliders::Output> = tokio::time::timeout(DISPLAY_TIMEOUT, tokio::task::spawn_blocking(display_sliders::outputs)).await.ok().and_then(Result::ok).unwrap_or_default();
+            *OUTPUT_CACHE.lock().unwrap_or_else(|p| p.into_inner()) = Some((std::time::Instant::now(), list.clone()));
+            list
+        }
+    };
     let config = crate::vdd::read_full_sunshine_config().await.unwrap_or_default();
     let output_is_virtual = config_text(&config, "output_name").as_deref() == Some(VIRTUAL_OUTPUT);
     (outputs, Facts { virtual_active: vdd_active, output_is_virtual, stream }, config)
@@ -336,7 +348,7 @@ async fn displays_and_facts(vdd_active: bool, stream: Option<(u32, u32, u32)>) -
 
 /// `state.sliders`: the target display and what it can do now, the scale, the bitrate cap (only with a connected core).
 async fn slider_state(connected: bool, vdd_active: bool, stream: Option<(u32, u32, u32)>) -> Value {
-    let (outputs, facts, config) = displays_and_facts(vdd_active, stream).await;
+    let (outputs, facts, config) = displays_and_facts(vdd_active, stream, false).await;
     let target = display_sliders::choose(&outputs, &facts);
     let dpi = if target.is_some() { crate::system::get_current_dpi().await.ok() } else { None };
     let bitrate = connected.then(|| config_text(&config, "max_bitrate").and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(0));
@@ -360,7 +372,7 @@ async fn live_facts() -> (bool, Option<(u32, u32, u32)>) {
 /// Sets a mode of the target display: the new resolution (keeping the rate where the display has it) or the new refresh rate.
 async fn change_mode(want_size: Option<(u32, u32)>, want_hz: Option<u32>) -> Result<(), String> {
     let (vdd_active, stream) = live_facts().await;
-    let (_, facts, _) = displays_and_facts(vdd_active, stream).await;
+    let (_, facts, _) = displays_and_facts(vdd_active, stream, true).await;
     tokio::task::spawn_blocking(move || {
         let outputs = display_sliders::outputs();
         let (at, kind) = display_sliders::choose(&outputs, &facts).ok_or("没有可调整的显示器")?;
@@ -425,6 +437,7 @@ pub(super) async fn set(app: &AppHandle, key: &str, value: &Value) -> Result<(),
         other => return Err(format!("未知的滑块 {other}")),
     };
     tokio::time::sleep(settle).await;
+    *OUTPUT_CACHE.lock().unwrap_or_else(|p| p.into_inner()) = None; // what the display has now, not what it had
     ctx_popup::update_tray_state(app, build_state(app).await);
     Ok(())
 }
