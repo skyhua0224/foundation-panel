@@ -9,6 +9,7 @@
 //! The native menu stays as the fallback: it is the icon's menu until the menu window has loaded, again when the person asks for it ("force native"), and again when the window fails twice in a
 //! row. A menu that is attached to the icon makes Windows show it on a right click by itself, so while the popup is in use the icon has no menu at all.
 
+use super::display_sliders::{self, Facts, Kind};
 use super::*;
 use crate::ctx_popup::{self, TrayTarget};
 use crate::menu_place::Rect as PhysRect;
@@ -274,6 +275,13 @@ pub(super) async fn build_state(_app: &AppHandle) -> Value {
         Some(x) if vdd_active && x.width > 0 && x.height > 0 => (format!("{}×{}@{}", x.width, x.height, x.fps), short_mode(x.height, x.fps)),
         _ => (String::new(), String::new()),
     };
+    let stream = match first {
+        Some(x) => Some((x.width, x.height, x.fps)),
+        // the live list did not come: a stream is still on, its display is the one in use (the primary one when none matches)
+        None if connected && tray_state.as_ref().is_some_and(|state| host_word(&state.status) == "streaming") => Some((0, 0, 0)),
+        None => None,
+    };
+    let sliders = slider_state(connected, vdd_active, stream).await;
     let notification = tray_state.as_ref().filter(|state| state.notification.active).map(|state| menu::tray_notification_label(s, state));
     let update_version = update::last_seen_update();
     #[cfg(target_os = "windows")]
@@ -304,8 +312,68 @@ pub(super) async fn build_state(_app: &AppHandle) -> Value {
         "update": update_version.map(|version| json!({ "version": version })),
         "ds5": ds5,
         "notification": notification,
+        "sliders": sliders,
         "labels": labels(s),
     })
+}
+
+// ---- the sliders (display_sliders.rs) -----------------------------------------------------------------------------------------------------------------------------------------------------
+
+const VIRTUAL_OUTPUT: &str = "ZakoHDR";
+const DISPLAY_TIMEOUT: Duration = Duration::from_millis(1500);
+
+fn config_text(config: &serde_json::Map<String, Value>, key: &str) -> Option<String> {
+    config.get(key).and_then(|v| v.as_str().map(str::to_string).or_else(|| v.as_u64().map(|n| n.to_string())))
+}
+
+/// The displays of the machine now (Win32, off the async threads) and what decides which of them the sliders change.
+async fn displays_and_facts(vdd_active: bool, stream: Option<(u32, u32, u32)>) -> (Vec<display_sliders::Output>, Facts, serde_json::Map<String, Value>) {
+    let outputs = tokio::time::timeout(DISPLAY_TIMEOUT, tokio::task::spawn_blocking(display_sliders::outputs)).await.ok().and_then(Result::ok).unwrap_or_default();
+    let config = crate::vdd::read_full_sunshine_config().await.unwrap_or_default();
+    let output_is_virtual = config_text(&config, "output_name").as_deref() == Some(VIRTUAL_OUTPUT);
+    (outputs, Facts { virtual_active: vdd_active, output_is_virtual, stream }, config)
+}
+
+/// `state.sliders`: the target display and what it can do now, the scale, the bitrate cap (only with a connected core).
+async fn slider_state(connected: bool, vdd_active: bool, stream: Option<(u32, u32, u32)>) -> Value {
+    let (outputs, facts, config) = displays_and_facts(vdd_active, stream).await;
+    let target = display_sliders::choose(&outputs, &facts);
+    let dpi = if target.is_some() { crate::system::get_current_dpi().await.ok() } else { None };
+    let bitrate = connected.then(|| config_text(&config, "max_bitrate").and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(0));
+    display_sliders::sliders_json(&outputs, target, dpi, bitrate)
+}
+
+/// The facts of the moment a slider is released (the menu's state may be a second old).
+async fn live_facts() -> (bool, Option<(u32, u32, u32)>) {
+    let (tray_state, connection, _) = TRAY_RUNTIME_STATE.lock().unwrap_or_else(|p| p.into_inner()).menu_snapshot();
+    let connected = connection == CoreConnectionState::Connected;
+    let vdd_active = tray_state.as_ref().is_some_and(|state| state.vdd.active);
+    let sessions = if connected { tokio::time::timeout(LIVE_TIMEOUT, sunshine::get_active_sessions()).await.ok().and_then(Result::ok) } else { None };
+    let stream = match sessions.as_ref().and_then(|rows| rows.first()) {
+        Some(x) => Some((x.width, x.height, x.fps)),
+        None if connected && tray_state.as_ref().is_some_and(|state| host_word(&state.status) == "streaming") => Some((0, 0, 0)),
+        None => None,
+    };
+    (vdd_active, stream)
+}
+
+/// Sets a mode of the target display: the new resolution (keeping the rate where the display has it) or the new refresh rate.
+async fn change_mode(want_size: Option<(u32, u32)>, want_hz: Option<u32>) -> Result<(), String> {
+    let (vdd_active, stream) = live_facts().await;
+    let (_, facts, _) = displays_and_facts(vdd_active, stream).await;
+    tokio::task::spawn_blocking(move || {
+        let outputs = display_sliders::outputs();
+        let (at, kind) = display_sliders::choose(&outputs, &facts).ok_or("没有可调整的显示器")?;
+        let output = &outputs[at];
+        let mode = display_sliders::pick_mode(output, want_size, want_hz).ok_or("显示器没有这个模式")?;
+        if mode == output.current {
+            return Ok(());
+        }
+        info!("tray: {} {} -> {}x{}@{}", if kind == Kind::Stream { "stream display" } else { "virtual display" }, output.device, mode.width, mode.height, mode.hz);
+        display_sliders::set_mode(&output.device, mode)
+    })
+    .await
+    .map_err(|e| e.to_string())?
 }
 
 // ---- commands -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -321,6 +389,44 @@ pub(super) fn act(app: &AppHandle, token: u64, id: &str) {
         return; // not the menu that is on screen (a late answer)
     }
     handle_tray_menu_event(app, id);
+}
+
+/// A slider of the quick page was released (`tray_popup_set`): the menu stays open; the answer comes when the value is set, and the state the host ended up in is pushed first.
+pub(super) async fn set(app: &AppHandle, key: &str, value: &Value) -> Result<(), String> {
+    if !ctx_popup::tray_menu_open() {
+        return Err("菜单已经关闭".to_string());
+    }
+    let settle = match key {
+        "resolution" => {
+            let size = value.as_str().and_then(display_sliders::parse_resolution).ok_or("分辨率无效")?;
+            change_mode(Some(size), None).await?;
+            Duration::from_millis(700)
+        }
+        "refresh" => {
+            let hz = value.as_u64().and_then(|n| u32::try_from(n).ok()).filter(|n| (24..=1000).contains(n)).ok_or("刷新率无效")?;
+            change_mode(None, Some(hz)).await?;
+            Duration::from_millis(700)
+        }
+        "dpi" => {
+            let dpi = value.as_u64().and_then(|n| u32::try_from(n).ok()).filter(|n| (100..=300).contains(n) && n % 25 == 0).ok_or("缩放无效")?;
+            crate::system::set_desktop_dpi(dpi).await?;
+            // SetDpi.exe is started and not waited for; Windows shows the new scale a moment later (the 桌面缩放 section reads it back after a second too)
+            Duration::from_millis(1200)
+        }
+        "bitrate" => {
+            let kbps = value.as_u64().filter(|n| *n <= 800_000).ok_or("码率无效")?;
+            // the configuration API replaces the whole table: read it all, change the one key, write it back under the lock every such writer takes
+            let _guard = crate::device_config::DEVICE_CONFIG_LOCK.lock().await;
+            let mut config = crate::vdd::read_full_sunshine_config().await?;
+            config.insert("max_bitrate".to_string(), json!(kbps.to_string()));
+            sunshine::post_sunshine_config(&config).await?;
+            Duration::from_millis(100)
+        }
+        other => return Err(format!("未知的滑块 {other}")),
+    };
+    tokio::time::sleep(settle).await;
+    ctx_popup::update_tray_state(app, build_state(app).await);
+    Ok(())
 }
 
 #[cfg(test)]

@@ -427,6 +427,7 @@ fn main() {
             tray::tray_prefs_get,
             tray::tray_prefs_set,
             tray::tray_popup_act,
+            tray::tray_popup_set,
             ctx_popup::tray_popup_theme_set,
             tray::get_tray_locale,
             tray::main_panel_loading,
