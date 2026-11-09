@@ -16,6 +16,22 @@ pub const WEBVIEW2_MISSING_EXIT_CODE: i32 = 0x5352;
 /// The environment override is intentionally test-only in effect: it lets a
 /// Windows session exercise the native fallback without uninstalling the
 /// machine's runtime.
+
+/// Which copy the missing-runtime dialog uses for a Windows UI language id.
+pub(crate) fn webview2_dialog_language(language_id: u16) -> &'static str {
+    let primary = language_id & 0x03ff;
+    let region = language_id >> 10;
+    if primary == 0x0004 && matches!(region, 0x01 | 0x03 | 0x05) {
+        "zh_TW"
+    } else if primary == 0x0004 {
+        "zh"
+    } else if primary == 0x0011 {
+        "ja"
+    } else {
+        "en"
+    }
+}
+
 pub fn ensure_available() -> bool {
     if std::env::var_os("SUNSHINE_GUI_FORCE_NO_WEBVIEW2").is_some() {
         #[cfg(target_os = "windows")]
@@ -134,8 +150,22 @@ fn show_missing_runtime_dialog() {
         .find(|path| path.is_file())
     }
 
-    let chinese = unsafe { GetUserDefaultUILanguage() } & 0x03ff == 0x0004;
-    let (title, instruction, content, download, web, close) = if chinese {
+    // LANGID: low 10 bits are the language, the rest the region.
+    // 0x04 Chinese; region 0x01 Taiwan, 0x03 Hong Kong and 0x05 Macao are Traditional.
+    // 0x11 Japanese. Anything else stays English.
+    let language = unsafe { GetUserDefaultUILanguage() };
+    let primary = language & 0x03ff;
+    let region = language >> 10;
+    let (title, instruction, content, download, web, close) = if primary == 0x0004 && matches!(region, 0x01 | 0x03 | 0x05) {
+        (
+            "需要 Microsoft Edge WebView2 Runtime",
+            "管理介面需要 Microsoft Edge WebView2 Runtime",
+            "目前系統沒有可用的 WebView2 Runtime。請安裝 Runtime，或使用網頁管理介面。",
+            "下載並安裝",
+            "開啟網頁管理",
+            "關閉",
+        )
+    } else if primary == 0x0004 {
         (
             "需要 Microsoft Edge WebView2 Runtime",
             "管理界面需要 Microsoft Edge WebView2 Runtime",
@@ -143,6 +173,15 @@ fn show_missing_runtime_dialog() {
             "下载并安装",
             "打开网页管理",
             "关闭",
+        )
+    } else if primary == 0x0011 {
+        (
+            "Microsoft Edge WebView2 Runtime が必要です",
+            "管理画面には Microsoft Edge WebView2 Runtime が必要です",
+            "使える WebView2 Runtime がありません。Runtime をインストールするか、ウェブ管理画面を使ってください。",
+            "ダウンロードしてインストール",
+            "ウェブ管理を開く",
+            "閉じる",
         )
     } else {
         (
@@ -216,4 +255,15 @@ mod tests {
         assert!(!version_is_installed("not-a-version"));
         assert!(version_is_installed("128.0.2739.42"));
     }
+
+    #[test]
+    fn dialog_language_follows_the_ui_language_id() {
+        assert_eq!(super::webview2_dialog_language(0x0804), "zh");
+        assert_eq!(super::webview2_dialog_language(0x0404), "zh_TW");
+        assert_eq!(super::webview2_dialog_language(0x0c04), "zh_TW");
+        assert_eq!(super::webview2_dialog_language(0x0411), "ja");
+        assert_eq!(super::webview2_dialog_language(0x0409), "en");
+        assert_eq!(super::webview2_dialog_language(0x0407), "en");
+    }
+
 }

@@ -154,6 +154,8 @@ export const cs = {
     },
     bitrateLimit: "Limit bitrate",
     bitrateAuto: "Auto",
+    hostAudio: "Zvuk na hostiteli",
+    hostAudioDesc: "Platí pro běžící stream bez nového spojení, pokud to zvuková cesta umí.",
     hdr: "HDR",
     hdrAutoSwitch: "Automatické přepínání HDR",
     hdrAutoSwitchDesc: "Automaticky povolit/zakázat HDR během streamování",

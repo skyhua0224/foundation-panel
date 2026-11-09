@@ -154,6 +154,8 @@ export const fr = {
     },
     bitrateLimit: "Limite de débit",
     bitrateAuto: "Automatique",
+    hostAudio: "Lire le son sur l'hôte",
+    hostAudioDesc: "S'applique au flux en cours sans reconnexion si le chemin audio le permet.",
     hdr: "HDR",
     hdrAutoSwitch: "Commutation automatique HDR",
     hdrAutoSwitchDesc: "Activer/désactiver automatiquement HDR pendant la diffusion",
