@@ -36,7 +36,7 @@
             <MIconButton icon="keyboard_return" :label="r.newline" @click="insert('\\n')" />
           </div>
           <MChipSet v-model="fontSize" class="m-rtss__sizes" :label="r.size" :options="FONT_SIZES.map((v) => ({ value: v, label: v ? `${v}px` : r.defaultSize }))" />
-          <md-outlined-text-field ref="osdField" class="m-rtss__text" type="textarea" rows="4" :label="r.text" :value="osdText" :placeholder="r.placeholder" :supporting-text="r.hint" @input="osdText = $event.target.value" />
+          <md-outlined-text-field ref="osdField" class="m-rtss__text" type="textarea" rows="4" :label="r.text" :value="osdText" :placeholder="r.placeholder" :supporting-text="r.hint" @input="osdText = $event.target.value"><span slot="container" class="m-field__fill" aria-hidden="true" /></md-outlined-text-field>
           <div class="m-rtss__actions">
             <MButton icon="send" :loading="osdBusy" :disabled="osdBusy" @click="sendOsd">{{ r.send }}</MButton>
             <MButton variant="text" :disabled="osdBusy" @click="clearOsd">{{ r.clear }}</MButton>
@@ -81,7 +81,7 @@
               <MSwitchItem :model-value="hw.state.injecting" icon="input" :title="r.inject" :text="hw.state.selected.length ? r.selected.replace('{count}', hw.state.selected.length) : r.pick" :disabled="!hw.state.available" @update:model-value="toggleInject" />
               <MItem action icon="refresh" :title="r.refreshSensors" :disabled="hw.state.loading" @click="hw.load" />
             </MGroup>
-            <md-outlined-text-field class="m-rtss__search" type="search" :label="r.search" :value="query" @input="query = $event.target.value" />
+            <md-outlined-text-field class="m-rtss__search" type="search" :label="r.search" :value="query" @input="query = $event.target.value"><span slot="container" class="m-field__fill" aria-hidden="true" /></md-outlined-text-field>
             <MGroup v-for="group in shownGroups" :key="group.name">
               <MItem action :icon="isOpen(group) ? 'keyboard_arrow_up' : 'keyboard_arrow_down'" :title="group.name" :value="String(group.readings.length)" @click="toggleGroup(group.name)" />
               <template v-if="isOpen(group)">
@@ -240,7 +240,7 @@ onUnmounted(() => { stopPoll(); clearTimeout(restartTimer) })
 .m-rtss__color span { width: 20px; height: 20px; border-radius: 10px; outline: 1px solid var(--md-sys-color-outline); }
 .m-rtss__color input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
 .m-rtss__sizes { padding: 4px 0 12px; }
-.m-rtss__text, .m-rtss__search { width: 100%; --md-outlined-text-field-container-shape: 16px; --md-outlined-text-field-outline-color: var(--md-sys-color-outline-variant); }
+.m-rtss__text, .m-rtss__search { width: 100%; }
 .m-rtss__search { margin: 4px 0 12px; }
 .m-rtss__preview { margin-top: 12px; padding: 12px 16px; border-radius: 16px; background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface-variant); }
 .m-rtss__preview pre { margin: 6px 0 0; font: var(--m-body-medium); font-family: ui-monospace, Consolas, monospace; white-space: pre-wrap; color: var(--md-sys-color-on-surface); }
