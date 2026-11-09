@@ -15,12 +15,12 @@ const ctxRs = read('src-tauri/src/ctx_popup.rs')
 const mainRs = read('src-tauri/src/main.rs')
 const trayRs = read('src-tauri/src/tray.rs')
 
-const menuIds = [...menuRs.matchAll(/(?:MenuItem|CheckMenuItem)::with_id\(\s*app,\s*"([a-z_]+)"/g)].map((m) => m[1])
-const rustIds = [...inputRs.slice(inputRs.indexOf('ITEM_IDS: [&str; 37]')).matchAll(/"([a-z_]+)"/g)].map((m) => m[1]).slice(0, 37)
+const menuIds = [...menuRs.matchAll(/(?:MenuItem|CheckMenuItem)::with_id\(\s*app,\s*"([a-z_0-9]+)"/g)].map((m) => m[1])
+const rustIds = [...inputRs.slice(inputRs.indexOf('ITEM_IDS: [&str; 43]')).matchAll(/"([a-z_0-9]+)"/g)].map((m) => m[1]).slice(0, 43)
 
-test('the 37 item ids are the same in menu.rs, the popup\'s list in Rust, the handler arms and the menus\' model', () => {
-  assert.equal(rustIds.length, 37)
-  // menu.rs builds 36 items itself (tray_status is built there too: 37 with it); the containers are submenus
+test('the 43 item ids are the same in menu.rs, the popup\'s list in Rust, the handler arms and the menus\' model', () => {
+  assert.equal(rustIds.length, 43)
+  // menu.rs builds 42 items itself (tray_status is built there too: 43 with it); the containers are submenus
   assert.deepEqual([...new Set(menuIds)].sort(), [...rustIds].sort())
   assert.deepEqual([...TRAY_ITEM_IDS].sort(), [...rustIds].sort())
   for (const id of rustIds.filter((x) => x !== 'tray_status')) assert.ok(actionsRs.includes(`"${id}" =>`), `no handler arm for ${id}`)
@@ -108,7 +108,7 @@ test('the sliders: tray_popup_set is registered, its answer reaches the page (a 
 test('the quick panel\'s layout: the host keeps it apart from the click settings, accepts exactly the ids the menu knows, and sends it with the state', async () => {
   const rust = read('src-tauri/src/tray_prefs.rs')
   // the id lists of Rust and of foundation-ui are one list
-  const rustList = (name) => [...rust.slice(rust.indexOf(name)).split('];')[0].matchAll(/"([a-z_]+)"/g)].map((m) => m[1])
+  const rustList = (name) => [...rust.slice(rust.indexOf(name)).split('];')[0].matchAll(/"([a-z_0-9]+)"/g)].map((m) => m[1])
   assert.deepEqual(rustList('pub const TILE_IDS'), [...TILE_IDS]); assert.deepEqual(rustList('pub const SLIDER_KEYS'), [...SLIDER_KEYS])
   assert.ok(rust.includes('pub const TILE_IDS: [&str; 17]') && TILE_IDS.length === 17)
   // every tile is an item the handler runs (nothing invented)

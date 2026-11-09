@@ -3,6 +3,19 @@ use super::*;
 #[cfg(target_os = "windows")]
 const RECOVERY_TIMEOUT: Duration = Duration::from_secs(30);
 
+// The addresses of the support line (help page of the popup menu and the native menu's 帮助 submenu). The website follows the menu language (.cn for Chinese); the Bilibili channel is one address;
+// the sponsor pages are the 爱发电 pages of config/sponsors.js (a Panel test compares them).
+const BILIBILI_URL: &str = "https://space.bilibili.com/3690974838524514";
+const STAR_URL: &str = "https://github.com/AlkaidLab/foundation-sunshine";
+
+fn site_url(locale: &str) -> &'static str {
+    if locale == "zh" {
+        "https://www.alkaidlab.cn/"
+    } else {
+        "https://www.alkaidlab.com/"
+    }
+}
+
 pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id: &str) {
     let s = get_tray_strings();
     match menu_id {
@@ -88,6 +101,13 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
         "visit_project_moonlight" => {
             utils::open_url_in_browser("https://github.com/qiin2333/moonlight-vplus")
         }
+        // the support line of 帮助 (m3e SUPPORT_ROW) and the same entries in the native menu: opened with the same opener as the project links above
+        "visit_site" => utils::open_url_in_browser(site_url(&get_current_locale())),
+        "visit_bilibili" => utils::open_url_in_browser(BILIBILI_URL),
+        "star_github" => utils::open_url_in_browser(STAR_URL),
+        "sponsor_qiin" => utils::open_url_in_browser("https://www.ifdian.net/a/qiin2333"),
+        "sponsor_yundi339" => utils::open_url_in_browser("https://www.ifdian.net/a/Yundi339"),
+        "sponsor_skyhua" => utils::open_url_in_browser("https://ifdian.net/a/skyhua"),
         "restart" => restart_sunshine(app),
         _ => warn!("⚠️ 未知的托盘菜单事件: {}", menu_id),
     }
