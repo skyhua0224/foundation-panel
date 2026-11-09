@@ -73,6 +73,7 @@ mod vmouse;
 mod win_clipboard;
 mod windows;
 mod windows_proxy;
+mod webview_runtime;
 
 use log::info;
 use std::sync::OnceLock;

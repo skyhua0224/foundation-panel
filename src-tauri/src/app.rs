@@ -60,6 +60,10 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
         .map_or(false, |arg| arg.contains("/pin"));
 
     let app_handle = app.handle().clone();
+    if !crate::webview_runtime::ensure_available() {
+        info!("WebView2 Runtime is unavailable; native fallback was shown");
+        std::process::exit(crate::webview_runtime::WEBVIEW2_MISSING_EXIT_CODE);
+    }
     windows::register_agent_restart();
     crate::desktop_settings::apply_startup_settings(&app_handle, &desktop_settings);
     // 更新偏好属于应用级状态，必须在 `--hidden` 的纯托盘代理模式下也立即注册。
