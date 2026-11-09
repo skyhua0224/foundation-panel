@@ -22,9 +22,9 @@ test('the stream hub is a page of the stream rail declared after its pages, so �
   assert.ok(pages.indexOf('[ROUTES.STREAM_HUB]') > pages.indexOf('[ROUTES.LIVE_SESSION]'), 'after the pages of 串流')
   assert.ok(pages.indexOf('[ROUTES.WEB_CLIENTS]') < pages.indexOf('[ROUTES.STREAM_HUB]'))
 })
-test('串流 is the same page as 设置: MPage, one group of MItem rows, the action in the title row; no page opens by itself on a phone', () => {
+test('串流 is the same page as 设置: MPage, one group of MItem rows, no action (添加应用 is on the page 串流应用); no page opens by itself on a phone', () => {
   for (const src of [stream, hub]) { assert.match(src, /<MPage :title=/); assert.match(src, /<MGroup>/); assert.match(src, /<MItem v-for="item in [a-zA-Z.]+"[^>]*action :icon="item\.icon" :title="item\.label" :text="item\.text"/) }
-  assert.match(stream, /<template #actions><MButton variant="tonal" icon="add"/)
+  assert.ok(!/#actions|MButton|'add'/.test(stream), 'the hub lists pages; the app list adds apps')
   assert.match(shell, /<StreamHubPage v-else-if="entry\.id === ROUTES\.STREAM_HUB"/)
   assert.match(shell, /if \(!isPhone\(\)\) emit\('webui-navigate', webPathOf\(ROUTES\.WEB_CLIENTS\)\)/)
 })
