@@ -303,3 +303,29 @@ test('the address step opens the diagnostics through the panel', async () => {
   data.callbacks.openDiagnostics(); assert.equal(opened, 1)
   assert.doesNotThrow(() => make({}).callbacks.openDiagnostics())
 })
+
+test('the guide reads what the host remembers and saves the steps done and who runs it, one write at a time', async () => {
+  const config = { setup_wizard_completed: false, guide_done: 'intro,consent' }
+  const posts = []
+  const fetchImpl = async (url, init) => {
+    if (init?.method === 'POST') { posts.push(JSON.parse(init.body)); Object.assign(config, JSON.parse(init.body)); return { ok: true, json: async () => ({ status: true }) } }
+    return { ok: true, headers: { get: () => 'application/json' }, json: async () => ({ ...config }) }
+  }
+  const data = createGuideData({ proxyUrl: async () => 'http://h', fetchImpl, openUrl() {}, copy() {}, openApps() {} })
+  assert.deepEqual((await data.loadGuideHost()).done, ['intro', 'consent'])
+  await data.callbacks.saveGuideProgress({ done: ['intro', 'consent', 'account'], active: { device: 'phone', at: 100 } })
+  assert.equal(posts.length, 1)
+  assert.equal(posts[0].guide_done, 'intro,consent,account')
+  assert.equal(posts[0].guide_active, 'phone@100')
+  assert.equal(posts[0].setup_wizard_completed, false, 'the rest of the configuration is kept')
+})
+
+test('the panel does not open the guide while a phone runs it, nor after it was closed on any device', async () => {
+  const now = Date.now()
+  const host = (extra) => async (url) => ({ ok: true, headers: { get: () => 'application/json' }, json: async () => (/clients/.test(url) ? { status: true, named_certs: [] } : { setup_wizard_completed: false, ...extra }) })
+  const ask = (extra, device) => shouldOpenGuide({ proxyUrl: async () => 'http://h', fetchImpl: host(extra), progress: null, version: '1.3.9' })
+  assert.equal(await ask({}), true)
+  assert.equal(await ask({ guide_active: `phone@${Math.floor(now / 1000) - 10}` }), false)
+  assert.equal(await ask({ guide_closed: '1.3.9' }), false)
+  assert.equal(await ask({ guide_finished: 'true', guide_closed: '1.3.9' }), false)
+})

@@ -10,6 +10,8 @@
       :locale="locale"
       :version="version"
       :mode="entry.mode"
+      :restart="!!entry.restart"
+      :host-progress="hostProgress"
       :texts="accountTexts"
       :storage-key="GUIDE_STORAGE_KEY"
       :qr="qrMatrix"
@@ -26,7 +28,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import QRCode from 'qrcode'
 import { invoke } from '@tauri-apps/api/core'
-import { MGuideFlow, MLoading, MOnboardWindow, buildGuideSteps, clearProgress, guideEntry, readProgress, upgradeSkips, useTelemetryConsent } from 'foundation-ui/vue'
+import { MGuideFlow, MLoading, MOnboardWindow, buildGuideSteps, clearProgress, guideDeviceId, guideEntry, readProgress, upgradeSkips, useTelemetryConsent } from 'foundation-ui/vue'
 import { supportedLocales, setLocaleChoice as setWelcomeChoice, localeChoice, systemLocale, useWelcomeI18n } from '../../i18n/index.js'
 import { useI18n as useDesktopI18n } from '../desktop/i18n/index.js'
 import { telemetryApi } from '../composables/telemetryApi.js'
@@ -59,7 +61,8 @@ const data = createGuideData({
   openTools: () => emit('webui-navigate', '/#test-tools'),
   openDiagnostics: () => emit('open-doctor'),
 })
-const { state, probeAccount } = data
+const { state, probeAccount, loadGuideHost } = data
+const hostProgress = ref(null) // what the host remembers of the guide, read once before the flow opens
 // the update method (the last step): the same source and CDK the 更新 page keeps; the CDK itself stays in the native side
 const updateSource = useUpdateSource()
 const flowState = computed(() => ({
@@ -112,14 +115,15 @@ onMounted(async () => {
   const fromStart = consumeStartGuide()
   if (fromStart) clearProgress(null, GUIDE_STORAGE_KEY)
   await Promise.all([probeAccount(), telemetry.refresh().then(() => { consentShow.value = telemetry.consent.value === 'ask' }), panelVersion().then((v) => { version.value = v })])
-  if (state.account.exists) await Promise.all([callbacks.loadSetup?.(), callbacks.refreshClients?.()])
+  if (state.account.exists) await Promise.all([callbacks.loadSetup?.(), callbacks.refreshClients?.(), loadGuideHost().then((h) => { hostProgress.value = h })])
   if (fromStart) {
-    entry.value = guideOnLaunch({ fromStart: true })
+    entry.value = { ...guideOnLaunch({ fromStart: true }), restart: true }
     return
   }
   const pairedCount = Array.isArray(state.clients) ? state.clients.length : null
-  const found = state.account.exists ? guideEntry({ progress: readProgress(null, GUIDE_STORAGE_KEY), version: version.value, setupCompleted: !!state.setup.completed, pairedCount, configExists: true }) : null
-  entry.value = found?.mode === 'upgrade' ? { mode: 'upgrade', skip: upgradeSkips({ accountExists: true, setupCompleted: !!state.setup.completed, pairedCount }) } : { mode: 'fresh', skip: [] }
+  const found = state.account.exists ? guideEntry({ progress: readProgress(null, GUIDE_STORAGE_KEY), version: version.value, setupCompleted: !!state.setup.completed, pairedCount, configExists: true, host: hostProgress.value, device: guideDeviceId() }) : null
+  // the guide the host would not open by itself was asked for by hand (the help page): it starts at the first step, not where an old run was left
+  entry.value = found?.mode === 'upgrade' ? { mode: 'upgrade', skip: upgradeSkips({ accountExists: true, setupCompleted: !!state.setup.completed, pairedCount }) } : { mode: 'fresh', skip: [], restart: !found }
 })
 </script>
 
