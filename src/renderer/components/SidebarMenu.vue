@@ -52,7 +52,7 @@
         <LatencyClockPage v-else-if="entry.id === ROUTES.LATENCY_CLOCK" />
         <StreamTimerPage v-else-if="entry.id === ROUTES.STREAM_TIMER" />
         <TestToolsPage v-else-if="entry.id === ROUTES.TEST_TOOLS" />
-        <LiveSessionPage v-else-if="entry.id === ROUTES.LIVE_SESSION" @open-quality="jumpTo(ROUTES.HDR_ENHANCED)" />
+        <LiveSessionPage v-else-if="entry.id === ROUTES.LIVE_SESSION" @open-quality="jumpTo(ROUTES.HDR_ENHANCED)" @webui-navigate="openWebUi" />
         <RtssPage v-else-if="entry.id === ROUTES.RTSS" />
         <NetworkOverviewPage v-else-if="entry.id === ROUTES.NETWORK_OVERVIEW" @open-network="jumpConfig({ tab: 'network' })" />
         <DiagnosticsPage

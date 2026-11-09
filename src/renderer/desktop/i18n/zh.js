@@ -1162,7 +1162,7 @@ export const zh = {
     nav: { overview: '概览', stream: '串流', config: '主机设置', input: '输入与外设', audio: '音频', display: '显示与视频', system: '系统', assistant: '米塔 AI', settings: '面板设置', help: '帮助与关于', main: '主导航', barSettings: '设置', barMore: '更多', moreTitle: '更多选项', expand: '展开导航', collapse: '收起导航' },
     live: {
       title: '当前串流', refresh: '刷新', ok: '确定', cancel: '取消', noStream: '没有正在进行的串流', idle: '有 {count} 个会话，都没有在串流', loadFailed: '读取会话失败：{error}',
-      bitrate: '码率', client: '客户端', current: '当前码率', target: '目标码率', presets: '常用码率', input: '输入码率', apply: '应用码率', applying: '调整中…', selectFirst: '先选择一个客户端',
+      values: '当前值', display: '显示', encoding: '编码', toSettings: '去设置', bitrateTemporary: '码率只对本次串流生效；长期上限在编码与码率中设置。', bitrate: '码率', client: '客户端', current: '当前码率', target: '目标码率', presets: '常用码率', input: '输入码率', apply: '应用码率', applying: '调整中…', selectFirst: '先选择一个客户端',
       applied: '码率已调整为 {value}', rangeError: '码率须在 {min} 到 {max} 之间', authFailed: '身份验证失败，请检查 Web UI 的用户名和密码', failed: '调整失败：{error}',
       host: '主机性能', perfFailed: '读取性能快照失败：{error}', p95: 'P95 延迟', fps: '帧率', budget: '帧预算占用', health: '状态', latency: '主机处理延迟', samples: '{count} 个样本',
       status: { idle: '没有串流', waiting: '等待数据', good: '良好', warning: '偏高', slow: '过慢', error: '读不到主机' },

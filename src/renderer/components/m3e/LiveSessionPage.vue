@@ -19,6 +19,14 @@
           </MGroup>
           <div class="m-live__actions"><MButton icon="check" :loading="applying" :disabled="applying || !client" @click="applyBitrate">{{ applying ? l.applying : l.apply }}</MButton></div>
         </MSection>
+        <!-- what the stream runs on now, read from the session; the settings behind each value are one press away (the same settings as 显示与视频, not a copy of them) -->
+        <MSection :title="l.values">
+          <MGroup>
+            <MItem action icon="monitor" :title="l.display" :value="modeOf(live[0])" @click="emit('webui-navigate', '/config#tab=display&sub=output')"><template #trail><span class="m-item__count">{{ l.toSettings }}</span></template></MItem>
+            <MItem v-if="live[0].codec" action icon="memory" :title="l.encoding" :value="String(live[0].codec).toUpperCase()" @click="emit('webui-navigate', '/config#tab=display&sub=encoders')"><template #trail><span class="m-item__count">{{ l.toSettings }}</span></template></MItem>
+          </MGroup>
+          <MFooter>{{ l.bitrateTemporary }}</MFooter>
+        </MSection>
       </template>
 
       <!-- 画质增强: the NR live controls of the stream (NrSessionControls, as on 画质增强 › 当前会话); without a stream its state and one action -->
@@ -96,7 +104,7 @@ import { BITRATE, BITRATE_PRESETS, DEFAULT_BITRATE, formatBitrate, validBitrate,
 // 当前串流: the old 码率调整 tool (a live session's bitrate: change_bitrate) and the old 主机性能 window (/api/perf/current) on one page of 串流.
 const { t, locale } = useI18n()
 const l = computed(() => t.value.m3e.live)
-const emit = defineEmits(['open-quality'])
+const emit = defineEmits(['open-quality', 'webui-navigate'])
 const say = (text) => useNotify().snack(text)
 
 const sessions = ref([]), loaded = ref(false), refreshing = ref(false), loadError = ref('')
