@@ -305,7 +305,7 @@ button:disabled { cursor: default; opacity: .5; }
 .advanced summary { cursor: pointer; }
 .advanced-row { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
 .advanced-row input { appearance: none; width: 14px; height: 14px; border: 1px solid #83916f; background: #0004; cursor: pointer; }
-.advanced-row input:checked { background: var(--green); box-shadow: inset 0 0 0 2px #101508; }
+.advanced-row input:checked { background: var(--green); box-shadow: inset 0 0 0 1px #101508; }
 .motion-label { margin: 12px 0 8px; }
 .motion-options { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; }
 .style-options { grid-template-columns: repeat(5, 1fr); }

@@ -190,9 +190,39 @@ async function selectAndUpload(candidate) {
     box-shadow: var(--d-shadow-3);
   }
 
-  &:focus-visible,
-  &.selected {
+  &:focus-visible {
     box-shadow: 0 0 0 3px var(--md-sys-color-primary);
+  }
+
+  // the chosen cover: the selected container (foundation-ui layout.css --m-sel-fill), a heavier name and a check on the picture; no outline (focus keeps its ring)
+  &.selected {
+    background: var(--m-sel-fill);
+  }
+
+  &.selected .candidate-name {
+    font-weight: 700;
+  }
+
+  &.selected::before,
+  &.selected::after {
+    content: '';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    width: 28px;
+    height: 28px;
+    pointer-events: none;
+  }
+
+  &.selected::before {
+    border-radius: 50%;
+    background: var(--md-sys-color-primary);
+  }
+
+  &.selected::after {
+    background: var(--md-sys-color-on-primary);
+    -webkit-mask: var(--m-check-mask) center / 20px no-repeat;
+    mask: var(--m-check-mask) center / 20px no-repeat;
   }
 
   &.uploading {
