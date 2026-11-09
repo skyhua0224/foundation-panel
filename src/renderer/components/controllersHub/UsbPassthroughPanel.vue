@@ -7,13 +7,13 @@
         <MItem action icon="folder_open" :title="t.deviceHub.usb.manualTitle" @click="manualOpen = !manualOpen"><template #trail><MInfo :text="t.deviceHub.usb.exporterHint" /><MIcon :name="manualOpen ? 'keyboard_arrow_up' : 'keyboard_arrow_down'" /></template></MItem>
       </MGroup>
       <form v-if="manualOpen" class="m-usb__discover" @submit.prevent="discover">
-        <md-outlined-text-field class="m-usb__host" :label="t.deviceHub.usb.hostPlaceholder" :value="remote" autocomplete="off" :disabled="!status.ready || discovering" @input="remote = $event.target.value"><span slot="container" class="m-field__fill" aria-hidden="true" /></md-outlined-text-field>
+        <md-outlined-text-field class="m-usb__host" data-redact="address" :label="t.deviceHub.usb.hostPlaceholder" :value="remote" autocomplete="off" :disabled="!status.ready || discovering" @input="remote = $event.target.value"><span slot="container" class="m-field__fill" aria-hidden="true" /></md-outlined-text-field>
         <md-outlined-text-field class="m-port-field" type="number" min="1024" max="65535" :label="t.deviceHub.usb.tcpPortLabel" :value="tcpPort" :disabled="!status.ready || discovering" @input="tcpPort = Number($event.target.value)"><span slot="container" class="m-field__fill" aria-hidden="true" /></md-outlined-text-field>
         <MButton type="submit" :loading="discovering" :disabled="!canDiscover">{{ t.deviceHub.usb.discover }}</MButton>
       </form>
       <MGroup v-if="manualOpen && discoveryDone" aria-live="polite">
         <MItem v-if="remoteDevices.length === 0" plain :title="t.deviceHub.usb.noRemoteDevices" />
-        <MItem v-for="device in remoteDevices" :key="device.bus_id" icon="usb" :title="device.description || t.deviceHub.usb.unknownDevice" :text="t.deviceHub.usb.busId + ' · ' + device.bus_id + (device.details?.length ? ' · ' + device.details[0] : '')">
+        <MItem v-for="device in remoteDevices" :key="device.bus_id" data-redact="serial" icon="usb" :title="device.description || t.deviceHub.usb.unknownDevice" :text="t.deviceHub.usb.busId + ' · ' + device.bus_id + (device.details?.length ? ' · ' + device.details[0] : '')">
           <template #trail><MButton size="sm" variant="tonal" :loading="attachingBusId === device.bus_id" :disabled="operationBusy || !status.ready" @click="attachDevice(device)">{{ t.deviceHub.usb.attach }}</MButton></template>
         </MItem>
       </MGroup>
@@ -21,7 +21,7 @@
     <MSection :title="t.deviceHub.usb.attachedTitle" :description="t.deviceHub.usb.attachedHint">
       <MEmpty v-if="statusLoaded && attachedDevices.length === 0" icon="usb" :title="t.deviceHub.usb.noAttachedDevices" />
       <MGroup v-else>
-        <MItem v-for="device in attachedDevices" :key="device.port" icon="usb" tone="success" :title="device.description || t.deviceHub.usb.unknownDevice" :text="device.remote_host + ':' + device.remote_port + ' · ' + device.remote_bus_id + ' · ' + device.speed + (device.serial ? ' · ' + device.serial : '')">
+        <MItem v-for="device in attachedDevices" :key="device.port" data-redact="address" icon="usb" tone="success" :title="device.description || t.deviceHub.usb.unknownDevice" :text="device.remote_host + ':' + device.remote_port + ' · ' + device.remote_bus_id + ' · ' + device.speed + (device.serial ? ' · ' + device.serial : '')">
           <template #trail>
             <MChip>{{ String(device.port).padStart(2, '0') }}</MChip>
             <MButton size="sm" variant="danger" :loading="detachingPort === device.port" :disabled="operationBusy" @click="detachDevice(device)">{{ t.deviceHub.usb.detach }}</MButton>

@@ -58,7 +58,7 @@
       </div>
 
       <div class="tile-info">
-        <span class="tile-name" :title="app.name">{{ app.name }}</span>
+        <span class="tile-name" data-redact="text" :title="app.name">{{ app.name }}</span>
         <span v-if="playtimeLabel(app.name)" class="tile-playtime">{{ playtimeLabel(app.name) }}</span>
         <MChip v-if="app.elevated && app.elevated !== 'false'" class="tile-badge" tone="warn" icon="shield">{{ t.appContext.admin }}</MChip>
       </div>

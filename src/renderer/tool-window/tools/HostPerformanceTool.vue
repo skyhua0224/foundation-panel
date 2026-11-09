@@ -3,8 +3,8 @@
     <header class="m-perf__head" v-bind="dragRegionAttrs">
       <div class="m-perf__session" v-bind="dragRegionAttrs">
         <MChip :tone="statusTone">{{ statusText }}</MChip>
-        <b>{{ sessionTitle }}</b>
-        <span>{{ sessionMeta }}</span>
+        <b data-redact="client">{{ sessionTitle }}</b>
+        <span data-redact="address">{{ sessionMeta }}</span>
       </div>
       <div class="m-perf__actions">
         <MIconButton icon="refresh" :label="t.performanceTool.refresh" :disabled="refreshing" @click="loadSnapshot(true)" />
