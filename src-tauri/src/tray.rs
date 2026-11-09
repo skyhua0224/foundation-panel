@@ -316,6 +316,9 @@ struct TrayStrings {
     recovery_timeout: &'static str,
     tooltip: &'static str,
     tooltip_admin: &'static str,
+    download_progress: &'static str,
+    download_done: &'static str,
+    download_failed: &'static str,
 }
 
 const ZH_STRINGS: TrayStrings = TrayStrings {
@@ -394,6 +397,9 @@ const ZH_STRINGS: TrayStrings = TrayStrings {
     recovery_timeout: "Sunshine 服务未能在等待时间内恢复，请检查服务日志后重试。",
     tooltip: "Sunshine GUI",
     tooltip_admin: "Sunshine GUI (管理员)",
+    download_progress: "正在下载更新 {percent}%",
+    download_done: "更新已下载，可打开面板安装",
+    download_failed: "更新下载失败",
 };
 
 const EN_STRINGS: TrayStrings = TrayStrings {
@@ -472,6 +478,9 @@ const EN_STRINGS: TrayStrings = TrayStrings {
     recovery_timeout: "The Sunshine service did not recover in time. Check the service log and try again.",
     tooltip: "Sunshine GUI",
     tooltip_admin: "Sunshine GUI (Admin)",
+    download_progress: "Downloading update {percent}%",
+    download_done: "Update downloaded; open the panel to install",
+    download_failed: "Update download failed",
 };
 
 const JA_STRINGS: TrayStrings = TrayStrings {
@@ -550,6 +559,9 @@ const JA_STRINGS: TrayStrings = TrayStrings {
     recovery_timeout: "Sunshine サービスが時間内に復旧しませんでした。サービスログを確認して再試行してください。",
     tooltip: "Sunshine GUI",
     tooltip_admin: "Sunshine GUI (管理者)",
+    download_progress: "更新をダウンロード中 {percent}%",
+    download_done: "更新をダウンロードしました。パネルを開いてインストールできます",
+    download_failed: "更新のダウンロードに失敗しました",
 };
 
 fn get_tray_strings() -> &'static TrayStrings {
@@ -559,6 +571,20 @@ fn get_tray_strings() -> &'static TrayStrings {
         Some("ja") => &JA_STRINGS,
         _ => &EN_STRINGS,
     }
+}
+
+pub(crate) fn download_progress_tooltip(percent: u32) -> String {
+    get_tray_strings()
+        .download_progress
+        .replace("{percent}", &percent.min(100).to_string())
+}
+
+pub(crate) fn download_done_tooltip() -> &'static str {
+    get_tray_strings().download_done
+}
+
+pub(crate) fn download_failed_tooltip() -> &'static str {
+    get_tray_strings().download_failed
 }
 
 fn get_current_locale() -> String {
@@ -768,6 +794,42 @@ fn default_tray_tooltip() -> &'static str {
     } else {
         s.tooltip
     }
+}
+
+/// A tooltip for work that outlives the panel window, such as an update
+/// download. Core state continues to arrive while it is set; the override is
+/// applied at the moment of each update and cleared when the work ends.
+static TRANSIENT_TOOLTIP: LazyLock<Mutex<Option<String>>> = LazyLock::new(|| Mutex::new(None));
+static LAST_CORE_TOOLTIP: LazyLock<Mutex<String>> =
+    LazyLock::new(|| Mutex::new(String::new()));
+
+pub(crate) fn set_transient_tooltip<R: Runtime>(app: &AppHandle<R>, text: Option<String>) {
+    *TRANSIENT_TOOLTIP.lock().unwrap() = text;
+    let transient = { TRANSIENT_TOOLTIP.lock().unwrap().clone() };
+    let value = match transient {
+        Some(value) => value,
+        None => {
+            let last = LAST_CORE_TOOLTIP.lock().unwrap().clone();
+            if last.is_empty() {
+                default_tray_tooltip().to_string()
+            } else {
+                last
+            }
+        }
+    };
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
+        let _ = tray.set_tooltip(Some(value.as_str()));
+    }
+}
+
+fn tooltip_with_transient(state: &sunshine::TrayState) -> String {
+    let core = tray_tooltip_from_state(state);
+    *LAST_CORE_TOOLTIP.lock().unwrap() = core.clone();
+    TRANSIENT_TOOLTIP
+        .lock()
+        .unwrap()
+        .clone()
+        .unwrap_or(core)
 }
 
 fn tray_tooltip_from_state(state: &sunshine::TrayState) -> String {
@@ -1090,7 +1152,7 @@ fn apply_tray_state<R: Runtime + 'static>(
     }
 
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
-        let tooltip = tray_tooltip_from_state(state);
+        let tooltip = tooltip_with_transient(state);
         if let Err(e) = tray.set_tooltip(Some(tooltip.as_str())) {
             debug!("Failed to update tray tooltip from core state: {}", e);
         }
@@ -1115,8 +1177,9 @@ fn apply_core_disconnected<R: Runtime + 'static>(app: &AppHandle<R>) {
         rebuild_tray_menu(app);
     }
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
-        let tooltip =
-            tray_status_label(get_tray_strings(), None, CoreConnectionState::Disconnected);
+        let tooltip = TRANSIENT_TOOLTIP.lock().unwrap().clone().unwrap_or_else(|| {
+            tray_status_label(get_tray_strings(), None, CoreConnectionState::Disconnected)
+        });
         let _ = tray.set_tooltip(Some(tooltip.as_str()));
     }
     icons::apply_disconnected_tray_icon(app);

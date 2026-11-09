@@ -68,6 +68,7 @@ mod vmouse;
 #[cfg(target_os = "windows")]
 mod win_clipboard;
 mod windows;
+mod windows_proxy;
 
 use log::info;
 use std::sync::OnceLock;
@@ -340,6 +341,7 @@ fn main() {
             update::update_mirrorchyan_check,
             update::set_update_source,
             update::download_update,
+            update::download_update_status,
             update::check_cached_update,
             update::install_update,
             logger::get_all_logs,

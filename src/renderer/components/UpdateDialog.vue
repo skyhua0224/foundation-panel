@@ -35,9 +35,10 @@
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
-import { MUpdateSheet, sheetFromPanelInfo, downloadView } from 'foundation-ui/vue'
+import { MUpdateSheet, sheetFromPanelInfo } from 'foundation-ui/vue'
 import { channelOfVersion, fetchReleaseMetadata, orderedDownloadUrls } from 'foundation-ui/update'
 import { useUpdateSource } from '../composables/useUpdateSource.js'
+import { useUpdateDownload } from '../composables/updateDownload.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
 const { t, locale } = useI18n()
@@ -63,9 +64,10 @@ const visible = computed({
   set: (val) => emit('update:modelValue', val),
 })
 
-const isDownloading = ref(false)
-const download = ref(downloadView(null))
-const downloadedFilePath = ref('')
+const updateDownload = useUpdateDownload()
+const isDownloading = computed(() => updateDownload.state.active)
+const download = computed(() => updateDownload.state)
+const downloadedFilePath = computed(() => updateDownload.state.path)
 const isInstalling = ref(false)
 const installStage = ref('idle')
 const installDetail = ref('')
@@ -93,11 +95,7 @@ const phase = computed(() => {
   return 'available'
 })
 
-const resetDownloadState = () => {
-  isDownloading.value = false
-  download.value = downloadView(null)
-  downloadedFilePath.value = ''
-}
+const resetDownloadState = () => updateDownload.discard()
 
 const clearInstallProgressListener = () => {
   if (installProgressUnlisten) {
@@ -184,7 +182,7 @@ const checkCachedInstaller = async () => {
       !isDownloading.value &&
       !isInstalling.value
     ) {
-      downloadedFilePath.value = cached
+      updateDownload.state.path = cached
     }
   } catch (error) {
     console.warn('Failed to check cached installer:', error)
@@ -207,20 +205,12 @@ const handleDownload = async () => {
 
   resetDownloadState()
   errorText.value = ''
-  isDownloading.value = true
-  let progressUnlisten = null
 
   try {
-    const { invoke, listen } = await getTauriApis()
-
-    progressUnlisten = await listen('download-progress', (event) => {
-      download.value = downloadView(event.payload)
-    })
-
     const filename = props.updateInfo.download_name || `sunshine-update-${props.updateInfo.version}.exe`
     // the host that is tried first follows the interface language and the source of the update settings; the other is the one tried when it fails
     const urls = orderedDownloadUrls({ url: downloadUrl, fallbackUrl: props.updateInfo.download_fallback_url || '' }, { source: updateSource.source.value, hasCdk: updateSource.hasCdk.value, locale: locale.value })
-    const result = await invoke('download_update', {
+    const result = await updateDownload.start({
       url: urls.url,
       fallbackUrl: urls.fallbackUrl,
       filename,
@@ -228,27 +218,15 @@ const handleDownload = async () => {
       expectedSha256: props.updateInfo.download_sha256 || null,
       assetType: props.updateInfo.download_type || null,
     })
-    await progressUnlisten()
-    progressUnlisten = null
 
-    if (result.success) {
-      // Ready: the user presses "install and restart" (the installer closes Sunshine and this panel).
-      downloadedFilePath.value = result.file_path
-    } else {
+    if (!result.ok) {
       console.error('Download update returned an unsuccessful result', result)
-      resetDownloadState()
       errorStep.value = 'download'
-      errorText.value = t.value.updateDialog.downloadFailed
+      errorText.value = downloadErrorMessage({ code: result.errorCode })
     }
   } catch (error) {
-    resetDownloadState()
     errorStep.value = 'download'
     errorText.value = downloadErrorMessage(error)
-  } finally {
-    if (progressUnlisten) {
-      await progressUnlisten()
-    }
-    isDownloading.value = false
   }
 }
 
@@ -298,7 +276,7 @@ const handleInstall = async (filePath) => {
 
 const handleRetry = () => {
   errorText.value = ''
-  if (downloadedFilePath.value) handleInstall(downloadedFilePath.value)
+    if (downloadedFilePath.value) handleInstall(downloadedFilePath.value)
   else handleDownload()
 }
 
@@ -333,9 +311,13 @@ const handleSkipVersion = () => {
 }
 
 const resetState = () => {
-  resetDownloadState()
+  // An update download outlives this sheet: reopening it must show the
+  // transfer, not erase it.
+  if (!isDownloading.value && !downloadedFilePath.value) resetDownloadState()
   isInstalling.value = false
-  errorText.value = ''
+  errorText.value = updateDownload.state.errorCode
+    ? downloadErrorMessage({ code: updateDownload.state.errorCode })
+    : ''
   resetInstallProgress()
   clearInstallProgressListener()
 }
@@ -351,6 +333,7 @@ watch(
   (newVal) => {
     if (newVal) {
       resetState()
+      updateDownload.refresh()
       checkCachedInstaller()
       resolveChannel()
     }
