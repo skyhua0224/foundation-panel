@@ -229,9 +229,9 @@ struct Attempt {
     params: String,
 }
 
-/// Reproduce the historical launch parsing ladder: a quoted executable is
-/// authoritative, otherwise try the whole string as a file (so paths with spaces
-/// and URI handlers work) before splitting on the first space.
+/// Split a command into the executable and its arguments before passing it to
+/// ShellExecuteExW. Passing the complete unquoted command as `lpFile` makes
+/// Windows look for the argument-bearing string as a file name.
 fn launch_attempts(command: &str) -> Vec<Attempt> {
     let trimmed = command.trim();
     if trimmed.starts_with('"') {
@@ -246,17 +246,29 @@ fn launch_attempts(command: &str) -> Vec<Attempt> {
         }
     }
 
-    let mut attempts = vec![Attempt {
-        file: trimmed.to_string(),
-        params: String::new(),
-    }];
-    if let Some(space) = trimmed.find(' ') {
-        attempts.push(Attempt {
-            file: trimmed[..space].to_string(),
-            params: trimmed[space + 1..].trim().to_string(),
-        });
+    if trimmed.contains("://") {
+        return vec![Attempt {
+            file: trimmed.to_string(),
+            params: String::new(),
+        }];
     }
-    attempts
+
+    let (file, params) = trimmed
+        .split_once(char::is_whitespace)
+        .map_or((trimmed, ""), |(file, params)| (file, params.trim()));
+    vec![Attempt {
+        file: file.to_string(),
+        params: params.to_string(),
+    }]
+}
+
+fn default_working_dir(command: &str) -> Option<String> {
+    let file = launch_attempts(command).into_iter().next()?.file;
+    if file.contains("://") {
+        return None;
+    }
+    let separator = file.rfind(['\\', '/'])?;
+    Some(file[..separator].to_string())
 }
 
 struct SpawnedProcess {
@@ -265,6 +277,7 @@ struct SpawnedProcess {
     /// Lowercased basename of the executable that actually started, used to
     /// adopt the real game when a launcher shim exits.
     exe_name: Option<String>,
+    host_managed: bool,
 }
 
 /// Run one command through the shell, keeping the process handle when Windows
@@ -340,6 +353,7 @@ fn spawn_command(
             handle: None,
             pid: None,
             exe_name: None,
+            host_managed: false,
         });
     }
 
@@ -361,6 +375,7 @@ fn spawn_command(
                 handle,
                 pid,
                 exe_name: exe_basename(&attempt.file),
+                host_managed: false,
             });
         }
         if index == 0 {
@@ -654,6 +669,7 @@ struct MonitorContext {
     /// FILETIME captured before the launch, used to reject adoption candidates
     /// that were already running.
     launched_at_filetime: u64,
+    host_managed: bool,
 }
 
 /// Wait for the game to exit, adopting the real process when the launched one
@@ -714,14 +730,20 @@ fn monitor_game(mut handle: OwnedHandle, context: MonitorContext) {
         return;
     }
 
-    for step in context.undo_steps.iter().rev() {
-        info!("Running prep-cmd undo: {}", step.command);
-        run_and_wait(
-            &step.command,
-            step.elevated,
-            context.working_dir.as_deref(),
-            "prep-cmd undo",
-        );
+    if context.host_managed {
+        if let Err(error) = tauri::async_runtime::block_on(crate::proxy_server::close_host_app()) {
+            warn!("Could not finish host-managed app launch: {}", error);
+        }
+    } else {
+        for step in context.undo_steps.iter().rev() {
+            info!("Running prep-cmd undo: {}", step.command);
+            run_and_wait(
+                &step.command,
+                step.elevated,
+                context.working_dir.as_deref(),
+                "prep-cmd undo",
+            );
+        }
     }
 
     update_stat(&context.app_name, |stat| {
@@ -853,7 +875,8 @@ pub async fn launch_game(
     }
 
     let elevated = value_bool(app.get("elevated")).unwrap_or(false);
-    let working_dir = value_string(&app, "working-dir").map(|dir| to_wide(&dir));
+    let working_dir_text = value_string(&app, "working-dir").or_else(|| default_working_dir(&cmd));
+    let working_dir = working_dir_text.as_deref().map(to_wide);
     let undo_steps = collect_undo_steps(&app);
     // Captured before anything runs so adoption can reject processes that were
     // already alive when the user pressed launch.
@@ -886,38 +909,66 @@ pub async fn launch_game(
     info!("Launching tracked app '{}': {}", app_name, cmd);
 
     let launch_app_name = app_name.clone();
-    let launch = tokio::task::spawn_blocking(move || -> Result<SpawnedProcess, String> {
-        let dir = working_dir.as_deref();
+    // The host API is authoritative for process creation. It uses the service's
+    // active-user token and the same command parser/working-directory rules as a
+    // streaming launch (ds5-ms-createprocessasuserw-20261109).
+    let host_launch = match value_string(&app, "id").and_then(|id| id.parse::<i32>().ok()) {
+        Some(app_id) => match crate::proxy_server::launch_host_app(app_id).await {
+            Ok(result) => Some(result),
+            Err(error) if error == "host-api-unavailable" => None,
+            Err(error) => return Err(error),
+        },
+        None => None,
+    };
 
-        for step in &prep_do {
-            info!("Running prep-cmd do: {}", step.command);
-            run_and_wait(&step.command, step.elevated, dir, "prep-cmd");
+    let launch = if let Some(host) = host_launch {
+        let pid = host
+            .pid
+            .as_deref()
+            .and_then(|pid| pid.parse::<u32>().ok())
+            .unwrap_or(0);
+        SpawnedProcess {
+            handle: (pid != 0).then(|| open_for_wait(pid)).flatten(),
+            pid: (pid != 0).then_some(pid),
+            exe_name: exe_basename(&cmd),
+            host_managed: true,
         }
+    } else {
+        tokio::task::spawn_blocking(move || -> Result<SpawnedProcess, String> {
+            let dir = working_dir.as_deref();
 
-        for command in &detached {
-            // Detached commands are fire-and-forget by definition.
-            if let Err(error) = spawn_command(command, elevated, dir, "detached") {
-                warn!("{}", error);
+            for step in &prep_do {
+                info!("Running prep-cmd do: {}", step.command);
+                run_and_wait(&step.command, step.elevated, dir, "prep-cmd");
             }
-        }
 
-        if cmd.is_empty() {
-            return Ok(SpawnedProcess {
-                handle: None,
-                pid: None,
-                exe_name: None,
-            });
-        }
+            for command in &detached {
+                // Detached commands are fire-and-forget by definition.
+                if let Err(error) = spawn_command(command, elevated, dir, "detached") {
+                    warn!("{}", error);
+                }
+            }
 
-        spawn_command(&cmd, elevated, dir, "launch")
-    })
-    .await
-    .map_err(|error| format!("Launch task failed: {}", error))??;
+            if cmd.is_empty() {
+                return Ok(SpawnedProcess {
+                    handle: None,
+                    pid: None,
+                    exe_name: None,
+                    host_managed: false,
+                });
+            }
+
+            spawn_command(&cmd, elevated, dir, "launch")
+        })
+        .await
+        .map_err(|error| format!("Launch task failed: {}", error))??
+    };
 
     let SpawnedProcess {
         handle,
         pid,
         exe_name,
+        host_managed,
     } = launch;
     let exe_name = watch_override.or(exe_name);
 
@@ -987,9 +1038,10 @@ pub async fn launch_game(
         generation,
         stop,
         undo_steps,
-        working_dir: value_string(&app, "working-dir").map(|dir| to_wide(&dir)),
+        working_dir: working_dir_text.map(|dir| to_wide(&dir)),
         auto_yield: options.auto_yield,
         exe_name,
+        host_managed,
         launched_at_filetime,
     };
 
@@ -1069,13 +1121,20 @@ mod tests {
     }
 
     #[test]
-    fn unquoted_commands_try_the_whole_string_before_splitting() {
+    fn unquoted_commands_split_before_shell_execution() {
         let attempts = launch_attempts("C:\\Games\\My Game\\game.exe -dx12");
-        assert_eq!(attempts.len(), 2);
-        assert_eq!(attempts[0].file, "C:\\Games\\My Game\\game.exe -dx12");
-        assert_eq!(attempts[0].params, "");
-        assert_eq!(attempts[1].file, "C:\\Games\\My");
-        assert_eq!(attempts[1].params, "Game\\game.exe -dx12");
+        assert_eq!(attempts.len(), 1);
+        assert_eq!(attempts[0].file, "C:\\Games\\My");
+        assert_eq!(attempts[0].params, "Game\\game.exe -dx12");
+    }
+
+    #[test]
+    fn default_working_directory_comes_from_the_executable_path() {
+        assert_eq!(
+            default_working_dir("D:\\Game\\Unlocker.exe -Genshin -popupwindow"),
+            Some("D:\\Game".to_string())
+        );
+        assert_eq!(default_working_dir("steam://rungameid/440"), None);
     }
 
     #[test]

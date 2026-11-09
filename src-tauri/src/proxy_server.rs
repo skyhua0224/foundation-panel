@@ -1500,6 +1500,82 @@ async fn send_local_authenticated_request(
     .await?)
 }
 
+#[derive(Clone, Debug, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct HostLaunchResult {
+    pub status: String,
+    pub app_id: Option<String>,
+    pub app_name: Option<String>,
+    pub pid: Option<String>,
+}
+
+pub(crate) async fn launch_host_app(app_id: i32) -> Result<HostLaunchResult, String> {
+    let body = Bytes::from(serde_json::json!({ "appId": app_id }).to_string());
+    let mut headers = axum::http::HeaderMap::new();
+    headers.insert(
+        axum::http::header::CONTENT_TYPE,
+        axum::http::HeaderValue::from_static("application/json"),
+    );
+    let url = format!(
+        "{}/api/apps/launch",
+        get_sunshine_target().trim_end_matches('/')
+    );
+    let response = send_local_authenticated_request(
+        get_http_client(),
+        &url,
+        &axum::http::Method::POST,
+        &headers,
+        &body,
+        Some(std::time::Duration::from_secs(15)),
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Err("host-api-unavailable".to_string());
+    }
+    let status = response.status();
+    let payload = response.bytes().await.map_err(|error| error.to_string())?;
+    let result: HostLaunchResult = serde_json::from_slice(&payload)
+        .map_err(|error| format!("Invalid host launch response (HTTP {}): {}", status, error))?;
+    if !status.is_success() || result.status != "true" {
+        return Err(serde_json::from_slice::<serde_json::Value>(&payload)
+            .ok()
+            .and_then(|value| {
+                value
+                    .get("error")
+                    .and_then(|error| error.as_str())
+                    .map(str::to_owned)
+            })
+            .unwrap_or_else(|| format!("Host rejected application launch (HTTP {})", status)));
+    }
+    Ok(result)
+}
+
+pub(crate) async fn close_host_app() -> Result<(), String> {
+    let url = format!(
+        "{}/api/apps/close",
+        get_sunshine_target().trim_end_matches('/')
+    );
+    let response = send_local_authenticated_request(
+        get_http_client(),
+        &url,
+        &axum::http::Method::POST,
+        &axum::http::HeaderMap::new(),
+        &Bytes::new(),
+        Some(std::time::Duration::from_secs(15)),
+    )
+    .await
+    .map_err(|error| error.to_string())?;
+    if response.status().is_success() {
+        Ok(())
+    } else {
+        Err(format!(
+            "Host app close failed (HTTP {})",
+            response.status()
+        ))
+    }
+}
+
 /// 获取并代理内容
 async fn fetch_and_proxy(
     url: &str,
@@ -1523,33 +1599,32 @@ async fn fetch_and_proxy(
     // 尝试请求，HTTPS 失败时降级到 HTTP（仅限非连接错误）
     let long_poll = long_poll_timeout(method, url);
     let upstream_timeout = long_poll.or(slow_api);
-    let response =
-        match send_local_authenticated_request(
-            client,
-            url,
-            method,
-            headers,
-            body,
-            upstream_timeout,
-        )
-        .await
-        {
-            Ok(resp) => resp,
-            Err(e) if url.starts_with("https://") && !is_connection_error(&e.to_string()) => {
-                let http_url = url.replace("https://", "http://");
-                warn!("⚠️  HTTPS 连接失败，尝试 HTTP: {}", http_url);
-                send_local_authenticated_request(
-                    client,
-                    &http_url,
-                    method,
-                    headers,
-                    body,
-                    upstream_timeout,
-                )
-                .await?
-            }
-            Err(e) => return Err(e.into()),
-        };
+    let response = match send_local_authenticated_request(
+        client,
+        url,
+        method,
+        headers,
+        body,
+        upstream_timeout,
+    )
+    .await
+    {
+        Ok(resp) => resp,
+        Err(e) if url.starts_with("https://") && !is_connection_error(&e.to_string()) => {
+            let http_url = url.replace("https://", "http://");
+            warn!("⚠️  HTTPS 连接失败，尝试 HTTP: {}", http_url);
+            send_local_authenticated_request(
+                client,
+                &http_url,
+                method,
+                headers,
+                body,
+                upstream_timeout,
+            )
+            .await?
+        }
+        Err(e) => return Err(e.into()),
+    };
 
     let status = response.status();
     let resp_headers = response.headers().clone();
@@ -2010,7 +2085,10 @@ mod tests {
             None
         );
         assert_eq!(
-            slow_api_timeout(&axum::http::Method::POST, "https://127.0.0.1:57990/api/doctor"),
+            slow_api_timeout(
+                &axum::http::Method::POST,
+                "https://127.0.0.1:57990/api/doctor"
+            ),
             None
         );
     }
