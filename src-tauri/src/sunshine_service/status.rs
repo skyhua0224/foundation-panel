@@ -132,8 +132,10 @@ pub struct ProcessLayer {
     pub error: Option<String>,
 }
 
-/// API layer: an HTTP answer from the host web server (any status below
-/// 500 counts, 401 included: the server is up).
+/// API layer: an HTTP answer from the host web server. Any valid HTTP status,
+/// including a temporary 503 response, means the listener answered; only a
+/// transport error or timeout means that this layer is silent.
+/// [panel-rfc9110-20261109 §15.6.4]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ApiLayer {
@@ -144,7 +146,7 @@ pub struct ApiLayer {
 }
 
 pub(crate) fn api_answers(http_status: u16) -> bool {
-    http_status < 500
+    (100..600).contains(&http_status)
 }
 
 /// One word for the whole picture; the page still shows each layer.
@@ -361,11 +363,13 @@ mod tests {
     }
 
     #[test]
-    fn the_api_answers_below_500() {
+    fn a_temporary_http_error_is_still_an_api_answer() {
         assert!(api_answers(200));
         assert!(api_answers(401));
-        assert!(!api_answers(502));
-        assert!(!api_answers(503));
+        assert!(api_answers(502));
+        assert!(api_answers(503));
+        assert!(!api_answers(0));
+        assert!(!api_answers(600));
     }
 
     #[test]

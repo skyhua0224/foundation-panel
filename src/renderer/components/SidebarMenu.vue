@@ -285,7 +285,12 @@ watch(() => router.currentRoute.value, (route) => {
 // and a probe queued behind them made a host that answers in milliseconds look silent.
 const probeHost = async () => {
   const status = await sunshine.probeHost(2500)
-  return status !== 502 && status !== 503
+  // The native probe reaches the configured host directly. Any valid HTTP
+  // status proves that the listener answered; 503 is the host's temporary
+  // overload/startup response, not a dead service. The shared connection
+  // state requires consecutive probe failures before showing offline.
+  // [panel-rfc9110-20261109 §15.6.4; panel-reqwest-client-builder-20261109 Client::send]
+  return status >= 100 && status < 600
 }
 // 重启 and 用户模式 of the offline page and the search actions confirm first, as 系统 › Sunshine 服务 does, and pass the acknowledgement on
 const hostRestart = createHostRestart({ locale, ask: (options) => useDialogs().ask(options), status: () => sunshineService.status(), restart: (ack) => tools.restartSunshineService(ack), userMode: (ack) => tools.restartSunshineInUserMode(ack) })
