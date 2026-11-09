@@ -1,23 +1,23 @@
 <template>
-  <section class="dsk-about">
-    <div class="dsk-about__logo"><img :src="sunshineIcon" alt="" /></div>
-    <div class="dsk-about__info">
-      <div class="dsk-about__name">Foundation Desktop</div>
-      <div class="dsk-about__version">{{ t.settings.version }} {{ appVersion }}</div>
-      <div class="dsk-about__links">
-        <MButton variant="text" size="sm" icon="code" @click="emit('open-link', 'github')">GitHub</MButton>
-        <MButton variant="text" size="sm" icon="menu_book" @click="emit('open-link', 'docs')">{{ t.settings.docs }}</MButton>
-        <MButton variant="text" size="sm" icon="forum" @click="emit('open-link', 'discord')">Discord</MButton>
-      </div>
-    </div>
-    <MButton variant="tonal" icon="update" :loading="checking" @click="emit('check-update')">
-      {{ checking ? t.settings.checking : t.settings.checkUpdate }}
-    </MButton>
-  </section>
+  <MSection>
+    <MGroup role="list">
+      <MItem :title="'Foundation Desktop'" :text="`${t.settings.version} ${appVersion}`">
+        <template #lead><img class="dsk-about__logo" :src="sunshineIcon" alt="" /></template>
+        <template #trail>
+          <MButton variant="tonal" icon="update" :loading="checking" @click="emit('check-update')">
+            {{ checking ? t.settings.checking : t.settings.checkUpdate }}
+          </MButton>
+        </template>
+      </MItem>
+      <MItem action icon="code" title="GitHub" @click="emit('open-link', 'github')" />
+      <MItem action icon="menu_book" :title="t.settings.docs" @click="emit('open-link', 'docs')" />
+      <MItem action icon="forum" title="Discord" @click="emit('open-link', 'discord')" />
+    </MGroup>
+  </MSection>
 </template>
 
 <script setup>
-import { MButton } from 'foundation-ui/vue'
+import { MButton, MGroup, MItem, MSection } from 'foundation-ui/vue'
 import sunshineIcon from '../../../../assets/sunshine.ico'
 import { useI18n } from '../../i18n/index.js'
 
@@ -31,12 +31,5 @@ const { t } = useI18n()
 </script>
 
 <style scoped>
-.dsk-about { display: flex; align-items: center; gap: 20px; padding: 20px 24px; border-radius: var(--md-sys-shape-corner-extra-large); background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
-.dsk-about__logo { flex: none; width: 64px; height: 64px; display: grid; place-items: center; }
-.dsk-about__logo img { width: 100%; height: 100%; object-fit: contain; }
-.dsk-about__info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.dsk-about__name { font: var(--m-title-large); }
-.dsk-about__version { font: var(--m-body-large); opacity: .8; }
-.dsk-about__links { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 0 -12px; }
-.dsk-about__links .m-btn--text { --m-btn-fg: var(--md-sys-color-on-primary-container); }
+.dsk-about__logo { width: 40px; height: 40px; object-fit: contain; }
 </style>

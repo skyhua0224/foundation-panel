@@ -1,7 +1,6 @@
 <template>
   <MItem
-    class="dsk-row"
-    :class="{ 'dsk-row--tool': nameClass }"
+    :icon="icon"
     :title="name"
     :text="description"
     :disabled="disabled"
@@ -17,19 +16,12 @@
 <script setup>
 import { MItem } from 'foundation-ui/vue'
 
-// One row of a settings section: the name, one line of what it does, the control at the end (or below it when `stack`).
+// One row of a settings section: the name, one line of what it does, the control at the end (or below it when `stack`). The same MItem row as the Web UI, the Panel and the phone.
 defineProps({
   name: { type: String, default: '' },
   description: { type: String, default: '' },
-  nameClass: { type: [String, Array, Object], default: null },
-  controlClass: { type: [String, Array, Object], default: null },
+  icon: { type: String, default: '' },
   disabled: { type: Boolean, default: false },
   stack: { type: Boolean, default: false },
 })
 </script>
-
-<style scoped>
-.dsk-row { min-height: 72px; }
-.dsk-row :deep(.m-item__title) { font: var(--m-title-medium); }
-.dsk-row--tool :deep(.m-item__title) { display: inline-flex; align-items: center; gap: 10px; }
-</style>

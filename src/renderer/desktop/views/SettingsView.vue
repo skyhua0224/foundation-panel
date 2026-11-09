@@ -1,40 +1,27 @@
 <template>
-  <DeskPage class="settings-view" :title="t.settings.pageTitle" icon="settings" :text="heroText" wide>
-    <template #chips>
-      <MChip v-for="chip in heroChips" :key="chip.label" :tone="chip.on === chip.total ? 'ok' : 'neutral'">{{ chip.label }} {{ chip.on }}/{{ chip.total }}</MChip>
-    </template>
+  <DeskPage class="settings-view" :title="t.settings.pageTitle" wide>
+    <SettingsAppearanceCard @open-theme-editor="emit('openThemeEditor')" />
 
-    <div class="dsk-settings">
-      <div class="dsk-settings__col">
-        <SettingsAppearanceCard @open-theme-editor="emit('openThemeEditor')" />
+    <SettingsToggleSection
+      :title="t.settings.startup"
+      :items="startupSettings"
+      :values="settings"
+      @update-value="setSettingValue"
+    />
 
-        <SettingsToggleSection
-          :title="t.settings.startup"
-          icon="rocket_launch"
-          :items="startupSettings"
-          :values="settings"
-          @update-value="setSettingValue"
-        />
-      </div>
+    <SettingsToggleSection
+      :title="t.settings.bigScreen"
+      :items="bigScreenItems"
+      :values="bigScreenSettings"
+      @update-value="setBigScreenSetting"
+    />
 
-      <div class="dsk-settings__col">
-        <SettingsToggleSection
-          :title="t.settings.bigScreen"
-          icon="tv_gen"
-          :items="bigScreenItems"
-          :values="bigScreenSettings"
-          @update-value="setBigScreenSetting"
-        />
-
-        <SettingsToggleSection
-          :title="t.settings.notifications"
-          icon="notifications"
-          :items="notificationSettings"
-          :values="settings"
-          @update-value="setSettingValue"
-        />
-      </div>
-    </div>
+    <SettingsToggleSection
+      :title="t.settings.notifications"
+      :items="notificationSettings"
+      :values="settings"
+      @update-value="setSettingValue"
+    />
 
     <SettingsAboutCard
       :app-version="appVersion"
@@ -55,7 +42,6 @@
 
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
-import { MChip } from 'foundation-ui/vue'
 import { useSettingsState } from '../composables/useSettingsState'
 import { bigScreenSettings, setBigScreenSetting } from '../composables/useBigScreenSettings.js'
 import { useI18n } from '../i18n/index.js'
@@ -152,15 +138,6 @@ function setSettingValue(key, value) {
 
 const emit = defineEmits(['openThemeEditor'])
 
-// the hero: the version, and how much of each group is on
-const onCount = (items, values) => items.filter((item) => Boolean(values[item.key])).length
-const heroText = computed(() => `${t.value.settings.version} ${appVersion.value}`)
-const heroChips = computed(() => [
-  { label: t.value.settings.startup, on: onCount(startupSettings.value, settings.value), total: startupSettings.value.length },
-  { label: t.value.settings.bigScreen, on: onCount(bigScreenItems.value, bigScreenSettings.value), total: bigScreenItems.value.length },
-  { label: t.value.settings.notifications, on: onCount(notificationSettings.value, settings.value), total: notificationSettings.value.length },
-])
-
 onMounted(async () => {
   await initializeSettingsState()
 })
@@ -169,11 +146,3 @@ onUnmounted(() => {
   disposeSettingsState()
 })
 </script>
-
-<style scoped>
-.dsk-settings { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; margin-bottom: 20px; }
-.dsk-settings__col { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-@media (min-width: 1500px) {
-  .dsk-settings { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
-}
-</style>

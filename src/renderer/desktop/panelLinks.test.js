@@ -49,18 +49,17 @@ test('the pad moves inside the page before it leaves for the rail or the docked 
   assert.ok(nav.includes('focusables.filter((element) => page.contains(element))'))
 })
 
-test('design guard: every page of the big screen opens with a hero band and its headings keep the colour of their tile', () => {
+test('design guard: every page of the big screen is an MPage like the rest of the app (no hero band, no shapes), and its rows are MItem rows', () => {
   const page = read('./components/DeskPage.vue')
-  assert.ok(page.includes('<MHero v-if="icon"') && page.includes('.dsk-page :is(h1, h2, h3, h4, p) { color: inherit; }'))
-  for (const view of ['DevicesView', 'StreamView', 'SettingsView', 'ToolsView']) assert.match(read(`./views/${view}.vue`), /<DeskPage[^>]*\sicon="[a-z_]+"/, view)
+  assert.ok(page.includes('<MPage :title="title"') && !page.includes('MHero'))
+  for (const view of ['DevicesView', 'StreamView', 'SettingsView', 'ToolsView']) assert.match(read(`./views/${view}.vue`), /<DeskPage[^>]*:title=/, view)
   for (const view of ['StreamView', 'SettingsView', 'ToolsView']) assert.ok(read(`./views/${view}.vue`).includes('<PanelLinkSection'), `${view} has its rows 在 Panel 中打开`)
   assert.ok(read('./components/DesktopWindow.vue').includes('id="dsk-dock"'))
 })
 
-test('design guard: tonal tiles take the third colour from --dsk-tert-bg, which is a dark block in dark mode (the raw token is a light pink there)', () => {
-  const less = read('./desktop.less')
-  assert.ok(less.includes("html[data-theme='dark']") && less.includes('--dsk-tert-bg: color-mix('))
-  for (const file of ['views/DevicesView.vue', 'views/StreamView.vue', 'components/PanelLink.vue', 'components/AppGridView.vue']) {
-    assert.ok(!/var\(--md-sys-color-(on-)?tertiary-container\)/.test(read(`./${file}`)), `${file} uses the raw tertiary container`)
+test('design guard: the big-screen pages carry no tonal tiles of their own, no shaped icons and no giant numbers', () => {
+  for (const file of ['views/DevicesView.vue', 'views/StreamView.vue', 'views/SettingsView.vue', 'views/ToolsView.vue', 'components/PanelLink.vue', 'components/PanelLinkSection.vue', 'components/DeskPage.vue', 'components/settings/SettingsCard.vue', 'components/settings/SettingsAboutCard.vue', 'components/settings/SettingsToggleSection.vue']) {
+    const text = read(`./${file}`)
+    assert.ok(!/var\(--md-sys-color-(on-)?tertiary-container\)|--dsk-tert|clip-path|m-shape-|m-turn|MScallop|MHero|display-(large|medium|small)/.test(text), `${file} draws a shape, a tonal tile or a giant number`)
   }
 })
