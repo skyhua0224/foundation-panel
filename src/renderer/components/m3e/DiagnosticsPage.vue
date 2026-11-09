@@ -46,9 +46,11 @@ import { computed, onMounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { MDiagnostics, MDialog, MButton, diagnosticsTexts, guideTexts, coachTexts, remoteTexts, MGroup, MSection, useDialogs, useNotify } from 'foundation-ui/vue'
 import { useDiagnostics } from '../../composables/useDiagnostics.js'
+import { exportPanelLogs } from '../../composables/panelLogExport.js'
 import { useLogDiagnosis } from '../../composables/useLogDiagnosis.js'
 import { usbipStatusChannel, dualsenseStatusChannel, micStatusChannel, vigemStatusChannel } from '../../composables/deviceStatusStore.js'
 import { openExternalUrl, sunshine } from '../../tauri-adapter.js'
+import { saveThroughDialog } from '../../shared/saveDialog.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
 // 诊断与日志. The same page as the Web UI. What only this window can read (the panel log, the device status) is passed as facts.
@@ -120,11 +122,15 @@ async function downloadLogs() {
     if (!response.ok) throw new Error('logs')
     const content = await response.text()
     const invoke = window.__TAURI_INTERNALS__?.invoke
-    if (invoke) { await invoke('save_text_file', { content, defaultName: name, filterName: 'Text', extensions: ['txt'] }); return }
+    if (invoke) {
+      const saved = await saveThroughDialog(invoke, 'save_text_file', { content, defaultName: name, filterName: 'Text', extensions: ['txt'] })
+      if (saved === null) return
+      return
+    }
     const link = Object.assign(document.createElement('a'), { href: URL.createObjectURL(new Blob([content], { type: 'text/plain' })), download: name })
     link.click()
     URL.revokeObjectURL(link.href)
-  } catch (e) { if (e !== 'cancelled') note.value = { ...note.value, downloadLogs: { text: texts.value.downloadLogs, tone: 'error' } } }
+  } catch (e) { note.value = { ...note.value, downloadLogs: { text: `${texts.value.failed}: ${e?.message || e}`, tone: 'error' } } }
 }
 
 const commands = computed(() => ({
@@ -176,8 +182,7 @@ async function clearLogs() {
   catch (error) { say(`${logText.value.clearFailed}: ${error}`) }
 }
 async function exportLogs(format) {
-  try { const result = await invoke('export_logs', { format }); await useDialogs().alert(result || logText.value.exportSuccess, logText.value.exportComplete, { type: 'info' }) }
-  catch (error) { await useDialogs().alert(`${logText.value.exportFailed}: ${error}`, logText.value.dialogError, { type: 'error' }) }
+  await exportPanelLogs({ invoke, format, texts: logText.value, alert: useDialogs().alert })
 }
 onMounted(() => { diag.loadFacts(); diag.start() })
 </script>

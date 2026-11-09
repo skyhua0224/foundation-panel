@@ -3,6 +3,7 @@ import { invoke } from '@tauri-apps/api/core'
 import { appendTail, createLogByteDecoder, decodeLogBytes, findSessions, parseLog, sessionSummary } from 'foundation-ui/diagnostics'
 import { sunshine } from '../tauri-adapter.js'
 import { combineDiagnosticsRecords } from './diagnosticsRecords.js'
+import { SAVE_CANCELLED, saveThroughDialog } from '../shared/saveDialog.js'
 
 // The data of the diagnostics page of the control panel: the host log and configuration through the local proxy, and what only the panel
 // can read (system, graphics cards, monitors, device status). Reading only: `save` writes a file the person chose in the system dialog.
@@ -22,12 +23,9 @@ const getJson = async (path) => {
 const safe = async (fn, fallback = undefined) => { try { return await fn() } catch { return fallback } }
 
 export async function saveBundle(name, bytes) {
-  try {
-    return await invoke('save_binary_file', { contentBase64: base64(bytes), defaultName: name, filterName: 'Zip', extensions: ['zip'] })
-  } catch (e) {
-    if (e === 'cancelled') throw new Error('cancelled')
-    throw e
-  }
+  const saved = await saveThroughDialog(invoke, 'save_binary_file', { contentBase64: base64(bytes), defaultName: name, filterName: 'Zip', extensions: ['zip'] })
+  if (saved === null) throw new Error(SAVE_CANCELLED)
+  return saved
 }
 
 /** `status` = { usb, dualsense, mic, vdd } readers (cached status of the device hub) for the devices part of the bundle. */

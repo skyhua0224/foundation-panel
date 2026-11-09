@@ -119,16 +119,14 @@ async fn pick_config_file<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, Str
     let file_path = rx
         .await
         .map_err(|_| "dialog channel error".to_string())?
-        .ok_or_else(|| "cancelled".to_string())?;
+        .ok_or_else(|| crate::fs_utils::SAVE_CANCELLED.to_string())?;
 
     Ok(PathBuf::from(file_path.to_string()))
 }
 
 async fn pick_config_save_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
     use tauri_plugin_dialog::DialogExt;
-    use tokio::sync::oneshot;
 
-    let (tx, rx) = oneshot::channel();
     let mut dialog = app
         .dialog()
         .file()
@@ -141,16 +139,8 @@ async fn pick_config_save_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf
         dialog = dialog.set_directory(config_dir);
     }
 
-    dialog.save_file(move |file_path_opt| {
-        let _ = tx.send(file_path_opt);
-    });
-
-    let file_path = rx
-        .await
-        .map_err(|_| "dialog channel error".to_string())?
-        .ok_or_else(|| "cancelled".to_string())?;
-
-    Ok(PathBuf::from(file_path.to_string()))
+    let path = crate::fs_utils::wait_for_save_path(dialog).await?;
+    crate::fs_utils::chosen_save_path(path)
 }
 
 fn validate_config_path(path: &Path) -> Result<(), String> {
