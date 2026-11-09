@@ -163,15 +163,15 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
-import { MExpander, MVddDevice, displayTreeTexts, MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards, MDialog, MPrepArt, MValueItem, MSeg, MChip, MTile, MIcon, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, MPageLoading, MModeListRow, MModeListDialog, modeListTexts, useSubpage, vddPageTexts, vddTexts, VDD_PREP, VDD_RULES, vddOn } from 'foundation-ui/vue'
+import { MExpander, MVddDevice, displayTreeTexts, MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MDialog, MValueItem, MSeg, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, MPageLoading, useSubpage, vddPageTexts, vddTexts, vddOn } from 'foundation-ui/vue'
 import { useHostVdd } from '../composables/useHostVdd.js'
-import { cleanList, toResolutionNodes } from 'foundation-ui/settings/modeList.js'
+import { cleanList } from 'foundation-ui/settings/modeList.js'
 import { useVddEdid } from '../composables/useVddEdid.js'
 import { useVddStatusLabel } from '../composables/useVddStatusLabel.js'
 import { installVddWithRecovery } from '../composables/vddInstallRecovery.js'
-import { openExternalUrl, sunshine, vdd } from '../tauri-adapter.js'
+import { sunshine, vdd } from '../tauri-adapter.js'
 import { setPath, useVddPending } from '../composables/useVddPending.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
@@ -233,7 +233,6 @@ const fillPlaceholders = (message, replacements = {}) => Object.entries(replacem
   message || ''
 )
 
-const getVddText = (key, replacements = {}) => fillPlaceholders(t.value.vddSettings[key], replacements)
 
 const syncGpuOptions = (options = []) => {
   const uniqueOptions = [...new Set(options.filter(Boolean))]
@@ -279,9 +278,6 @@ const isStartingTrace = ref(false)
 const isStoppingTrace = ref(false)
 const isOpeningTraceFolder = ref(false)
 const isRefreshingCalibration = ref(false)
-const isLaunchingCalibration = ref(false)
-const isSavingCalibration = ref(false)
-const isLaunchingPhysicalCalibration = ref(false)
 const { current: vddSub, open: openVddSub, back: backVdd } = useSubpage('vdd')
 
 // ---- the host's keys of the virtual display (the modes, the shared display, the rules, the expert options): the shared store, each change saved at once ----
@@ -303,25 +299,8 @@ const flagOf = (key, def = false) => computed({
   get: () => (hostConfig.value[key] === undefined || hostConfig.value[key] === '' ? def : vddOn(hostConfig.value[key])),
   set: (on) => { void hostVdd.store.set({ [key]: typeof hostConfig.value[key] === 'boolean' ? on : on ? 'enabled' : 'disabled' }) },
 })
-const pickOf = (key, def, list) => computed({ get: () => (list.includes(hostConfig.value[key]) ? hostConfig.value[key] : def), set: (value) => { void hostVdd.store.set({ [key]: value }) } })
-const textOf = (key) => computed({ get: () => hostConfig.value[key] ?? '', set: (value) => { void hostVdd.store.set({ [key]: value }) } })
-const isVirtualMode = computed(() => hostVdd.store.mode.value !== 'physical')
-const sourceModel = computed({ get: () => hostVdd.store.mode.value, set: (value) => { void hostVdd.store.setMode(value) } })
-const SOURCE_ICONS = { physical: 'monitor', ondemand: 'screen_share', persistent: 'keep' }
-const sourceOptions = computed(() => hostVdd.store.modes.value.map((m) => ({ value: m.id, label: vt.value.modes[m.id], icon: SOURCE_ICONS[m.id], disabled: m.disabled })))
-const prepModel = pickOf('display_device_prep', 'no_operation', VDD_PREP)
-const prepOptions = computed(() => VDD_PREP.map((value) => ({ value, label: vp.value.preps[value].title, text: vp.value.preps[value].text })))
 const reuseModel = flagOf('vdd_reuse')
 const headlessModel = flagOf('vdd_headless_create')
-const followModel = flagOf('dynamic_resolution_follow_display', true)
-const borrowedModel = flagOf('vdd_borrowed_texture', true)
-const vsyncModel = flagOf('nvenc_vdd_force_vsync')
-const vulkanModel = flagOf('vdd_vulkan_hdr_bridge')
-const ruleResolution = pickOf('resolution_change', 'automatic', VDD_RULES)
-const ruleRefresh = pickOf('refresh_rate_change', 'automatic', VDD_RULES)
-const manualResolution = textOf('manual_resolution')
-const manualRefresh = textOf('manual_refresh_rate')
-const ruleOptions = computed(() => VDD_RULES.map((value) => ({ value, label: vt.value.rules[value] })))
 
 // the Vulkan HDR bridge: what the host reports and a test of the current display
 const vulkanStatus = ref({ state: 'idle', artifacts_installed: false, display_available: false })
@@ -337,17 +316,6 @@ const vulkan = {
     try { vulkanStatus.value = await hostVdd.fetchJson('/api/vulkan-hdr-bridge/validate', { method: 'POST' }) } catch { vulkanStatus.value = { ...vulkanStatus.value, state: 'error' } } finally { vulkanValidating.value = false; vulkanLoaded.value = true }
   },
 }
-const vulkanView = computed(() => {
-  const st = vulkanStatus.value, on = vulkanModel.value
-  const icon = (k) => ({ enabled: 'check_circle', idle: 'check_circle', error: 'warning', validating: 'sync' }[k] || 'info')
-  if (!on) return { key: 'disabled', icon: icon('disabled'), showValidate: false }
-  if (!vulkanLoaded.value) return { key: 'loading', icon: icon('loading'), showValidate: false }
-  if (!st.artifacts_installed || st.state === 'unavailable') return { key: 'unavailable', icon: icon('unavailable'), showValidate: false }
-  const showValidate = st.state !== 'enabled', canValidate = showValidate && st.display_available && !vulkanValidating.value
-  if (st.state === 'idle' && !st.display_available) return { key: 'waiting', icon: icon('waiting'), showValidate, canValidate, hint: true }
-  const key = ['idle', 'validating', 'enabled', 'error'].includes(st.state) ? st.state : 'idle'
-  return { key, icon: icon(key), showValidate, canValidate }
-})
 
 // an expert option is confirmed before it changes: what it does, then the change
 const confirm = reactive({ open: false, name: '', text: '', apply: null })
@@ -400,7 +368,6 @@ const createCalibrationStatus = () => ({
   statusText: '',
 })
 const calibrationStatus = reactive(createCalibrationStatus())
-const vddReuseEnabled = computed(() => Boolean(calibrationStatus.sharedVdd))
 
 let calibrationContextPollTimer = null
 let calibrationContextRequest = null
@@ -422,14 +389,8 @@ const resolutionList = ref([])
 const rateList = ref([...DEFAULT_REFRESH_RATES])
 const setResolutionOptions = (values = []) => { resolutionList.value = cleanList('resolution', values) }
 const setRefreshRateOptions = (values = []) => { rateList.value = cleanList('rate', values) }
-const gpuSummary = computed(() => gpuFriendlyName.value || t.value.vddSettings.unboundGpu)
-const presetSummary = computed(() => getVddText('presetsSummary', {
-  resolutions: resolutionList.value.length,
-  rates: rateList.value.length,
-}))
 const traceDisplayPath = computed(() => traceStatus.value.latest_file || t.value.vddSettings.vddTraceNoFile)
 const hasCustomEdidIssue = computed(() => settings.edid.CustomEdid && !edidFileExists.value)
-const previewHdr = computed(() => !!settings.colour.HDRPlus)
 const isColorDepthConflict = computed(() => settings.colour.SDR10bit && settings.colour.HDRPlus)
 const colorDepthProfile = computed({
   get() {
@@ -452,30 +413,6 @@ const colorDepthProfile = computed({
     settings.colour.HDRPlus = value === COLOR_DEPTH_HDR12
   },
 })
-const currentVddModeLabel = computed(() => vddReuseEnabled.value
-  ? t.value.vddSettings.sharedVddMode
-  : t.value.vddSettings.dedicatedVddMode)
-const currentVddModeHint = computed(() => vddReuseEnabled.value
-  ? t.value.vddSettings.sharedVddModeDesc
-  : t.value.vddSettings.dedicatedVddModeDesc)
-const overviewCards = computed(() => [
-  {
-    key: 'mode',
-    label: t.value.vddSettings.overviewMode,
-    value: currentVddModeLabel.value,
-    hint: currentVddModeHint.value,
-  },
-  {
-    key: 'presets',
-    label: t.value.vddSettings.overviewPresets,
-    value: presetSummary.value,
-  },
-  {
-    key: 'gpu',
-    label: t.value.vddSettings.overviewGpu,
-    value: gpuSummary.value,
-  },
-])
 const buildSettingsPayload = () => ({
   ...settings,
   gpu: {
@@ -524,47 +461,7 @@ const driverDetectionDescription = computed(() => driverCheckPhase.value === 'sy
   : t.value.vddSettings.driverDetectionDesc)
 const vddCanInstall = computed(() => !['unsupported', 'payload_missing'].includes(vddStatus.state))
 const vddStatusLabel = useVddStatusLabel(t, vddStatus)
-const activeCalibrationClient = computed(() => calibrationStatus.activeClients?.[0] || null)
-const hasActiveHdrClient = computed(() => Boolean(activeCalibrationClient.value))
-const calibrationStatusTone = computed(() => {
-  if (calibrationStatus.calibrated) return 'success'
-  if (!calibrationStatus.supported) return 'danger'
-  if (!calibrationStatus.vddActive || !calibrationStatus.hdrEnabled) return 'warning'
-  return 'ready'
-})
-const calibrationStatusTitle = computed(() => {
-  if (calibrationStatus.calibrated) return t.value.vddSettings.calibrationDetected
-  if (calibrationStatus.state === 'unbound_profile') return t.value.vddSettings.calibrationUnbound
-  if (calibrationStatus.state === 'invalid_profile') return t.value.vddSettings.calibrationInvalid
-  if (calibrationStatus.state === 'locked') return t.value.vddSettings.calibrationLocked
-  if (calibrationStatus.state === 'unavailable') return t.value.vddSettings.calibrationRefreshFailed
-  if (calibrationStatus.state === 'shared_vdd') return t.value.vddSettings.calibrationSharedWarning
-  if (calibrationStatus.state === 'multiple_streams') return t.value.vddSettings.calibrationMultipleStreams
-  if (!calibrationStatus.supported) return t.value.vddSettings.calibrationUnsupported
-  if (!calibrationStatus.vddActive) return t.value.vddSettings.calibrationWaitingVdd
-  if (!calibrationStatus.hdrEnabled) return t.value.vddSettings.calibrationWaitingHdr
-  return t.value.vddSettings.calibrationReady
-})
-const calibrationStatusDescription = computed(() => {
-  if (calibrationStatus.statusText) return calibrationStatus.statusText
-  if (calibrationStatus.calibrated) return t.value.vddSettings.calibrationDetectedHint
-  if (calibrationStatus.state === 'unbound_profile') return t.value.vddSettings.calibrationUnboundHint
-  if (calibrationStatus.state === 'invalid_profile') return t.value.vddSettings.calibrationInvalidHint
-  if (calibrationStatus.state === 'locked') return t.value.vddSettings.calibrationLocked
-  if (calibrationStatus.state === 'multiple_streams') return t.value.vddSettings.calibrationMultipleStreams
-  if (calibrationStatus.state === 'unavailable') {
-    const diagnostic = calibrationStatus.diagnostic
-    return `${t.value.vddSettings.calibrationRefreshFailed}${diagnostic?.stage ? ` (${diagnostic.stage}, 0x${Number(diagnostic.hresult).toString(16)})` : ''}`
-  }
-  if (!calibrationStatus.vddActive) return t.value.vddSettings.calibrationWaitingStream
-  if (!calibrationStatus.hdrEnabled) return t.value.vddSettings.calibrationWaitingHdrHint
-  return t.value.vddSettings.calibrationReadyHint
-})
 
-const formatCalibrationNits = (value) => {
-  if (!Number.isFinite(value)) return '—'
-  return `${value < 1 ? value.toFixed(4).replace(/0+$/, '').replace(/\.$/, '') : Math.round(value)} nits`
-}
 
 const stopCalibrationContextPolling = () => {
   if (calibrationContextPollTimer) {
@@ -633,86 +530,10 @@ const startCalibrationContextPolling = () => {
   calibrationContextPollTimer = setInterval(() => loadCalibrationContext({ silent: true }), 2500)
 }
 
-const launchHdrCalibration = async () => {
-  try {
-    await ElMessageBox.confirm(
-      t.value.vddSettings.calibrationLaunchConfirm,
-      t.value.vddSettings.calibrationLaunchTitle,
-      {
-        confirmButtonText: t.value.vddSettings.calibrationLaunch,
-        cancelButtonText: t.value.vddSettings.cancel,
-        type: 'info',
-      }
-    )
-    isLaunchingCalibration.value = true
-    await calibrationContextRequest
-    await loadCalibrationContext()
-    if (!calibrationStatus.canCalibrate) return
-    const result = await vdd.launchHdrCalibration()
-    if (!result?.success) {
-      throw new Error(result?.message || t.value.vddSettings.calibrationLaunchFailed)
-    }
-    ElMessage.success(t.value.vddSettings.calibrationLaunched)
-    startCalibrationContextPolling()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(getErrorMessage(error, t.value.vddSettings.calibrationLaunchFailed))
-    }
-  } finally {
-    isLaunchingCalibration.value = false
-  }
-}
 
 
-const bindHdrCalibration = async () => {
-  if (isSavingCalibration.value) return
-  isSavingCalibration.value = true
-  try {
-    const context = await loadCalibrationContext({ silent: true, snapshot: { ...calibrationStatus } })
-    if (!context) throw new Error(calibrationStatus.statusText)
-    ElMessage.success(t.value.vddSettings.calibrationDetected)
-  } catch (error) {
-    ElMessage.error(getErrorMessage(error, t.value.vddSettings.calibrationRefreshFailed))
-  } finally {
-    isSavingCalibration.value = false
-  }
-}
 
-const launchPhysicalHdrCalibration = async () => {
-  try {
-    await ElMessageBox.confirm(
-      t.value.vddSettings.physicalCalibrationConfirm,
-      t.value.vddSettings.physicalCalibrationTitle,
-      {
-        confirmButtonText: t.value.vddSettings.physicalCalibrationLaunch,
-        cancelButtonText: t.value.vddSettings.cancel,
-        type: 'info',
-      }
-    )
-    isLaunchingPhysicalCalibration.value = true
-    const result = await vdd.launchHdrCalibration()
-    if (!result?.success) {
-      throw new Error(result?.message || t.value.vddSettings.calibrationLaunchFailed)
-    }
-    ElMessage.success(t.value.vddSettings.physicalCalibrationLaunched)
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(getErrorMessage(error, t.value.vddSettings.calibrationLaunchFailed))
-    }
-  } finally {
-    isLaunchingPhysicalCalibration.value = false
-  }
-}
 
-const openHdrCalibrationStore = async () => {
-  try {
-    const opened = await openExternalUrl('ms-windows-store://pdp/?ProductId=9N7F2SM5D1LR')
-    if (!opened) ElMessage.error(t.value.vddSettings.calibrationStoreFailed)
-  } catch (error) {
-    console.error('Failed to open HDR calibration store page:', error)
-    ElMessage.error(t.value.vddSettings.calibrationStoreFailed)
-  }
-}
 
 const markSettingsClean = () => {
   lastSavedSnapshot.value = takeSnapshot()
