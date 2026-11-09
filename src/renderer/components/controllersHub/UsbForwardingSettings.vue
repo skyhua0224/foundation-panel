@@ -13,7 +13,7 @@
         </MItem>
         <MItem v-if="portOpen" plain :title="text.forwardingPort">
           <template #trail>
-            <md-outlined-text-field class="m-port-field" type="number" min="0" max="65535" :value="port" :error="!validPort" :aria-label="text.forwardingPort" @input="port = Number($event.target.value)" />
+            <md-outlined-text-field class="m-port-field" type="number" min="0" max="65535" :value="port" :error="!validPort" :aria-label="text.forwardingPort" @input="port = Number($event.target.value)"><span slot="container" class="m-field__fill" aria-hidden="true" /></md-outlined-text-field>
           </template>
         </MItem>
       </MGroup>

@@ -7,8 +7,8 @@
         <MItem action icon="folder_open" :title="t.deviceHub.usb.manualTitle" @click="manualOpen = !manualOpen"><template #trail><MInfo :text="t.deviceHub.usb.exporterHint" /><MIcon :name="manualOpen ? 'keyboard_arrow_up' : 'keyboard_arrow_down'" /></template></MItem>
       </MGroup>
       <form v-if="manualOpen" class="m-usb__discover" @submit.prevent="discover">
-        <md-outlined-text-field class="m-usb__host" :label="t.deviceHub.usb.hostPlaceholder" :value="remote" autocomplete="off" :disabled="!status.ready || discovering" @input="remote = $event.target.value" />
-        <md-outlined-text-field class="m-port-field" type="number" min="1024" max="65535" :label="t.deviceHub.usb.tcpPortLabel" :value="tcpPort" :disabled="!status.ready || discovering" @input="tcpPort = Number($event.target.value)" />
+        <md-outlined-text-field class="m-usb__host" :label="t.deviceHub.usb.hostPlaceholder" :value="remote" autocomplete="off" :disabled="!status.ready || discovering" @input="remote = $event.target.value"><span slot="container" class="m-field__fill" aria-hidden="true" /></md-outlined-text-field>
+        <md-outlined-text-field class="m-port-field" type="number" min="1024" max="65535" :label="t.deviceHub.usb.tcpPortLabel" :value="tcpPort" :disabled="!status.ready || discovering" @input="tcpPort = Number($event.target.value)"><span slot="container" class="m-field__fill" aria-hidden="true" /></md-outlined-text-field>
         <MButton type="submit" :loading="discovering" :disabled="!canDiscover">{{ t.deviceHub.usb.discover }}</MButton>
       </form>
       <MGroup v-if="manualOpen && discoveryDone" aria-live="polite">
