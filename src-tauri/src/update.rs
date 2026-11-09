@@ -2148,7 +2148,7 @@ pub async fn download_update(
         set_download_status(|status| {
             status.active = false;
             status.phase = "error".to_string();
-            status.error = Some(error.to_string());
+            status.error = Some(error.detail.clone());
         });
         crate::tray::set_transient_tooltip(
             &app_handle,

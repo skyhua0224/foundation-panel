@@ -752,7 +752,7 @@ mod collect {
 
     pub async fn process() -> ProcessFacts {
         let base_port = crate::sunshine::parse_sunshine_config().await.ok().and_then(|c| c.port).and_then(|p| p.trim().parse().ok()).unwrap_or(47989);
-        let (listeners, port_table_error) = match output_bounded(Command::new("netstat").args(["-ano"]).creation_flags(CREATE_NO_WINDOW), Duration::from_secs(5)) {
+        let (listeners, port_table_error) = match output_bounded({ let mut netstat = Command::new("netstat"); netstat.args(["-ano"]).creation_flags(CREATE_NO_WINDOW); netstat }, Duration::from_secs(5)) {
             Ok(output) => (parse_netstat(&crate::text_encoding::decode_console_bytes(&output.stdout)), String::new()),
             Err(error) => (Vec::new(), error),
         };
