@@ -253,6 +253,7 @@ const invoke = ref(null)
 let settingsListener = null
 let updateUnlisten = null
 let desktopNavigateUnlisten = null
+let keyboardBackListener = null
 
 function applyRuntimeSettings() {
   document.documentElement.dataset.fdDevMode = desktopSettings.value.devMode ? 'true' : 'false'
@@ -303,6 +304,8 @@ async function setupDesktopNavigationEvents() {
 }
 
 onMounted(async () => {
+  keyboardBackListener = handleKeyboardBack
+  window.addEventListener('keydown', keyboardBackListener)
   systemDark?.addEventListener?.('change', onSystemScheme)
   void useAppearance().init()
   try {
@@ -325,6 +328,7 @@ onUnmounted(() => {
   if (settingsListener) window.removeEventListener(DESKTOP_SETTINGS_UPDATED, settingsListener)
   if (updateUnlisten) updateUnlisten()
   if (desktopNavigateUnlisten) desktopNavigateUnlisten()
+  if (keyboardBackListener) window.removeEventListener('keydown', keyboardBackListener)
   disposeGameSession()
 })
 
@@ -332,14 +336,7 @@ onUnmounted(() => {
 async function handleNavClick(item) {
   if (item.disabled) return
   if (item.id === 'exit') {
-    if (invoke.value) {
-      try {
-        const { getCurrentWindow } = await import('@tauri-apps/api/window')
-        await getCurrentWindow().close()
-      } catch (e) {
-        window.close()
-      }
-    }
+    await requestExitShell()
     return
   }
   if (item.id === 'theme') {
@@ -399,10 +396,11 @@ async function restoreFocusForView(viewKey) {
   restoreFocus(viewKey)
 }
 
-watch(activeNav, async (next, previous) => {
+watch([activeNav, gamepadConnected], async ([next, connected], previous) => {
   // 没插手柄时不抢焦点，鼠标用户不该看到光标位置被移动
-  if (!gamepadConnected.value) return
-  if (previous) rememberFocus(previous)
+  if (!connected) return
+  const previousView = Array.isArray(previous) ? previous[0] : null
+  if (previousView && previousView !== next) rememberFocus(previousView)
   await restoreFocusForView(next)
 })
 
@@ -502,6 +500,15 @@ function handleBack(deep) {
 function handleCursorToggle() {
   if (!bigScreenSettings.value.gamepadCursorEnabled) return
   setCursorEnabled(!cursorEnabled.value)
+}
+
+function handleKeyboardBack(event) {
+  if (event.key !== 'Escape' || event.defaultPrevented || event.isComposing) return
+  // Text fields own Escape for cancelling an edit. The screen keyboard and dialogs are
+  // routed through the same back stack below.
+  if (!oskOpen.value && isTextEntryElement(event.target)) return
+  event.preventDefault()
+  handleBack(false)
 }
 
 function focusSidebar() {

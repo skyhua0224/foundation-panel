@@ -1,5 +1,5 @@
 <template>
-  <span class="gamepad-legend" :data-pad-type="padType" aria-hidden="true">
+  <span class="gamepad-legend" :data-pad-type="padType" :data-cursor-mode="cursorMode ? 'on' : 'off'" aria-hidden="true">
     <TransitionGroup name="legend-item" tag="span" class="legend-items">
       <span v-for="hint in hints" :key="hint.id" class="legend-item" :class="{ 'is-primary': hint.primary }" :data-hint="hint.id">
         <PadGlyph :action="hint.action" size="md" />
