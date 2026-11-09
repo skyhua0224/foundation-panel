@@ -168,6 +168,10 @@ pub fn disable_context_menu<R: Runtime>(_window: &WebviewWindow<R>) {}
 pub fn panel_content_ready(window: tauri::WebviewWindow) {
     log::info!("[cold] content ready in {}", window.label());
     lifecycle::content_ready(&window);
+    // the window of the context menu is made once the main window has its first view (hidden; it is never in the way of the first paint)
+    if window.label() == MAIN_WINDOW_ID {
+        crate::ctx_popup::schedule_create(window.app_handle());
+    }
 }
 
 /// A measurement instance (SUNSHINE_GUI_TEST_OFFSCREEN = 1): its main window opens outside every monitor, is never activated and logs its WM_SIZE timing.
@@ -198,7 +202,7 @@ static COLD_CLOAK_SINCE: std::sync::OnceLock<Instant> = std::sync::OnceLock::new
 const COLD_CLOAK_CAP: Duration = Duration::from_millis(600);
 
 #[cfg(target_os = "windows")]
-fn set_cloak<R: Runtime>(window: &WebviewWindow<R>, cloaked: bool) {
+pub(crate) fn set_cloak<R: Runtime>(window: &WebviewWindow<R>, cloaked: bool) {
     use windows::Win32::Foundation::HWND;
     use windows::Win32::Graphics::Dwm::{DWMWINDOWATTRIBUTE, DwmSetWindowAttribute};
     use windows::core::BOOL;
@@ -1103,6 +1107,10 @@ fn refresh_webview_surface<R: Runtime>(window: &WebviewWindow<R>) {
 
 /// 处理窗口事件
 pub fn handle_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
+    // the context menu window, and the window a menu belongs to
+    if crate::ctx_popup::handle_window_event(window, event) {
+        return;
+    }
     match event {
         tauri::WindowEvent::Moved(position) => {
             if window.label() == TOOL_WINDOW_ID {

@@ -10,6 +10,7 @@ mod commands;
 mod controller_hub;
 mod controller_input;
 mod controllermeta;
+mod ctx_popup;
 mod desktop_settings;
 mod dev_tools;
 mod device_config;
@@ -27,6 +28,7 @@ mod host_facts;
 mod host_facts_math;
 mod hwinfo;
 mod logger;
+mod menu_place;
 mod moonlight_web;
 mod native_tools;
 mod power;
@@ -373,6 +375,12 @@ fn main() {
             windows::webview_heartbeat,
             logger::frontend_slow,
             windows::panel_content_ready,
+            ctx_popup::ctx_popup_loaded,
+            ctx_popup::ctx_popup_open,
+            ctx_popup::ctx_popup_ready,
+            ctx_popup::ctx_popup_pick,
+            ctx_popup::ctx_popup_cancel,
+            ctx_popup::ctx_popup_selftest,
             windows::panel_set_surface,
             windows::panel_dpi_settled,
             windows::panel_activity,
