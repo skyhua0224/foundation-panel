@@ -2,9 +2,11 @@
   <div class="m-app m-app--scroll panel-shell">
     <!-- slim caption bar over the whole window: draggable, the window controls at the end; the pages start below it -->
     <MCaption bem="panel-caption" data-tauri-drag-region @pointerdown="onTouchWindowDragStart">
+      <template v-if="backButton" #back><MCaptionBack :page="backPage" :locale="locale" @back="jumps.back()" /></template>
+      <template #version><MCaptionVersion :version="currentVersion" :build="buildInfo" :os="osName()" :locale="locale" :update="notice.version" @copied="onVersionCopied" @open-update="openUpdates" /></template>
       <template #brand><MBrand class="panel-caption__brand" :size="20" data-tauri-drag-region /></template>
       <template #announcements><UpdateDownloadChip @open="showUpdateDialog = true" /><MStatusBell :locale="locale" /><MAnnouncementButton :unread="announcements.unread.value" :locale="locale" @open="router.navigate(ROUTES.ANNOUNCEMENTS)" /></template>
-      <template #search><div class="panel-caption__search" data-tauri-drag-region><MUnifiedSearch :search="uni" :texts="searchT" :compact="compactSearch" :height="38" /></div></template>
+      <template #search><div class="panel-caption__search" data-tauri-drag-region><MUnifiedSearch :search="uni" :texts="searchT" :compact="compactSearch || narrowCaption" :height="38" /></div></template>
       <template #connect><button type="button" class="m-caption-connect" :aria-label="connectT.title" :data-tip="connectT.title" :disabled="hostUnusable" @click="connect.show('pair')"><MIcon name="person_add" /><span>{{ connectT.title }}</span></button></template>
       <template #controls><div class="panel-caption__controls">
         <button type="button" class="panel-caption__btn" :aria-label="t.sidebar.minimize" :data-tip="t.sidebar.minimize" @click="minimizeWindow"><MIcon name="remove" /></button>
@@ -13,7 +15,8 @@
       </div></template>
     </MCaption>
     <div class="panel-body">
-    <MScene :nav="nav" :caption-height="48" :rail-items="rail" :bar-items="bar" :bar-current="barCur" :texts="sceneTexts" :overlay="isWebPage || offlineShown" :status="offlineShown" storage-key="foundation-ui.panel.list" @rail="onRail">
+    <MScene :nav="nav" :caption-height="48" :jumps="jumps" :chip="backChip" :rail-items="rail" :bar-items="bar" :bar-current="barCur" :texts="sceneTexts" :overlay="isWebPage || offlineShown" :status="offlineShown" storage-key="foundation-ui.panel.list" @rail="onRail">
+      <template #back-chip><MBackChip :page="backPage" :locale="locale" @back="jumps.back()" /></template>
       <template #rail-foot><MIconButton icon="palette" :label="appearanceLabel" :current="router.currentRoute.value === ROUTES.CFG_APPEARANCE" @click="router.navigate(ROUTES.CFG_APPEARANCE)" /><MIconButton icon="info" :label="aboutTexts(locale).title" :current="router.currentRoute.value === ROUTES.ABOUT" @click="router.navigate(ROUTES.ABOUT, undefined, { root: true })" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
       <template #list="{ entry, scene }">
         <MNavList
@@ -39,19 +42,19 @@
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
         <StreamHubPage v-else-if="entry.id === ROUTES.STREAM_HUB" :runtime="runtimeView" :add-label="homeTexts(locale)['c_act-add-app']" @open="onListNavigate" @add="openDestination('apps:add')" />
         <SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" :groups="settingsList.groups.value" :runtime="runtimeView" @open="onListNavigate" />
-        <HdrEnhancedManager v-else-if="entry.id === ROUTES.HDR_ENHANCED" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
+        <HdrEnhancedManager v-else-if="entry.id === ROUTES.HDR_ENHANCED" @manage-components="jumpTo(ROUTES.COMPONENTS)" />
         <AppearancePage v-else-if="entry.id === ROUTES.CFG_APPEARANCE" />
-        <MicrophonePage v-else-if="entry.id === ROUTES.MICROPHONE" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
-        <UsbPage v-else-if="entry.id === ROUTES.USB" @manage-components="router.navigate(ROUTES.COMPONENTS)" />
+        <MicrophonePage v-else-if="entry.id === ROUTES.MICROPHONE" @manage-components="jumpTo(ROUTES.COMPONENTS)" />
+        <UsbPage v-else-if="entry.id === ROUTES.USB" @manage-components="jumpTo(ROUTES.COMPONENTS)" />
         <SunshineServicePage v-else-if="entry.id === ROUTES.SUNSHINE_SERVICE" :locale="locale" />
         <ComponentStatusPage v-else-if="entry.id === ROUTES.COMPONENT_STATUS" />
         <ToolboxPage v-else-if="entry.id === ROUTES.TOOLBOX" :tools="toolsMenuItems" />
         <LatencyClockPage v-else-if="entry.id === ROUTES.LATENCY_CLOCK" />
         <StreamTimerPage v-else-if="entry.id === ROUTES.STREAM_TIMER" />
         <TestToolsPage v-else-if="entry.id === ROUTES.TEST_TOOLS" />
-        <LiveSessionPage v-else-if="entry.id === ROUTES.LIVE_SESSION" @open-quality="router.navigate(ROUTES.HDR_ENHANCED)" />
+        <LiveSessionPage v-else-if="entry.id === ROUTES.LIVE_SESSION" @open-quality="jumpTo(ROUTES.HDR_ENHANCED)" />
         <RtssPage v-else-if="entry.id === ROUTES.RTSS" />
-        <NetworkOverviewPage v-else-if="entry.id === ROUTES.NETWORK_OVERVIEW" @open-network="openConfig({ tab: 'network' })" />
+        <NetworkOverviewPage v-else-if="entry.id === ROUTES.NETWORK_OVERVIEW" @open-network="jumpConfig({ tab: 'network' })" />
         <DiagnosticsPage
           v-else-if="entry.id === ROUTES.DIAGNOSTICS || entry.id === ROUTES.WEB_TROUBLESHOOTING"
           @go="goDiagnosticsPlace"
@@ -98,12 +101,13 @@
     <MErrorHost :locale="locale" :can-go-back="nav.canPop.value" :host-online="hostConn.state.status === 'online'" :restart="() => hostConn.restart('service')" :doctor="openDoctor" :open-url="actions_openExternal" @back="errorBack" />
     <!-- 更多 of the bottom bar: what the bar has no room for -->
     <MSheet v-model="moreOpen" :title="t.m3e.nav.moreTitle" side="end" :close-label="t.m3e.home.done">
+      <div class="panel-more-version"><MBrand :size="20" /><MCaptionVersion :version="currentVersion" :build="buildInfo" :os="osName()" :locale="locale" :update="notice.version" @copied="onVersionCopied" @open-update="moreGo(openUpdates)" /></div>
       <MGroup>
         <MItem action icon="search" :title="t.m3e.search" @click="moreGo(() => uni.show())" />
-        <MItem action icon="settings" :title="t.m3e.nav.settings" :text="settingsList.lines.value.panel" @click="moreGo(() => onRail({ id: 'settings' }))" />
+        <MItem action icon="settings" :title="t.m3e.nav.settings" :text="settingsList.lines.value.panel" :tone="notice.dot ? 'warn' : ''" @click="moreGo(() => onRail({ id: 'settings' }))" />
         <MItem action icon="palette" :title="appearanceLabel" @click="moreGo(() => router.navigate(ROUTES.CFG_APPEARANCE))" />
         <MItem action icon="info" :title="aboutTexts(locale).title" :text="currentVersion" @click="moreGo(() => router.navigate(ROUTES.ABOUT, undefined, { root: true }))" />
-        <MItem action icon="help" :title="t.m3e.nav.help" :text="settingsList.lines.value.help" :tone="updateWaiting ? 'warn' : ''" @click="moreGo(() => onRail({ id: 'help' }))" />
+        <MItem action icon="help" :title="t.m3e.nav.help" :text="settingsList.lines.value.help" @click="moreGo(() => onRail({ id: 'help' }))" />
         <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="moreGo(() => { sponsorOpen = true })" />
       </MGroup>
     </MSheet>
@@ -134,8 +138,9 @@ import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
 import { openBigScreenWithNotice } from '../composables/openBigScreen.js'
-import { MButton, homeTexts, MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, doctorTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode, useDialogs } from 'foundation-ui/vue'
+import { MButton, homeTexts, MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MCaptionVersion, MCaptionBack, MBackChip, createJumpHistory, useBackVariant, showsButton, showsChip, captionTexts, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, doctorTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode, useDialogs } from 'foundation-ui/vue'
 import { developerOverlays, developerTexts, DEFAULT_FLAGS } from 'foundation-ui/developer'
+import { afterCheck, afterOpened, noticeView, readNotice, writeNotice } from 'foundation-ui/update'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelBusyLayer from './PanelBusyLayer.vue'
@@ -196,7 +201,7 @@ const props = defineProps({ webuiPath: { type: String, default: '/' } })
 const emit = defineEmits(['route-change', 'webui-navigate'])
 const { t, locale, choice: localeChoice, setChoice: setLocaleChoice, systemLocale } = useI18n()
 const {
-  isMaximized, isAdmin, showUpdateDialog, updateInfo, currentVersion, router, themeMode, setTheme,
+  isMaximized, isAdmin, showUpdateDialog, updateInfo, currentVersion, skippedVersion, router, themeMode, setTheme,
   openVddSettings, openWelcome, openWebStream, openAiAssistant, openControllers, openRtxHdr, skipVersion,
   includePrerelease, setIncludePrerelease,
 } = useSidebarState()
@@ -242,6 +247,8 @@ const handleCheckForUpdates = async (channel = null) => {
   if (!result) return false
   updateInfo.value = result
   showUpdateDialog.value = true
+  // the person asked and is looking at the answer
+  remember(afterOpened(afterCheck(noticeState.value, { version: result.version, is_latest: result.is_latest }, { installed: installedKnown.value ? currentVersion.value : '' })))
   return true
 }
 const toolsCtx = {
@@ -270,6 +277,45 @@ const sponsorSections = computed(() => [
 ])
 const actions_openExternal = (url) => openExternalUrl(url)
 const nav = router.nav
+// ---- the version in the caption bar and the notice of a waiting update (kept from the checks the updater already runs; nothing here asks the network)
+const buildInfo = ref(null)
+onMounted(async () => { try { buildInfo.value = await sunshine.getBuildInfo() } catch { buildInfo.value = null } })
+const noticeState = ref(readNotice(localStorage))
+const installedKnown = computed(() => /^[vV]?\d/.test(String(currentVersion.value || '')) && currentVersion.value !== '0.0.0')
+const notice = computed(() => (installedKnown.value ? noticeView(noticeState.value, { installed: currentVersion.value, skipped: skippedVersion.value }) : { waiting: false, version: '', dot: false }))
+const remember = (next) => { noticeState.value = next; writeNotice(localStorage, next) }
+watch(updateInfo, (info) => { if (info) remember(afterCheck(noticeState.value, { version: info.version, is_latest: info.is_latest }, { installed: installedKnown.value ? currentVersion.value : '' })) }, { immediate: true })
+// 软件更新 is on 面板设置 (关于 shows it too, and so does the sheet a person's own 检查更新 opens): opening one of them puts the dot out for the version that waits; a newer one brings it back.
+// The sheet the updater opens by itself when it finds an update is not the person opening it: the dot stays.
+const updatesOpen = computed(() => router.currentRoute.value === ROUTES.PANEL_SETTINGS || router.currentRoute.value === ROUTES.ABOUT)
+watch([updatesOpen, () => notice.value.version], ([open]) => { if (open && noticeState.value.available) remember(afterOpened(noticeState.value)) }, { immediate: true })
+const openUpdates = () => { router.navigate(ROUTES.PANEL_SETTINGS) }
+const onVersionCopied = (text) => useNotify().snack(text ? captionTexts(locale.value).copiedNote : captionTexts(locale.value).copyFailed)
+// ---- the global back: the places a person left by a jump (体检 → 网络, a home tile → its settings); the person's own moves clear it
+const jumps = createJumpHistory({
+  locate: () => ({ id: nav.current.value, params: nav.detail.value?.params, rail: nav.rail.value }),
+  restore: (place) => restorePlace(place),
+})
+jumps.attach(nav.entries)
+const jumpTo = (route, params) => jumps.jump(() => router.navigate(route, params))
+const jumpConfig = (params) => jumps.jump(() => openConfig(params))
+const { variant } = useBackVariant()
+const backButton = computed(() => showsButton(variant.value))
+const backChip = computed(() => showsChip(variant.value) && jumps.canBack.value)
+// the name of the place Back goes to: the setting's tab, the page's own name, or its section
+const backPage = computed(() => {
+  const place = jumps.top.value
+  if (!place) return ''
+  if (place.params?.tab) return labelOf(locale.value, `tabs.${place.params.tab}`) || railLabel(place.rail)
+  const row = ['stream', 'config', 'input', 'audio', 'display', 'system', 'settings', 'help'].flatMap((r) => pageItems(t.value, r, {})).find((i) => i.id === place.id)
+  return row?.label || (place.id === ROUTES.HOME ? t.value.m3e.nav.overview : '') || railLabel(place.rail)
+})
+const restorePlace = (place) => {
+  if (place.params?.tab || place.id === ROUTES.WEB_CONFIG) { openConfig(place.params || { tab: 'general' }); return }
+  const path = webPathOf(place.id)
+  if (path) emit('webui-navigate', path)
+  router.navigate(place.id, place.params)
+}
 // the back stack mirrors into the window's history (as in the Web UI): the back arrow of a pushed page, Esc, the mouse's back button and the browser's agree; without it the arrow only went back in the history and the page stayed
 onMounted(() => { nav.widen(); nav.attach() })
 onBeforeUnmount(() => nav.detach())
@@ -364,8 +410,7 @@ const announcements = useAnnouncements({ locale, version: announceVersion })
 const appearanceLabel = computed(() => labelOf(locale.value, 'shell.appearance'))
 const announcementsUnread = announcements.unread
 // a dot on the help rail while an update is waiting (the about page checks and opens the update sheet)
-const updateWaiting = computed(() => !!updateInfo.value && !updateInfo.value.is_latest)
-const rail = computed(() => railItems(t.value).map((item) => (item.id === 'overview' && announcementsUnread.value ? { ...item, badge: announcementsUnread.value } : item.id === 'help' && updateWaiting.value ? { ...item, badge: 'dot' } : item.id === 'assistant' && mitaState.unread ? { ...item, badge: 'dot' } : item)))
+const rail = computed(() => railItems(t.value).map((item) => (item.id === 'overview' && announcementsUnread.value ? { ...item, badge: announcementsUnread.value } : item.id === 'settings' && notice.value.dot ? { ...item, badge: 'dot' } : item.id === 'assistant' && mitaState.unread ? { ...item, badge: 'dot' } : item)))
 // the one-time thank-you line after the guided first run
 const railLabel = (id) => t.value.m3e.nav[id]
 // Developer mode (seven taps on the version in 关于): the row of 开发者选项 in 系统, and the overlays the page chose, applied at start
@@ -425,8 +470,10 @@ const searchItems = computed(() => [
 ])
 // ---- the unified search: one entry in the caption bar (an icon and a full-screen view on a narrow window) over everything a person can look for ----
 const compactSearch = ref(typeof window !== 'undefined' && window.innerWidth < 600)
+// the caption bar carries the version beside the name: below this width the search is its icon (as on a phone), so the bar never cuts the search field
+const narrowCaption = ref(typeof window !== 'undefined' && window.innerWidth < 900)
 let wasPhone = isPhone()
-const onSearchResize = () => { compactSearch.value = window.innerWidth < 600; const now = isPhone(); if (now !== wasPhone) { wasPhone = now; if (now) nav.narrow(); else nav.widen() } }
+const onSearchResize = () => { compactSearch.value = window.innerWidth < 600; narrowCaption.value = window.innerWidth < 900; const now = isPhone(); if (now !== wasPhone) { wasPhone = now; if (now) nav.narrow(); else nav.widen() } }
 onMounted(() => window.addEventListener('resize', onSearchResize))
 onBeforeUnmount(() => window.removeEventListener('resize', onSearchResize))
 const searchT = computed(() => searchTexts(locale.value))
@@ -525,17 +572,17 @@ const searchDocs = computed(() => [
   ...tileDocs(locale.value),
 ])
 const recentSettingDocs = computed(() => settingDocs(settingsList.recentView.value.items.map((r) => r.entry), { prefix: settingsPlace, locale: locale.value }))
-const onUnifiedChoose = (doc) => {
+const onUnifiedChoose = (doc) => jumps.jump(() => {
   if (doc.type === 'setting' || doc.type === 'page') onSearch(doc.entry)
   else if (doc.type === 'client') { emit('webui-navigate', `/pin${filterHash(doc.client?.name || doc.title)}`); router.navigate(ROUTES.WEB_CLIENTS) }
   else if (doc.type === 'app') { emit('webui-navigate', `/apps${filterHash(doc.app?.name || doc.title)}`); router.navigate(ROUTES.WEB_APPS) }
   else if (doc.type === 'tile') { addTileToHome('panel-home', doc.tile); router.navigate(ROUTES.HOME) }
-}
+})
 const uni = useUnifiedSearch({ docs: searchDocs, onPin: (doc) => pinToHome('panel-home', doc.pin), isPinned: (doc) => isPinnedOnHome('panel-home', doc.pin), recentSettings: recentSettingDocs, onChoose: onUnifiedChoose })
 // Where an error of the diagnostics page leads
 // 体检: the entries of help and search open it running; a fix leads to a setting row or a page of the panel; 米塔 AI gets the result
 // each press of 「开始体检」 carries its own token: the history entry keeps it, so Back from a fix finds the result instead of running every check again (MDoctor)
-const openDoctor = () => router.navigate(ROUTES.DOCTOR, { autostart: Date.now() })
+const openDoctor = () => jumps.jump(() => router.navigate(ROUTES.DOCTOR, { autostart: Date.now() }))
 const DOCTOR_PAGES = {
   network: () => openConfig({ tab: 'network' }),
   audio: () => openConfig({ tab: 'audio', sub: 'sound' }),
@@ -546,22 +593,22 @@ const DOCTOR_PAGES = {
   config: () => openConfig({ tab: 'files' }),
   update: () => router.navigate(ROUTES.ABOUT),
 }
-const goDoctorTarget = (target) => {
+const goDoctorTarget = (target) => jumps.jump(() => {
   const [kind, id] = String(target).split(':')
   if (kind === 'setting') { const entry = settingsList.searchItems.value.find((e) => e.keyName === id); if (entry) openSettingsRoute(entry) }
   else DOCTOR_PAGES[id]?.()
-}
+})
 const askMita = (prompt) => {
   try { sessionStorage.setItem(MITA_PENDING_PROMPT, prompt) } catch { /* the chat opens empty */ }
   router.navigate(ROUTES.AI_ASSISTANT)
 }
-const goDiagnosticsPlace = (place) => {
+const goDiagnosticsPlace = (place) => jumps.jump(() => {
   if (place === 'drivers') router.navigate(ROUTES.COMPONENTS)
   else if (place === 'encoder') openConfig({ tab: 'display', sub: 'encoders' })
   else if (place === 'network') openConfig({ tab: 'network' })
   else if (place === 'audio') openConfig({ tab: 'audio', sub: 'sound' })
   else if (place === 'display') openConfig({ tab: 'display', sub: 'output' })
-}
+})
 // A place of the stream settings: the list pane opens the Web page in the frame at that tab, section and row
 const openConfig = (params = { tab: 'general' }) => {
   // The Web row stays in 捕获与视频, while the panel's native manager has its own 画质增强 place.
@@ -583,16 +630,16 @@ const openSettingsRoute = (item) => {
   else openRoute(item.route || item.id)
 }
 // a page of the unsaved changes (the bar's list): the settings tab, the gamepad, the application list or the virtual display
-const onPendingGo = ({ page, entry, route }) => {
+const onPendingGo = ({ page, entry, route }) => jumps.jump(() => {
   if (route) openRoute(route)
   else if (page.startsWith('config:')) openConfig({ tab: entry?.tab || page.slice(7), sub: entry?.sub, focus: entry?.focus })
   else openRoute(page === 'apps' ? ROUTES.WEB_APPS : ROUTES.GAMEPAD)
-}
+})
 const onListNavigate = (item) => (item.route ? openSettingsRoute(item) : openRoute(item.id))
 
 const sceneTexts = computed(() => ({ resize: t.value.m3e.resize, main: t.value.m3e.nav.main, expand: t.value.m3e.nav.expand, collapse: t.value.m3e.nav.collapse, shortcuts: t.value.m3e.shortcuts, back: t.value.m3e.back, search: t.value.m3e.search, help: t.value.m3e.shortcutHelp, section: t.value.m3e.section, close: t.value.m3e.clear }))
 // the bottom bar of a narrow window: five destinations, the settings categories behind one, the rest behind 更多
-const bar = computed(() => barItems(t.value).map((item) => (item.id === 'overview' && announcementsUnread.value ? { ...item, badge: announcementsUnread.value } : item.id === 'more' && updateWaiting.value ? { ...item, badge: 'dot' } : item)))
+const bar = computed(() => barItems(t.value).map((item) => (item.id === 'overview' && announcementsUnread.value ? { ...item, badge: announcementsUnread.value } : item.id === 'more' && notice.value.dot ? { ...item, badge: 'dot' } : item)))
 const barCur = computed(() => (router.currentRoute.value === ROUTES.SETTINGS_HUB ? 'settings-hub' : barCurrent(nav.rail.value)))
 const moreOpen = ref(false)
 const sponsorOpen = ref(false)
@@ -672,7 +719,7 @@ const actions_openUrl = async (item) => {
   if (base) toolsCtx.openUrl(base + webPathOf(item.id))
 }
 // Old call sites speak in short ids; each maps to a destination.
-const openDestination = (id) => {
+const openDestination = (id) => jumps.jump(() => {
   if (id === 'check-update') { handleCheckForUpdates(); return }
   if (id.startsWith('announcement:')) { router.navigate(ROUTES.ANNOUNCEMENTS, { id: id.slice(13) }); return }
   if (id.startsWith('setting:')) { const entry = searchItems.value.find((e) => e.keyName === id.slice(8)); if (entry) onSearch(entry); return }
@@ -687,7 +734,7 @@ const openDestination = (id) => {
   if (id === 'settings') { openConfig({ tab: 'general' }); return }
   const route = web[id] || { gamepad: ROUTES.GAMEPAD, microphone: ROUTES.MICROPHONE, usb: ROUTES.USB, vdd: ROUTES.VDD_SETTINGS, quality: ROUTES.HDR_ENHANCED, components: ROUTES.COMPONENTS, diagnostics: ROUTES.DIAGNOSTICS, assistant: ROUTES.AI_ASSISTANT }[id]
   if (route) openRoute(route)
-}
+})
 const openRoute = (route) => {
   const path = webPathOf(route)
   if (path) emit('webui-navigate', path)
@@ -718,6 +765,8 @@ defineExpose({
 .panel-shell { position: relative; height: 100vh; height: 100dvh; min-height: 0; overflow: clip; }
 .panel-caption { position: absolute; top: 0; left: var(--m-rail-w, 0px); right: 0; z-index: 40; transition: left var(--m-spring-default-spatial-duration, .4s) var(--m-spring-default-spatial, ease); display: grid; grid-template-columns: minmax(max-content, 1fr) minmax(0, 560px) minmax(max-content, 1fr); align-items: stretch; height: 48px; background: transparent; user-select: none; }
 .panel-caption__brand { align-self: center; padding-inline-start: 16px; pointer-events: none; }
+.panel-more-version { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; padding: 4px 16px 12px; }
+.panel-more-version .m-capver { margin-inline-start: 0; }
 .panel-caption__controls { display: flex; justify-self: end; }
 .panel-caption__search { display: flex; align-items: center; justify-content: center; min-width: 0; padding: 0 12px; }
 /* the caption bar of a phone is the Web UI's: the brand gives way (it was max-content and pushed the buttons out of a 360 px window), search and the action buttons touch (the shared icon sizes are m3e's layout.css) */

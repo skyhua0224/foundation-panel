@@ -301,6 +301,7 @@ export function useSidebarState() {
     showUpdateDialog,
     updateInfo,
     currentVersion,
+    skippedVersion,
     includePrerelease,
     router,
 
