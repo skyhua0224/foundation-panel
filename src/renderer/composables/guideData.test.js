@@ -276,3 +276,13 @@ test('「还原内置应用」 in the flow restores through the host API and ans
   const down = createGuideData({ proxyUrl: async () => 'http://proxy', fetchImpl: async () => { throw new Error('offline') } })
   assert.deepEqual(await down.callbacks.restoreApps(), { ok: false, error: 'offline' })
 })
+
+test('the address step reads the port the host runs and the one it saved', async () => {
+  const data = make({ '/api/network/listeners': { status: true, active: { port: 47989, upnp: false }, saved: { port: 48989, upnp: false }, addresses: [{ name: '以太网', address: '192.168.1.5' }] }, '/api/config': { sunshine_name: 'SKY-PC', external_endpoints: '' } })
+  await data.callbacks.loadNetwork()
+  assert.deepEqual([data.state.network.port, data.state.network.activePort], [48989, 47989])
+  const old = make({ '/api/network/listeners': { status: true, active: { port: 47989 }, saved: {}, addresses: [] }, '/api/config': {} })
+  await old.callbacks.loadNetwork()
+  assert.deepEqual([old.state.network.port, old.state.network.activePort], [47989, 47989])
+})
+
