@@ -29,3 +29,9 @@ test('the library rule the panel inherits is there: the fill, the 3 : 1 edge', (
   assert.match(css, /--m-field-fill: var\(--md-sys-color-surface-container-highest\)/)
   assert.match(css, /--m-field-outline: var\(--md-sys-color-outline\)/)
 })
+
+test('the AI composer is a container with the field edge and a primary focus edge', () => {
+  const css = readFileSync(new URL('./AiAssistant.css', import.meta.url), 'utf8')
+  assert.match(css, /\.ai-composer \{[^}]*box-shadow: inset 0 0 0 1px var\(--m-field-outline\)/)
+  assert.match(css, /\.ai-composer:focus-within \{ box-shadow: inset 0 0 0 2px var\(--md-sys-color-primary\)/)
+})
