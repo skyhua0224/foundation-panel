@@ -6,4 +6,4 @@ import 'foundation-ui/all.css'
 import { createBridge } from 'foundation-ui/vue/installer/bridge.js'
 import MInstaller from 'installer-root'
 
-createApp(MInstaller, { bridge: createBridge() }).mount('#app')
+createApp(MInstaller, { bridge: createBridge(), windowed: true }).mount('#app')

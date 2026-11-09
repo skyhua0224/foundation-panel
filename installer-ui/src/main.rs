@@ -21,9 +21,15 @@ use serde_json::{json, Value};
 use tauri::{Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 const WINDOW_ID: &str = "main";
-/// Logical size of the installer window, the same as the native shell (tools/installer_d2d.h kW, kH).
+/// Logical size of the installer surface, the same as the native shell (tools/installer_d2d.h kW, kH). The window is
+/// transparent and larger by ROOM on every side: the page (foundation-ui MInstaller, windowed) draws the rounded surface
+/// and its shadow in that room (--inst-room in installer.css).
 const WIDTH: f64 = 820.0;
 const HEIGHT: f64 = 560.0;
+const ROOM: f64 = 12.0;
+/// The smallest surface the pages are laid out for (installer.css container queries).
+const MIN_WIDTH: f64 = 480.0;
+const MIN_HEIGHT: f64 = 360.0;
 
 struct Host {
     last: Mutex<Value>,
@@ -31,41 +37,117 @@ struct Host {
     shown: AtomicBool,
 }
 
+/// One line to the shell, "type" first. serde_json orders keys alphabetically, so {"action":{"type":..},"type":..}
+/// would put the nested "type" first, and a shell that reads the first "type" (every shell before
+/// installer_json.h) dropped every action: the owner's blocker of 2026-11-09.
+fn wire_line(message: Value) -> String {
+    match message {
+        Value::Object(mut map) => match map.remove("type") {
+            Some(kind) => {
+                let whole = Value::Object(map).to_string();
+                let rest = whole.strip_prefix('{').and_then(|r| r.strip_suffix('}')).unwrap_or("");
+                if rest.is_empty() { format!("{{\"type\":{kind}}}") } else { format!("{{\"type\":{kind},{rest}}}") }
+            }
+            None => Value::Object(map).to_string(),
+        },
+        other => other.to_string(),
+    }
+}
+
 impl Host {
     fn send(&self, message: Value) {
+        let line = wire_line(message);
         if let Ok(mut out) = self.out.lock() {
-            let _ = writeln!(out, "{message}");
+            let _ = writeln!(out, "{line}");
             let _ = out.flush();
         }
     }
 }
 
+// Both commands are async: they run on the async runtime, never on the main thread, so nothing the window does on the
+// main thread (a focus change, a modal loop) can hold an action back.
 #[tauri::command]
-fn installer_view(host: tauri::State<'_, Host>) -> Value {
-    host.last.lock().map(|v| v.clone()).unwrap_or(Value::Null)
+async fn installer_view(host: tauri::State<'_, Host>) -> Result<Value, String> {
+    Ok(host.last.lock().map(|v| v.clone()).unwrap_or(Value::Null))
 }
 
 #[tauri::command]
-fn installer_action(window: WebviewWindow, host: tauri::State<'_, Host>, action: Value) {
-    match action.get("type").and_then(Value::as_str).unwrap_or("") {
-        "minimise" => {
-            let _ = window.minimize();
-        }
-        "ready" => reveal(&window, &host),
-        _ => {}
-    }
+async fn installer_action(window: WebviewWindow, host: tauri::State<'_, Host>, action: Value) -> Result<(), String> {
+    // The shell hears the action first: nothing below may delay or swallow it.
     host.send(json!({ "type": "action", "action": action }));
+    let kind = action.get("type").and_then(Value::as_str).unwrap_or("").to_string();
+    if kind == "minimise" {
+        let _ = window.minimize();
+    }
+    // 'ready', and any action at all (the page is live, whatever happened to 'ready'), shows the window.
+    reveal(&window, &host, if kind == "ready" { "ready" } else { "action" });
+    Ok(())
 }
 
 /// The window is shown cloaked from the start (WebView2 renders only for a shown window) and uncloaked when the page
-/// says it has painted ('ready'), or 3 s after the page loaded, whichever is first.
-fn reveal(window: &WebviewWindow, host: &Host) {
+/// says it has painted ('ready'), on its first action, or 1.5 s after the page loaded (watchdog), whichever is first.
+/// Every reveal is logged to the shell (%TEMP%\FoundationSunshine-setup-web.log).
+fn reveal(window: &WebviewWindow, host: &Host, reason: &str) {
     if host.shown.swap(true, Ordering::SeqCst) {
         return;
     }
+    host.send(json!({ "type": "log", "text": format!("reveal by {reason}") }));
     #[cfg(windows)]
-    set_cloak(window, false);
-    let _ = window.set_focus();
+    {
+        set_cloak(window, false);
+        // the WebView renders and takes input for a visible controller: say so explicitly after the uncloak
+        let _ = window.with_webview(|webview| unsafe {
+            let _ = webview.controller().SetIsVisible(true);
+        });
+        if !test_offscreen() {
+            // The shell allowed this process to come to the front (AllowSetForegroundWindow). A plain
+            // SetForegroundWindow, not tao's set_focus (which synthesises an Alt key press).
+            use windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
+            if let Some(hwnd) = hwnd_of(window) {
+                let _ = unsafe { SetForegroundWindow(hwnd) };
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = window;
+}
+
+/// Test switch, as the Panel's SUNSHINE_GUI_TEST_OFFSCREEN: FOUNDATION_SETUP_TEST_OFFSCREEN=1 opens the window at
+/// 6000,100 (outside every monitor), shown, never activated, so a guarded measurement instance in a person's session
+/// never covers their screen or takes their focus. Never set by the installer.
+fn test_offscreen() -> bool {
+    std::env::var_os("FOUNDATION_SETUP_TEST_OFFSCREEN").is_some_and(|v| v == "1")
+}
+
+/// Test instance only: a physical position right of every monitor of the desktop (whatever their arrangement and
+/// scale), so the window is on none of them. 6000,100 in logical pixels was not enough: it landed on a monitor.
+fn offscreen_position(app: &tauri::App) -> tauri::PhysicalPosition<i32> {
+    let monitors = app.available_monitors().unwrap_or_default();
+    let right = monitors.iter().map(|m| m.position().x + m.size().width as i32).max().unwrap_or(0);
+    let top = monitors.iter().map(|m| m.position().y).min().unwrap_or(0);
+    tauri::PhysicalPosition::new(right + 4000, top)
+}
+
+/// Test instance only: a window that is on any monitor ends the process at once (it must never be seen).
+/// MonitorFromWindow with MONITOR_DEFAULTTONULL is null for a window that intersects no monitor.
+#[cfg(windows)]
+fn guard_offscreen(window: &WebviewWindow) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::Graphics::Gdi::{MonitorFromWindow, MONITOR_DEFAULTTONULL};
+    let Some(hwnd) = hwnd_of(window) else { std::process::exit(4) };
+    let raw = hwnd.0 as isize;
+    let on_screen = move || unsafe { !MonitorFromWindow(HWND(raw as *mut _), MONITOR_DEFAULTTONULL).is_invalid() };
+    if on_screen() {
+        eprintln!("test instance would be on a monitor: exiting");
+        std::process::exit(4);
+    }
+    std::thread::spawn(move || loop {
+        std::thread::sleep(Duration::from_millis(100));
+        if on_screen() {
+            eprintln!("test instance moved onto a monitor: exiting");
+            std::process::exit(4);
+        }
+    });
 }
 
 /// Evidence for tests (never set in a real install): FOUNDATION_SETUP_UI_SHOTS=<dir> writes a PNG of the page
@@ -139,17 +221,122 @@ fn capture_page(window: &WebviewWindow, path: PathBuf) {
 fn keep_fixed_size(window: &WebviewWindow) {
     use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
     use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
+    use windows::Win32::UI::WindowsAndMessaging::{GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_STYLE, STYLESTRUCT, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_CAPTION};
     unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM, _id: usize, _data: usize) -> LRESULT {
         const WM_NCLBUTTONDBLCLK: u32 = 0x00A3;
         const WM_SYSCOMMAND: u32 = 0x0112;
+        const WM_STYLECHANGING: u32 = 0x007C;
         const SC_MAXIMIZE: usize = 0xF030;
         if msg == WM_NCLBUTTONDBLCLK || (msg == WM_SYSCOMMAND && (wparam.0 & 0xFFF0) == SC_MAXIMIZE) {
             return LRESULT(0);
         }
+        // no OS caption, ever: the window keeps WS_CAPTION off whatever re-applies its style
+        if msg == WM_STYLECHANGING && wparam.0 as i32 == GWL_STYLE.0 {
+            let change = lparam.0 as *mut STYLESTRUCT;
+            if !change.is_null() {
+                unsafe { (*change).styleNew &= !WS_CAPTION.0 };
+            }
+        }
         unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
     }
     if let Some(hwnd) = hwnd_of(window) {
-        let _ = unsafe { SetWindowSubclass(hwnd, Some(proc), 0x5e7, 0) };
+        unsafe {
+            let _ = SetWindowSubclass(hwnd, Some(proc), 0x5e7, 0);
+            let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+            SetWindowLongPtrW(hwnd, GWL_STYLE, style & !(WS_CAPTION.0 as isize));
+            let _ = SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        }
+    }
+}
+
+/// It is an application window, never a browser: no context menu, no DevTools (release), no browser keys (reload,
+/// find, print, view source, zoom keys and Ctrl+wheel), no zoom or pinch, no swipe navigation, no status bubble, no
+/// built-in error page, no autofill or password prompts; a new window or a navigation away from the app opens http(s)
+/// in the system browser instead and anything else is dropped; no download bubble. As the Panel's
+/// harden_browser_surface (src-tauri/src/windows.rs). Authority: installer-ms-icorewebview2settings*-20261109.
+#[cfg(windows)]
+fn harden_webview(window: &WebviewWindow) {
+    let _ = window.with_webview(|webview| unsafe {
+        use webview2_com::Microsoft::Web::WebView2::Win32::{
+            ICoreWebView2Settings3, ICoreWebView2Settings4, ICoreWebView2Settings5, ICoreWebView2Settings6, ICoreWebView2_4,
+        };
+        use webview2_com::{DownloadStartingEventHandler, NavigationStartingEventHandler, NewWindowRequestedEventHandler, take_pwstr};
+        use windows::core::{Interface, PWSTR};
+        let Ok(core) = webview.controller().CoreWebView2() else { return };
+        if let Ok(settings) = core.Settings() {
+            let _ = settings.SetAreDefaultContextMenusEnabled(false);
+            let _ = settings.SetAreDevToolsEnabled(cfg!(debug_assertions));
+            let _ = settings.SetIsStatusBarEnabled(false);
+            let _ = settings.SetIsZoomControlEnabled(false);
+            let _ = settings.SetIsBuiltInErrorPageEnabled(false);
+            if let Ok(s3) = settings.cast::<ICoreWebView2Settings3>() {
+                let _ = s3.SetAreBrowserAcceleratorKeysEnabled(cfg!(debug_assertions));
+            }
+            if let Ok(s4) = settings.cast::<ICoreWebView2Settings4>() {
+                let _ = s4.SetIsGeneralAutofillEnabled(false);
+                let _ = s4.SetIsPasswordAutosaveEnabled(false);
+            }
+            if let Ok(s5) = settings.cast::<ICoreWebView2Settings5>() {
+                let _ = s5.SetIsPinchZoomEnabled(false);
+            }
+            if let Ok(s6) = settings.cast::<ICoreWebView2Settings6>() {
+                let _ = s6.SetIsSwipeNavigationEnabled(false);
+            }
+        }
+        let new_window = NewWindowRequestedEventHandler::create(Box::new(|_, args| {
+            if let Some(args) = args {
+                let mut uri = PWSTR::null();
+                args.Uri(&mut uri)?;
+                let target = take_pwstr(uri);
+                args.SetHandled(true)?;
+                open_external(&target);
+            }
+            Ok(())
+        }));
+        let mut token = 0;
+        let _ = core.add_NewWindowRequested(&new_window, &mut token);
+        let navigation = NavigationStartingEventHandler::create(Box::new(|_, args| {
+            if let Some(args) = args {
+                let mut uri = PWSTR::null();
+                args.Uri(&mut uri)?;
+                let target = take_pwstr(uri);
+                if !is_app_url(&target) {
+                    args.SetCancel(true)?;
+                    open_external(&target);
+                }
+            }
+            Ok(())
+        }));
+        let _ = core.add_NavigationStarting(&navigation, &mut token);
+        if let Ok(core4) = core.cast::<ICoreWebView2_4>() {
+            let download = DownloadStartingEventHandler::create(Box::new(|_, args| {
+                if let Some(args) = args {
+                    args.SetCancel(true)?;
+                    args.SetHandled(true)?;
+                }
+                Ok(())
+            }));
+            let _ = core4.add_DownloadStarting(&download, &mut token);
+        }
+    });
+}
+
+/// The pages of this app: tauri.localhost (Tauri 2 on Windows) and about:blank.
+fn is_app_url(url: &str) -> bool {
+    url.starts_with("http://tauri.localhost") || url.starts_with("https://tauri.localhost") || url.starts_with("tauri://") || url == "about:blank"
+}
+
+/// An http(s) address in the system browser (the person's own browser, unelevated like this process); nothing else.
+#[cfg(windows)]
+fn open_external(url: &str) {
+    use windows::core::HSTRING;
+    use windows::Win32::UI::Shell::ShellExecuteW;
+    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+    if !(url.starts_with("https://") || url.starts_with("http://")) || test_offscreen() {
+        return;
+    }
+    unsafe {
+        ShellExecuteW(None, &HSTRING::from("open"), &HSTRING::from(url), windows::core::PCWSTR::null(), windows::core::PCWSTR::null(), SW_SHOWNORMAL);
     }
 }
 
@@ -178,13 +365,14 @@ fn set_cloak(window: &WebviewWindow, cloaked: bool) {
     }
 }
 
-/// Win11 rounded corners from DWM (DWMWA_WINDOW_CORNER_PREFERENCE 33 = DWMWCP_ROUND 2), exactly as the Panel's
-/// main window (src-tauri/src/windows.rs apply_dwm_rounded_corners). No effect before Windows 11.
+/// The page draws the window's rounded shape (radius = card radius + inset) on a transparent window, so DWM must not
+/// clip it with its own 8 px corner: DWMWA_WINDOW_CORNER_PREFERENCE (33) = DWMWCP_DONOTROUND (1).
+/// Authority: installer-ms-dwmwindowattribute-20261109.
 #[cfg(windows)]
 fn apply_dwm_corners(window: &WebviewWindow) {
     use windows::Win32::Graphics::Dwm::{DwmSetWindowAttribute, DWMWINDOWATTRIBUTE};
     if let Some(hwnd) = hwnd_of(window) {
-        let preference: u32 = 2;
+        let preference: u32 = 1;
         let _ = unsafe { DwmSetWindowAttribute(hwnd, DWMWINDOWATTRIBUTE(33), (&preference as *const u32).cast(), std::mem::size_of::<u32>() as u32) };
     }
 }
@@ -197,39 +385,63 @@ fn main() {
         .setup(move |app| {
             let mut builder = WebviewWindowBuilder::new(app, WINDOW_ID, WebviewUrl::App("index.html".into()))
                 .title("Foundation Sunshine")
-                .inner_size(WIDTH, HEIGHT)
-                .resizable(false)
+                .inner_size(WIDTH + 2.0 * ROOM, HEIGHT + 2.0 * ROOM)
+                .min_inner_size(MIN_WIDTH + 2.0 * ROOM, MIN_HEIGHT + 2.0 * ROOM)
+                .resizable(true)
                 .maximizable(false)
+                // No OS caption or frame at all: the page draws the title bar, its buttons, the rounded surface and the
+                // shadow on a transparent window (as the Panel's popup windows, ctx_popup.rs).
                 .decorations(false)
-                // As the Panel: opaque WebView2, DWM clips the corners. shadow(true) keeps the DWM drop shadow of an
-                // undecorated window (Tauri: "on Windows 11 it will have rounded corners").
-                .transparent(false)
-                .shadow(true)
+                .transparent(true)
+                .shadow(false)
                 .visible(false)
-                .center()
+                .skip_taskbar(test_offscreen())
+                .focused(!test_offscreen())
                 .disable_drag_drop_handler()
+                // wry's own switches, plus: a window that is cloaked (or covered) keeps rendering, so the page's first
+                // frame and its 'ready' never wait for the window to be shown (Chromium native window occlusion)
+                .additional_browser_args("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,CalculateNativeWinOcclusion --disable-backgrounding-occluded-windows")
                 .on_page_load(|window, payload| {
                     if payload.event() == tauri::webview::PageLoadEvent::Finished {
                         let host = window.state::<Host>();
                         host.send(json!({ "type": "loaded" }));
                         let w = window.clone();
                         std::thread::spawn(move || {
-                            std::thread::sleep(Duration::from_secs(3));
+                            std::thread::sleep(Duration::from_millis(1500));
                             let host = w.state::<Host>();
-                            reveal(&w, &host);
+                            reveal(&w, &host, "watchdog (no ready 1.5 s after load)");
                         });
                     }
                 });
+            builder = if test_offscreen() { builder } else { builder.center() };
             if let Some(dir) = data_dir.clone() {
                 builder = builder.data_directory(dir);
             }
             let window = builder.build()?;
+            if test_offscreen() {
+                let _ = window.set_position(offscreen_position(app));
+                #[cfg(windows)]
+                guard_offscreen(&window);
+            }
             #[cfg(windows)]
             {
+                harden_webview(&window);
                 apply_dwm_corners(&window);
                 keep_fixed_size(&window);
                 set_cloak(&window, true);
             }
+            // A test instance is shown without activation (Tauri show() activates even with focused(false)): it must
+            // never take the focus of the person whose session it runs in.
+            #[cfg(windows)]
+            if test_offscreen() {
+                use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_SHOWNOACTIVATE};
+                if let Some(hwnd) = hwnd_of(&window) {
+                    let _ = unsafe { ShowWindow(hwnd, SW_SHOWNOACTIVATE) };
+                }
+            } else {
+                let _ = window.show();
+            }
+            #[cfg(not(windows))]
             let _ = window.show();
             #[cfg(windows)]
             if let Some(hwnd) = hwnd_of(&window) {
@@ -257,7 +469,7 @@ fn main() {
                         "minimise" => {
                             let _ = window.minimize();
                         }
-                        "focus" => {
+                        "focus" if !test_offscreen() => {
                             let _ = window.unminimize();
                             let _ = window.set_focus();
                         }
@@ -278,4 +490,25 @@ fn main() {
         })
         .run(tauri::generate_context!())
         .expect("the setup UI could not start");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::wire_line;
+    use serde_json::{json, Value};
+
+    #[test]
+    fn the_type_is_the_first_key_and_the_line_is_the_same_json() {
+        for v in [
+            json!({"type": "action", "action": {"type": "toggle-component", "id": "usbip"}}),
+            json!({"type": "action", "action": {"type": "ready"}}),
+            json!({"type": "loaded"}),
+            json!({"type": "hello", "hwnd": 12}),
+            json!({"type": "log", "text": "a \"b\" {c}"}),
+        ] {
+            let line = wire_line(v.clone());
+            assert!(line.starts_with(&format!("{{\"type\":{}", v["type"])), "{line}");
+            assert_eq!(serde_json::from_str::<Value>(&line).unwrap(), v);
+        }
+    }
 }
