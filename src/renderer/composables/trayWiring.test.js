@@ -87,3 +87,20 @@ test('the menus open with the colours of the main window: it reports its theme a
   theme = { sheet: 'b' }; observer.cb(); timers[2](); assert.equal(sent.length, 2)
   stop(); assert.ok(observer.gone)
 })
+
+test('the sliders: tray_popup_set is registered, its answer reaches the page (a refusal too), and the host takes exactly the four keys', async () => {
+  const mainRs = read('src-tauri/src/main.rs'), trayRs = read('src-tauri/src/tray.rs'), sliderRs = read('src-tauri/src/tray/display_sliders.rs')
+  assert.ok(mainRs.includes('tray::tray_popup_set')); assert.ok(trayRs.includes('pub async fn tray_popup_set')); assert.ok(trayRs.includes('mod display_sliders;'))
+  const calls = []
+  const ok = trayTransport({ invoke: async (...a) => { calls.push(a); return 'done' }, listen: () => {} })
+  assert.equal(await ok.set(7, 'dpi', 150), 'done'); assert.deepEqual(calls, [['tray_popup_set', { token: 7, key: 'dpi', value: 150 }]])
+  const refused = trayTransport({ invoke: async () => { throw '显示器不支持这个模式' }, listen: () => {} })
+  await assert.rejects(() => refused.set(7, 'refresh', 144), /显示器不支持这个模式/)
+  for (const key of ['resolution', 'refresh', 'dpi', 'bitrate']) assert.ok(inputRs.includes(`"${key}" =>`), `popup_input::set has no arm for ${key}`)
+  // the host is the one that writes: the same lock and config round trip as the other config writers, set_desktop_dpi for the scale, Win32 for the modes
+  assert.match(inputRs, /DEVICE_CONFIG_LOCK[\s\S]*read_full_sunshine_config[\s\S]*post_sunshine_config/); assert.ok(inputRs.includes('crate::system::set_desktop_dpi(dpi)'))
+  assert.ok(sliderRs.includes('ChangeDisplaySettingsExW') && sliderRs.includes('CDS_TEST') && sliderRs.includes('EnumDisplaySettingsExW'))
+  // the page sends exactly the keys the model draws
+  assert.deepEqual(VARIANTS.v3.pages.quick.rows.find((r) => r.t === 'sliders').keys, ['resolution', 'refresh', 'dpi', 'bitrate'])
+  assert.deepEqual(VARIANTS.v3.pages.quick.rows.find((r) => r.t === 'buttons').ids, ['open_main_panel', 'open_desktop', 'connect_device', 'open_sunshine'])
+})
