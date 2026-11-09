@@ -46,15 +46,18 @@ export function activeScopeRoot() {
 }
 
 function isVisible(element) {
-  if (element.hasAttribute('disabled') || element.getAttribute('aria-hidden') === 'true') {
+  if (!element || element.isConnected === false || element.hasAttribute('disabled') || element.getAttribute('aria-disabled') === 'true' || element.getAttribute('aria-hidden') === 'true') {
     return false
   }
+  if (element.getAttribute('tabindex') === '-1' || element.closest?.('[hidden], [inert], [aria-hidden="true"]')) return false
   const rect = element.getBoundingClientRect()
   if (rect.width <= 0 || rect.height <= 0) return false
   // 视口外的元素（例如横向条里滚走的部分）仍然可聚焦，只排除被隐藏的
   const style = window.getComputedStyle(element)
-  return style.visibility !== 'hidden' && style.display !== 'none'
+  return style.visibility !== 'hidden' && style.display !== 'none' && (typeof element.checkVisibility !== 'function' || element.checkVisibility({ checkOpacity: false, contentVisibilityAuto: true }))
 }
+
+export const isFocusVisible = isVisible
 
 export function collectFocusables(root = activeScopeRoot()) {
   if (!root) return []
@@ -183,7 +186,7 @@ function playEntryAnimation(element, direction) {
 }
 
 export function focusElement(element, { direction = null } = {}) {
-  if (!element) return false
+  if (!isVisible(element)) return false
   element.focus({ preventScroll: true })
   element.scrollIntoView({ block: 'nearest', inline: 'nearest', behavior: 'smooth' })
   if (direction) playEntryAnimation(element, direction)
@@ -316,7 +319,8 @@ function handleFocusIn(event) {
   if (scope.contains(event.target)) return
   // 焦点逃出栈顶作用域（Tab 或程序化聚焦），拉回来
   const focusables = collectFocusables(scope)
-  focusElement(focusables[0] || scope)
+  if (focusables.length > 0) focusElement(focusables[0])
+  else if (isVisible(scope)) scope.focus({ preventScroll: true })
 }
 
 function ensureTrap() {
@@ -360,7 +364,8 @@ export function popFocusScope(element) {
   const previous = scopeReturnFocus.get(element)
   scopeReturnFocus.delete(element)
   releaseTrap()
-  if (previous && previous.isConnected) focusElement(previous)
+  if (previous && isVisible(previous)) focusElement(previous)
+  else focusFirst(activeScopeRoot())
 }
 
 // ===== 视图焦点记忆 =====
@@ -372,7 +377,7 @@ function focusIdentity(element) {
 /** 记住某个视图当前的焦点，供切回时恢复。 */
 export function rememberFocus(viewKey) {
   const current = document.activeElement
-  if (!(current instanceof HTMLElement)) return
+  if (!(current instanceof HTMLElement) || !isVisible(current)) return
   const focusables = collectFocusables()
   focusMemory.set(viewKey, {
     key: focusIdentity(current),
