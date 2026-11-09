@@ -33,6 +33,7 @@ mod moonlight_web;
 mod native_tools;
 mod power;
 mod device_probe;
+mod display_mode;
 mod probe_cache;
 mod proxy_server;
 mod rtss;
@@ -218,6 +219,8 @@ fn main() {
             toolbar::save_toolbar_position,
             toolbar::is_primary_mouse_button_pressed,
             toolbar::set_toolbar_window_expanded,
+            display_mode::list_display_modes,
+            display_mode::set_display_mode,
             system::get_current_dpi,
             system::set_desktop_dpi,
             native_tools::open_native_tool,

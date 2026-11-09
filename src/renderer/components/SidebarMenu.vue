@@ -35,7 +35,7 @@
         <PanelHome v-else-if="entry.id === ROUTES.HOME" :runtime="runtime" :update-available="!!updateInfo" @open="openDestination" @webui-navigate="openWebUi" />
         <Welcome v-else-if="entry.id === ROUTES.WELCOME" :key="guideRun" @close="closeWelcome" @webui-navigate="openWebUi" @open-doctor="openDoctor" />
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />
-        <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" />
+        <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" @webui-navigate="openWebUi" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
         <StreamHubPage v-else-if="entry.id === ROUTES.STREAM_HUB" :runtime="runtimeView" @open="onListNavigate" />
         <SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" :groups="settingsList.groups.value" :runtime="runtimeView" @open="onListNavigate" />
@@ -49,7 +49,7 @@
         <LatencyClockPage v-else-if="entry.id === ROUTES.LATENCY_CLOCK" />
         <StreamTimerPage v-else-if="entry.id === ROUTES.STREAM_TIMER" />
         <TestToolsPage v-else-if="entry.id === ROUTES.TEST_TOOLS" />
-        <LiveSessionPage v-else-if="entry.id === ROUTES.LIVE_SESSION" @open-quality="jumpTo(ROUTES.HDR_ENHANCED)" />
+        <LiveSessionPage v-else-if="entry.id === ROUTES.LIVE_SESSION" @open-quality="jumpTo(ROUTES.HDR_ENHANCED)" @webui-navigate="openWebUi" />
         <RtssPage v-else-if="entry.id === ROUTES.RTSS" />
         <NetworkOverviewPage v-else-if="entry.id === ROUTES.NETWORK_OVERVIEW" @open-network="jumpConfig({ tab: 'network' })" />
         <DiagnosticsPage
@@ -444,7 +444,13 @@ const loadHostData = async () => {
     if (apps.status === 'fulfilled' && Array.isArray(apps.value?.apps)) hostApps.value = apps.value.apps
   } catch { /* the list shows no live lines and the search the pages only */ }
 }
-const listGroups = (rail) => (rail === 'config' ? settingsList.groups.value : [{ id: rail, items: listItems(rail) }])
+// a row marked `separated` (the 高级 of 显示与视频) is a group of its own at the end of the list
+const listGroups = (rail) => {
+  if (rail === 'config') return settingsList.groups.value
+  const items = listItems(rail)
+  const apart = items.filter((i) => i.separated)
+  return apart.length ? [{ id: rail, items: items.filter((i) => !i.separated) }, { id: `${rail}-apart`, items: apart }] : [{ id: rail, items }]
+}
 const currentRow = computed(() => {
   const route = nav.current.value
   if (route === ROUTES.WEB_CONFIG) return `config:${nav.detail.value?.params?.tab || 'general'}`

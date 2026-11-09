@@ -39,70 +39,48 @@
         <MButton variant="tonal" icon="refresh" :loading="isCheckingDriver" @click="recheckDriver">{{ t.vddSettings.recheckDriver }}</MButton>
       </div>
       <MProgress v-if="isInstallingDriver" class="vdd-installing" :label="t.vddSettings.installingDriver" />
-      <DpiScaleSection />
     </template>
 
     <template v-else>
-      <!-- Overview: the modes first (tier 1), then the options of a virtual display (tier 2), then the way to the rest -->
+      <!-- Overview: the device card, then the way to the settings that belong to the display; nothing here is a second copy of a setting (modes, calibration and scaling live on their own pages) -->
       <template v-if="activeSection === 'overview'">
-        <MStatusPill icon="desktop_windows" :label="vddStatusLabel" tone="ok" :action="false" />
         <MBanner v-if="hostVdd.store.error.value" tone="error" icon="error">{{ vp.saveFailed.replace('{error}', hostVdd.store.error.value) }}</MBanner>
-        <MSection :title="vp.source">
-          <MSeg v-model="sourceModel" block size="lg" :label="vp.source" :options="sourceOptions" :disabled="hostVdd.store.anyBusy.value" />
-          <MFooter>{{ vt.modeText[hostVdd.store.mode.value] }}<template v-if="!hostVdd.store.canSaveProtected"> {{ vt.trayMode }}</template></MFooter>
-        </MSection>
-        <MSection :title="vp.prepTitle">
-          <MChoiceCards v-model="prepModel" :options="prepOptions" :label="vp.prepLabel" :columns="3" :disabled="hostVdd.store.anyBusy.value">
-            <template #art="{ option }"><MPrepArt :mode="option.value" /></template>
-          </MChoiceCards>
-        </MSection>
-        <MSection v-if="isVirtualMode" :title="vp.options">
+        <MSection :title="dt.sections.virtual.device">
+          <MVddDevice
+            v-model:keep="keepModel" data-cfg="vdd_keep_enabled" :state="deviceState" :installed-version="vddStatus.installed_version || ''" :bundled-version="vddStatus.bundled_version || ''"
+            :active="hostVdd.store.summary.value.active" :busy="isInstallingDriver || isCreatingNow" :can-install="vddCanInstall" :can-keep="hostVdd.store.canSaveProtected" :keep-busy="!!hostVdd.store.busy.vdd_keep_enabled"
+            :status-text="vddStatus.status_text || ''" :locale="locale" @install="installOrRepairDriver" @recheck="recheckDriver" @create="trayVdd('vdd_create')" @close="trayVdd('vdd_destroy')"
+          />
           <MGroup>
-            <MSwitchItem v-model="reuseModel" icon="devices" :title="vp.reuse" :text="vp.reuseText" :disabled="hostVdd.store.busy.vdd_reuse" />
-            <MSwitchItem v-model="headlessModel" icon="desktop_access_disabled" :title="vp.headless" :text="hostVdd.store.canSaveProtected ? '' : vt.trayOnly" :disabled="!hostVdd.store.canSaveProtected || hostVdd.store.busy.vdd_headless_create" />
+            <MSwitchItem v-model="headlessModel" icon="desktop_access_disabled" :title="dt.device.headless" :text="hostVdd.store.canSaveProtected ? '' : vt.trayOnly" :disabled="!hostVdd.store.canSaveProtected || hostVdd.store.busy.vdd_headless_create" />
+            <MSwitchItem v-model="reuseModel" data-cfg="vdd_reuse" icon="devices" :title="dt.device.reuse" :text="dt.device.reuseText" :disabled="hostVdd.store.busy.vdd_reuse" />
           </MGroup>
         </MSection>
-        <DpiScaleSection />
-        <MGroup>
-          <MItem action icon="monitor" :title="t.vddSettings.tabDisplay" :text="displaySummary" @click="activeSection = 'display'" />
-          <MItem action icon="hdr_on" :title="vp.qualityTitle" :text="qualitySummary" @click="activeSection = 'quality'" />
-          <MItem action :icon="calibrationStatus.calibrated ? 'check_circle' : 'warning'" :title="t.vddSettings.calibrationTitle" :text="calibrationStatusTitle" @click="activeSection = 'calibration'" />
-          <MItem action icon="build" :title="vp.driverTitle" :text="vp.tier3" @click="activeSection = 'driver'" />
-        </MGroup>
+        <MSection :title="dt.sections.virtual.links">
+          <MGroup>
+            <MItem action icon="aspect_ratio" :title="dt.device.links.modes" @click="emit('webui-navigate', '/config#tab=display&sub=modes')" />
+            <MItem action icon="hdr_on" :title="dt.device.links.calibration" @click="emit('webui-navigate', '/config#tab=display&sub=hdr')" />
+            <MItem action icon="format_size" :title="dt.device.links.scaling" @click="emit('webui-navigate', '/config#tab=display&sub=output')" />
+          </MGroup>
+        </MSection>
+        <MExpander v-model:open="driverOpen" :title="vp.driverTitle" icon="build">
+          <MGroup>
+            <MItem action icon="monitor" :title="t.vddSettings.tabDisplay" :text="displaySummary" @click="activeSection = 'display'" />
+            <MItem action icon="palette" :title="vp.qualityTitle" :text="qualitySummary" @click="activeSection = 'quality'" />
+            <MItem action icon="build" :title="vp.driverTitle" :text="vp.tier3" @click="activeSection = 'driver'" />
+          </MGroup>
+        </MExpander>
       </template>
 
       <!-- Display: resolutions, refresh rates, GPU, colour -->
       <template v-else-if="activeSection === 'display'">
         <MSection :title="t.vddSettings.displaySection">
-          <div v-if="previewScreens.length" class="vdd-preview" role="img" :aria-label="t.vddSettings.resolutionPresets">
-            <div v-for="screen in previewScreens" :key="screen.key" class="vdd-preview__item">
-              <span class="m-dinfo__display" :class="{ 'is-hdr': previewHdr }" :style="{ aspectRatio: `${screen.w} / ${screen.h}`, width: `${screen.px}px` }"><i>{{ screen.w }}×{{ screen.h }}</i></span>
-              <span class="m-dinfo__stand" :style="{ width: `${Math.round(screen.px * 0.3)}px` }" />
-            </div>
-            <span class="vdd-preview__note">{{ previewRefresh }} Hz{{ previewHdr ? ' · HDR' : '' }}</span>
-          </div>
           <MGroup>
-            <MModeListRow kind="resolution" :values="resolutionList" :title="mlt.resolutionTitle" :locale="locale" data-cfg="vdd_resolution_list" @edit="modesOpen = true" />
-            <MModeListRow kind="rate" :values="rateList" :title="mlt.rateTitle" :locale="locale" data-cfg="vdd_refresh_list" @edit="modesOpen = true" />
             <MValueItem v-if="!gpuOptions.length" :model-value="gpuFriendlyName" :label="t.vddSettings.gpuBinding" :placeholder="t.vddSettings.gpuPlaceholder" :ok-label="t.common.confirm" :cancel-label="t.common.cancel" @update:model-value="(v) => { gpuFriendlyName = v; saveGpuEdit() }" />
             <MChoiceItem v-if="gpuOptions.length" :model-value="gpuFriendlyName" icon="developer_board" :title="t.vddSettings.gpuBinding" :options="gpuOptions.map((g) => ({ value: g, label: g }))" :cancel-label="t.common.cancel" @update:model-value="(v) => { gpuFriendlyName = v; saveGpuEdit() }" />
             <MItem icon="monitor" :title="t.vddSettings.monitorCount" :text="t.vddSettings.monitorCountTip" :value="String(settings.monitors.count)" />
             <MSwitchItem v-model="settings.edid.Vrr" icon="sync" :title="t.vddSettings.vrr" :text="t.vddSettings.vrrTip" />
           </MGroup>
-        </MSection>
-        <MSection :title="vp.displayRules">
-          <MGroup>
-            <MItem icon="aspect_ratio" :title="vt.resolution" stack data-cfg="resolution_change">
-              <template #control><MSeg v-model="ruleResolution" block :label="vt.resolution" :options="ruleOptions" /></template>
-            </MItem>
-            <MValueItem v-if="ruleResolution === 'manual'" v-model="manualResolution" :label="vt.manualResolution" placeholder="2560x1440" :ok-label="t.common.confirm" :cancel-label="t.common.cancel" />
-            <MItem icon="speed" :title="vt.refresh" stack data-cfg="refresh_rate_change">
-              <template #control><MSeg v-model="ruleRefresh" block :label="vt.refresh" :options="ruleOptions" /></template>
-            </MItem>
-            <MValueItem v-if="ruleRefresh === 'manual'" v-model="manualRefresh" :label="vt.manualRefresh" placeholder="59.95" :ok-label="t.common.confirm" :cancel-label="t.common.cancel" />
-            <MSwitchItem v-model="followModel" icon="sync" :title="vp.follow" />
-          </MGroup>
-          <MFooter>{{ vp.rulesFooter }}</MFooter>
         </MSection>
       </template>
 
@@ -122,48 +100,8 @@
         </MSection>
       </template>
 
-      <!-- HDR calibration -->
-      <template v-else-if="activeSection === 'calibration'">
-        <MStatusPill :icon="calibrationStatus.calibrated ? 'check_circle' : 'warning'" :tone="calibrationStatusTone === 'success' ? 'ok' : calibrationStatusTone === 'danger' ? 'error' : 'warn'" :label="calibrationStatusTitle" :action="false">
-          <template #actions><MIconButton icon="refresh" :label="t.vddSettings.calibrationRefresh" :disabled="isRefreshingCalibration" @click="loadCalibrationContext" /></template>
-        </MStatusPill>
-        <MFooter>{{ calibrationStatusDescription }}</MFooter>
-        <MGroup v-if="calibrationStatus.calibrated">
-          <MItem v-if="calibrationStatus.profileName" icon="description" :title="calibrationStatus.profileName" plain />
-          <MItem icon="brightness_6" :title="t.vddSettings.calibrationPeak" :value="formatCalibrationNits(calibrationStatus.maxNits)" />
-          <MItem icon="brightness_medium" :title="t.vddSettings.calibrationMinimum" :value="formatCalibrationNits(calibrationStatus.minNits)" />
-          <MItem icon="contrast" :title="t.vddSettings.calibrationFullFrame" :value="formatCalibrationNits(calibrationStatus.maxFullFrameNits)" />
-        </MGroup>
-        <MGroup>
-          <MItem icon="monitor" :title="t.vddSettings.calibrationClient" :value="activeCalibrationClient?.name || t.vddSettings.calibrationNoActiveClient" />
-          <MCheckItem :title="t.vddSettings.calibrationStepStream" :text="t.vddSettings.calibrationStepStreamHint" :state="hasActiveHdrClient ? 'ok' : 'pending'" />
-          <MCheckItem :title="t.vddSettings.calibrationStepVdd" :text="t.vddSettings.calibrationStepVddHint" :state="calibrationStatus.vddActive && calibrationStatus.hdrEnabled ? 'ok' : 'pending'" />
-          <MCheckItem :title="t.vddSettings.calibrationStepRun" :text="t.vddSettings.calibrationStepRunHint" :state="calibrationStatus.calibrated ? 'ok' : 'pending'" />
-        </MGroup>
-        <MBanner v-if="vddReuseEnabled" tone="warn" icon="warning">{{ t.vddSettings.calibrationSharedWarning }}</MBanner>
-        <div class="m-actions-row">
-          <MButton icon="play_arrow" :disabled="!calibrationStatus.canCalibrate" :loading="isLaunchingCalibration" @click="launchHdrCalibration">{{ calibrationStatus.calibrated ? t.vddSettings.calibrationRunAgain : t.vddSettings.calibrationLaunch }}</MButton>
-          <MButton v-if="calibrationStatus.state === 'unbound_profile'" variant="tonal" :disabled="!calibrationStatus.canCalibrate" :loading="isSavingCalibration" @click="bindHdrCalibration">{{ t.vddSettings.calibrationUseExisting }}</MButton>
-          <MButton variant="tonal" icon="download" @click="openHdrCalibrationStore">{{ t.vddSettings.calibrationInstall }}</MButton>
-        </div>
-        <MGroup>
-          <MItem action icon="light_mode" :title="t.vddSettings.physicalCalibrationTitle" :text="t.vddSettings.physicalCalibrationHint" :disabled="isLaunchingPhysicalCalibration" @click="launchPhysicalHdrCalibration" />
-        </MGroup>
-        <MFooter>{{ t.vddSettings.calibrationHint }}</MFooter>
-      </template>
-
       <!-- Driver: tools, trace, EDID -->
       <template v-else-if="activeSection === 'driver'">
-        <MSection :title="vp.advanced">
-          <MGroup>
-            <MSwitchItem :model-value="borrowedModel" icon="content_copy" :title="vp.borrowed" :text="vp.borrowedText" data-cfg="vdd_borrowed_texture" :disabled="hostVdd.store.busy.vdd_borrowed_texture" @update:model-value="(v) => confirmThen('borrowed', vp.borrowed, () => (borrowedModel = v))" />
-            <MSwitchItem :model-value="vsyncModel" icon="sync" :title="vp.vsync" :text="vp.vsyncText" data-cfg="nvenc_vdd_force_vsync" :disabled="hostVdd.store.busy.nvenc_vdd_force_vsync" @update:model-value="(v) => confirmThen('vsync', vp.vsync, () => (vsyncModel = v))" />
-            <MSwitchItem :model-value="vulkanModel" icon="hdr_on" :title="vp.vulkan" :text="vp.vulkanText" data-cfg="vdd_vulkan_hdr_bridge" :disabled="hostVdd.store.busy.vdd_vulkan_hdr_bridge" @update:model-value="(v) => confirmThen('vulkan', vp.vulkan, () => (vulkanModel = v))" />
-            <MItem :icon="vulkanView.icon" :title="vp.vulkanStatus[vulkanView.key]" />
-            <MItem v-if="vulkanView.showValidate" action icon="play_arrow" :disabled="!vulkanView.canValidate" :title="vulkan.validating.value ? vp.vulkanValidating : vp.vulkanValidate" :text="vulkanView.hint ? vp.vulkanHint : ''" @click="vulkan.validate" />
-          </MGroup>
-          
-        </MSection>
         <MSection :title="t.vddSettings.driverTools">
           <MGroup>
             <MItem action icon="refresh" :title="t.vddSettings.reloadDriver" :disabled="isReloadingDriver" @click="confirmThen('reload', t.vddSettings.reloadDriver, reloadDriver)" />
@@ -213,7 +151,6 @@
         </MSection>
       </template>
 
-      <MModeListDialog v-model="modesOpen" :resolutions="resolutionList" :rates="rateList" :locale="locale" :note="t.vddSettings.modeListNote" :saver="saveModes" />
       <MDialog v-model="confirm.open" :title="vp.confirmTitle.replace('{name}', confirm.name)" icon="warning" tone="warning">
         <p class="vdd-confirm__text">{{ confirm.text }}</p>
         <template #actions>
@@ -226,17 +163,15 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
-import { MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MChoiceCards, MDialog, MPrepArt, MValueItem, MSeg, MChip, MTile, MIcon, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, MPageLoading, MModeListRow, MModeListDialog, modeListTexts, useSubpage, vddPageTexts, vddTexts, VDD_PREP, VDD_RULES, vddOn } from 'foundation-ui/vue'
+import { MExpander, MVddDevice, displayTreeTexts, MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MDialog, MValueItem, MSeg, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, MPageLoading, useSubpage, vddPageTexts, vddTexts, vddOn } from 'foundation-ui/vue'
 import { useHostVdd } from '../composables/useHostVdd.js'
-import DpiScaleSection from './m3e/DpiScaleSection.vue'
-import { usePanelPart } from '../composables/panelParts.js'
-import { cleanList, toResolutionNodes } from 'foundation-ui/settings/modeList.js'
+import { cleanList } from 'foundation-ui/settings/modeList.js'
 import { useVddEdid } from '../composables/useVddEdid.js'
 import { useVddStatusLabel } from '../composables/useVddStatusLabel.js'
 import { installVddWithRecovery } from '../composables/vddInstallRecovery.js'
-import { openExternalUrl, sunshine, vdd } from '../tauri-adapter.js'
+import { sunshine, vdd } from '../tauri-adapter.js'
 import { setPath, useVddPending } from '../composables/useVddPending.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
@@ -298,7 +233,6 @@ const fillPlaceholders = (message, replacements = {}) => Object.entries(replacem
   message || ''
 )
 
-const getVddText = (key, replacements = {}) => fillPlaceholders(t.value.vddSettings[key], replacements)
 
 const syncGpuOptions = (options = []) => {
   const uniqueOptions = [...new Set(options.filter(Boolean))]
@@ -344,37 +278,29 @@ const isStartingTrace = ref(false)
 const isStoppingTrace = ref(false)
 const isOpeningTraceFolder = ref(false)
 const isRefreshingCalibration = ref(false)
-const isLaunchingCalibration = ref(false)
-const isSavingCalibration = ref(false)
-const isLaunchingPhysicalCalibration = ref(false)
 const { current: vddSub, open: openVddSub, back: backVdd } = useSubpage('vdd')
 
 // ---- the host's keys of the virtual display (the modes, the shared display, the rules, the expert options): the shared store, each change saved at once ----
 const hostVdd = useHostVdd()
+const emit = defineEmits(['close', 'webui-navigate'])
+const dt = computed(() => displayTreeTexts(locale.value))
+const driverOpen = ref(false)
+const keepModel = computed({ get: () => hostVdd.store.mode.value === 'persistent', set: (on) => { void hostVdd.store.set({ vdd_keep_enabled: on }) } })
+// the state of the device card: the driver as the host reports it ('degraded' still works but asks for a repair)
+const deviceState = computed(() => (isDriverCheckPending.value ? 'checking' : vddStatus.state === 'degraded' ? 'degraded' : vddReady.value ? 'ready' : ['unknown', ''].includes(vddStatus.state) ? 'unknown' : 'missing'))
+// create or close the display now: the same tray actions the tray menu runs, through the host API
+const isCreatingNow = ref(false)
+async function trayVdd(action) {
+  isCreatingNow.value = true
+  try { await hostVdd.fetchJson('/api/tray/action', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action }) }); await hostVdd.store.refresh() } catch (error) { ElMessage.error(getErrorMessage(error, '')) } finally { isCreatingNow.value = false }
+}
 const hostConfig = hostVdd.store.config
 const flagOf = (key, def = false) => computed({
   get: () => (hostConfig.value[key] === undefined || hostConfig.value[key] === '' ? def : vddOn(hostConfig.value[key])),
   set: (on) => { void hostVdd.store.set({ [key]: typeof hostConfig.value[key] === 'boolean' ? on : on ? 'enabled' : 'disabled' }) },
 })
-const pickOf = (key, def, list) => computed({ get: () => (list.includes(hostConfig.value[key]) ? hostConfig.value[key] : def), set: (value) => { void hostVdd.store.set({ [key]: value }) } })
-const textOf = (key) => computed({ get: () => hostConfig.value[key] ?? '', set: (value) => { void hostVdd.store.set({ [key]: value }) } })
-const isVirtualMode = computed(() => hostVdd.store.mode.value !== 'physical')
-const sourceModel = computed({ get: () => hostVdd.store.mode.value, set: (value) => { void hostVdd.store.setMode(value) } })
-const SOURCE_ICONS = { physical: 'monitor', ondemand: 'screen_share', persistent: 'keep' }
-const sourceOptions = computed(() => hostVdd.store.modes.value.map((m) => ({ value: m.id, label: vt.value.modes[m.id], icon: SOURCE_ICONS[m.id], disabled: m.disabled })))
-const prepModel = pickOf('display_device_prep', 'no_operation', VDD_PREP)
-const prepOptions = computed(() => VDD_PREP.map((value) => ({ value, label: vp.value.preps[value].title, text: vp.value.preps[value].text })))
 const reuseModel = flagOf('vdd_reuse')
 const headlessModel = flagOf('vdd_headless_create')
-const followModel = flagOf('dynamic_resolution_follow_display', true)
-const borrowedModel = flagOf('vdd_borrowed_texture', true)
-const vsyncModel = flagOf('nvenc_vdd_force_vsync')
-const vulkanModel = flagOf('vdd_vulkan_hdr_bridge')
-const ruleResolution = pickOf('resolution_change', 'automatic', VDD_RULES)
-const ruleRefresh = pickOf('refresh_rate_change', 'automatic', VDD_RULES)
-const manualResolution = textOf('manual_resolution')
-const manualRefresh = textOf('manual_refresh_rate')
-const ruleOptions = computed(() => VDD_RULES.map((value) => ({ value, label: vt.value.rules[value] })))
 
 // the Vulkan HDR bridge: what the host reports and a test of the current display
 const vulkanStatus = ref({ state: 'idle', artifacts_installed: false, display_available: false })
@@ -390,23 +316,12 @@ const vulkan = {
     try { vulkanStatus.value = await hostVdd.fetchJson('/api/vulkan-hdr-bridge/validate', { method: 'POST' }) } catch { vulkanStatus.value = { ...vulkanStatus.value, state: 'error' } } finally { vulkanValidating.value = false; vulkanLoaded.value = true }
   },
 }
-const vulkanView = computed(() => {
-  const st = vulkanStatus.value, on = vulkanModel.value
-  const icon = (k) => ({ enabled: 'check_circle', idle: 'check_circle', error: 'warning', validating: 'sync' }[k] || 'info')
-  if (!on) return { key: 'disabled', icon: icon('disabled'), showValidate: false }
-  if (!vulkanLoaded.value) return { key: 'loading', icon: icon('loading'), showValidate: false }
-  if (!st.artifacts_installed || st.state === 'unavailable') return { key: 'unavailable', icon: icon('unavailable'), showValidate: false }
-  const showValidate = st.state !== 'enabled', canValidate = showValidate && st.display_available && !vulkanValidating.value
-  if (st.state === 'idle' && !st.display_available) return { key: 'waiting', icon: icon('waiting'), showValidate, canValidate, hint: true }
-  const key = ['idle', 'validating', 'enabled', 'error'].includes(st.state) ? st.state : 'idle'
-  return { key, icon: icon(key), showValidate, canValidate }
-})
 
 // an expert option is confirmed before it changes: what it does, then the change
 const confirm = reactive({ open: false, name: '', text: '', apply: null })
 const confirmThen = (riskKey, name, apply) => { Object.assign(confirm, { open: true, name, text: vp.value.risk[riskKey] || '', apply }) }
 const confirmApply = () => { const run = confirm.apply; confirm.open = false; confirm.apply = null; if (run) run() }
-const displaySummary = computed(() => [`${resolutionList.value.length} ${t.value.vddSettings.resolutionPresets}`, `${rateList.value.length} ${t.value.vddSettings.refreshRatePresets}`].join(' · '))
+const displaySummary = computed(() => [gpuFriendlyName.value, `${settings.monitors.count}`].filter(Boolean).join(' · '))
 const edidProfileOptions = computed(() => ['auto', 'legacy', 'modern'].map((value) => ({ value, label: vp.value.edidProfiles[value].title })))
 const cursorMaxOptions = computed(() => [...new Set([64, 128, 256, Number(settings.cursor.CursorMaxX) || 128])].sort((x, y) => x - y).map((value) => ({ value, label: `${value} × ${value}` })))
 const xorLevelOptions = computed(() => [0, 1, 2, 3].map((value) => ({ value, label: vp.value.xorLevels[value] })))
@@ -417,7 +332,6 @@ const activeSection = computed({
   set: (value) => { if (value === 'overview') { if (vddSub.value) backVdd() } else openVddSub(value) },
 })
 // the toolbar menu's 调整 DPI: the overview, scrolled to 桌面缩放
-usePanelPart('desktop-scale', () => { activeSection.value = 'overview'; setTimeout(() => document.getElementById('m-desktop-scale')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 60) })
 const pageTitle = computed(() => ({ display: t.value.vddSettings.tabDisplay, quality: vp.value.qualityTitle, calibration: t.value.vddSettings.calibrationTitle, driver: vp.value.driverTitle }[activeSection.value] || t.value.m3e.display.vdd))
 const edidInput = ref(null)
 const onEdidPicked = (event) => {
@@ -454,7 +368,6 @@ const createCalibrationStatus = () => ({
   statusText: '',
 })
 const calibrationStatus = reactive(createCalibrationStatus())
-const vddReuseEnabled = computed(() => Boolean(calibrationStatus.sharedVdd))
 
 let calibrationContextPollTimer = null
 let calibrationContextRequest = null
@@ -476,43 +389,8 @@ const resolutionList = ref([])
 const rateList = ref([...DEFAULT_REFRESH_RATES])
 const setResolutionOptions = (values = []) => { resolutionList.value = cleanList('resolution', values) }
 const setRefreshRateOptions = (values = []) => { rateList.value = cleanList('rate', values) }
-const mlt = computed(() => modeListTexts(locale.value))
-const modesOpen = ref(false)
-// the popup's 保存 saves for real, as the save bar does: the file is read again, only the two lists are put in, the file is written and the driver asked to reload
-// (the page's other unsaved edits stay in the bar). '' on success, else the error text for the popup.
-const saveModes = async ({ resolutions, rates }) => {
-  try {
-    const loaded = await vdd.loadSettings()
-    if (!loaded?.success) return t.value.vddSettings.saveFailed.replace('{error}', t.value.vddSettings.loadFailed)
-    const data = JSON.parse(JSON.stringify(loaded.data))
-    const nodes = toResolutionNodes(resolutions)
-    data.global = { ...(data.global || {}), g_refresh_rate: rates.slice() }
-    data.resolutions = { ...(data.resolutions || {}), resolution: nodes }
-    const result = await vdd.saveSettings(data)
-    if (!result?.success) return t.value.vddSettings.saveFailed.replace('{error}', result?.message || t.value.vddSettings.unknownError)
-    resolutionList.value = resolutions.slice()
-    rateList.value = rates.slice()
-    const saved = JSON.parse(lastSavedSnapshot.value || '{}')
-    saved.global = { ...(saved.global || {}), g_refresh_rate: rates.slice() }
-    saved.resolutions = { ...(saved.resolutions || {}), resolution: nodes }
-    lastSavedSnapshot.value = JSON.stringify(saved)
-    return ''
-  } catch (error) {
-    return t.value.vddSettings.saveFailed.replace('{error}', getErrorMessage(error, t.value.vddSettings.unknownError))
-  }
-}
-
-const gpuSummary = computed(() => gpuFriendlyName.value || t.value.vddSettings.unboundGpu)
-const presetSummary = computed(() => getVddText('presetsSummary', {
-  resolutions: resolutionList.value.length,
-  rates: rateList.value.length,
-}))
 const traceDisplayPath = computed(() => traceStatus.value.latest_file || t.value.vddSettings.vddTraceNoFile)
 const hasCustomEdidIssue = computed(() => settings.edid.CustomEdid && !edidFileExists.value)
-// the configured resolutions drawn as displays in their real proportions (the widest is 168 px), with the highest refresh rate and the colour profile
-const previewScreens = computed(() => resolutionList.value.map((res) => { const m = /^(\d{3,5})\s*[x×]\s*(\d{3,5})/i.exec(String(res)); return m ? { key: res, w: Number(m[1]), h: Number(m[2]) } : null }).filter(Boolean).slice(0, 6).map((x, _i, all) => ({ ...x, px: Math.max(56, Math.round((x.w / Math.max(...all.map((a) => a.w))) * 168)) })))
-const previewRefresh = computed(() => Math.max(...rateList.value.map(Number).filter(Number.isFinite), 0))
-const previewHdr = computed(() => !!settings.colour.HDRPlus)
 const isColorDepthConflict = computed(() => settings.colour.SDR10bit && settings.colour.HDRPlus)
 const colorDepthProfile = computed({
   get() {
@@ -535,30 +413,6 @@ const colorDepthProfile = computed({
     settings.colour.HDRPlus = value === COLOR_DEPTH_HDR12
   },
 })
-const currentVddModeLabel = computed(() => vddReuseEnabled.value
-  ? t.value.vddSettings.sharedVddMode
-  : t.value.vddSettings.dedicatedVddMode)
-const currentVddModeHint = computed(() => vddReuseEnabled.value
-  ? t.value.vddSettings.sharedVddModeDesc
-  : t.value.vddSettings.dedicatedVddModeDesc)
-const overviewCards = computed(() => [
-  {
-    key: 'mode',
-    label: t.value.vddSettings.overviewMode,
-    value: currentVddModeLabel.value,
-    hint: currentVddModeHint.value,
-  },
-  {
-    key: 'presets',
-    label: t.value.vddSettings.overviewPresets,
-    value: presetSummary.value,
-  },
-  {
-    key: 'gpu',
-    label: t.value.vddSettings.overviewGpu,
-    value: gpuSummary.value,
-  },
-])
 const buildSettingsPayload = () => ({
   ...settings,
   gpu: {
@@ -607,47 +461,7 @@ const driverDetectionDescription = computed(() => driverCheckPhase.value === 'sy
   : t.value.vddSettings.driverDetectionDesc)
 const vddCanInstall = computed(() => !['unsupported', 'payload_missing'].includes(vddStatus.state))
 const vddStatusLabel = useVddStatusLabel(t, vddStatus)
-const activeCalibrationClient = computed(() => calibrationStatus.activeClients?.[0] || null)
-const hasActiveHdrClient = computed(() => Boolean(activeCalibrationClient.value))
-const calibrationStatusTone = computed(() => {
-  if (calibrationStatus.calibrated) return 'success'
-  if (!calibrationStatus.supported) return 'danger'
-  if (!calibrationStatus.vddActive || !calibrationStatus.hdrEnabled) return 'warning'
-  return 'ready'
-})
-const calibrationStatusTitle = computed(() => {
-  if (calibrationStatus.calibrated) return t.value.vddSettings.calibrationDetected
-  if (calibrationStatus.state === 'unbound_profile') return t.value.vddSettings.calibrationUnbound
-  if (calibrationStatus.state === 'invalid_profile') return t.value.vddSettings.calibrationInvalid
-  if (calibrationStatus.state === 'locked') return t.value.vddSettings.calibrationLocked
-  if (calibrationStatus.state === 'unavailable') return t.value.vddSettings.calibrationRefreshFailed
-  if (calibrationStatus.state === 'shared_vdd') return t.value.vddSettings.calibrationSharedWarning
-  if (calibrationStatus.state === 'multiple_streams') return t.value.vddSettings.calibrationMultipleStreams
-  if (!calibrationStatus.supported) return t.value.vddSettings.calibrationUnsupported
-  if (!calibrationStatus.vddActive) return t.value.vddSettings.calibrationWaitingVdd
-  if (!calibrationStatus.hdrEnabled) return t.value.vddSettings.calibrationWaitingHdr
-  return t.value.vddSettings.calibrationReady
-})
-const calibrationStatusDescription = computed(() => {
-  if (calibrationStatus.statusText) return calibrationStatus.statusText
-  if (calibrationStatus.calibrated) return t.value.vddSettings.calibrationDetectedHint
-  if (calibrationStatus.state === 'unbound_profile') return t.value.vddSettings.calibrationUnboundHint
-  if (calibrationStatus.state === 'invalid_profile') return t.value.vddSettings.calibrationInvalidHint
-  if (calibrationStatus.state === 'locked') return t.value.vddSettings.calibrationLocked
-  if (calibrationStatus.state === 'multiple_streams') return t.value.vddSettings.calibrationMultipleStreams
-  if (calibrationStatus.state === 'unavailable') {
-    const diagnostic = calibrationStatus.diagnostic
-    return `${t.value.vddSettings.calibrationRefreshFailed}${diagnostic?.stage ? ` (${diagnostic.stage}, 0x${Number(diagnostic.hresult).toString(16)})` : ''}`
-  }
-  if (!calibrationStatus.vddActive) return t.value.vddSettings.calibrationWaitingStream
-  if (!calibrationStatus.hdrEnabled) return t.value.vddSettings.calibrationWaitingHdrHint
-  return t.value.vddSettings.calibrationReadyHint
-})
 
-const formatCalibrationNits = (value) => {
-  if (!Number.isFinite(value)) return '—'
-  return `${value < 1 ? value.toFixed(4).replace(/0+$/, '').replace(/\.$/, '') : Math.round(value)} nits`
-}
 
 const stopCalibrationContextPolling = () => {
   if (calibrationContextPollTimer) {
@@ -716,86 +530,10 @@ const startCalibrationContextPolling = () => {
   calibrationContextPollTimer = setInterval(() => loadCalibrationContext({ silent: true }), 2500)
 }
 
-const launchHdrCalibration = async () => {
-  try {
-    await ElMessageBox.confirm(
-      t.value.vddSettings.calibrationLaunchConfirm,
-      t.value.vddSettings.calibrationLaunchTitle,
-      {
-        confirmButtonText: t.value.vddSettings.calibrationLaunch,
-        cancelButtonText: t.value.vddSettings.cancel,
-        type: 'info',
-      }
-    )
-    isLaunchingCalibration.value = true
-    await calibrationContextRequest
-    await loadCalibrationContext()
-    if (!calibrationStatus.canCalibrate) return
-    const result = await vdd.launchHdrCalibration()
-    if (!result?.success) {
-      throw new Error(result?.message || t.value.vddSettings.calibrationLaunchFailed)
-    }
-    ElMessage.success(t.value.vddSettings.calibrationLaunched)
-    startCalibrationContextPolling()
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(getErrorMessage(error, t.value.vddSettings.calibrationLaunchFailed))
-    }
-  } finally {
-    isLaunchingCalibration.value = false
-  }
-}
 
 
-const bindHdrCalibration = async () => {
-  if (isSavingCalibration.value) return
-  isSavingCalibration.value = true
-  try {
-    const context = await loadCalibrationContext({ silent: true, snapshot: { ...calibrationStatus } })
-    if (!context) throw new Error(calibrationStatus.statusText)
-    ElMessage.success(t.value.vddSettings.calibrationDetected)
-  } catch (error) {
-    ElMessage.error(getErrorMessage(error, t.value.vddSettings.calibrationRefreshFailed))
-  } finally {
-    isSavingCalibration.value = false
-  }
-}
 
-const launchPhysicalHdrCalibration = async () => {
-  try {
-    await ElMessageBox.confirm(
-      t.value.vddSettings.physicalCalibrationConfirm,
-      t.value.vddSettings.physicalCalibrationTitle,
-      {
-        confirmButtonText: t.value.vddSettings.physicalCalibrationLaunch,
-        cancelButtonText: t.value.vddSettings.cancel,
-        type: 'info',
-      }
-    )
-    isLaunchingPhysicalCalibration.value = true
-    const result = await vdd.launchHdrCalibration()
-    if (!result?.success) {
-      throw new Error(result?.message || t.value.vddSettings.calibrationLaunchFailed)
-    }
-    ElMessage.success(t.value.vddSettings.physicalCalibrationLaunched)
-  } catch (error) {
-    if (error !== 'cancel') {
-      ElMessage.error(getErrorMessage(error, t.value.vddSettings.calibrationLaunchFailed))
-    }
-  } finally {
-    isLaunchingPhysicalCalibration.value = false
-  }
-}
 
-const openHdrCalibrationStore = async () => {
-  try {
-    const opened = await openExternalUrl('ms-windows-store://pdp/?ProductId=9N7F2SM5D1LR')
-    if (!opened) ElMessage.error(t.value.vddSettings.calibrationStoreFailed)
-  } catch (error) {
-    console.error('Failed to open HDR calibration store page:', error)
-    ElMessage.error(t.value.vddSettings.calibrationStoreFailed)
-  }
-}
 
 const markSettingsClean = () => {
   lastSavedSnapshot.value = takeSnapshot()

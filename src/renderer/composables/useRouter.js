@@ -53,7 +53,8 @@ export const ROUTES = {
   WEB_DISPLAY_MODES: 'web-display-modes',
   WEB_DISPLAY_ENCODERS: 'web-display-encoders',
   WEB_DISPLAY_HDR: 'web-display-hdr',
-  WEB_DISPLAY_VIDEO: 'web-display-video',
+  WEB_DISPLAY_ADVANCED: 'web-display-advanced', // 高级: capture, graphics card, compatibility, sync (the former 捕获与视频)
+  WEB_DISPLAY_VIDEO: 'web-display-video', // retired: an old address of the page lands on WEB_DISPLAY_ADVANCED (ALIAS)
   WEB_AUDIO_SOUND: 'web-audio-sound',
   WEB_TROUBLESHOOTING: 'web-troubleshooting',
   LIVE_SESSION: 'live-session', // 当前串流: the bitrate of a live session and the host performance (the old 码率调整 and 主机性能 tools)
@@ -78,13 +79,13 @@ export const PAGES = {
   [ROUTES.WEB_AUDIO_SOUND]: { rail: 'audio' }, // the first page of a rail is the one the rail opens on
   [ROUTES.MICROPHONE]: { rail: 'audio' },
   [ROUTES.USB]: { rail: 'input' },
-  [ROUTES.WEB_DISPLAY_MODES]: { rail: 'display' }, // the page the rail opens on: resolution, frame rates and bitrate (the most common change)
-  [ROUTES.WEB_DISPLAY_OUTPUT]: { rail: 'display' },
-  [ROUTES.WEB_DISPLAY_ENCODERS]: { rail: 'display' },
-  [ROUTES.WEB_DISPLAY_VIDEO]: { rail: 'display' },
+  [ROUTES.WEB_DISPLAY_OUTPUT]: { rail: 'display' }, // the page the rail opens on: the displays (the output display, the display mode)
+  [ROUTES.WEB_DISPLAY_MODES]: { rail: 'display' },
   [ROUTES.WEB_DISPLAY_HDR]: { rail: 'display' },
-  [ROUTES.VDD_SETTINGS]: { rail: 'display' },
   [ROUTES.HDR_ENHANCED]: { rail: 'display' },
+  [ROUTES.WEB_DISPLAY_ENCODERS]: { rail: 'display' },
+  [ROUTES.VDD_SETTINGS]: { rail: 'display' },
+  [ROUTES.WEB_DISPLAY_ADVANCED]: { rail: 'display' },
   [ROUTES.SUNSHINE_SERVICE]: { rail: 'system' }, // the first page of 系统
   [ROUTES.COMPONENT_STATUS]: { rail: 'system' },
   [ROUTES.COMPONENTS]: { rail: 'system' },
@@ -109,11 +110,11 @@ export const PAGES = {
 export const RAILS = ['overview', 'stream', 'config', 'input', 'audio', 'display', 'system', 'assistant', 'settings', 'help']
 
 // the old component page is part of the component status page now
-const ALIAS = { [ROUTES.CONTROLLERS]: ROUTES.GAMEPAD, [ROUTES.COMPONENTS]: ROUTES.COMPONENT_STATUS, [ROUTES.WEB_TROUBLESHOOTING]: ROUTES.DIAGNOSTICS }
+const ALIAS = { [ROUTES.CONTROLLERS]: ROUTES.GAMEPAD, [ROUTES.COMPONENTS]: ROUTES.COMPONENT_STATUS, [ROUTES.WEB_TROUBLESHOOTING]: ROUTES.DIAGNOSTICS, [ROUTES.WEB_DISPLAY_VIDEO]: ROUTES.WEB_DISPLAY_ADVANCED }
 const CATEGORY = { [ROUTES.CAT_CONFIG]: 'config', [ROUTES.CAT_STREAM]: 'stream', [ROUTES.CAT_INPUT]: 'input', [ROUTES.CAT_AUDIO]: 'audio', [ROUTES.CAT_DISPLAY]: 'display', [ROUTES.CAT_SYSTEM]: 'system' }
 // The panel destination of a place of the display and audio tabs (the same places as foundation-ui's DISPLAY_PLACES and AUDIO_PLACES): the virtual display and the microphone are pages of the panel itself
 const PLACE_ROUTE = {
-  'display:output': ROUTES.WEB_DISPLAY_OUTPUT, 'display:modes': ROUTES.WEB_DISPLAY_MODES, 'display:encoders': ROUTES.WEB_DISPLAY_ENCODERS, 'display:video': ROUTES.WEB_DISPLAY_VIDEO, 'display:hdr': ROUTES.WEB_DISPLAY_HDR, 'display:virtual': ROUTES.VDD_SETTINGS, 'display:quality': ROUTES.HDR_ENHANCED,
+  'display:output': ROUTES.WEB_DISPLAY_OUTPUT, 'display:modes': ROUTES.WEB_DISPLAY_MODES, 'display:encoders': ROUTES.WEB_DISPLAY_ENCODERS, 'display:advanced': ROUTES.WEB_DISPLAY_ADVANCED, 'display:video': ROUTES.WEB_DISPLAY_ADVANCED, 'display:hdr': ROUTES.WEB_DISPLAY_HDR, 'display:virtual': ROUTES.VDD_SETTINGS, 'display:quality': ROUTES.HDR_ENHANCED, 'display:quality': ROUTES.HDR_ENHANCED,
   'audio:sound': ROUTES.WEB_AUDIO_SOUND, 'audio:microphone': ROUTES.MICROPHONE,
   'input:gamepad': ROUTES.GAMEPAD, 'input:keyboard': ROUTES.WEB_INPUT_KEYBOARD, 'input:mouse': ROUTES.WEB_INPUT_MOUSE, 'input:usb': ROUTES.USB,
 }
@@ -122,7 +123,7 @@ export const routeOfPlace = (tab, sub) => PLACE_ROUTE[`${tab}:${sub || DEFAULT_P
 const PLACE_PATH = /^\/config(?:\.html)?#tab=(display|audio|input)(?:&sub=([\w-]+))?/
 // tabs that were pages of their own: an old address still reaches what moved
 const MOVED_TAB_PATH = /^\/config(?:\.html)?#tab=(advanced|encoders)(?:&|$)/
-const MOVED_TAB_ROUTE = { advanced: ROUTES.WEB_DISPLAY_VIDEO, encoders: ROUTES.WEB_DISPLAY_ENCODERS }
+const MOVED_TAB_ROUTE = { advanced: ROUTES.WEB_DISPLAY_ADVANCED, encoders: ROUTES.WEB_DISPLAY_ENCODERS }
 const WEB_PATHS = [
   [/^\/(?:pin|clients)(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_CLIENTS],
   [/^\/apps(?:\.html)?(?:[?#/]|$)/, ROUTES.WEB_APPS],
@@ -148,7 +149,7 @@ export const webPathOf = (route) => ({
   [ROUTES.WEB_CLIENTS]: '/pin', [ROUTES.WEB_APPS]: '/apps', [ROUTES.WEB_CONFIG]: '/config', [ROUTES.WEB_DOWNLOADS]: '/downloads',
   [ROUTES.WEB_PASSWORD]: '/password',
   [ROUTES.WEB_DISPLAY_OUTPUT]: `/config${settingsHash({ tab: 'display', sub: 'output' })}`, [ROUTES.WEB_DISPLAY_MODES]: `/config${settingsHash({ tab: 'display', sub: 'modes' })}`,
-  [ROUTES.WEB_DISPLAY_ENCODERS]: `/config${settingsHash({ tab: 'display', sub: 'encoders' })}`, [ROUTES.WEB_DISPLAY_VIDEO]: `/config${settingsHash({ tab: 'display', sub: 'video' })}`,
+  [ROUTES.WEB_DISPLAY_ENCODERS]: `/config${settingsHash({ tab: 'display', sub: 'encoders' })}`, [ROUTES.WEB_DISPLAY_ADVANCED]: `/config${settingsHash({ tab: 'display', sub: 'advanced' })}`,
   [ROUTES.WEB_DISPLAY_HDR]: `/config${settingsHash({ tab: 'display', sub: 'hdr' })}`,
   [ROUTES.WEB_AUDIO_SOUND]: `/config${settingsHash({ tab: 'audio', sub: 'sound' })}`,
   // the gamepad, the keyboard and the mouse are pages of 输入与外设 in the Web UI: the rail destinations show those pages in the frame

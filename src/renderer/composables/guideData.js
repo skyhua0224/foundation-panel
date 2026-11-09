@@ -65,7 +65,7 @@ export function createGuideData(deps) {
     }
   }
 
-  async function saveSetup({ locale, adapter, display, prep }) {
+  async function saveSetup({ locale, adapter, display, prep, hdr }) {
     if (display === 'ZakoHDR' && state.setup.virtual) {
       let status = null
       try { status = await deps.vddStatus() } catch { /* not ready */ }
@@ -73,7 +73,7 @@ export function createGuideData(deps) {
       if (!ready) return { ok: false, vdd: false }
     }
     try {
-      const config = mergeSetupConfig(await getJson('/api/config'), { locale, adapter, display, prep: prep ?? state.setup.prep })
+      const config = mergeSetupConfig(await getJson('/api/config'), { locale, adapter, display, prep: prep ?? state.setup.prep, hdr })
       const { response } = await postJson('/api/config', config)
       if (!response.ok) return { ok: false, error: await response.text().catch(() => '') }
       state.setup.completed = true
