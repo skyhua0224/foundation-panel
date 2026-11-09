@@ -24,11 +24,11 @@ static FAILURES: AtomicU32 = AtomicU32::new(0);
 const FAILURES_BEFORE_NATIVE: u32 = 2;
 
 /// Every item id of the native menu (menu.rs) except the containers: what the three menus can send back, and all that `tray_popup_act` accepts.
-pub(super) const ITEM_IDS: [&str; 37] = [
+pub(super) const ITEM_IDS: [&str; 43] = [
     "tray_status", "recover_service", "tray_notification_action", "open_main_panel", "connect_device", "download_client", "open_desktop", "auto_start", "open_sunshine", "vdd_settings", "vdd_create",
     "vdd_close", "vdd_toggle_keep_enabled", "vdd_toggle_headless_create", "reset_display", "show_toolbar", "host_performance", "rtss_control", "web_stream", "log_console", "debug_page", "lang_zh",
     "lang_en", "lang_ja", "prevent_sleep", "restart_user_mode", "import_config", "export_config", "reset_config", "clear_cache", "check_update", "about", "star_project", "visit_project_sunshine",
-    "visit_project_moonlight", "restart", "shutdown",
+    "visit_project_moonlight", "visit_site", "visit_bilibili", "star_github", "sponsor_qiin", "sponsor_yundi339", "sponsor_skyhua", "restart", "shutdown",
 ];
 
 /// Whether the icon carries the native menu now.
@@ -237,6 +237,12 @@ pub(super) fn labels(s: &TrayStrings) -> Value {
     put("star_project", s.star_project);
     put("visit_project_sunshine", s.visit_project_sunshine);
     put("visit_project_moonlight", s.visit_project_moonlight);
+    put("visit_site", s.visit_site);
+    put("visit_bilibili", s.visit_bilibili);
+    put("star_github", s.star_github);
+    put("sponsor_qiin", "qiin2333");
+    put("sponsor_yundi339", "Yundi339");
+    put("sponsor_skyhua", "skyhua0224");
     put("restart", s.restart);
     put("shutdown", s.shutdown);
     Value::Object(m)
@@ -465,14 +471,14 @@ mod tests {
 
     #[test]
     fn the_item_ids_are_the_ids_menu_rs_builds() {
-        assert_eq!(ITEM_IDS.len(), 37);
+        assert_eq!(ITEM_IDS.len(), 43);
         for id in ITEM_IDS {
             assert!(MENU.contains(&format!("\"{id}\"")), "menu.rs has no '{id}'");
         }
         let mut sorted = ITEM_IDS.to_vec();
         sorted.sort();
         sorted.dedup();
-        assert_eq!(sorted.len(), 37, "no id twice");
+        assert_eq!(sorted.len(), 43, "no id twice");
     }
 
     #[test]
