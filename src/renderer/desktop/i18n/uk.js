@@ -154,6 +154,8 @@ export const uk = {
     },
     bitrateLimit: "Ліміт бітрейту",
     bitrateAuto: "Авто",
+    hostAudio: "Звук на вузлі",
+    hostAudioDesc: "Для поточного потоку без перепідключення, якщо звуковий шлях це вміє.",
     hdr: "HDR",
     hdrAutoSwitch: "Автоматичне перемикання HDR",
     hdrAutoSwitchDesc: "Автоматично вмикати/вимикати HDR під час трансляції",

@@ -154,6 +154,8 @@ export const ja = {
     },
     bitrateLimit: "ビットレート制限",
     bitrateAuto: "自動",
+    hostAudio: "ホストで音声を再生",
+    hostAudioDesc: "対応している音声経路なら、再接続せず現在のストリームに適用します。",
     hdr: "HDR",
     hdrAutoSwitch: "自動HDR切り替え",
     hdrAutoSwitchDesc: "ストリーミング中にHDRを自動的に有効/無効にします",

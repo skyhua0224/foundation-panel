@@ -154,6 +154,8 @@ export const ko = {
     },
     bitrateLimit: "비트레이트 제한",
     bitrateAuto: "자동",
+    hostAudio: "호스트에서 오디오 재생",
+    hostAudioDesc: "오디오 경로가 지원하면 다시 연결하지 않고 현재 스트림에 적용합니다.",
     hdr: "HDR",
     hdrAutoSwitch: "자동 HDR 전환",
     hdrAutoSwitchDesc: "스트리밍 중 HDR 자동 활성화/비활성화",

@@ -154,6 +154,8 @@ export const bg = {
     },
     bitrateLimit: "Лимит на битрейт",
     bitrateAuto: "Авто",
+    hostAudio: "Звук на възела",
+    hostAudioDesc: "За текущия поток без ново свързване, ако звуковият път го позволява.",
     hdr: "HDR",
     hdrAutoSwitch: "Автоматично HDR Превключване",
     hdrAutoSwitchDesc: "Автоматично активиране/деактивиране на HDR по време на поточно предаване",

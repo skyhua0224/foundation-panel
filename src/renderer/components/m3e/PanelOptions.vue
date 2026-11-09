@@ -164,11 +164,34 @@ async function importAppearance(event) {
 }
 
 // ---- 高级 (expert) ----
-const X = computed(() => (zh.value
-  ? { changed: '已修改', desc: '作用', effect: '影响', default: '默认值', reset: '恢复默认', on: '开', off: '关',
-      devMode: '打开开发者功能（例如调试输出）；日常使用保持关闭。', textContext: '允许把选中的文字作为上下文交给助手。', logLevel: '面板写入日志的最低级别；级别越低日志越大。' }
-  : { changed: 'Changed', desc: 'What it does', effect: 'Effect', default: 'Default', reset: 'Reset to default', on: 'On', off: 'Off',
-      devMode: 'Turns on developer features such as debug output; leave off for daily use.', textContext: 'Lets selected text be handed to the assistant as context.', logLevel: 'The least severe message the panel writes to its log; lower levels make the log larger.' }))
+const EXPERT = {
+  zh: { changed: '已修改', desc: '作用', effect: '影响', default: '默认值', reset: '恢复默认', on: '开', off: '关', devMode: '打开开发者功能（例如调试输出）；日常使用保持关闭。', textContext: '允许把选中的文字作为上下文交给助手。', logLevel: '面板写入日志的最低级别；级别越低日志越大。' },
+  zh_TW: { changed: '已變更', desc: '作用', effect: '影響', default: '預設值', reset: '恢復預設', on: '開', off: '關', devMode: '開啟開發者功能（例如除錯輸出）；日常使用保持關閉。', textContext: '允許把選取的文字作為上下文交給助手。', logLevel: '面板寫入日誌的最低級別；級別越低日誌越大。' },
+  en: { changed: 'Changed', desc: 'What it does', effect: 'Effect', default: 'Default', reset: 'Reset to default', on: 'On', off: 'Off', devMode: 'Turns on developer features such as debug output; leave off for daily use.', textContext: 'Lets selected text be handed to the assistant as context.', logLevel: 'The least severe message the panel writes to its log; lower levels make the log larger.' },
+  de: { changed: 'Geändert', desc: 'Was es tut', effect: 'Wirkung', default: 'Standard', reset: 'Zurücksetzen', on: 'Ein', off: 'Aus', devMode: 'Schaltet Entwicklerfunktionen wie die Debug-Ausgabe ein; im Alltag aus lassen.', textContext: 'Ausgewählter Text darf als Kontext an den Assistenten.', logLevel: 'Die niedrigste Stufe, die das Panel schreibt; niedrigere Stufen machen den Log größer.' },
+  fr: { changed: 'Modifié', desc: 'Ce que cela fait', effect: 'Effet', default: 'Défaut', reset: 'Réinitialiser', on: 'Oui', off: 'Non', devMode: 'Active les fonctions développeur, comme la sortie de débogage ; laissez désactivé au quotidien.', textContext: 'Le texte sélectionné peut servir de contexte à l’assistant.', logLevel: 'Le message le moins grave que le panneau écrit ; un niveau bas agrandit le journal.' },
+  es: { changed: 'Cambiado', desc: 'Qué hace', effect: 'Efecto', default: 'Predeterminado', reset: 'Restablecer', on: 'Sí', off: 'No', devMode: 'Activa funciones de desarrollador, como la salida de depuración; déjelo desactivado a diario.', textContext: 'El texto seleccionado puede darse al asistente como contexto.', logLevel: 'El mensaje menos grave que escribe el panel; un nivel bajo agranda el registro.' },
+  it: { changed: 'Modificato', desc: 'Che cosa fa', effect: 'Effetto', default: 'Predefinito', reset: 'Ripristina', on: 'Sì', off: 'No', devMode: 'Attiva le funzioni sviluppatore, come l’output di debug; lascialo spento ogni giorno.', textContext: 'Il testo selezionato può andare all’assistente come contesto.', logLevel: 'Il messaggio meno grave che il pannello scrive; un livello basso ingrandisce il registro.' },
+  ja: { changed: '変更済み', desc: '何をするか', effect: '影響', default: '既定', reset: '既定に戻す', on: 'オン', off: 'オフ', devMode: 'デバッグ出力などの開発者機能をオンにします。普段はオフのまま。', textContext: '選択した文字を助手の文脈として渡せます。', logLevel: 'パネルがログに書く最も低いレベル。低いほどログは大きくなります。' },
+  ko: { changed: '변경됨', desc: '하는 일', effect: '영향', default: '기본값', reset: '기본값으로', on: '켜짐', off: '꺼짐', devMode: '디버그 출력 같은 개발자 기능을 켭니다. 평소에는 끄세요.', textContext: '선택한 글을 도우미의 맥락으로 넘길 수 있습니다.', logLevel: '패널이 로그에 쓰는 가장 낮은 수준. 낮을수록 로그가 커집니다.' },
+  ru: { changed: 'Изменено', desc: 'Что делает', effect: 'Эффект', default: 'По умолчанию', reset: 'Сбросить', on: 'Вкл', off: 'Выкл', devMode: 'Включает функции разработчика, например отладочный вывод; в обычной работе выключено.', textContext: 'Выделенный текст можно передать помощнику как контекст.', logLevel: 'Наименее серьёзное сообщение, которое панель пишет в журнал; ниже уровень — больше журнал.' },
+  pt_BR: { changed: 'Alterado', desc: 'O que faz', effect: 'Efeito', default: 'Padrão', reset: 'Redefinir', on: 'Ligado', off: 'Desligado', devMode: 'Liga recursos de desenvolvedor, como a saída de depuração; deixe desligado no dia a dia.', textContext: 'O texto selecionado pode ir ao assistente como contexto.', logLevel: 'A mensagem menos grave que o painel grava; níveis mais baixos aumentam o registro.' },
+  pt: { changed: 'Alterado', desc: 'O que faz', effect: 'Efeito', default: 'Predefinição', reset: 'Repor', on: 'Ligado', off: 'Desligado', devMode: 'Liga funções de programador, como a saída de depuração; deixe desligado no dia a dia.', textContext: 'O texto selecionado pode ir para o assistente como contexto.', logLevel: 'A mensagem menos grave que o painel escreve; níveis mais baixos aumentam o registo.' },
+  bg: { changed: 'Променено', desc: 'Какво прави', effect: 'Ефект', default: 'По подразбиране', reset: 'Нулиране', on: 'Вкл', off: 'Изкл', devMode: 'Включва функции за разработчик, например отладочен изход; в ежедневието остава изключено.', textContext: 'Избраният текст може да отиде при асистента като контекст.', logLevel: 'Най-лекото съобщение, което панелът пише; по-ниско ниво прави журнала по-голям.' },
+  cs: { changed: 'Změněno', desc: 'Co dělá', effect: 'Účinek', default: 'Výchozí', reset: 'Obnovit', on: 'Zap', off: 'Vyp', devMode: 'Zapne vývojářské funkce, třeba ladící výstup; v běžném provozu nechte vypnuté.', textContext: 'Vybraný text může jít asistentovi jako kontext.', logLevel: 'Nejméně závažná zpráva, kterou panel zapíše; nižší úroveň zvětší protokol.' },
+  pl: { changed: 'Zmieniono', desc: 'Co robi', effect: 'Efekt', default: 'Domyślne', reset: 'Przywróć', on: 'Wł.', off: 'Wył.', devMode: 'Włącza funkcje programisty, na przykład wyjście debug; na co dzień zostaw wyłączone.', textContext: 'Zaznaczony tekst może trafić do asystenta jako kontekst.', logLevel: 'Najmniej poważny komunikat, jaki panel zapisuje; niższy poziom powiększa dziennik.' },
+  sv: { changed: 'Ändrad', desc: 'Vad den gör', effect: 'Effekt', default: 'Standard', reset: 'Återställ', on: 'På', off: 'Av', devMode: 'Slår på utvecklarfunktioner som felsökningsutdata; lämna av i vardagen.', textContext: 'Markerad text kan ges till assistenten som sammanhang.', logLevel: 'Det minst allvarliga meddelandet panelen skriver; lägre nivå gör loggen större.' },
+  tr: { changed: 'Değişti', desc: 'Ne yapar', effect: 'Etki', default: 'Varsayılan', reset: 'Sıfırla', on: 'Açık', off: 'Kapalı', devMode: 'Hata ayıklama çıktısı gibi geliştirici özelliklerini açar; günlük kullanımda kapalı kalsın.', textContext: 'Seçilen yazı yardımcıya bağlam olarak verilebilir.', logLevel: 'Panelin günlüğe yazdığı en düşük düzey; düzey düştükçe günlük büyür.' },
+  uk: { changed: 'Змінено', desc: 'Що робить', effect: 'Ефект', default: 'Типово', reset: 'Скинути', on: 'Увімк', off: 'Вимк', devMode: 'Вмикає функції розробника, наприклад налагоджувальний вивід; у повсякденні лишайте вимкненим.', textContext: 'Виділений текст можна передати помічнику як контекст.', logLevel: 'Найменш серйозне повідомлення, яке панель пише в журнал; нижчий рівень збільшує журнал.' },
+}
+const expertCode = (raw) => {
+  const tag = String(raw || 'en').replace(/-/g, '_')
+  if (/^zh/i.test(tag) && /(_TW|_HK|_MO|Hant)/i.test(tag)) return 'zh_TW'
+  if (/^zh/i.test(tag)) return 'zh'
+  const primary = tag.split('_')[0]
+  return EXPERT[tag] ? tag : (EXPERT[primary] ? primary : 'en')
+}
+const X = computed(() => EXPERT[expertCode(props.locale)] || EXPERT.en)
 const logOptions = computed(() => ['error', 'warn', 'info', 'debug'].map((value) => ({ value, label: value.toUpperCase() })))
 const reset = (key) => set(key, defaultDesktopSettings[key])
 const resetAll = async () => {

@@ -154,6 +154,8 @@ export const ru = {
     },
     bitrateLimit: "Предел битрейта",
     bitrateAuto: "Авто",
+    hostAudio: "Звук на узле",
+    hostAudioDesc: "Для текущего потока без переподключения, если звуковой путь это умеет.",
     hdr: "HDR",
     hdrAutoSwitch: "Авто HDR Переключение",
     hdrAutoSwitchDesc: "Автоматически включать/отключать HDR во время потоковой передачи",

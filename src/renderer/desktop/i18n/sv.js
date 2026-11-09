@@ -154,6 +154,8 @@ export const sv = {
     },
     bitrateLimit: "Bithastighetsgräns",
     bitrateAuto: "Auto",
+    hostAudio: "Ljud på värden",
+    hostAudioDesc: "Gäller den pågående strömmen utan ny anslutning om ljudvägen kan det.",
     hdr: "HDR",
     hdrAutoSwitch: "Auto HDR Växling",
     hdrAutoSwitchDesc: "Aktivera/inaktivera HDR automatiskt under streaming",

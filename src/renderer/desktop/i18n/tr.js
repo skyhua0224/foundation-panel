@@ -154,6 +154,8 @@ export const tr = {
     },
     bitrateLimit: "Bit Hızı Sınırı",
     bitrateAuto: "Otomatik",
+    hostAudio: "Ana bilgisayarda ses",
+    hostAudioDesc: "Ses yolu destekliyorsa yeniden bağlanmadan geçerli akışa uygulanır.",
     hdr: "HDR",
     hdrAutoSwitch: "Otomatik HDR Geçiş",
     hdrAutoSwitchDesc: "Akış sırasında HDR'yi otomatik olarak etkinleştirin/devre dışı bırakın",

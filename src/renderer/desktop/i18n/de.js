@@ -154,6 +154,8 @@ export const de = {
     },
     bitrateLimit: "Bitratenlimit",
     bitrateAuto: "Automatisch",
+    hostAudio: "Ton auf dem Host",
+    hostAudioDesc: "Gilt für den laufenden Stream ohne neue Verbindung, wenn der Audiopfad das kann.",
     hdr: "HDR",
     hdrAutoSwitch: "Automatische HDR Umschaltung",
     hdrAutoSwitchDesc: "HDR während des Streamings automatisch aktivieren/deaktivieren",
