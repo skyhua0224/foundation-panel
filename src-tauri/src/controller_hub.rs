@@ -33,6 +33,12 @@ pub struct MicrophoneStatus {
     pub submit_errors: u32,
     pub last_error: i32,
     pub error_code: String,
+    /// Peak of the client microphone input since the previous status read (0..1).
+    pub input_peak: f64,
+    /// Milliseconds since the last client microphone frame; -1 when none arrived.
+    pub input_active_ms: i64,
+    /// Total client microphone frames received since the host process started.
+    pub input_frames: u64,
 }
 
 #[derive(Debug, Default, Deserialize, Serialize, Clone)]
@@ -41,6 +47,15 @@ pub struct MicrophoneTestResult {
     pub success: bool,
     pub error_code: String,
     pub backend: String,
+    /// "tone" after a test sound was played; "live" when a stream owns the route.
+    pub mode: String,
+    pub input_peak: f64,
+    pub input_active_ms: i64,
+    /// Tone diagnostics: seconds heard, judged windows and the tone amplitude found.
+    pub heard_seconds: f64,
+    pub windows_total: i32,
+    pub windows_good: i32,
+    pub heard_amplitude: f64,
 }
 
 async fn device_api_url(path: &str) -> Result<String, String> {

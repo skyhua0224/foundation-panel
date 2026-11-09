@@ -84,3 +84,20 @@ export function microphoneUsesUsbip(status = {}) {
     ? status.active_backend === 'usbip_experimental'
     : status.configured_backend === 'usbip_experimental'
 }
+
+/** Peak of the client microphone input since the previous status read, clamped to 0..1. */
+export function microphoneInputLevel(status = {}) {
+  const peak = Number(status.input_peak)
+  return Number.isFinite(peak) ? Math.min(1, Math.max(0, peak)) : 0
+}
+
+/** True when the host saw a client microphone frame recently enough to call the route live. */
+export function microphoneInputFresh(status = {}) {
+  const ms = Number(status.input_active_ms)
+  return Number.isFinite(ms) && ms >= 0 && ms < 3000
+}
+
+/** The host reported the live route instead of playing a test tone (a stream owns the microphone). */
+export function microphoneTestIsLive(answer = {}) {
+  return answer?.mode === 'live'
+}

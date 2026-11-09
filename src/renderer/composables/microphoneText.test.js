@@ -10,6 +10,7 @@ const CODES = [
   'MIC_TEST_WRITE_FAILED', 'MIC_USBIP_COMPONENT_UNAVAILABLE', 'MIC_USBIP_CREATE_FAILED', 'MIC_USBIP_DEVICE_BUSY',
   'MIC_USBIP_START_TIMEOUT', 'MIC_USBIP_TRANSPORT_LOST',
 ]
+const LIVE_KEYS = ['howToTest', 'testLive', 'level', 'levelActive', 'levelSilent']
 
 for (const [name, locale] of [['zh', zh], ['en', en]]) {
   test(`${name}: the microphone tab has every state, backend and host error code`, () => {
@@ -23,6 +24,15 @@ for (const [name, locale] of [['zh', zh], ['en', en]]) {
       assert.ok(text.backendHints[backend], `${backend} hint`)
     }
     for (const code of [...CODES, 'unknown']) assert.ok(text.errors[code], code)
+    for (const key of LIVE_KEYS) assert.ok(typeof text[key] === 'string' && text[key], key)
+  })
+
+  test(`${name}: one line tells the user how to test, idle and while streaming`, () => {
+    const how = locale.deviceHub.microphone.howToTest
+    // English sentence case differs from the label capitalization, so compare insensitively.
+    const fold = (value) => value.toLowerCase()
+    assert.ok(fold(how).includes(fold(locale.deviceHub.microphone.test)), 'names the idle test')
+    assert.ok(fold(how).includes(fold(locale.deviceHub.microphone.level)), 'names the live level')
   })
 
   test(`${name}: the microphone wording no longer calls the backend experimental`, () => {
