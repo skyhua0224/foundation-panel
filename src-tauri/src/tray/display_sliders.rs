@@ -180,7 +180,7 @@ mod win {
     }
 
     /// The displays attached to the desktop, with the modes each lists (32 bit only: one entry per size and rate).
-    pub(super) fn outputs() -> Vec<Output> {
+    pub(in crate::tray) fn outputs() -> Vec<Output> {
         let mut list = Vec::new();
         let mut index = 0u32;
         loop {
@@ -235,7 +235,7 @@ mod win {
     }
 
     /// Sets a mode of a display (checked first with CDS_TEST, then written like the Settings app does).
-    pub(super) fn set_mode(device: &str, mode: Mode) -> Result<(), String> {
+    pub(in crate::tray) fn set_mode(device: &str, mode: Mode) -> Result<(), String> {
         let wide = nul_terminated(device);
         let mut dm = devmode();
         // SAFETY: as in `outputs`.
