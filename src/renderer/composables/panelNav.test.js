@@ -44,7 +44,7 @@ test('网络概览 is a page of the 系统 list, two steps from the rail, and op
   assert.equal(zh.m3e.system.network, '网络概览')
   assert.equal(en.m3e.system.network, 'Network overview')
   const menu = fs.readFileSync(new URL('../components/SidebarMenu.vue', import.meta.url), 'utf8')
-  assert.match(menu, /<NetworkOverviewPage v-else-if="entry\.id === ROUTES\.NETWORK_OVERVIEW" @open-network="openConfig\(\{ tab: 'network' \}\)" \/>/)
+  assert.match(menu, /<NetworkOverviewPage v-else-if="entry\.id === ROUTES\.NETWORK_OVERVIEW" @open-network="jumpConfig\(\{ tab: 'network' \}\)" \/>/)
   const page = fs.readFileSync(new URL('../components/m3e/NetworkOverviewPage.vue', import.meta.url), 'utf8')
   assert.match(page, /createNetworkOverview\(\{/, 'the shared state of foundation-ui, the same as the Web UI page')
   assert.match(page, /@recheck="state\.refresh\(true\)"/, '重新检测 asks the host again; opening the page reads its cache')
