@@ -206,6 +206,13 @@ pub(crate) fn running_in_user_mode() -> bool {
     }
 }
 
+/// End every sunshine.exe of this install. An update calls this after the service has stopped,
+/// so a user-mode copy is not left beside the next service child.
+#[cfg(target_os = "windows")]
+pub(crate) fn end_host_processes(install_dir: &std::path::Path) -> Result<(), u32> {
+    probe::end_install_processes(install_dir)
+}
+
 /// 重启 Sunshine for the offline page, the tray recovery, the home tile and the old pages: through the elevated
 /// helper (stop the service, end any leftover sunshine.exe of this install, start the service) when the install
 /// has its service, else ending and starting sunshine.exe of this install as the current user. No PowerShell,

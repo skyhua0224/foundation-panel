@@ -36,14 +36,26 @@ const { t, locale } = useI18n()
 
 const proxyBase = async () => String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')
 const request = async (path) => {
-  const response = await fetch(`${await proxyBase()}${path}`)
-  return { ok: response.ok, status: response.status, json: await response.json().catch(() => null) }
+  try {
+    const response = await fetch(`${await proxyBase()}${path}`, { signal: AbortSignal.timeout(110000) })
+    return { ok: response.ok, status: response.status, json: await response.json().catch(() => null) }
+  }
+  catch (error) {
+    const timedOut = error && (error.name === 'TimeoutError' || error.name === 'AbortError')
+    return { ok: false, status: 0, json: { error: timedOut ? 'the host did not answer within 110 s' : String(error) } }
+  }
 }
 const local = {
   id: 'local',
   groups: DOCTOR_LOCAL_GROUPS,
   fetch: async (group, lang) => {
-    try { return { ok: true, status: 200, json: await invoke('doctor_local', { only: group, lang }) } }
+    try {
+      const json = await Promise.race([
+        invoke('doctor_local', { only: group, lang }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('the check did not finish within 20 s')), 20000)),
+      ])
+      return { ok: true, status: 200, json }
+    }
     catch (error) { return { ok: false, status: 500, json: { error: String(error) } } }
   },
 }
