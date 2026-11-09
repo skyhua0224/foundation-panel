@@ -267,7 +267,6 @@ onMounted(async () => {
 
 .dsk-tile__icon { flex: none; width: 56px; height: 56px; display: grid; place-items: center; font-size: 28px; background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); clip-path: var(--m-shape-squircle); transition: clip-path var(--m-spring-default-spatial-duration, 300ms) var(--m-spring-default-spatial, ease); }
 .dsk-bit { position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; gap: 18px; padding: 28px 30px 24px; border-radius: var(--md-sys-shape-corner-extra-extra-large); background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
-.dsk-bit::after { content: ''; position: absolute; z-index: -1; right: -70px; top: -80px; width: 300px; height: 300px; background: var(--md-sys-color-primary); opacity: .1; clip-path: var(--m-shape-cookie); animation: m-turn 50s linear infinite; }
 .dsk-bit__head { display: flex; align-items: center; gap: 14px; }
 .dsk-bit__title { margin: 0; font: var(--m-headline-small-emphasized); letter-spacing: 0; }
 .dsk-bit__number { display: flex; align-items: baseline; gap: 14px; }
