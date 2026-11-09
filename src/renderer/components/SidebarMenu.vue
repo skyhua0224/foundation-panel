@@ -59,7 +59,7 @@
           @open-guide="openWelcome"
           @open-remote="remoteOpen = true"
         />
-        <DoctorPage v-else-if="entry.id === ROUTES.DOCTOR" :autostart="!!entry.params?.autostart" @go="goDoctorTarget" @restart="hostConn.restart('service')" @ai="askMita" />
+        <DoctorPage v-else-if="entry.id === ROUTES.DOCTOR" :autostart="entry.params?.autostart || false" @go="goDoctorTarget" @restart="hostConn.restart('service')" @ai="askMita" />
         <MAnnouncementPage v-else-if="entry.id === ROUTES.ANNOUNCEMENTS" :items="announcements.list.value" :locale="locale" :acked-at="ackedAt" :open-id="entry.params?.id || ''" :on-refresh="() => announcements.refresh(true)" @dismiss="announcements.dismiss" @read="announcements.read" @open-url="actions_openExternal" @back="back" />
         <DeveloperPage v-else-if="entry.id === ROUTES.DEVELOPER" :locale="locale" :version="currentVersion" :consent="telemetry.consent.value" :error-context="errorContext" :simulate-host="simulateHost" @disabled="back" />
         <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" :on-refresh="() => announcements.refresh(true)" :consent="telemetry.consent.value" @consent="telemetry.answer" :include-prerelease="includePrerelease" @channel-change="setIncludePrerelease" @open-update="showUpdateDialog = true" @open="actions_openExternal" @open-developer="router.navigate(ROUTES.DEVELOPER)" />
@@ -528,7 +528,8 @@ const onUnifiedChoose = (doc) => {
 const uni = useUnifiedSearch({ docs: searchDocs, onPin: (doc) => pinToHome('panel-home', doc.pin), isPinned: (doc) => isPinnedOnHome('panel-home', doc.pin), recentSettings: recentSettingDocs, onChoose: onUnifiedChoose })
 // Where an error of the diagnostics page leads
 // 体检: the entries of help and search open it running; a fix leads to a setting row or a page of the panel; 米塔 AI gets the result
-const openDoctor = () => router.navigate(ROUTES.DOCTOR, { autostart: true })
+// each press of 「开始体检」 carries its own token: the history entry keeps it, so Back from a fix finds the result instead of running every check again (MDoctor)
+const openDoctor = () => router.navigate(ROUTES.DOCTOR, { autostart: Date.now() })
 const DOCTOR_PAGES = {
   network: () => openConfig({ tab: 'network' }),
   audio: () => openConfig({ tab: 'audio', sub: 'sound' }),

@@ -30,7 +30,7 @@ import { useI18n } from '../../desktop/i18n/index.js'
 // 体检 of the control panel: the panel's own checks (doctor_local: the service, the installation, the processes and ports, the
 // drivers; they answer when Sunshine is down) and Sunshine's (GET /api/doctor through the proxy), on the shared page (MDoctor).
 // The repairs a check asks for run through the panel's existing commands; the bundle is the one of 日志与诊断, 米塔 AI is the chat.
-defineProps({ autostart: { type: Boolean, default: false } })
+defineProps({ autostart: { type: [Boolean, Number], default: false } })
 const emit = defineEmits(['go', 'restart', 'ai'])
 const { t, locale } = useI18n()
 
