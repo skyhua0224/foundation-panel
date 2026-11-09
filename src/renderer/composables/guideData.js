@@ -1,5 +1,5 @@
 import { reactive } from 'vue'
-import { guideEntry, isSetupCompleted, mergeSetupConfig, normalizeClients, normalizeSessions, setupStateFromConfig } from 'foundation-ui/vue/guide.js'
+import { createHostSaver, deviceId as guideDeviceId, guideEntry, hostProgressOf, isSetupCompleted, mergeSetupConfig, normalizeClients, normalizeSessions, setupStateFromConfig } from 'foundation-ui/vue/guide.js'
 import { endpointsOfConfig } from 'foundation-ui/settings'
 import { restoreDefaultBuiltInApps } from 'foundation-ui/apps'
 
@@ -64,6 +64,12 @@ export function createGuideData(deps) {
       console.error('Failed to read the host configuration:', error)
     }
   }
+
+  /** What the host remembers of the guide (the steps done on any device, finished, closed, the device running it). */
+  async function loadGuideHost() {
+    try { return hostProgressOf(await getJson('/api/config')) } catch { return hostProgressOf(null) }
+  }
+  const saveGuideProgress = createHostSaver({ getJson, postJson: async (path, body) => (await postJson(path, body)).data })
 
   async function saveSetup({ locale, adapter, display, prep }) {
     if (display === 'ZakoHDR' && state.setup.virtual) {
@@ -281,6 +287,7 @@ export function createGuideData(deps) {
     openLink: (link) => deps.openUrl(link),
     copy: (text) => deps.copy(text),
     loadSetup,
+    saveGuideProgress,
     saveSetup,
     skipSetup,
     refreshAddresses,
@@ -300,7 +307,7 @@ export function createGuideData(deps) {
     pair,
     openApps: (mode) => deps.openApps(mode),
   }
-  return { state, callbacks, probeAccount, createAccount }
+  return { state, callbacks, probeAccount, createAccount, loadGuideHost }
 }
 
 /**
@@ -319,12 +326,13 @@ export async function shouldOpenGuide({ proxyUrl, fetchImpl, progress, dismissed
     if (/^text\/html/i.test(configResponse.headers?.get?.('content-type') || '')) return true
     const config = await configResponse.json()
     const completed = isSetupCompleted(config)
-    const resuming = !!progress && !progress.finished && progress.visited?.length > 0
+    const host = hostProgressOf(config)
+    const resuming = !!progress && !progress.finished && !host.finished && (progress.visited?.length > 0 || progress.done?.length > 0 || host.done.length > 0)
     if (completed && !resuming && !version) return false
     const clientsResponse = await get(`${base}/api/clients/list`)
     if (!clientsResponse.ok) return false
     const clients = normalizeClients(await clientsResponse.json())
-    return !!guideEntry({ progress, version, setupCompleted: completed, pairedCount: clients ? clients.length : null, configExists: true })
+    return !!guideEntry({ progress, version, setupCompleted: completed, pairedCount: clients ? clients.length : null, configExists: true, host, device: guideDeviceId() })
   } catch {
     return false
   }
