@@ -1341,10 +1341,24 @@ pub fn tray_prefs_get() -> crate::tray_prefs::TrayPrefs {
 
 #[tauri::command]
 pub fn tray_prefs_set(app: AppHandle, prefs: crate::tray_prefs::TrayPrefs) -> Result<crate::tray_prefs::TrayPrefs, String> {
-    let saved = crate::tray_prefs::save(prefs)?;
+    // the layout of the quick panel is written only by tray_layout_set / tray_popup_layout: a page opened before an edit in the menu must not put the old layout back
+    let saved = crate::tray_prefs::save_keeping_layout(prefs)?;
     popup_input::reset_failures();
     refresh_menu_mode(&app);
     Ok(saved)
+}
+
+/// 个性化 > 托盘: the tiles and the sliders of the quick panel (V3), in order; null = the default. Returns the record as kept.
+#[tauri::command]
+pub fn tray_layout_set(tiles: Option<Vec<String>>, sliders: Option<Vec<String>>) -> Result<crate::tray_prefs::TrayPrefs, String> {
+    crate::tray_prefs::save_layout(tiles, sliders)
+}
+
+/// The quick panel's edit mode (the pencil): the same layout, set from the menu that is on screen; the state with it goes back to the menu.
+#[tauri::command]
+pub async fn tray_popup_layout(app: AppHandle, token: u64, tiles: Option<Vec<String>>, sliders: Option<Vec<String>>) -> Result<(), String> {
+    let _ = token; // one tray menu is open at a time; a late answer for another is refused by `tray_menu_open`
+    popup_input::set_layout(&app, tiles, sliders).await
 }
 
 /// The tray menu's page chose an item (an id of the native menu): it runs through the same handler.

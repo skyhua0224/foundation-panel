@@ -3,6 +3,7 @@ import { computed, onMounted, ref } from 'vue'
 import { MAppearance, MPage, MSection, MTraySettings } from 'foundation-ui/vue'
 import { labelOf } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../../desktop/i18n/index.js'
+import { readRtssInstall, rtssInstalled } from '../../composables/rtssInstall.js'
 
 // 个性化 among the stream settings: the shared appearance component (wallpaper, colour source, light or dark, dim, blur, icon style), and what the tray icon does (src-tauri/src/tray_prefs.rs)
 const { locale } = useI18n()
@@ -16,7 +17,14 @@ const invokeTray = async (name, args) => {
 }
 onMounted(async () => {
   try { prefs.value = await invokeTray('tray_prefs_get') } catch { /* not the app window: the defaults are shown */ }
+  // the tile list of the quick panel offers RTSS only where it is installed
+  if (rtssInstalled.value === null) await readRtssInstall((name) => invokeTray(name))
 })
+// the tiles and sliders of the quick panel go by their own command: the rest of the record is saved without them
+const saveLayout = async (record) => {
+  prefs.value = { ...prefs.value, tiles: record.tiles, sliders: record.sliders }
+  try { prefs.value = await invokeTray('tray_layout_set', { tiles: record.tiles, sliders: record.sliders }) } catch { /* not saved: the next start has the old layout */ }
+}
 const save = async (next) => {
   prefs.value = next // the choice shows at once; the host answers with the record it kept
   try { prefs.value = await invokeTray('tray_prefs_set', { prefs: next }) } catch { /* not saved: the next start has the old choice */ }
@@ -27,7 +35,7 @@ const save = async (next) => {
   <MPage :title="title">
     <MAppearance :locale="String(locale)" />
     <MSection :title="trayTitle">
-      <MTraySettings :model-value="prefs" :locale="String(locale)" @update:model-value="save" />
+      <MTraySettings :model-value="prefs" :locale="String(locale)" :rtss="rtssInstalled === true" @update:model-value="save" @layout="saveLayout" />
     </MSection>
   </MPage>
 </template>

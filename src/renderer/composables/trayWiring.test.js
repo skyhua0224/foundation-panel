@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { installTrayTheme } from './trayTheme.js'
 import { trayTransport } from './menuPopupTransport.js'
-import { TRAY_ITEM_IDS, VARIANTS, modelIds } from 'foundation-ui/tray/trayModel.js'
+import { SLIDER_KEYS, TILE_IDS, TRAY_ITEM_IDS, VARIANTS, modelIds, normalizeLayout, tileItemIds } from 'foundation-ui/tray/trayModel.js'
 import { TRAY_PREFS_DEFAULT } from 'foundation-ui/tray/trayPrefs.js'
 
 // The tray menus in the menu window (docs/tray-menu.md, src-tauri/src/tray/popup_input.rs): the ids, the commands and events both sides name, the settings page, the theme the menus open with.
@@ -101,6 +101,28 @@ test('the sliders: tray_popup_set is registered, its answer reaches the page (a 
   assert.match(inputRs, /DEVICE_CONFIG_LOCK[\s\S]*read_full_sunshine_config[\s\S]*post_sunshine_config/); assert.ok(inputRs.includes('crate::system::set_desktop_dpi(dpi)'))
   assert.ok(sliderRs.includes('ChangeDisplaySettingsExW') && sliderRs.includes('CDS_TEST') && sliderRs.includes('EnumDisplaySettingsExW'))
   // the page sends exactly the keys the model draws
-  assert.deepEqual(VARIANTS.v3.pages.quick.rows.find((r) => r.t === 'sliders').keys, ['resolution', 'refresh', 'dpi', 'bitrate'])
-  assert.deepEqual(VARIANTS.v3.pages.quick.rows.find((r) => r.t === 'buttons').ids, ['open_main_panel', 'open_desktop', 'connect_device', 'open_sunshine'])
+  assert.deepEqual([...SLIDER_KEYS], ['resolution', 'refresh', 'dpi', 'bitrate'])
+  assert.equal(VARIANTS.v3.pages.quick.rows.find((r) => r.t === 'sliders').source, 'layout', 'which sliders: the person\'s layout, the scale by default')
+})
+
+test('the quick panel\'s layout: the host keeps it apart from the click settings, accepts exactly the ids the menu knows, and sends it with the state', async () => {
+  const rust = read('src-tauri/src/tray_prefs.rs')
+  // the id lists of Rust and of foundation-ui are one list
+  const rustList = (name) => [...rust.slice(rust.indexOf(name)).split('];')[0].matchAll(/"([a-z_]+)"/g)].map((m) => m[1])
+  assert.deepEqual(rustList('pub const TILE_IDS'), [...TILE_IDS]); assert.deepEqual(rustList('pub const SLIDER_KEYS'), [...SLIDER_KEYS])
+  assert.ok(rust.includes('pub const TILE_IDS: [&str; 17]') && TILE_IDS.length === 17)
+  // every tile is an item the handler runs (nothing invented)
+  for (const id of TILE_IDS) for (const act of tileItemIds(id)) assert.ok(actionsRs.includes(`"${act}" =>`), `tile ${id}: no handler arm for ${act}`)
+  // commands: registered, and the transport sends the record by name
+  for (const cmd of ['tray_layout_set', 'tray_popup_layout']) { assert.ok(mainRs.includes(`tray::${cmd}`), cmd); assert.ok(trayRs.includes(`pub `) && trayRs.includes(`fn ${cmd}`), cmd) }
+  const calls = []
+  const t = trayTransport({ invoke: async (...a) => { calls.push(a) }, listen: () => {} })
+  await t.layout(7, { tiles: ['vdd', 'auto_start'], sliders: null }); await t.layout(7, null)
+  assert.deepEqual(calls, [['tray_popup_layout', { token: 7, tiles: ['vdd', 'auto_start'], sliders: null }], ['tray_popup_layout', { token: 7, tiles: null, sliders: null }]])
+  // the settings page saves the click record without the layout, and the layout by its own command; the state carries the layout and the toolbar's state
+  assert.match(trayRs, /save_keeping_layout\(prefs\)/); assert.match(read('src/renderer/components/m3e/AppearancePage.vue'), /tray_layout_set/)
+  assert.match(inputRs, /"layout": \{ "tiles": prefs\.tiles, "sliders": prefs\.sliders \}/); assert.match(inputRs, /"show_toolbar": app\.get_webview_window\("toolbar"\)\.is_some\(\)/)
+  assert.match(inputRs, /tray_prefs::save_layout\(tiles, sliders\)\?;[\s\S]*update_tray_state/)
+  // what a stored record means to the menu
+  assert.deepEqual(normalizeLayout({ tiles: null, sliders: null }).sliders, ['dpi'])
 })

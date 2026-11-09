@@ -431,6 +431,8 @@ fn main() {
             tray::tray_prefs_set,
             tray::tray_popup_act,
             tray::tray_popup_set,
+            tray::tray_layout_set,
+            tray::tray_popup_layout,
             ctx_popup::tray_popup_theme_set,
             tray::get_tray_locale,
             tray::main_panel_loading,

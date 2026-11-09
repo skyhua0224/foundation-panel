@@ -77,12 +77,36 @@ pub struct TrayPrefs {
     pub click: String,
     pub double: String,
     pub force_native: bool,
+    /// The tiles of the quick panel (V3), in order, once the person has edited it; None = the default of foundation-ui (`DEFAULT_TILES`).
+    pub tiles: Option<Vec<String>>,
+    /// The sliders of the quick panel, in order; None = the default (the scale).
+    pub sliders: Option<Vec<String>>,
 }
 
 impl Default for TrayPrefs {
     fn default() -> Self {
-        Self { right: "v1".into(), click: "panel".into(), double: "none".into(), force_native: false }
+        Self { right: "v1".into(), click: "panel".into(), double: "none".into(), force_native: false, tiles: None, sliders: None }
     }
+}
+
+/// The tile ids of the quick panel (foundation-ui `TILES`, src/tray/trayModel.js; trayWiring.test.js compares the two lists). An id outside it is dropped.
+pub const TILE_IDS: [&str; 17] = [
+    "open_main_panel", "open_desktop", "connect_device", "download_client", "vdd", "auto_start", "check_update", "open_sunshine", "show_toolbar", "host_performance", "rtss_control", "log_console",
+    "prevent_sleep", "restart_user_mode", "vdd_toggle_keep_enabled", "vdd_toggle_headless_create", "reset_display",
+];
+/// The slider keys of the quick panel (foundation-ui `SLIDER_KEYS`).
+pub const SLIDER_KEYS: [&str; 4] = ["resolution", "refresh", "dpi", "bitrate"];
+
+/// A list of known ids without repeats, or None when nothing was stored (the default). An empty list is a real choice.
+fn known_ids(list: Option<Vec<String>>, known: &[&str]) -> Option<Vec<String>> {
+    let list = list?;
+    let mut out: Vec<String> = Vec::new();
+    for id in list {
+        if known.contains(&id.as_str()) && !out.contains(&id) {
+            out.push(id);
+        }
+    }
+    Some(out)
 }
 
 impl TrayPrefs {
@@ -94,6 +118,8 @@ impl TrayPrefs {
             click: if Action::parse(&self.click).is_some() { self.click } else { d.click },
             double: if Action::parse(&self.double).is_some() { self.double } else { d.double },
             force_native: self.force_native,
+            tiles: known_ids(self.tiles, &TILE_IDS),
+            sliders: known_ids(self.sliders, &SLIDER_KEYS),
         }
     }
 
@@ -219,6 +245,24 @@ pub fn save(prefs: TrayPrefs) -> Result<TrayPrefs, String> {
     Ok(next)
 }
 
+/// The settings page's record, with the layout of the quick panel left as stored: the layout is written only by `save_layout`, so a page that was opened before an edit in the menu cannot overwrite it.
+pub fn merge_keeping_layout(mut incoming: TrayPrefs, stored: &TrayPrefs) -> TrayPrefs {
+    incoming.tiles = stored.tiles.clone();
+    incoming.sliders = stored.sliders.clone();
+    incoming
+}
+pub fn save_keeping_layout(prefs: TrayPrefs) -> Result<TrayPrefs, String> {
+    save(merge_keeping_layout(prefs, &current()))
+}
+
+/// Stores the layout of the quick panel (the rest of the record as stored) and returns the record.
+pub fn save_layout(tiles: Option<Vec<String>>, sliders: Option<Vec<String>>) -> Result<TrayPrefs, String> {
+    let mut next = current();
+    next.tiles = tiles;
+    next.sliders = sliders;
+    save(next)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -226,7 +270,7 @@ mod tests {
     const WAIT: Duration = Duration::from_millis(500);
 
     fn prefs(click: &str, double: &str) -> TrayPrefs {
-        TrayPrefs { right: "v1".into(), click: click.into(), double: double.into(), force_native: false }
+        TrayPrefs { right: "v1".into(), click: click.into(), double: double.into(), ..TrayPrefs::default() }
     }
 
     #[test]
@@ -240,13 +284,40 @@ mod tests {
 
     #[test]
     fn unknown_values_take_the_defaults_and_a_right_click_is_always_a_menu() {
-        let bad = TrayPrefs { right: "none".into(), click: "v9".into(), double: "".into(), force_native: true }.normalized();
+        let bad = TrayPrefs { right: "none".into(), click: "v9".into(), double: "".into(), force_native: true, ..TrayPrefs::default() }.normalized();
         assert_eq!((bad.right.as_str(), bad.click.as_str(), bad.double.as_str(), bad.force_native), ("v1", "panel", "none", true));
         assert_eq!(parse("not json"), TrayPrefs::default());
         assert_eq!(parse(r#"{"right":"v3","click":"v2","double":"panel","forceNative":true}"#).action(Gesture::Right), Action::Menu(Variant::V3));
         // a partial record keeps the rest at the defaults
         let partial = parse(r#"{"right":"v3"}"#);
         assert_eq!((partial.right.as_str(), partial.click.as_str()), ("v3", "panel"));
+    }
+
+    fn ids(list: &[&str]) -> Option<Vec<String>> {
+        Some(list.iter().map(|s| s.to_string()).collect())
+    }
+
+    #[test]
+    fn the_layout_is_the_default_until_edited_and_keeps_known_ids_once_in_order() {
+        assert_eq!((TrayPrefs::default().tiles, TrayPrefs::default().sliders), (None, None));
+        let p = TrayPrefs { tiles: ids(&["vdd", "nope", "auto_start", "vdd"]), sliders: ids(&["bitrate", "dpi", "zzz"]), ..TrayPrefs::default() }.normalized();
+        assert_eq!((p.tiles, p.sliders), (ids(&["vdd", "auto_start"]), ids(&["bitrate", "dpi"])));
+        // an empty list is a real choice (nothing shown), not the default
+        let none = TrayPrefs { tiles: ids(&[]), sliders: ids(&[]), ..TrayPrefs::default() }.normalized();
+        assert_eq!((none.tiles, none.sliders), (ids(&[]), ids(&[])));
+        // it survives the file, and an old record without it reads as the default
+        let parsed = parse(r#"{"right":"v3","tiles":["open_desktop","check_update"],"sliders":["dpi","refresh"]}"#);
+        assert_eq!((parsed.tiles, parsed.sliders), (ids(&["open_desktop", "check_update"]), ids(&["dpi", "refresh"])));
+        assert_eq!(parse(r#"{"right":"v3"}"#).tiles, None);
+        assert_eq!(parse(r#"{"tiles":"x"}"#), TrayPrefs::default(), "a wrong shape is the default record");
+    }
+
+    #[test]
+    fn the_settings_page_cannot_overwrite_the_layout() {
+        let stored = TrayPrefs { tiles: ids(&["vdd"]), sliders: ids(&["dpi", "bitrate"]), ..TrayPrefs::default() };
+        let incoming = TrayPrefs { right: "v3".into(), tiles: None, sliders: ids(&["refresh"]), ..TrayPrefs::default() };
+        let merged = merge_keeping_layout(incoming, &stored);
+        assert_eq!((merged.right.as_str(), merged.tiles, merged.sliders), ("v3", ids(&["vdd"]), ids(&["dpi", "bitrate"])));
     }
 
     #[test]
