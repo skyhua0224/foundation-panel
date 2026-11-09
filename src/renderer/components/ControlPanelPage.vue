@@ -1,11 +1,9 @@
 <template>
   <MPage :title="heading.title">
     <template v-if="page === ROUTES.PANEL_SETTINGS">
-      <MSection :title="t.sidebar.language">
+      <MSection>
         <MGroup>
-          <MItem v-for="opt in localeOptions" :key="opt.value" action role="radio" icon="language" :title="opt.label" :selected="localeChoice === opt.value" :aria-checked="localeChoice === opt.value" :data-locale="opt.value" @click="emit('locale-change', opt.value)">
-            <template #trail><MIcon v-if="localeChoice === opt.value" name="check" /></template>
-          </MItem>
+          <MChoiceItem icon="language" :title="t.sidebar.language" :options="localeOptions" :model-value="localeChoice" data-panel-option="locale" :search-label="zhUi ? '搜索语言' : 'Search languages'" :empty-text="zhUi ? '没有匹配的语言' : 'No matching language'" :close-label="zhUi ? '关闭' : 'Close'" :cancel-label="zhUi ? '取消' : 'Cancel'" @update:model-value="emit('locale-change', $event)" />
         </MGroup>
       </MSection>
       <MSection :title="t.sidebar.softwareUpdate">
@@ -90,7 +88,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSeg, MChip, MButton, MIcon, MFieldItem, MBanner, MSupportSheet, useNotify, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard, doctorTexts, MFeedbackRow } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MChoiceItem, MSeg, MChip, MButton, MIcon, MFieldItem, MBanner, MSupportSheet, useNotify, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard, doctorTexts, MFeedbackRow } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import ShortcutsSheet from './m3e/ShortcutsSheet.vue'
 import { usePanelPart } from '../composables/panelParts.js'
@@ -139,6 +137,7 @@ const heading = computed(() => {
 const themeOptions = computed(() => [
   { value: 'system', label: t.value.sidebar.systemTheme, icon: 'tonality' }, { value: 'light', label: t.value.sidebar.lightMode, icon: 'light_mode' }, { value: 'dark', label: t.value.sidebar.darkMode, icon: 'dark_mode' },
 ])
+const zhUi = computed(() => String(props.locale).startsWith('zh'))
 const localeOptions = computed(() => {
   const systemName = LOCALE_NAMES[props.systemLocale] || props.systemLocale
   return [{ value: 'system', label: guide.value.intro.followSystem + ' · ' + systemName }, ...DESKTOP_LOCALES.map((code) => ({ value: code, label: LOCALE_NAMES[code] }))]

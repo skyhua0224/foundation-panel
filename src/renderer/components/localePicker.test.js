@@ -15,3 +15,8 @@ test('the settings language list offers follow-system and all 20 endonyms', () =
   assert.equal(LOCALE_NAMES.ja, '日本語')
   assert.equal(LOCALE_NAMES.pt_BR, 'Português (Brasil)')
 })
+
+test('the language is one choice row: the current language as its value, a searchable sheet for the long list (owner 2026-11-09)', () => {
+  assert.match(page, /<MChoiceItem icon="language"[^>]*:options="localeOptions"/)
+  assert.doesNotMatch(page, /v-for="opt in localeOptions"/)
+})
