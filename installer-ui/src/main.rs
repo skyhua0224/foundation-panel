@@ -46,34 +46,52 @@ impl Host {
     }
 }
 
+// Both commands are async: they run on the async runtime, never on the main thread, so nothing the window does on the
+// main thread (a focus change, a modal loop) can hold an action back.
 #[tauri::command]
-fn installer_view(host: tauri::State<'_, Host>) -> Value {
-    host.last.lock().map(|v| v.clone()).unwrap_or(Value::Null)
+async fn installer_view(host: tauri::State<'_, Host>) -> Result<Value, String> {
+    Ok(host.last.lock().map(|v| v.clone()).unwrap_or(Value::Null))
 }
 
 #[tauri::command]
-fn installer_action(window: WebviewWindow, host: tauri::State<'_, Host>, action: Value) {
-    match action.get("type").and_then(Value::as_str).unwrap_or("") {
-        "minimise" => {
-            let _ = window.minimize();
-        }
-        "ready" => reveal(&window, &host),
-        _ => {}
-    }
+async fn installer_action(window: WebviewWindow, host: tauri::State<'_, Host>, action: Value) -> Result<(), String> {
+    // The shell hears the action first: nothing below may delay or swallow it.
     host.send(json!({ "type": "action", "action": action }));
+    let kind = action.get("type").and_then(Value::as_str).unwrap_or("").to_string();
+    if kind == "minimise" {
+        let _ = window.minimize();
+    }
+    // 'ready', and any action at all (the page is live, whatever happened to 'ready'), shows the window.
+    reveal(&window, &host, if kind == "ready" { "ready" } else { "action" });
+    Ok(())
 }
 
 /// The window is shown cloaked from the start (WebView2 renders only for a shown window) and uncloaked when the page
-/// says it has painted ('ready'), or 3 s after the page loaded, whichever is first.
-fn reveal(window: &WebviewWindow, host: &Host) {
+/// says it has painted ('ready'), on its first action, or 1.5 s after the page loaded (watchdog), whichever is first.
+/// Every reveal is logged to the shell (%TEMP%\FoundationSunshine-setup-web.log).
+fn reveal(window: &WebviewWindow, host: &Host, reason: &str) {
     if host.shown.swap(true, Ordering::SeqCst) {
         return;
     }
+    host.send(json!({ "type": "log", "text": format!("reveal by {reason}") }));
     #[cfg(windows)]
-    set_cloak(window, false);
-    if !test_offscreen() {
-        let _ = window.set_focus();
+    {
+        set_cloak(window, false);
+        // the WebView renders and takes input for a visible controller: say so explicitly after the uncloak
+        let _ = window.with_webview(|webview| unsafe {
+            let _ = webview.controller().SetIsVisible(true);
+        });
+        if !test_offscreen() {
+            // The shell allowed this process to come to the front (AllowSetForegroundWindow). A plain
+            // SetForegroundWindow, not tao's set_focus (which synthesises an Alt key press).
+            use windows::Win32::UI::WindowsAndMessaging::SetForegroundWindow;
+            if let Some(hwnd) = hwnd_of(window) {
+                let _ = unsafe { SetForegroundWindow(hwnd) };
+            }
+        }
     }
+    #[cfg(not(windows))]
+    let _ = window;
 }
 
 /// Test switch, as the Panel's SUNSHINE_GUI_TEST_OFFSCREEN: FOUNDATION_SETUP_TEST_OFFSCREEN=1 opens the window at
@@ -185,17 +203,31 @@ fn capture_page(window: &WebviewWindow, path: PathBuf) {
 fn keep_fixed_size(window: &WebviewWindow) {
     use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
     use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
+    use windows::Win32::UI::WindowsAndMessaging::{GetWindowLongPtrW, SetWindowLongPtrW, SetWindowPos, GWL_STYLE, STYLESTRUCT, SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, WS_CAPTION};
     unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM, _id: usize, _data: usize) -> LRESULT {
         const WM_NCLBUTTONDBLCLK: u32 = 0x00A3;
         const WM_SYSCOMMAND: u32 = 0x0112;
+        const WM_STYLECHANGING: u32 = 0x007C;
         const SC_MAXIMIZE: usize = 0xF030;
         if msg == WM_NCLBUTTONDBLCLK || (msg == WM_SYSCOMMAND && (wparam.0 & 0xFFF0) == SC_MAXIMIZE) {
             return LRESULT(0);
         }
+        // no OS caption, ever: the window keeps WS_CAPTION off whatever re-applies its style
+        if msg == WM_STYLECHANGING && wparam.0 as i32 == GWL_STYLE.0 {
+            let change = lparam.0 as *mut STYLESTRUCT;
+            if !change.is_null() {
+                unsafe { (*change).styleNew &= !WS_CAPTION.0 };
+            }
+        }
         unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
     }
     if let Some(hwnd) = hwnd_of(window) {
-        let _ = unsafe { SetWindowSubclass(hwnd, Some(proc), 0x5e7, 0) };
+        unsafe {
+            let _ = SetWindowSubclass(hwnd, Some(proc), 0x5e7, 0);
+            let style = GetWindowLongPtrW(hwnd, GWL_STYLE);
+            SetWindowLongPtrW(hwnd, GWL_STYLE, style & !(WS_CAPTION.0 as isize));
+            let _ = SetWindowPos(hwnd, None, 0, 0, 0, 0, SWP_FRAMECHANGED | SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE);
+        }
     }
 }
 
@@ -348,15 +380,18 @@ fn main() {
                 .skip_taskbar(test_offscreen())
                 .focused(!test_offscreen())
                 .disable_drag_drop_handler()
+                // wry's own switches, plus: a window that is cloaked (or covered) keeps rendering, so the page's first
+                // frame and its 'ready' never wait for the window to be shown (Chromium native window occlusion)
+                .additional_browser_args("--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection,CalculateNativeWinOcclusion --disable-backgrounding-occluded-windows")
                 .on_page_load(|window, payload| {
                     if payload.event() == tauri::webview::PageLoadEvent::Finished {
                         let host = window.state::<Host>();
                         host.send(json!({ "type": "loaded" }));
                         let w = window.clone();
                         std::thread::spawn(move || {
-                            std::thread::sleep(Duration::from_secs(3));
+                            std::thread::sleep(Duration::from_millis(1500));
                             let host = w.state::<Host>();
-                            reveal(&w, &host);
+                            reveal(&w, &host, "watchdog (no ready 1.5 s after load)");
                         });
                     }
                 });
@@ -377,6 +412,18 @@ fn main() {
                 keep_fixed_size(&window);
                 set_cloak(&window, true);
             }
+            // A test instance is shown without activation (Tauri show() activates even with focused(false)): it must
+            // never take the focus of the person whose session it runs in.
+            #[cfg(windows)]
+            if test_offscreen() {
+                use windows::Win32::UI::WindowsAndMessaging::{ShowWindow, SW_SHOWNOACTIVATE};
+                if let Some(hwnd) = hwnd_of(&window) {
+                    let _ = unsafe { ShowWindow(hwnd, SW_SHOWNOACTIVATE) };
+                }
+            } else {
+                let _ = window.show();
+            }
+            #[cfg(not(windows))]
             let _ = window.show();
             #[cfg(windows)]
             if let Some(hwnd) = hwnd_of(&window) {
