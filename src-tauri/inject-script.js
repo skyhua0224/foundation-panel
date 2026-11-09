@@ -222,18 +222,26 @@
   const initNavigation = () => {
     const getFullPath = () => location.pathname + location.search + location.hash
     let lastPath = location.pathname + location.search
+    let lastFull = getFullPath()
 
     postToParent('path-update', { path: getFullPath() })
 
     window.navigation?.addEventListener('navigate', (e) => {
-      if (!e.canIntercept || e.hashChange || e.downloadRequest) return
+      if (!e.canIntercept || e.downloadRequest) return
 
       const { pathname, search, hash } = new URL(e.destination.url)
       const newPath = pathname + search
 
+      // a place set by the page's own hash (/config#tab=audio&sub=sound) is a move of the page: the panel's list follows it (SidebarMenu.followFrame). It was ignored here, and the list stayed on the old row.
+      if (e.hashChange) {
+        const full = newPath + hash
+        if (full !== lastFull) { lastFull = full; postToParent('navigation-start', { path: full }) }
+        return
+      }
       if (newPath !== lastPath) {
         postToParent('navigation-start', { path: newPath + hash })
         lastPath = newPath
+        lastFull = newPath + hash
       }
     })
   }
