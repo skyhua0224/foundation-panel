@@ -1445,7 +1445,7 @@ fn stop_sunshine_for_update() -> Result<(), String> {
         );
         let status = query_status(*service)?;
         if status.dwCurrentState == SERVICE_STOPPED {
-            return Ok(());
+            return end_leftover_hosts(&root);
         }
         // SCM's PID is only meaningful in stable running/paused states.
         if !matches!(status.dwCurrentState, SERVICE_RUNNING | SERVICE_PAUSED)
@@ -1487,7 +1487,7 @@ fn stop_sunshine_for_update() -> Result<(), String> {
         ControlService(*service, SERVICE_CONTROL_STOP, &mut stopped)
             .map_err(|error| format!("stop update service failed: {error}"))?;
         match WaitForSingleObject(*process, 45_000) {
-            WAIT_OBJECT_0 => Ok(()),
+            WAIT_OBJECT_0 => end_leftover_hosts(&root),
             WAIT_TIMEOUT => Err("update service did not exit; installation was cancelled".into()),
             _ => Err(format!(
                 "wait for update service failed: {}",
@@ -1495,6 +1495,15 @@ fn stop_sunshine_for_update() -> Result<(), String> {
             )),
         }
     }
+}
+
+/// The service stop reaps the child it launched. A user-mode sunshine.exe, or a child that
+/// outlived the service, is still holding the ports. End those before the installer runs.
+#[cfg(target_os = "windows")]
+fn end_leftover_hosts(root: &std::path::Path) -> Result<(), String> {
+    crate::sunshine_service::end_host_processes(root).map_err(|code| {
+        format!("sunshine.exe was still running and could not be ended ({code}); installation was cancelled")
+    })
 }
 
 #[cfg(all(test, target_os = "windows"))]

@@ -63,6 +63,12 @@ const DEFAULT_PROXY_TIMEOUT_SECS: u64 = 5;
 /// weakening the failure budget of ordinary page requests.
 const SLOW_API_PROXY_TIMEOUT_SECS: u64 = 15;
 
+/// GET /api/doctor runs each group on the host with its own budget. The encoder group
+/// allows 90 s. The proxy must outlast that budget so the page receives the host's
+/// per-probe timeout instead of a transport failure, and must still end if the host
+/// never answers.
+const DOCTOR_PROXY_TIMEOUT_SECS: u64 = 100;
+
 /// AI 请求会携带日志、应用列表等上下文，模型首 token 可能明显慢于普通 API。
 const AI_PROXY_TIMEOUT_SECS: u64 = 120;
 
@@ -914,8 +920,11 @@ fn slow_api_timeout(method: &axum::http::Method, url: &str) -> Option<std::time:
         return None;
     }
     let path = url::Url::parse(url).ok()?.path().to_string();
-    matches!(path.as_str(), "/api/doctor" | "/api/runtime/sessions")
-        .then_some(std::time::Duration::from_secs(SLOW_API_PROXY_TIMEOUT_SECS))
+    match path.as_str() {
+        "/api/doctor" => Some(std::time::Duration::from_secs(DOCTOR_PROXY_TIMEOUT_SECS)),
+        "/api/runtime/sessions" => Some(std::time::Duration::from_secs(SLOW_API_PROXY_TIMEOUT_SECS)),
+        _ => None,
+    }
 }
 
 const ERROR_LOG_WINDOW: std::time::Duration = std::time::Duration::from_secs(60);
@@ -1389,6 +1398,14 @@ fn get_slow_api_http_client() -> &'static reqwest::Client {
     CLIENT.get_or_init(|| build_http_client(SLOW_API_PROXY_TIMEOUT_SECS))
 }
 
+fn get_doctor_http_client() -> &'static reqwest::Client {
+    use std::sync::OnceLock;
+    static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
+    // read_timeout is taken from the client, not from RequestBuilder::timeout.
+    // The doctor client therefore carries the 100 s budget on both.
+    CLIENT.get_or_init(|| build_http_client(DOCTOR_PROXY_TIMEOUT_SECS))
+}
+
 fn get_streaming_http_client() -> &'static reqwest::Client {
     use std::sync::OnceLock;
     static CLIENT: OnceLock<reqwest::Client> = OnceLock::new();
@@ -1590,6 +1607,8 @@ async fn fetch_and_proxy(
         get_streaming_http_client()
     } else if is_ai_api {
         get_ai_http_client()
+    } else if slow_api == Some(std::time::Duration::from_secs(DOCTOR_PROXY_TIMEOUT_SECS)) {
+        get_doctor_http_client()
     } else if slow_api.is_some() {
         get_slow_api_http_client()
     } else {
@@ -2073,7 +2092,7 @@ mod tests {
         assert_eq!(
             slow_api_timeout(&get, "https://127.0.0.1:57990/api/doctor?only=vdd&lang=zh")
                 .map(|duration| duration.as_secs()),
-            Some(SLOW_API_PROXY_TIMEOUT_SECS)
+            Some(DOCTOR_PROXY_TIMEOUT_SECS)
         );
         assert_eq!(
             slow_api_timeout(&get, "https://127.0.0.1:57990/api/runtime/sessions")

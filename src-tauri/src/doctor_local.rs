@@ -336,6 +336,8 @@ pub struct ProcessFacts {
     pub last_error: Option<(String, String, String)>,
     /// the log ends without the shutdown line while no host runs: the last run did not end cleanly
     pub ended_abruptly: bool,
+    /// set when the port table could not be read in time; empty listeners are then not "the ports are free"
+    pub port_table_error: String,
 }
 
 /// The last Error or Fatal line of a Sunshine log ("[stamp]: Level: message") and whether the log ends on a clean shutdown.
@@ -365,6 +367,38 @@ pub fn evaluate_process(f: &ProcessFacts, lang: Lang) -> Vec<Item> {
     }
     let name_of = |pid: u32| f.names.iter().find(|(p, _)| *p == pid).map(|(_, n)| n.clone()).unwrap_or_else(|| format!("PID {pid}"));
     let mut items = Vec::new();
+    if f.host_pids.len() > 1 {
+        items.push(item(
+            "process.instances",
+            "fail",
+            tr(lang, "Sunshine processes", "Sunshine 进程"),
+            tr(
+                lang,
+                format!("{} sunshine.exe processes are running and compete for the ports and the GPU", f.host_pids.len()),
+                format!("{} 个 sunshine.exe 同时在跑,互相抢端口和显卡", f.host_pids.len()),
+            ),
+            act(
+                tr(lang, "Restart Sunshine so only one is left.", "重启 Sunshine,只留一个。"),
+                "restart",
+                "sunshine",
+                2,
+                tr(lang, "Stops every Sunshine of this installation and starts one.", "停掉本安装的全部 Sunshine,再启动一个。"),
+            ),
+        ));
+    }
+    if !f.port_table_error.is_empty() {
+        items.push(item(
+            "process.ports",
+            "warn",
+            tr(lang, "Ports", "端口占用"),
+            tr(
+                lang,
+                format!("The port table did not answer: {}", f.port_table_error),
+                format!("端口表没有返回:{}", f.port_table_error),
+            ),
+            fix(tr(lang, "Run this group again. If it repeats, restart Sunshine.", "重新检查这一组。反复出现时重启 Sunshine。")),
+        ));
+    } else {
     let mut taken = Vec::new();
     let mut ours = 0;
     let mut free = Vec::new();
@@ -395,6 +429,7 @@ pub fn evaluate_process(f: &ProcessFacts, lang: Lang) -> Vec<Item> {
         }
     }
 
+    }
     if !f.log_found {
         items.push(item("process.log", "skip", tr(lang, "End of the log", "日志末尾"),
             tr(lang, format!("Not checked: no log at {}", f.log_path), format!("未检查:{} 没有日志", f.log_path)), Fix::default()));
@@ -431,6 +466,8 @@ pub struct DriverFact {
     pub note: String,
     /// absence is a problem (VDD is needed for headless hosts; the others are optional)
     pub required: bool,
+    /// the probe itself did not finish; not a statement about the driver
+    pub probe_error: String,
 }
 
 pub fn driver_effect(id: &str, lang: Lang) -> String {
@@ -465,6 +502,10 @@ pub fn evaluate_drivers(drivers: &[DriverFact], lang: Lang) -> Vec<Item> {
     let mut items = Vec::new();
     for d in drivers {
         let id = format!("drivers.{}", d.id);
+        if !d.probe_error.is_empty() {
+            items.push(item(&id, "warn", d.name.clone(), tr(lang, format!("The check did not finish: {}", d.probe_error), format!("检查没有完成:{}", d.probe_error)), fix(tr(lang, "Run this group again.", "重新检查这一组。"))));
+            continue;
+        }
         if !d.checked {
             items.push(skip_not_windows(&id, d.name.clone(), lang));
             continue;
@@ -587,6 +628,27 @@ mod collect {
 
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
+    /// `netstat -ano` walks the endpoint tables and does not return on its own when those tables are wedged
+    /// (two Sunshine processes holding sockets is the case that left the health check running forever).
+    /// Five seconds, then the child is ended and this probe fails on its own [dr-ms-netstat-20261109].
+    fn output_bounded(mut command: Command, budget: Duration) -> Result<std::process::Output, String> {
+        use std::process::Stdio;
+        let mut child = command.stdout(Stdio::piped()).stderr(Stdio::null()).spawn().map_err(|error| error.to_string())?;
+        let started = std::time::Instant::now();
+        loop {
+            match child.try_wait() {
+                Ok(Some(_)) => return child.wait_with_output().map_err(|error| error.to_string()),
+                Ok(None) if started.elapsed() >= budget => {
+                    let _ = child.kill();
+                    let _ = child.wait();
+                    return Err(format!("no answer within {} s", budget.as_secs()));
+                }
+                Ok(None) => std::thread::sleep(Duration::from_millis(50)),
+                Err(error) => return Err(error.to_string()),
+            }
+        }
+    }
+
     pub fn host_pids() -> Vec<u32> {
         crate::device_probe::system_processes()
             .map(|list| list.into_iter().filter(|p| p.name.eq_ignore_ascii_case("sunshine.exe")).map(|p| p.pid).collect())
@@ -690,7 +752,10 @@ mod collect {
 
     pub async fn process() -> ProcessFacts {
         let base_port = crate::sunshine::parse_sunshine_config().await.ok().and_then(|c| c.port).and_then(|p| p.trim().parse().ok()).unwrap_or(47989);
-        let listeners = Command::new("netstat").args(["-ano"]).creation_flags(CREATE_NO_WINDOW).output().map(|o| parse_netstat(&crate::text_encoding::decode_console_bytes(&o.stdout))).unwrap_or_default();
+        let (listeners, port_table_error) = match output_bounded(Command::new("netstat").args(["-ano"]).creation_flags(CREATE_NO_WINDOW), Duration::from_secs(5)) {
+            Ok(output) => (parse_netstat(&crate::text_encoding::decode_console_bytes(&output.stdout)), String::new()),
+            Err(error) => (Vec::new(), error),
+        };
         let names = crate::device_probe::system_processes().map(|list| list.into_iter().map(|p| (p.pid, p.name)).collect()).unwrap_or_default();
         let log = crate::sunshine::config_dir().join("sunshine.log");
         let text = read_tail(&log, 256 * 1024);
@@ -705,6 +770,7 @@ mod collect {
             log_path: log.display().to_string(),
             last_error,
             ended_abruptly: text.is_some() && !clean_end,
+            port_table_error,
         }
     }
 
@@ -720,31 +786,37 @@ mod collect {
 
     pub async fn drivers(lang: Lang) -> Vec<DriverFact> {
         let mut out = Vec::new();
-        match crate::vdd::get_vdd_status().await {
-            Ok(s) => out.push(DriverFact {
-                id: "vdd".into(), name: tr(lang, "ZakoDisplay", "杂鱼虚拟显示器"), checked: true, installed: s.installed,
+        let vdd_name = tr(lang, "ZakoDisplay", "杂鱼虚拟显示器");
+        match tokio::time::timeout(Duration::from_secs(8), crate::vdd::get_vdd_status()).await {
+            Ok(Ok(s)) => out.push(DriverFact {
+                id: "vdd".into(), name: vdd_name.clone(), checked: true, installed: s.installed,
                 running: s.running && s.control_available, problem: None, version: s.installed_version.clone(), reboot: s.state == "reboot_required",
                 note: if s.installed && !s.version_match && !s.bundled_version.is_empty() { tr(lang, format!("the bundled driver is {}", s.bundled_version), format!("随附驱动是 {}", s.bundled_version)) } else { String::new() },
-                required: true,
+                required: true, probe_error: String::new(),
             }),
-            Err(_) => out.push(DriverFact { id: "vdd".into(), name: tr(lang, "ZakoDisplay", "杂鱼虚拟显示器"), ..Default::default() }),
+            Err(_) => out.push(DriverFact { id: "vdd".into(), name: vdd_name, checked: true, required: true, probe_error: "no answer within 8 s".into(), ..Default::default() }),
+            Ok(Err(_)) => out.push(DriverFact { id: "vdd".into(), name: tr(lang, "ZakoDisplay", "杂鱼虚拟显示器"), ..Default::default() }),
         }
-        match crate::vigem::get_vigem_status().await {
-            Ok(s) => out.push(DriverFact {
+        match tokio::time::timeout(Duration::from_secs(8), crate::vigem::get_vigem_status()).await {
+            Ok(Ok(s)) => out.push(DriverFact {
                 id: "vigem".into(), name: "ViGEmBus".into(), checked: true, installed: s.installed, running: s.running && s.version_ok, problem: None, version: s.version.clone(), reboot: false,
-                note: tr(lang, "Upstream no longer maintains ViGEmBus; DualSense can go over USB instead.", "上游已停止维护 ViGEmBus,DualSense 可以改走 USB 方式。"), required: false,
+                note: tr(lang, "Upstream no longer maintains ViGEmBus; DualSense can go over USB instead.", "上游已停止维护 ViGEmBus,DualSense 可以改走 USB 方式。"), required: false, probe_error: String::new(),
             }),
-            Err(_) => out.push(DriverFact { id: "vigem".into(), name: "ViGEmBus".into(), ..Default::default() }),
+            Err(_) => out.push(DriverFact { id: "vigem".into(), name: "ViGEmBus".into(), checked: true, probe_error: "no answer within 8 s".into(), ..Default::default() }),
+            Ok(Err(_)) => out.push(DriverFact { id: "vigem".into(), name: "ViGEmBus".into(), ..Default::default() }),
         }
-        match crate::vmouse::get_vmouse_status().await {
-            Ok(s) => out.push(DriverFact { id: "vmouse".into(), name: tr(lang, "Virtual mouse", "虚拟鼠标"), checked: true, installed: s.installed, running: s.running, problem: None, version: String::new(), reboot: false, note: String::new(), required: false }),
-            Err(_) => out.push(DriverFact { id: "vmouse".into(), name: tr(lang, "Virtual mouse", "虚拟鼠标"), ..Default::default() }),
+        let vmouse_name = tr(lang, "Virtual mouse", "虚拟鼠标");
+        match tokio::time::timeout(Duration::from_secs(8), crate::vmouse::get_vmouse_status()).await {
+            Ok(Ok(s)) => out.push(DriverFact { id: "vmouse".into(), name: vmouse_name.clone(), checked: true, installed: s.installed, running: s.running, problem: None, version: String::new(), reboot: false, note: String::new(), required: false, probe_error: String::new() }),
+            Err(_) => out.push(DriverFact { id: "vmouse".into(), name: vmouse_name, checked: true, probe_error: "no answer within 8 s".into(), ..Default::default() }),
+            Ok(Err(_)) => out.push(DriverFact { id: "vmouse".into(), name: tr(lang, "Virtual mouse", "虚拟鼠标"), ..Default::default() }),
         }
-        match crate::usbip::usbip_get_status().await {
-            Ok(s) if s.supported => out.push(DriverFact {
+        match tokio::time::timeout(Duration::from_secs(8), crate::usbip::usbip_get_status()).await {
+            Ok(Ok(s)) if s.supported => out.push(DriverFact {
                 id: "usbip".into(), name: "USB/IP (usbip-win2)".into(), checked: true, installed: s.installed, running: s.ready, problem: None, version: s.version.clone(), reboot: s.reboot_recommended,
-                note: if s.error_code.is_empty() { String::new() } else { s.error_code.clone() }, required: false,
+                note: if s.error_code.is_empty() { String::new() } else { s.error_code.clone() }, required: false, probe_error: String::new(),
             }),
+            Err(_) => out.push(DriverFact { id: "usbip".into(), name: "USB/IP (usbip-win2)".into(), checked: true, probe_error: "no answer within 8 s".into(), ..Default::default() }),
             _ => out.push(DriverFact { id: "usbip".into(), name: "USB/IP (usbip-win2)".into(), ..Default::default() }),
         }
         // the PnP problem code of each device node, as Device Manager shows it
@@ -925,6 +997,47 @@ mod tests {
         assert_eq!(find(&items, "process.log").status, "warn");
         assert_eq!(find(&items, "process.last_run").status, "warn");
         contract(&items);
+    }
+
+    #[test]
+    fn two_sunshine_processes_fail_on_their_own_and_a_silent_port_table_is_not_a_pass() {
+        let f = ProcessFacts {
+            checked: true,
+            base_port: 47989,
+            host_pids: vec![100, 200],
+            log_found: true,
+            ..Default::default()
+        };
+        let items = evaluate_process(&f, Lang::Zh);
+        assert_eq!(find(&items, "process.instances").status, "fail");
+        assert!(find(&items, "process.instances").detail.contains("2"));
+        let silent = ProcessFacts {
+            checked: true,
+            base_port: 47989,
+            port_table_error: "no answer within 5 s".into(),
+            log_found: true,
+            ..Default::default()
+        };
+        let ports = find(&evaluate_process(&silent, Lang::Zh), "process.ports");
+        assert_eq!(ports.status, "warn");
+        assert!(ports.detail.contains("no answer within 5 s"));
+        contract(&items);
+    }
+
+    #[test]
+    fn a_driver_probe_that_does_not_finish_is_a_warning_not_not_installed() {
+        let drivers = [DriverFact {
+            id: "vdd".into(),
+            name: "杂鱼虚拟显示器".into(),
+            checked: true,
+            required: true,
+            probe_error: "no answer within 8 s".into(),
+            ..Default::default()
+        }];
+        let item = find(&evaluate_drivers(&drivers, Lang::Zh), "drivers.vdd");
+        assert_eq!(item.status, "warn");
+        assert!(item.detail.contains("8"));
+        assert!(!item.detail.contains("没有安装"));
     }
 
     #[test]

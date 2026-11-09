@@ -193,26 +193,35 @@ mod win {
 
     impl SharedMemoryHandle {
         pub fn open() -> std::result::Result<Self, String> {
-            unsafe {
-                let name = CString::new("RTSSSharedMemoryV2").unwrap();
-                let handle = OpenFileMappingA(
-                    FILE_MAP_READ.0 | FILE_MAP_WRITE.0,
-                    false,
-                    PCSTR(name.as_ptr() as *const u8),
-                )
-                .map_err(|e| format!("无法打开 RTSS 共享内存: {} (RTSS 可能未运行)", e))?;
-
-                let view = MapViewOfFile(handle, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
-
-                if view.Value.is_null() {
-                    let _ = CloseHandle(handle);
-                    return Err("映射 RTSS 共享内存失败".to_string());
+            let names = ["RTSSSharedMemoryV2", "Local\\RTSSSharedMemoryV2", "Global\\RTSSSharedMemoryV2"];
+            let accesses = [FILE_MAP_READ.0 | FILE_MAP_WRITE.0, FILE_MAP_READ.0];
+            let mut last = String::from("unable to open RTSS shared memory");
+            for name in names {
+                for access in accesses {
+                    match Self::map(name, access) {
+                        Ok(handle) => return Ok(handle),
+                        Err(error) => last = error,
+                    }
                 }
+            }
+            Err(last)
+        }
 
-                Ok(Self {
-                    ptr: view.Value,
-                    handle,
-                })
+        fn map(name: &str, access: u32) -> std::result::Result<Self, String> {
+            unsafe {
+                let name = CString::new(name).map_err(|error| error.to_string())?;
+                let handle = OpenFileMappingA(access, false, PCSTR(name.as_ptr() as *const u8))
+                    .map_err(|error| format!("unable to open RTSS shared memory: {error}"))?;
+                let view = MapViewOfFile(handle, FILE_MAP_READ | FILE_MAP_WRITE, 0, 0, 0);
+                if view.Value.is_null() {
+                    let view = MapViewOfFile(handle, FILE_MAP_READ, 0, 0, 0);
+                    if view.Value.is_null() {
+                        let _ = CloseHandle(handle);
+                        return Err("mapping RTSS shared memory failed".to_string());
+                    }
+                    return Ok(Self { ptr: view.Value, handle });
+                }
+                Ok(Self { ptr: view.Value, handle })
             }
         }
     }
@@ -236,32 +245,47 @@ fn detect_rtss_install_dir() -> Option<String> {
     use winreg::RegKey;
     use winreg::enums::*;
 
-    let paths = [
-        (HKEY_LOCAL_MACHINE, r"Software\WOW6432Node\Unwinder\RTSS"),
-        (HKEY_LOCAL_MACHINE, r"Software\Unwinder\RTSS"),
+    // 32-bit installer view first, then the native view. KEY_WOW64_32KEY reads the view
+    // RTSS actually writes [dr-ms-alt-registry-view-20261109].
+    let mut registry = Vec::new();
+    let views = [
+        (r"Software\WOW6432Node\Unwinder\RTSS", KEY_READ | KEY_WOW64_64KEY),
+        (r"Software\Unwinder\RTSS", KEY_READ | KEY_WOW64_32KEY),
+        (r"Software\Unwinder\RTSS", KEY_READ | KEY_WOW64_64KEY),
     ];
-
-    for (root, path) in &paths {
-        if let Ok(key) = RegKey::predef(*root).open_subkey(path) {
-            if let Ok(dir) = key.get_value::<String, _>("InstallDir") {
-                if std::path::Path::new(&dir).exists() {
-                    return Some(dir);
-                }
-            }
+    for (path, access) in views {
+        let Ok(key) = RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey_with_flags(path, access) else { continue };
+        if let Ok(dir) = key.get_value::<String, _>("InstallDir") {
+            registry.push(dir);
         }
     }
+    crate::rtss_detect::choose_rtss_install_dir(&registry, &rtss_process_images(), |dir| std::path::Path::new(dir).is_dir())
+}
 
-    let common_paths = [
-        r"C:\Program Files (x86)\RivaTuner Statistics Server",
-        r"C:\Program Files\RivaTuner Statistics Server",
-    ];
-    for path in &common_paths {
-        if std::path::Path::new(path).exists() {
-            return Some(path.to_string());
+#[cfg(target_os = "windows")]
+fn rtss_process_images() -> Vec<String> {
+    use windows::Win32::Foundation::CloseHandle;
+    use windows::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW};
+    use windows::core::PWSTR;
+    let Ok(list) = crate::device_probe::system_processes() else { return Vec::new() };
+    let mut images = Vec::new();
+    for process in list {
+        let name = process.name.to_ascii_lowercase();
+        if !matches!(name.as_str(), "rtss.exe" | "rtsshooksloader.exe" | "rtsshooksloader64.exe" | "encoderserver.exe") {
+            continue;
+        }
+        let Ok(handle) = (unsafe { OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, process.pid) }) else { continue };
+        let mut buffer = vec![0u16; 32768];
+        let mut length = buffer.len() as u32;
+        let read = unsafe {
+            QueryFullProcessImageNameW(handle, windows::Win32::System::Threading::PROCESS_NAME_WIN32, PWSTR(buffer.as_mut_ptr()), &mut length)
+        };
+        unsafe { let _ = CloseHandle(handle); }
+        if read.is_ok() {
+            images.push(String::from_utf16_lossy(&buffer[..length as usize]));
         }
     }
-
-    None
+    images
 }
 
 #[cfg(not(target_os = "windows"))]

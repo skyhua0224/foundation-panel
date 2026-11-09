@@ -34,6 +34,7 @@ mod device_probe;
 mod probe_cache;
 mod proxy_server;
 mod rtss;
+mod rtss_detect;
 mod rtss_frame_rates;
 mod perf;
 mod hdr_enhanced;
