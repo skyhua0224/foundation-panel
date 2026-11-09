@@ -1,10 +1,10 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The installer pages: the app's own two commands (installer_view, installer_action), events, and dragging the window by its title bar",
+  "description": "The installer pages: the app's own two commands (installer_view, installer_action), events, dragging the window by its title bar and minimising it; no maximise (fixed size: core:window:default would grant internal_toggle_maximize to the drag region's double click)",
   "windows": ["main"],
   "permissions": [
-    "core:default",
+    "core:event:default",
     "core:window:allow-start-dragging",
     "core:window:allow-minimize"
   ]

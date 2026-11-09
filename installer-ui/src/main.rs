@@ -131,6 +131,28 @@ fn capture_page(window: &WebviewWindow, path: PathBuf) {
     });
 }
 
+/// The window has a fixed size. Its drag region would maximise it on a double click: Windows does that for a
+/// caption hit (WM_NCLBUTTONDBLCLK, then WM_SYSCOMMAND SC_MAXIMIZE), and Tauri's drag-region script asks for it
+/// (internal_toggle_maximize, also not granted in capabilities/default.json). The subclass drops both
+/// (installer-ms-setwindowsubclass-20261109, installer-ms-wm-syscommand-20261109).
+#[cfg(windows)]
+fn keep_fixed_size(window: &WebviewWindow) {
+    use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
+    use windows::Win32::UI::Shell::{DefSubclassProc, SetWindowSubclass};
+    unsafe extern "system" fn proc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM, _id: usize, _data: usize) -> LRESULT {
+        const WM_NCLBUTTONDBLCLK: u32 = 0x00A3;
+        const WM_SYSCOMMAND: u32 = 0x0112;
+        const SC_MAXIMIZE: usize = 0xF030;
+        if msg == WM_NCLBUTTONDBLCLK || (msg == WM_SYSCOMMAND && (wparam.0 & 0xFFF0) == SC_MAXIMIZE) {
+            return LRESULT(0);
+        }
+        unsafe { DefSubclassProc(hwnd, msg, wparam, lparam) }
+    }
+    if let Some(hwnd) = hwnd_of(window) {
+        let _ = unsafe { SetWindowSubclass(hwnd, Some(proc), 0x5e7, 0) };
+    }
+}
+
 fn arg_value(name: &str) -> Option<String> {
     let args: Vec<String> = std::env::args().collect();
     args.iter().position(|a| a == name).and_then(|i| args.get(i + 1).cloned())
@@ -205,6 +227,7 @@ fn main() {
             #[cfg(windows)]
             {
                 apply_dwm_corners(&window);
+                keep_fixed_size(&window);
                 set_cloak(&window, true);
             }
             let _ = window.show();
