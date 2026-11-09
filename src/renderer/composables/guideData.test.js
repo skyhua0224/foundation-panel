@@ -286,10 +286,20 @@ test('the address step reads the port the host runs and the one it saved, and th
   assert.deepEqual([old.state.network.port, old.state.network.activePort, old.state.host.name], [47989, 47989, ''])
 })
 
+test('setPort saves the base port in the configuration through the host route, nothing else changes', async () => {
+  const calls = []
+  const data = make({ '/api/config': (path, init) => (init.method === 'POST' ? { status: true } : { sunshine_name: 'SKY-PC', port: 47989, upnp: 'enabled' }) }, {}, calls)
+  assert.deepEqual(await data.callbacks.setPort(48989), { ok: true })
+  const post = calls.find((c) => c.method === 'POST')
+  assert.equal(post.path, '/api/config'); assert.deepEqual(post.body, { sunshine_name: 'SKY-PC', port: 48989, upnp: 'enabled' })
+  assert.equal(data.state.network.port, 48989)
+  const refused = make({ '/api/config': (path, init) => (init.method === 'POST' ? new Response(JSON.stringify({ status: false, error: 'port out of range' }), { status: 400 }) : {}) })
+  assert.deepEqual(await refused.callbacks.setPort(80), { ok: false, error: 'port out of range' })
+})
+
 test('the address step opens the diagnostics through the panel', async () => {
   let opened = 0
   const data = make({}, { openDiagnostics: () => { opened += 1 } })
   data.callbacks.openDiagnostics(); assert.equal(opened, 1)
   assert.doesNotThrow(() => make({}).callbacks.openDiagnostics())
 })
-

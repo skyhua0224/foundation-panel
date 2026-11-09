@@ -147,6 +147,18 @@ export function createGuideData(deps) {
     }
   }
 
+  /** The base port (`port`) in the saved configuration; the host listens on it after a restart. */
+  async function setPort(port) {
+    try {
+      const { response, data } = await postJson('/api/config', { ...(await getJson('/api/config')), port })
+      if (!response.ok) return { ok: false, error: typeof data.error === 'string' ? data.error : '' } // postJson has read the body
+      state.network.port = Number(port)
+      return { ok: true }
+    } catch (error) {
+      return { ok: false, error: error?.message || '' }
+    }
+  }
+
   /** The public endpoints (`external_endpoints`: `host[:port]` entries, comma separated) in the saved configuration; the old single `external_ip` is cleared with the first save. */
   async function setPublicEndpoints(value) {
     try {
@@ -279,6 +291,7 @@ export function createGuideData(deps) {
     saveWebAccess,
     checkReach: (force, options) => deps.reach?.refresh(force, options),
     setUpnp,
+    setPort,
     openDiagnostics: () => deps.openDiagnostics?.(),
     setPublicEndpoints,
     restartHost,
