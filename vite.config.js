@@ -41,6 +41,7 @@ export default defineConfig(() => ({
         latencyClock: resolve(rendererSrcPath, 'latency-clock/index.html'),
         home: resolve(rendererSrcPath, 'home/index.html'),
         toolbar: resolve(rendererSrcPath, 'toolbar/index.html'),
+        ctxMenu: resolve(rendererSrcPath, 'ctxmenu/index.html'),
         toolWindow: resolve(rendererSrcPath, 'tool-window/index.html'),
         desktop: resolve(rendererSrcPath, 'desktop/index.html'),
       },

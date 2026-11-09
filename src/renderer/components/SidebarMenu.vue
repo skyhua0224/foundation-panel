@@ -134,6 +134,7 @@ import { SPONSORS } from '../config/sponsors.js'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
 import { openBigScreenWithNotice } from '../composables/openBigScreen.js'
+import { installMenuPopup } from '../composables/menuPopup.js'
 import { MButton, homeTexts, MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, doctorTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode, useDialogs } from 'foundation-ui/vue'
 import { developerOverlays, developerTexts, DEFAULT_FLAGS } from 'foundation-ui/developer'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
@@ -624,9 +625,21 @@ const pushDs5Status = () => {
   for (const frame of document.querySelectorAll('iframe')) frame.contentWindow?.postMessage(message, '*')
 }
 watch(() => ds5.status.value?.state, pushDs5Status)
+// The context menus of this window and of the Web pages in its frame are shown in the menu window (src-tauri/src/ctx_popup.rs), which may extend beyond this window; without it they stay in the page
+let popupMenu = null
+const startPopupMenu = async () => {
+  try {
+    const [{ invoke }, { listen }] = await Promise.all([import('@tauri-apps/api/core'), import('@tauri-apps/api/event')])
+    if (!window.__TAURI_INTERNALS__ || popupMenu) return
+    popupMenu = installMenuPopup({ invoke, listen, backLabel: () => contextTexts(locale.value).backToMenu })
+    for (const frame of document.querySelectorAll('iframe')) frame.contentWindow?.postMessage({ type: 'foundation-menu-host' }, '*')
+  } catch { /* not in the app window: the menus stay in the page */ }
+}
 const onFrameMessage = (event) => {
   const data = event.data
-  if (![...document.querySelectorAll('iframe')].some((frame) => frame.contentWindow === event.source)) return
+  const frame = [...document.querySelectorAll('iframe')].find((f) => f.contentWindow === event.source)
+  if (!frame) return
+  if (data?.type === 'foundation-menu-open' || data?.type === 'foundation-menu-hello') { popupMenu?.frameMessage(event, frame); return }
   if (data?.type === 'foundation-subpage') frameSub.value = data.open === true
   else if (data?.type === 'foundation-search-open') uni.show()
   else if (data?.type === 'foundation-settings-recent' && typeof data.key === 'string') settingsList.remember(data.key)
@@ -636,8 +649,8 @@ const onFrameMessage = (event) => {
   else if (data?.type === 'foundation-open' && data.page === 'components') router.navigate(ROUTES.COMPONENTS)
   else if (data?.type === 'foundation-open' && data.page === 'hdr-enhanced') router.navigate(ROUTES.HDR_ENHANCED)
   else if (data?.type === 'foundation-ds5-status-request') pushDs5Status()}
-onMounted(() => { window.addEventListener('message', onFrameMessage); loadHostData(); componentStatus.start(60000) })
-onBeforeUnmount(() => { window.removeEventListener('message', onFrameMessage); componentStatus.stop() })
+onMounted(() => { window.addEventListener('message', onFrameMessage); loadHostData(); componentStatus.start(60000); startPopupMenu() })
+onBeforeUnmount(() => { window.removeEventListener('message', onFrameMessage); componentStatus.stop(); popupMenu?.stop(); popupMenu = null })
 const contextMenu = ref(null)
 // the window's own context menu (SPEC-context-menu): what this product can do for it; an action that is not here is not an item
 // 运行体检 is 全部检查 of the components page; 打开 Web UI opens the host's address in the system browser (the dashboard card of the old panel did the same); the pet's entry is the 桌宠 sheet of 面板设置, the page
