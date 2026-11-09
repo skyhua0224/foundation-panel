@@ -47,6 +47,7 @@
           <MItem action icon="key" :title="t.sidebar.accountCredentials" @click="emit('webui-navigate', '/password')" />
         </MGroup>
       </MSection>
+      <MFeedbackAccount :locale="locale" />
       <MSection :title="t.sidebar.maintenance">
         <MGroup>
           <MItem icon="cleaning_services" :title="t.sidebar.coverCache" :text="t.sidebar.coverCacheDescription">
@@ -88,7 +89,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MChoiceItem, MSeg, MChip, MButton, MIcon, MFieldItem, MBanner, MSupportSheet, useNotify, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard, doctorTexts, MFeedbackRow } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MChoiceItem, MSeg, MChip, MButton, MIcon, MFieldItem, MBanner, MSupportSheet, useNotify, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard, doctorTexts, MFeedbackRow, MFeedbackAccount } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import ShortcutsSheet from './m3e/ShortcutsSheet.vue'
 import { usePanelPart } from '../composables/panelParts.js'
