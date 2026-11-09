@@ -157,7 +157,7 @@ export const zh = {
       alwaysHdr: '始终+HDR',
     },
     bitrateLimit: '码率上限',
-    bitrateUnlimited: '不限制',
+    bitrateAuto: '自动',
     hdr: 'HDR',
     hdrAutoSwitch: '自动 HDR 切换',
     hdrAutoSwitchDesc: '串流时自动开启/关闭 HDR',

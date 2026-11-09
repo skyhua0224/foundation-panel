@@ -27,10 +27,7 @@
           :titled="scene.kind === 'single'"
           @navigate="onListNavigate"
           @context="onRowContext"
-        >
-          <!-- 添加应用 is the thing people do on 串流: a press on the rail and a press here (the page and its button were three) -->
-          <template v-if="entry.rail === 'stream'" #top><div class="m-navlist__add"><MButton variant="tonal" icon="add" @click="openDestination('apps:add')">{{ homeTexts(locale)['c_act-add-app'] }}</MButton></div></template>
-        </MNavList>
+        />
       </template>
       <template #detail="{ entry }">
         <!-- while the host cannot be used the status page (the overlay) is the whole content area; a page that needs the host is not drawn under it -->
@@ -40,7 +37,7 @@
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" @webui-navigate="openWebUi" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
-        <StreamHubPage v-else-if="entry.id === ROUTES.STREAM_HUB" :runtime="runtimeView" :add-label="homeTexts(locale)['c_act-add-app']" @open="onListNavigate" @add="openDestination('apps:add')" />
+        <StreamHubPage v-else-if="entry.id === ROUTES.STREAM_HUB" :runtime="runtimeView" @open="onListNavigate" />
         <SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" :groups="settingsList.groups.value" :runtime="runtimeView" @open="onListNavigate" />
         <HdrEnhancedManager v-else-if="entry.id === ROUTES.HDR_ENHANCED" @manage-components="jumpTo(ROUTES.COMPONENTS)" />
         <AppearancePage v-else-if="entry.id === ROUTES.CFG_APPEARANCE" />
@@ -139,7 +136,8 @@ import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
 import { openBigScreenWithNotice } from '../composables/openBigScreen.js'
 import { installMenuPopup } from '../composables/menuPopup.js'
-import { MButton, homeTexts, MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MCaptionVersion, MCaptionBack, MBackChip, useCaptionRoom, createJumpHistory, useBackVariant, showsButton, showsChip, captionTexts, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, doctorTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode, useDialogs } from 'foundation-ui/vue'
+import { installTrayTheme } from '../composables/trayTheme.js'
+import { MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MCaptionVersion, MCaptionBack, MBackChip, useCaptionRoom, createJumpHistory, useBackVariant, showsButton, showsChip, captionTexts, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, doctorTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode, useDialogs } from 'foundation-ui/vue'
 import { developerOverlays, developerTexts, DEFAULT_FLAGS } from 'foundation-ui/developer'
 import { afterCheck, afterOpened, noticeView, readNotice, writeNotice } from 'foundation-ui/update'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
@@ -680,11 +678,13 @@ const pushDs5Status = () => {
 watch(() => ds5.status.value?.state, pushDs5Status)
 // The context menus of this window and of the Web pages in its frame are shown in the menu window (src-tauri/src/ctx_popup.rs), which may extend beyond this window; without it they stay in the page
 let popupMenu = null
+let stopTrayTheme = () => {}
 const startPopupMenu = async () => {
   try {
     const [{ invoke }, { listen }] = await Promise.all([import('@tauri-apps/api/core'), import('@tauri-apps/api/event')])
     if (!window.__TAURI_INTERNALS__ || popupMenu) return
     popupMenu = installMenuPopup({ invoke, listen, backLabel: () => contextTexts(locale.value).backToMenu })
+    stopTrayTheme = installTrayTheme({ invoke }) // the tray icon's menus use this window's colours
     for (const frame of document.querySelectorAll('iframe')) frame.contentWindow?.postMessage({ type: 'foundation-menu-host' }, '*')
   } catch { /* not in the app window: the menus stay in the page */ }
 }
@@ -703,7 +703,7 @@ const onFrameMessage = (event) => {
   else if (data?.type === 'foundation-open' && data.page === 'hdr-enhanced') router.navigate(ROUTES.HDR_ENHANCED)
   else if (data?.type === 'foundation-ds5-status-request') pushDs5Status()}
 onMounted(() => { window.addEventListener('message', onFrameMessage); loadHostData(); componentStatus.start(60000); startPopupMenu() })
-onBeforeUnmount(() => { window.removeEventListener('message', onFrameMessage); componentStatus.stop(); popupMenu?.stop(); popupMenu = null })
+onBeforeUnmount(() => { window.removeEventListener('message', onFrameMessage); componentStatus.stop(); popupMenu?.stop(); popupMenu = null; stopTrayTheme() })
 const contextMenu = ref(null)
 // the window's own context menu (SPEC-context-menu): what this product can do for it; an action that is not here is not an item
 // 运行体检 is 全部检查 of the components page; 打开 Web UI opens the host's address in the system browser (the dashboard card of the old panel did the same); the pet's entry is the 桌宠 sheet of 面板设置, the page

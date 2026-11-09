@@ -269,7 +269,6 @@ pub async fn export_logs(
     format: String, // "txt" or "json"
 ) -> Result<String, String> {
     use tauri_plugin_dialog::DialogExt;
-    use tokio::sync::oneshot;
 
     let logs = if let Some(collector) = LOG_COLLECTOR.get() {
         collector.get_logs()
@@ -285,28 +284,18 @@ pub async fn export_logs(
     let timestamp = Local::now().format("%Y%m%d_%H%M%S").to_string();
     let default_filename = format!("sunshine_gui_logs_{}.{}", timestamp, format);
 
-    // Receive the save dialog result through a oneshot channel.
-    let (tx, rx) = oneshot::channel();
-
-    // Open save-file dialog.
-    app.dialog()
-        .file()
-        .set_file_name(&default_filename)
-        .add_filter("Text files", &["txt"])
-        .add_filter("JSON files", &["json"])
-        .add_filter("All files", &["*"])
-        .save_file(move |file_path_opt| {
-            let _ = tx.send(file_path_opt);
-        });
-
-    // Wait for the user to choose a file.
-    let file_path = rx
-        .await
-        .map_err(|_| "Failed to receive dialog result".to_string())?
-        .ok_or_else(|| "Save canceled".to_string())?;
-
-    // Convert FilePath to PathBuf.
-    let file_path: PathBuf = PathBuf::from(file_path.to_string());
+    // The dialog answers with no path when the person closes it: a cancel, not an error.
+    let file_path = crate::fs_utils::chosen_save_path(
+        crate::fs_utils::wait_for_save_path(
+            app.dialog()
+                .file()
+                .set_file_name(&default_filename)
+                .add_filter("Text files", &["txt"])
+                .add_filter("JSON files", &["json"])
+                .add_filter("All files", &["*"]),
+        )
+        .await?,
+    )?;
 
     // Generate export content.
     let content = match format.as_str() {
@@ -331,7 +320,7 @@ pub async fn export_logs(
     };
 
     // Write export file.
-    fs::write(&file_path, content).map_err(|e| format!("Failed to write file: {}", e))?;
+    crate::fs_utils::write_export_file(&file_path, content.as_bytes())?;
 
     let file_name = file_path
         .file_name()

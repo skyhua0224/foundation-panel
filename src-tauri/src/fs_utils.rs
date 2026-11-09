@@ -1,12 +1,42 @@
 use crate::sunshine;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 #[cfg(target_os = "windows")]
 use std::ffi::OsStr;
 #[cfg(target_os = "windows")]
 use std::os::windows::ffi::OsStrExt;
+
+/// The answer of a save dialog the person closed: callers treat it as a quiet cancel, not a failure.
+pub(crate) const SAVE_CANCELLED: &str = "cancelled";
+
+/// Show a save dialog and wait for its answer. `Ok(None)` is the person closing it.
+pub(crate) async fn wait_for_save_path<R: tauri::Runtime>(
+    dialog: tauri_plugin_dialog::FileDialogBuilder<R>,
+) -> Result<Option<PathBuf>, String> {
+    use tokio::sync::oneshot;
+
+    let (tx, rx) = oneshot::channel();
+    dialog.save_file(move |file_path_opt| {
+        let _ = tx.send(file_path_opt);
+    });
+
+    let file_path = rx
+        .await
+        .map_err(|_| "dialog channel error".to_string())?;
+    Ok(file_path.map(|path| PathBuf::from(path.to_string())))
+}
+
+/// A chosen path, or the cancel the renderer understands.
+pub(crate) fn chosen_save_path(path: Option<PathBuf>) -> Result<PathBuf, String> {
+    path.ok_or_else(|| SAVE_CANCELLED.to_string())
+}
+
+/// Write an export file; a failure keeps the operating system's reason.
+pub(crate) fn write_export_file(path: &Path, bytes: &[u8]) -> Result<(), String> {
+    std::fs::write(path, bytes).map_err(|e| format!("write failed: {}", e))
+}
 
 /// 扫描到的应用信息
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -62,30 +92,22 @@ pub async fn save_binary_file(
 ) -> Result<String, String> {
     use base64::Engine as _;
     use tauri_plugin_dialog::DialogExt;
-    use tokio::sync::oneshot;
 
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(content_base64.as_bytes())
         .map_err(|e| format!("invalid content: {}", e))?;
 
     let ext_refs: Vec<&str> = extensions.iter().map(|s| s.as_str()).collect();
-    let (tx, rx) = oneshot::channel();
-
-    app.dialog()
-        .file()
-        .set_file_name(&default_name)
-        .add_filter(&filter_name, &ext_refs)
-        .save_file(move |file_path_opt| {
-            let _ = tx.send(file_path_opt);
-        });
-
-    let file_path = rx
-        .await
-        .map_err(|_| "dialog channel error".to_string())?
-        .ok_or_else(|| "cancelled".to_string())?;
-
-    let path_buf = std::path::PathBuf::from(file_path.to_string());
-    std::fs::write(&path_buf, &bytes).map_err(|e| format!("write failed: {}", e))?;
+    let path_buf = chosen_save_path(
+        wait_for_save_path(
+            app.dialog()
+                .file()
+                .set_file_name(&default_name)
+                .add_filter(&filter_name, &ext_refs),
+        )
+        .await?,
+    )?;
+    write_export_file(&path_buf, &bytes)?;
 
     Ok(path_buf.display().to_string())
 }
@@ -101,26 +123,18 @@ pub async fn save_text_file(
     extensions: Vec<String>,
 ) -> Result<String, String> {
     use tauri_plugin_dialog::DialogExt;
-    use tokio::sync::oneshot;
 
     let ext_refs: Vec<&str> = extensions.iter().map(|s| s.as_str()).collect();
-    let (tx, rx) = oneshot::channel();
-
-    app.dialog()
-        .file()
-        .set_file_name(&default_name)
-        .add_filter(&filter_name, &ext_refs)
-        .save_file(move |file_path_opt| {
-            let _ = tx.send(file_path_opt);
-        });
-
-    let file_path = rx
-        .await
-        .map_err(|_| "dialog channel error".to_string())?
-        .ok_or_else(|| "cancelled".to_string())?;
-
-    let path_buf = std::path::PathBuf::from(file_path.to_string());
-    std::fs::write(&path_buf, &content).map_err(|e| format!("write failed: {}", e))?;
+    let path_buf = chosen_save_path(
+        wait_for_save_path(
+            app.dialog()
+                .file()
+                .set_file_name(&default_name)
+                .add_filter(&filter_name, &ext_refs),
+        )
+        .await?,
+    )?;
+    write_export_file(&path_buf, content.as_bytes())?;
 
     Ok(path_buf.display().to_string())
 }
@@ -1672,4 +1686,30 @@ pub async fn upload_steam_cover(
 
     info!("✅ 封面已上传: {} ({} bytes)", app_name, bytes.len());
     Ok(app_name)
+}
+
+#[cfg(test)]
+mod save_dialog_tests {
+    use super::*;
+
+    #[test]
+    fn closing_the_save_dialog_is_a_cancel() {
+        assert_eq!(chosen_save_path(None).unwrap_err(), SAVE_CANCELLED);
+
+        let path = PathBuf::from("sunshine.log");
+        assert_eq!(chosen_save_path(Some(path.clone())).unwrap(), path);
+    }
+
+    #[test]
+    fn a_write_failure_keeps_its_reason() {
+        let directory =
+            std::env::temp_dir().join(format!("sunshine-panel-export-{}", std::process::id()));
+        std::fs::create_dir_all(&directory).unwrap();
+
+        let error = write_export_file(&directory, b"x").unwrap_err();
+        assert!(error.starts_with("write failed: "), "{error}");
+        assert!(error.len() > "write failed: ".len(), "{error}");
+
+        let _ = std::fs::remove_dir_all(&directory);
+    }
 }

@@ -337,7 +337,6 @@ onUnmounted(() => {
 /* The pairing tiles: a tonal block each, a rotating Material shape behind the icon, big forms (QR, PIN dots, circular keys). */
 .dsk-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; align-items: stretch; margin-bottom: 32px; }
 .dsk-tile { position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; gap: 18px; min-width: 0; padding: 26px 28px 28px; border-radius: var(--md-sys-shape-corner-extra-extra-large); color: var(--md-sys-color-on-surface); }
-.dsk-tile::after { content: ''; position: absolute; z-index: -1; right: -60px; top: -70px; width: 240px; height: 240px; background: currentColor; opacity: .07; clip-path: var(--m-shape-cookie); animation: m-turn 48s linear infinite; }
 .dsk-tile--qr { background: var(--dsk-tert-bg); color: var(--dsk-tert-fg); }
 .dsk-tile--pin { background: var(--md-sys-color-secondary-container); color: var(--md-sys-color-on-secondary-container); }
 .dsk-tile__head { display: flex; align-items: center; gap: 14px; }

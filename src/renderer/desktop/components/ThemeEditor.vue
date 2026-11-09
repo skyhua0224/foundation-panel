@@ -284,7 +284,7 @@ function handleDrop(e) {
 .dsk-te { position: fixed; top: 0; right: 0; bottom: 0; z-index: 9999; width: 460px; max-width: 100vw; box-sizing: border-box; display: flex; flex-direction: column; background: var(--md-sys-color-surface-container-low); color: var(--md-sys-color-on-surface); border-radius: var(--md-sys-shape-corner-extra-large) 0 0 var(--md-sys-shape-corner-extra-large); box-shadow: 0 8px 32px color-mix(in srgb, var(--md-sys-color-shadow) 36%, transparent); }
 .dsk-te__head { display: flex; align-items: center; gap: 12px; padding: 20px 20px 12px 28px; font-size: 28px; color: var(--md-sys-color-primary-text); }
 .dsk-te__title { margin: 0; flex: 1; min-width: 0; font: var(--m-headline-small); color: var(--md-sys-color-on-surface); letter-spacing: 0; }
-.dsk-te__body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 20px 28px; display: flex; flex-direction: column; gap: 4px; scrollbar-width: thin; }
+.dsk-te__body { flex: 1; min-height: 0; overflow-y: auto; padding: 0 20px 28px; display: flex; flex-direction: column; gap: 4px; }
 
 .dsk-te__drop { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 16px; border-radius: var(--md-sys-shape-corner-large); background: var(--md-sys-color-surface-container); box-shadow: inset 0 0 0 2px transparent; transition: box-shadow var(--m-spring-fast-effects-duration) var(--m-spring-fast-effects); }
 .dsk-te__drop.is-dragging { box-shadow: inset 0 0 0 2px var(--md-sys-color-primary); background: var(--md-sys-color-primary-container); }

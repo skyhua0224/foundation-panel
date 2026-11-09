@@ -1,3 +1,4 @@
+use crate::ctx_popup;
 use crate::proxy_server;
 use crate::sunshine;
 use crate::toolbar;
@@ -116,7 +117,12 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
             );
         });
     }
+    // the tray's menus open in the menu window (ctx_popup.rs): the icon's callbacks reach the app through this handle, and the window is made hidden, as for the main window's context menus
+    ctx_popup::remember_app(&app_handle);
     tray::create_system_tray(&app_handle)?;
+    if !agent_only {
+        ctx_popup::schedule_create(&app_handle);
+    }
     crate::power::refresh_ecoqos_state(&app_handle);
     #[cfg(target_os = "windows")]
     if let Err(e) = crate::shell_context_menu::install_file_transfer_menu() {

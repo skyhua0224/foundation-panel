@@ -23,6 +23,7 @@ mod icons;
 mod main_panel;
 mod menu;
 mod notifications;
+pub(crate) mod popup_input;
 #[cfg(target_os = "windows")]
 mod vdd_confirmation;
 
@@ -730,17 +731,8 @@ fn build_owned_system_tray<R: Runtime + 'static>(app: &AppHandle<R>) -> tauri::R
         .tooltip(tooltip)
         .show_menu_on_left_click(false)
         .on_menu_event(|app, event| handle_tray_menu_event(app, event.id().as_ref()))
-        .on_tray_icon_event(|tray, event| match event {
-            TrayIconEvent::Click {
-                button: MouseButton::Left,
-                ..
-            } => handle_tray_click(tray.app_handle()),
-            TrayIconEvent::DoubleClick {
-                button: MouseButton::Left,
-                ..
-            } => handle_tray_double_click(tray.app_handle()),
-            _ => {}
-        })
+        // what each gesture does is the person's choice (tray_prefs.rs, 个性化): popup_input.rs
+        .on_tray_icon_event(|_tray, event| popup_input::on_icon_event(event))
         .build(app)?;
 
     info!("GUI tray created for the current user session");
@@ -1252,15 +1244,6 @@ fn init_sunshine_user_mode_state<R: Runtime + 'static>(app: &AppHandle<R>) {
     });
 }
 
-/// 处理托盘单击事件
-pub fn handle_tray_click<R: Runtime>(app: &AppHandle<R>) {
-    open_main_panel_from_tray(app, "click");
-}
-/// 处理托盘双击事件
-pub fn handle_tray_double_click<R: Runtime>(app: &AppHandle<R>) {
-    open_main_panel_from_tray(app, "double click");
-}
-
 fn apply_next_tray_locale<R: Runtime>(app: &AppHandle<R>, locale: &str) -> (u64, String) {
     let locale = normalize_tray_locale(locale).to_string();
     let (revision, changed) = {
@@ -1311,8 +1294,11 @@ fn rebuild_tray_menu<R: Runtime>(app: &AppHandle<R>) {
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
         match build_tray_menu(app) {
             Ok(menu) => {
-                if let Err(e) = tray.set_menu(Some(menu)) {
-                    error!("❌ 重建托盘菜单失败: {}", e);
+                // while the menu window shows the menus, the icon has no native menu (it would open on a right click by itself)
+                if popup_input::use_native_menu() {
+                    if let Err(e) = tray.set_menu(Some(menu)) {
+                        error!("❌ 重建托盘菜单失败: {}", e);
+                    }
                 }
                 // 更新 tooltip
                 let tooltip = {
@@ -1332,11 +1318,38 @@ fn rebuild_tray_menu<R: Runtime>(app: &AppHandle<R>) {
             Err(e) => error!("❌ 构建托盘菜单失败: {}", e),
         }
     }
+    // a menu of the popup that is on screen shows the new state
+    popup_input::push_state_if_open();
 }
 
 /// Tauri 命令：前端通知 tray 同步语言
 pub fn refresh_menu<R: Runtime>(app: &AppHandle<R>) {
     rebuild_tray_menu(app);
+}
+
+/// The icon carries the native menu or none, as the settings and the state of the menu window say (see popup_input.rs).
+pub(crate) fn refresh_menu_mode<R: Runtime>(app: &AppHandle<R>) {
+    popup_input::apply_menu_mode(app);
+}
+
+/// 个性化: what the tray icon does.
+#[tauri::command]
+pub fn tray_prefs_get() -> crate::tray_prefs::TrayPrefs {
+    crate::tray_prefs::current()
+}
+
+#[tauri::command]
+pub fn tray_prefs_set(app: AppHandle, prefs: crate::tray_prefs::TrayPrefs) -> Result<crate::tray_prefs::TrayPrefs, String> {
+    let saved = crate::tray_prefs::save(prefs)?;
+    popup_input::reset_failures();
+    refresh_menu_mode(&app);
+    Ok(saved)
+}
+
+/// The tray menu's page chose an item (an id of the native menu): it runs through the same handler.
+#[tauri::command]
+pub fn tray_popup_act(app: AppHandle, token: u64, id: String) {
+    popup_input::act(&app, token, &id);
 }
 
 #[tauri::command]

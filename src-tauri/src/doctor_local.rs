@@ -1018,7 +1018,8 @@ mod tests {
             log_found: true,
             ..Default::default()
         };
-        let ports = find(&evaluate_process(&silent, Lang::Zh), "process.ports");
+        let silent_items = evaluate_process(&silent, Lang::Zh);
+        let ports = find(&silent_items, "process.ports");
         assert_eq!(ports.status, "warn");
         assert!(ports.detail.contains("no answer within 5 s"));
         contract(&items);
@@ -1034,7 +1035,8 @@ mod tests {
             probe_error: "no answer within 8 s".into(),
             ..Default::default()
         }];
-        let item = find(&evaluate_drivers(&drivers, Lang::Zh), "drivers.vdd");
+        let driver_items = evaluate_drivers(&drivers, Lang::Zh);
+        let item = find(&driver_items, "drivers.vdd");
         assert_eq!(item.status, "warn");
         assert!(item.detail.contains("8"));
         assert!(!item.detail.contains("没有安装"));

@@ -100,24 +100,7 @@ img {
   display: block;
 }
 
-// 滚动条样式
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: @background-secondary;
-}
-
-::-webkit-scrollbar-thumb {
-  background: @border-color;
-  border-radius: 4px;
-
-  &:hover {
-    background: @text-secondary;
-  }
-}
+// 滚动条：由 foundation-ui 的 css/scrollbar.css 统一绘制（细、悬停加宽、Material 颜色角色），这里不再单独定义
 
 // 选择文本样式
 ::selection {

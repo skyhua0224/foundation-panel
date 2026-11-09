@@ -25,7 +25,6 @@ defineProps({
 <style scoped>
 /* A section is one tonal tile: a shaped icon, the name, the rows connected under it. */
 .dsk-card { position: relative; overflow: hidden; isolation: isolate; margin: 0; padding: 22px 20px 20px; border-radius: var(--md-sys-shape-corner-extra-extra-large); background: var(--md-sys-color-surface-container); display: flex; flex-direction: column; gap: 14px; }
-.dsk-card::after { content: ''; position: absolute; z-index: -1; right: -56px; top: -64px; width: 220px; height: 220px; background: var(--md-sys-color-primary); opacity: .07; clip-path: var(--m-shape-cookie); animation: m-turn 52s linear infinite; }
 .dsk-card__head { display: flex; align-items: center; gap: 16px; padding: 0 4px; }
 .dsk-card__icon { position: relative; flex: none; width: 60px; height: 60px; display: grid; place-items: center; font-size: 30px; color: var(--md-sys-color-on-primary); }
 .dsk-card__icon::before { content: ''; position: absolute; inset: 0; background: var(--md-sys-color-primary); clip-path: var(--m-shape-burst); animation: m-turn 40s linear infinite; }

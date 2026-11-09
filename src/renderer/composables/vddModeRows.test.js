@@ -33,7 +33,7 @@ test('the product is named 基地虚拟显示器 in Chinese and Foundation Virtu
   const tray = readFileSync(new URL('../../../src-tauri/src/tray.rs', import.meta.url), 'utf8')
   assert.match(tray, /vdd_settings: "基地虚拟显示器设置"/)
   assert.match(tray, /vdd_settings: "Foundation Virtual Display Settings"/)
-  assert.doesNotMatch(tray, /基地显示器|杂鱼显示器/)
+  assert.doesNotMatch(tray, /基地显示器|杂鱼|Zako/)
   const doctor = readFileSync(new URL('../../../src-tauri/src/doctor_local.rs', import.meta.url), 'utf8')
   assert.match(doctor, /tr\(lang, "Foundation Virtual Display", "基地虚拟显示器"\)/)
 })
