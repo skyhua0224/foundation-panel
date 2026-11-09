@@ -21,6 +21,12 @@ tauri = { version = "~2.12.4", features = [] }
 serde_json = "1.0"
 raw-window-handle = "0.6"
 
+[features]
+# Embed the built pages (dist-installer) in the exe. The tauri CLI turns this on for `tauri build`; this crate is
+# built with plain cargo, so it is on by default. --no-default-features loads build.devUrl instead (vite dev server).
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_System_Com", "Win32_UI_Shell"] }
 
