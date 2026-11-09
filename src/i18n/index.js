@@ -133,9 +133,18 @@ export const systemLocale = () => resolveSystem()
 watchSystemLanguage(() => { if (localeChoice.value === LOCALE_SYSTEM) locale.value = resolveSystem() })
 
 // 平铺查表：当前语言缺失的键回退到 en，再缺失则原样返回键名。
+// Per key: zh_TW then zh then en; every other language then en. An empty string does not count.
+// A key none of them have is returned as itself.
 export function t(key) {
-  const table = messages[locale.value] || {}
-  return table[key] ?? messages.en[key] ?? key
+  const own = messages[locale.value]?.[key]
+  if (own !== undefined && own !== null && own !== '') return own
+  if (locale.value === 'zh_TW') {
+    const traditional = messages.zh?.[key]
+    if (traditional !== undefined && traditional !== null && traditional !== '') return traditional
+  }
+  const english = messages.en?.[key]
+  if (english !== undefined && english !== null && english !== '') return english
+  return key
 }
 
 export function useWelcomeI18n() {
