@@ -39,7 +39,13 @@
 `popup_input::build_state`：核心连接 / 主机状态（`TRAY_RUNTIME_STATE`）、串流（`get_active_sessions`：设备、应用、码率 Mbps、帧率；0.45 秒内没回来就用核心托盘状态里的名字，码率显示「—」）、基地虚拟显示器（是否已创建、冷却、保留、无头；模式取第一路串流的分辨率@帧率，没有串流时不显示模式）、
 更新（上一次检查的结果，`update::last_seen_update`）、DS5 已连接（`dualsense_get_status` 的 `active`）、通知（核心的通知文案）、开机自启 / 阻止休眠 / 用户模式的当前值、RTSS 是否安装、是否 beta/debug 构建。条目的文字是原生菜单的 `TrayStrings`（中/英/日），所以两种菜单用词一致；菜单打开期间状态变化会推给页面（`tray-popup:state`）。
 
+## V3 的砖和滑块由人选、人排
+
+快捷页显示哪些砖、哪些滑块、什么顺序，存在 `tray-prefs.json` 的 `tiles` / `sliders`（两个 id 列表，null = 默认：七块砖 = V1 第一屏，滑块 = 缩放；`tray_prefs.rs` 的 `TILE_IDS` / `SLIDER_KEYS` 与 foundation-ui 的 `TILES` / `SLIDER_KEYS` 同一份，`trayWiring.test.js` 比对）。写入口有两个，都只写这两个字段：菜单里的铅笔（编辑模式）走 `tray_popup_layout(token, tiles, sliders)`（`popup_input::set_layout`：存盘后把含 `state.layout` 的新状态推给菜单），设置 › 个性化 › 托盘走 `tray_layout_set`。`tray_prefs_set` 保存点击设置时保留已存的布局（`save_keeping_layout`），所以先于菜单里的编辑打开的设置页不会把旧布局写回。`state.layout` = `{ tiles, sliders }`，`state.toggles.show_toolbar` = 桌宠窗口是否开着（桌宠砖的开 / 关）。
+
 ## V3 的滑块（分辨率 / 刷新率 / 缩放 / 码率上限）
+
+默认只有缩放；其余三条在编辑模式里添加。
 
 页面松开滑块时调用 `tray_popup_set(token, key, value)`（`tray.rs` → `popup_input::set`），菜单不关；命令等到值设好、把设好之后的状态推给页面（`tray-popup:state`）才返回，失败返回原因，页面把它写在滑块下面。`state.sliders` 由 `popup_input::slider_state` 组装（`tray/display_sliders.rs`）：
 

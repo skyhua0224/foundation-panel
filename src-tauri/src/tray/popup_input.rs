@@ -243,7 +243,7 @@ pub(super) fn labels(s: &TrayStrings) -> Value {
 }
 
 /// The state of the host for a menu: what the native menu knows (menu.rs) and what it does not show (streams, display mode, update, DS5).
-pub(super) async fn build_state(_app: &AppHandle) -> Value {
+pub(super) async fn build_state(app: &AppHandle) -> Value {
     let s = get_tray_strings();
     let locale = get_current_locale();
     let (tray_state, connection, _) = TRAY_RUNTIME_STATE.lock().unwrap_or_else(|p| p.into_inner()).menu_snapshot();
@@ -289,6 +289,7 @@ pub(super) async fn build_state(_app: &AppHandle) -> Value {
     #[cfg(not(target_os = "windows"))]
     let (auto_start, user_mode) = (false, false);
 
+    let prefs = tray_prefs::current();
     json!({
         "locale": locale,
         "connection": match connection { CoreConnectionState::Connected => "connected", CoreConnectionState::Connecting => "connecting", CoreConnectionState::Disconnected => "disconnected" },
@@ -308,11 +309,14 @@ pub(super) async fn build_state(_app: &AppHandle) -> Value {
             "vdd_toggle_keep_enabled": tray_state.as_ref().is_some_and(|state| state.vdd.keep_enabled),
             "vdd_toggle_headless_create": tray_state.as_ref().is_some_and(|state| state.vdd.headless_create_enabled),
             "restart_user_mode": user_mode,
+            "show_toolbar": app.get_webview_window("toolbar").is_some(),
         },
         "update": update_version.map(|version| json!({ "version": version })),
         "ds5": ds5,
         "notification": notification,
         "sliders": sliders,
+        // the tiles and sliders the person chose for the quick panel (null = the default of the menu)
+        "layout": { "tiles": prefs.tiles, "sliders": prefs.sliders },
         "labels": labels(s),
     })
 }
@@ -438,6 +442,16 @@ pub(super) async fn set(app: &AppHandle, key: &str, value: &Value) -> Result<(),
     };
     tokio::time::sleep(settle).await;
     *OUTPUT_CACHE.lock().unwrap_or_else(|p| p.into_inner()) = None; // what the display has now, not what it had
+    ctx_popup::update_tray_state(app, build_state(app).await);
+    Ok(())
+}
+
+/// The quick panel was edited in the menu (`tray_popup_layout`): the layout is stored and the menu gets the state with it.
+pub(super) async fn set_layout(app: &AppHandle, tiles: Option<Vec<String>>, sliders: Option<Vec<String>>) -> Result<(), String> {
+    if !ctx_popup::tray_menu_open() {
+        return Err("菜单已经关闭".to_string());
+    }
+    tray_prefs::save_layout(tiles, sliders)?;
     ctx_popup::update_tray_state(app, build_state(app).await);
     Ok(())
 }
