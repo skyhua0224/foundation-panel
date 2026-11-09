@@ -172,10 +172,10 @@ fn host_word(status: &str) -> &'static str {
     }
 }
 
-/// "1440p · 120 Hz" for a mode of 2560x1440 at 120.
+/// "1440p@120" for a mode of 2560x1440 at 120 (short: it is the sub-label of a tile).
 pub(super) fn short_mode(height: u32, fps: u32) -> String {
     let label = if height >= 2160 { "4K".to_string() } else { format!("{height}p") };
-    if fps > 0 { format!("{label} · {fps} Hz") } else { label }
+    if fps > 0 { format!("{label}@{fps}") } else { label }
 }
 
 /// The streams as the menu draws them: client, app, bitrate in Mbps (null when unknown), frame rate.
@@ -384,8 +384,8 @@ mod tests {
         assert_eq!(rows[0]["bitrate"], json!(48.2));
         assert_eq!(rows[0]["app"], "Desktop");
         assert!(rows[1]["bitrate"].is_null());
-        assert_eq!(short_mode(1440, 120), "1440p · 120 Hz");
-        assert_eq!(short_mode(2160, 60), "4K · 60 Hz");
+        assert_eq!(short_mode(1440, 120), "1440p@120");
+        assert_eq!(short_mode(2160, 60), "4K@60");
         assert_eq!(short_mode(1080, 0), "1080p");
     }
 
