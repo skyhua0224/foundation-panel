@@ -36,16 +36,17 @@ test('串流 is one bitrate row (value, steps, slider, chips) from the shared bi
   assert.match(view, /<MItem class="dsk-bitrate" icon="monitoring" :title="t\.stream\.bitrateLimit"[^>]*stack>/)
   // the order the pad walks: value row (steps), slider, chips
   assert.ok(view.indexOf('icon="remove"') < view.indexOf('<MSlider') && view.indexOf('<MSlider') < view.indexOf('<MSeg :model-value="bitrateKbps"'))
-  assert.match(view, /<MSlider :model-value="bitrateSliderMbps\(bitrateKbps\)" :min="0" :max="SLIDER_MAX_MBPS" :step="1" unit=" Mbps" :off-text="t\.stream\.bitrateAuto"/)
+  assert.match(view, /<MSlider :model-value="bitrateSliderProgress\(bitrateKbps\)" :min="0" :max="SLIDER_MAX_PROGRESS" :step="1" unit=""/)
   assert.equal((view.match(/<SettingsToggleRow/g) || []).length, 3, 'the codecs (a v-for), HDR, launch mode')
   assert.match(view, /<MSeg v-if="configData\[codec\.key\] > 0"/)
-  for (const gone of ['bitrateNumber', 'bitrateUnit', 'heroText', '<MSwitch']) assert.ok(!view.includes(gone), gone)
+  for (const gone of ['bitrateNumber', 'bitrateUnit', 'heroText']) assert.ok(!view.includes(gone), gone)
+  assert.match(view, /t\.stream\.hostAudio/)
 })
 
 test('the values round-trip as everywhere else: max_bitrate defaults to 0 (自动), whole Kbps strings go out, the chips and the slider read the same value', () => {
   const view = read('views/StreamView.vue')
   assert.match(view, /max_bitrate: '0'/)
-  assert.match(view, /setCfg\('max_bitrate', String\(bitrateFromMbps\(v\)\)\)/)
+  assert.match(view, /setCfg\('max_bitrate', String\(bitrateFromProgress\(v\)\)\)/)
   assert.match(view, /setCfg\('max_bitrate', String\(v\)\)/)
   assert.match(view, /setCfg\('hdr_prep', on \? 'automatic' : 'no_operation'\)/)
   assert.match(view, /saveSettingKey\(hostApi, key, value\)/)
