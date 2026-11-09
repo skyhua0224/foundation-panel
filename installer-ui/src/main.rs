@@ -68,6 +68,69 @@ fn reveal(window: &WebviewWindow, host: &Host) {
     let _ = window.set_focus();
 }
 
+/// Evidence for tests (never set in a real install): FOUNDATION_SETUP_UI_SHOTS=<dir> writes a PNG of the page
+/// (WebView2 CapturePreview, the page as rendered, without the DWM frame) 900 ms after each view;
+/// FOUNDATION_SETUP_UI_DRIVE=a,b,toggle-component:usbip sends those actions one per shot, as the page would.
+struct Evidence {
+    dir: PathBuf,
+    drive: Mutex<std::collections::VecDeque<String>>,
+    count: std::sync::atomic::AtomicU32,
+}
+
+fn evidence() -> Option<&'static Evidence> {
+    static E: std::sync::OnceLock<Option<Evidence>> = std::sync::OnceLock::new();
+    E.get_or_init(|| {
+        let dir = PathBuf::from(std::env::var_os("FOUNDATION_SETUP_UI_SHOTS")?);
+        let _ = std::fs::create_dir_all(&dir);
+        let drive = std::env::var("FOUNDATION_SETUP_UI_DRIVE").unwrap_or_default();
+        Some(Evidence {
+            dir,
+            drive: Mutex::new(drive.split(',').filter(|a| !a.is_empty()).map(String::from).collect()),
+            count: std::sync::atomic::AtomicU32::new(0),
+        })
+    })
+    .as_ref()
+}
+
+fn evidence_after_view(window: &WebviewWindow, page: &str) {
+    let Some(e) = evidence() else { return };
+    let n = e.count.fetch_add(1, Ordering::SeqCst);
+    let _path = e.dir.join(format!("{n:02}-{page}.png"));
+    let w = window.clone();
+    std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_millis(900));
+        #[cfg(windows)]
+        capture_page(&w, _path);
+        std::thread::sleep(Duration::from_millis(400));
+        let next = e.drive.lock().ok().and_then(|mut q| q.pop_front());
+        if let Some(next) = next {
+            let action = match next.split_once(':') {
+                Some((t, id)) => json!({ "type": t, "id": id }),
+                None => json!({ "type": next }),
+            };
+            w.state::<Host>().send(json!({ "type": "action", "action": action }));
+        }
+    });
+}
+
+#[cfg(windows)]
+fn capture_page(window: &WebviewWindow, path: PathBuf) {
+    let _ = window.with_webview(move |webview| unsafe {
+        use webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG;
+        use windows::core::{HSTRING, Interface};
+        use windows::Win32::System::Com::{IStream, STGM_CREATE, STGM_WRITE};
+        use windows::Win32::UI::Shell::SHCreateStreamOnFileEx;
+        let Ok(core) = webview.controller().CoreWebView2() else { return };
+        let Ok(stream) = SHCreateStreamOnFileEx(&HSTRING::from(path.as_os_str()), (STGM_CREATE | STGM_WRITE).0, 0x80, true, None::<&IStream>) else { return };
+        let keep = stream.clone();
+        let handler = webview2_com::CapturePreviewCompletedHandler::create(Box::new(move |_result| {
+            let _ = keep.cast::<IStream>().map(|s| s.Commit(windows::Win32::System::Com::STGC_DEFAULT));
+            Ok(())
+        }));
+        let _ = core.CapturePreview(COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG, &stream, &handler);
+    });
+}
+
 fn arg_value(name: &str) -> Option<String> {
     let args: Vec<String> = std::env::args().collect();
     args.iter().position(|a| a == name).and_then(|i| args.get(i + 1).cloned())
@@ -164,7 +227,9 @@ fn main() {
                             if let Ok(mut last) = handle.state::<Host>().last.lock() {
                                 *last = view.clone();
                             }
+                            let page = view.get("page").and_then(Value::as_str).unwrap_or("view").to_string();
                             let _ = window.emit("installer://view", view);
+                            evidence_after_view(&window, &page);
                         }
                         "minimise" => {
                             let _ = window.minimize();

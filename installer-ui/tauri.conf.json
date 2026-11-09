@@ -9,7 +9,7 @@
   },
   "bundle": {
     "active": false,
-    "icon": ["../src-tauri/icons/icon.ico"]
+    "icon": ["icons/icon.png", "../src-tauri/icons/icon.ico"]
   },
   "app": {
     "windows": [],
