@@ -19,7 +19,7 @@
           <template v-if="updateSource.source.value === 'mirror'">
             <MFieldItem v-model="cdkDraft" icon="key" type="password" :label="src.cdk" :supporting="updateSource.available.value ? src.cdkHint : src.unavailable" :disabled="!updateSource.available.value || updateSource.busy.value" autocomplete="off" />
             <MItem action icon="link" :title="src.getCdk" @click="actions.openUrl(MIRRORCHYAN_CDK_URL)"><template #trail><MIcon name="open_in_new" /></template></MItem>
-            <MItem icon="verified_user" :title="cdkResult.label" :text="cdkResult.lines.join(' ')">
+            <MItem icon="verified_user" wrap :title="cdkResult.label" :text="cdkResult.lines.join(' ')">
               <template #trail>
                 <MButton size="sm" icon="save" :disabled="!cdkDraft.trim() || !updateSource.available.value || updateSource.busy.value" @click="saveCdk">{{ src.save }}</MButton>
                 <MButton variant="text" size="sm" icon="fact_check" :disabled="!updateSource.hasCdk.value || updateSource.busy.value" @click="updateSource.checkCdk()">{{ src.check }}</MButton>
@@ -47,7 +47,6 @@
       <MSection :title="t.sidebar.accountSettings">
         <MGroup>
           <MItem action icon="key" :title="t.sidebar.accountCredentials" @click="emit('webui-navigate', '/password')" />
-          <MItem action icon="logout" :title="t.sidebar.logout" :text="t.sidebar.logoutDescription" @click="emit('webui-navigate', '/password#logout')" />
         </MGroup>
       </MSection>
       <MSection :title="t.sidebar.maintenance">

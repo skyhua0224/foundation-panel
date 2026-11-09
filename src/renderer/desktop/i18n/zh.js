@@ -1122,8 +1122,6 @@ export const zh = {
     open: '打开',
     accountSettings: '账户设置',
     accountCredentials: '用户名与密码',
-    logout: '退出登录',
-    logoutDescription: '下次访问需要重新登录。',
     diagnostics: '诊断与日志',
     diagnosticsDescription: '日志、服务状态与故障排查。',
     timerDescription: '计时与定时操作',

@@ -28,7 +28,6 @@ export function isWebuiNavigationPath(path) {
     WEBUI_PAGES.some((page) => page.path === path) ||
     (typeof path === 'string' && CONFIG_PLACE.test(path)) ||
     path === '/password' ||
-    path === '/password#logout' ||
     path === '/troubleshooting'
   )
 }
