@@ -39,6 +39,21 @@
 `popup_input::build_state`：核心连接 / 主机状态（`TRAY_RUNTIME_STATE`）、串流（`get_active_sessions`：设备、应用、码率 Mbps、帧率；0.45 秒内没回来就用核心托盘状态里的名字，码率显示「—」）、基地虚拟显示器（是否已创建、冷却、保留、无头；模式取第一路串流的分辨率@帧率，没有串流时不显示模式）、
 更新（上一次检查的结果，`update::last_seen_update`）、DS5 已连接（`dualsense_get_status` 的 `active`）、通知（核心的通知文案）、开机自启 / 阻止休眠 / 用户模式的当前值、RTSS 是否安装、是否 beta/debug 构建。条目的文字是原生菜单的 `TrayStrings`（中/英/日），所以两种菜单用词一致；菜单打开期间状态变化会推给页面（`tray-popup:state`）。
 
+## V3 的滑块（分辨率 / 刷新率 / 缩放 / 码率上限）
+
+页面松开滑块时调用 `tray_popup_set(token, key, value)`（`tray.rs` → `popup_input::set`），菜单不关；命令等到值设好、把设好之后的状态推给页面（`tray-popup:state`）才返回，失败返回原因，页面把它写在滑块下面。`state.sliders` 由 `popup_input::slider_state` 组装（`tray/display_sliders.rs`）：
+
+| key | 值 | 做法 |
+| --- | --- | --- |
+| `resolution` | `"2560x1440"` | 目标显示器 `ChangeDisplaySettingsExW`（先 `CDS_TEST`，再 `CDS_UPDATEREGISTRY`，像系统设置一样），保留当前刷新率，没有就取最近的 |
+| `refresh` | Hz | 同上，当前分辨率下的刷新率 |
+| `dpi` | 100–300，25 的倍数 | `system::set_desktop_dpi`（SetDpi.exe 启动后不等待；约 1.2 秒后重新读状态）；SetDpi 不接受显示器参数，所以只在目标是主显示器时给这条 |
+| `bitrate` | Kbps，0 = 自动 | 读完整配置 → 改 `max_bitrate` → `post_sunshine_config`（`/api/config` 整表替换，和 `save_microphone_backend` 同一把 `DEVICE_CONFIG_LOCK`） |
+
+分辨率和刷新率之前面板里没有调用、主机也没有端点（主机的 display_device 只在串流开始和结束时改模式），所以这两个是面板自己用 Win32 做的，没有新增主机端点。
+目标显示器（`display_sliders::choose`）：串流中——配置的 `output_name` 是基地虚拟显示器（`ZakoHDR`）就是它，否则是当前模式等于串流模式的物理显示器（刷新率最近的优先），都不是则主显示器；没有串流——基地虚拟显示器已创建就是它；否则没有目标。基地虚拟显示器在 Win32 里靠显示器名 `Zako HDR` 认出（主机 `ZAKO_NAME`）。
+每次打开菜单要枚举一遍显示器的全部模式（`spawn_blocking`，1.5 秒超时，超时则不给显示器滑块）。
+
 ## 回退到原生菜单
 
 图标上挂着原生菜单时，Windows 会在右键时自己弹它，所以使用窗口菜单期间图标**不挂**菜单（`set_menu(None)`）。原生菜单在这些情况下回到图标上（`popup_input::apply_menu_mode`）：菜单窗口还没加载好（启动后约 1.5 秒内）、环境变量 `SUNSHINE_GUI_CTX_POPUP=off`、设置里「始终使用系统原生菜单」、窗口连续两次打不开（改设置会重置）。
@@ -60,4 +75,4 @@
 
 ## 没有验证的
 
-真窗口里的位置、焦点、动画、各边任务栏、150 % 缩放、英文/日文的宽度（组件按 360 px 内截断，没有逐页看）、`tray-icon` 在溢出区给出的图标矩形。
+真窗口里的位置、焦点、动画、各边任务栏、150 % 缩放、英文/日文的宽度；滑块在真机上的 `ChangeDisplaySettingsExW`（物理屏、基地虚拟显示器；串流中改分辨率主机怎么跟）、`Zako HDR` 显示器名的识别、改分辨率时菜单窗口会不会被显示变化关掉（组件按 360 px 内截断，没有逐页看）、`tray-icon` 在溢出区给出的图标矩形。

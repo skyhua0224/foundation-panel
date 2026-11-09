@@ -18,6 +18,7 @@ use crate::desktop_settings;
 use crate::{proxy_server, sunshine, toolbar, tray_config, update, utils, windows};
 
 mod actions;
+mod display_sliders;
 mod events;
 mod icons;
 mod main_panel;
@@ -1350,6 +1351,13 @@ pub fn tray_prefs_set(app: AppHandle, prefs: crate::tray_prefs::TrayPrefs) -> Re
 #[tauri::command]
 pub fn tray_popup_act(app: AppHandle, token: u64, id: String) {
     popup_input::act(&app, token, &id);
+}
+
+/// A slider of the tray's quick page was released (key: resolution | refresh | dpi | bitrate): the menu stays open; resolves when the value is set, rejects with the reason.
+#[tauri::command]
+pub async fn tray_popup_set(app: AppHandle, token: u64, key: String, value: serde_json::Value) -> Result<(), String> {
+    let _ = token; // one tray menu is open at a time; a late answer for another is refused by `tray_menu_open`
+    popup_input::set(&app, &key, &value).await
 }
 
 #[tauri::command]
