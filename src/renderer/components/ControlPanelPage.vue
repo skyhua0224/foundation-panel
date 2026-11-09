@@ -3,8 +3,8 @@
     <template v-if="page === ROUTES.PANEL_SETTINGS">
       <MSection :title="t.sidebar.language">
         <MGroup>
-          <MItem icon="language" :title="t.sidebar.language" stack>
-            <template #control><MSeg block :label="t.sidebar.language" :model-value="localeChoice" :options="localeOptions" @update:model-value="emit('locale-change', $event)" /></template>
+          <MItem v-for="opt in localeOptions" :key="opt.value" action role="radio" icon="language" :title="opt.label" :selected="localeChoice === opt.value" :aria-checked="localeChoice === opt.value" :data-locale="opt.value" @click="emit('locale-change', opt.value)">
+            <template #trail><MIcon v-if="localeChoice === opt.value" name="check" /></template>
           </MItem>
         </MGroup>
       </MSection>
@@ -95,6 +95,7 @@ import { SPONSORS } from '../config/sponsors.js'
 import ShortcutsSheet from './m3e/ShortcutsSheet.vue'
 import { usePanelPart } from '../composables/panelParts.js'
 import { useI18n } from '../desktop/i18n/index.js'
+import { DESKTOP_LOCALES, LOCALE_NAMES } from '../desktop/i18n/merge.js'
 import { openBigScreenWithNotice } from '../composables/openBigScreen.js'
 import PanelOptions from './m3e/PanelOptions.vue'
 import { ROUTES } from '../composables/useRouter.js'
@@ -138,7 +139,10 @@ const heading = computed(() => {
 const themeOptions = computed(() => [
   { value: 'system', label: t.value.sidebar.systemTheme, icon: 'tonality' }, { value: 'light', label: t.value.sidebar.lightMode, icon: 'light_mode' }, { value: 'dark', label: t.value.sidebar.darkMode, icon: 'dark_mode' },
 ])
-const localeOptions = computed(() => [{ value: 'system', label: `${guide.value.intro.followSystem} · ${props.systemLocale === 'zh' ? '简体中文' : 'English'}` }, { value: 'zh', label: '简体中文' }, { value: 'en', label: 'English' }])
+const localeOptions = computed(() => {
+  const systemName = LOCALE_NAMES[props.systemLocale] || props.systemLocale
+  return [{ value: 'system', label: guide.value.intro.followSystem + ' · ' + systemName }, ...DESKTOP_LOCALES.map((code) => ({ value: code, label: LOCALE_NAMES[code] }))]
+})
 const channelOptions = computed(() => [{ value: false, label: t.value.sidebar.stableChannel }, { value: true, label: t.value.sidebar.betaChannel }])
 const lastCheck = useUpdateCheckTime()
 // the update source and the Mirror酱 CDK (the CDK stays in the native side; this window only sets it and asks about it)
