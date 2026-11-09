@@ -294,6 +294,15 @@ fn create_update_info(candidate: &ReleaseCandidate) -> UpdateInfo {
     }
 }
 
+/// The newest version a check found when it is newer than this one (None: up to date, or no check yet): the tray's menus show it without asking again.
+static SEEN_UPDATE: Mutex<Option<String>> = Mutex::new(None);
+fn note_seen_update(version: Option<String>) {
+    *SEEN_UPDATE.lock().unwrap_or_else(|p| p.into_inner()) = version;
+}
+pub(crate) fn last_seen_update() -> Option<String> {
+    SEEN_UPDATE.lock().unwrap_or_else(|p| p.into_inner()).clone()
+}
+
 /// 检查更新核心逻辑。
 ///
 /// `manual=true` 时已是最新也返回 `Some(info { is_latest: true })`，
@@ -343,6 +352,7 @@ async fn check_for_updates_in_channel(
         }
     );
 
+    note_seen_update(candidate_is_newer_than(&current_version, &candidate).then(|| candidate.version.clone()));
     if !candidate_is_newer_than(&current_version, &candidate) {
         if manual {
             let mut info = create_update_info(&candidate);
