@@ -1,0 +1,41 @@
+# The setup UI of the Foundation Sunshine installer: a Tauri 2 window with the installer pages (foundation-ui
+# src/vue/installer). It installs nothing itself: the installer shell (host repo tools/installer_shell.cpp) starts
+# it with its stdin and stdout on pipes and drives it (docs/installer-webui.md in the host repo).
+# Same Tauri line as the Panel (src-tauri/Cargo.toml), so it builds with the same toolchain on the same VM.
+[package]
+name = "foundation-setup-ui"
+version = "0.1.0"
+edition = "2021"
+publish = false
+license = "GPL-3.0-only"
+
+[[bin]]
+name = "foundation-setup-ui"
+path = "src/main.rs"
+
+[build-dependencies]
+tauri-build = { version = "2.7.3", features = [] }
+
+[dependencies]
+tauri = { version = "~2.12.4", features = [] }
+serde_json = "1.0"
+raw-window-handle = "0.6"
+
+[features]
+# Embed the built pages (dist-installer) in the exe. The tauri CLI turns this on for `tauri build`; this crate is
+# built with plain cargo, so it is on by default. --no-default-features loads build.devUrl instead (vite dev server).
+default = ["custom-protocol"]
+custom-protocol = ["tauri/custom-protocol"]
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Graphics_Dwm", "Win32_System_Com", "Win32_UI_Shell"] }
+
+# the same version Tauri's wry uses (Cargo.lock): ICoreWebView2::CapturePreview for the evidence shots
+webview2-com = "0.39.1"
+
+[profile.release]
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true

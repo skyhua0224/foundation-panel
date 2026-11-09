@@ -1,0 +1,21 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Foundation Sunshine Setup",
+  "version": "0.1.0",
+  "identifier": "com.alkaidlab.foundation-sunshine.setup",
+  "build": {
+    "frontendDist": "../dist-installer",
+    "devUrl": "http://localhost:8091"
+  },
+  "bundle": {
+    "active": false,
+    "icon": ["icons/icon.png", "../src-tauri/icons/icon.ico"]
+  },
+  "app": {
+    "windows": [],
+    "security": {
+      "csp": null
+    },
+    "withGlobalTauri": true
+  }
+}

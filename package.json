@@ -21,7 +21,9 @@
     "build:win": "npm run build:component:win",
     "build:component:win": "powershell -ExecutionPolicy Bypass -File ./scripts/build-gui-component-installer.ps1",
     "build:beta": "npm run build:native-plugins && cross-env BETA=true npm run build:renderer && tauri build --features beta",
-    "build:beta:win": "cross-env BETA=true powershell -ExecutionPolicy Bypass -File ./scripts/build-gui-component-installer.ps1 -Beta"
+    "build:beta:win": "cross-env BETA=true powershell -ExecutionPolicy Bypass -File ./scripts/build-gui-component-installer.ps1 -Beta",
+    "build:installer-pages": "vite build --config vite.installer.config.js",
+    "build:installer-ui": "npm run build:installer-pages && cargo build --release --manifest-path installer-ui/Cargo.toml"
   },
   "repository": "https://github.com/qiin2333/sunshine",
   "author": {

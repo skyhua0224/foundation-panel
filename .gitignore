@@ -31,3 +31,7 @@ src-tauri/icons/*.png
 # Installer 构建产物
 src-tauri/installer/staging/
 src-tauri/installer/dist/
+# installer setup UI (installer-ui/)
+dist-installer/
+installer-ui/target/
+installer-ui/gen/
