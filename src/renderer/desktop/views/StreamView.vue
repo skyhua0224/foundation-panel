@@ -1,5 +1,5 @@
 <template>
-  <DeskPage class="stream-view" :title="t.stream.pageTitle" icon="cast_connected" :text="heroText" wide>
+  <DeskPage class="stream-view" :title="t.stream.pageTitle" wide>
     <div v-if="loading" class="dsk-stream__wait">
       <MLoading size="40px" :label="t.stream.loading" />
       <span>{{ t.stream.loading }}</span>
@@ -8,67 +8,60 @@
     <template v-else>
       <SettingsNotice :notice="saveNotice" />
 
-      <div class="dsk-stream">
-        <!-- bitrate: the number is the tile -->
-        <section class="dsk-bit">
-          <header class="dsk-bit__head">
-            <span class="dsk-tile__icon"><MIcon name="monitoring" fill /></span>
-            <h2 class="dsk-bit__title">{{ t.stream.bitrateLimit }}</h2>
-          </header>
-          <div class="dsk-bit__number">
-            <span class="dsk-bit__value">{{ bitrateNumber }}</span>
-            <span class="dsk-bit__unit">{{ bitrateUnit }}</span>
-          </div>
-          <div class="dsk-stream__range">
-            <MIconButton icon="remove" tonal :label="`${t.stream.bitrateLimit} −`" @click="nudgeBitrate(-NUDGE_MBPS)" />
-            <MSlider :model-value="bitrateSliderMbps(bitrateKbps)" :min="0" :max="SLIDER_MAX_MBPS" :step="1" unit=" Mbps" :off-text="t.stream.bitrateAuto" size="m" :label="t.stream.bitrateLimit" @update:model-value="(v) => setCfg('max_bitrate', String(bitrateFromMbps(v)))" />
-            <MIconButton icon="add" tonal :label="`${t.stream.bitrateLimit} +`" @click="nudgeBitrate(NUDGE_MBPS)" />
-          </div>
-          <MSeg :model-value="bitrateKbps" block :label="t.stream.bitrateLimit" :options="BITRATE_PRESETS" @update:model-value="(v) => setCfg('max_bitrate', String(v))" />
-          <p class="dsk-applies">{{ applies('max_bitrate') }}</p>
-        </section>
+      <!-- the same rows as the Web UI and the phone: the bitrate is one row with the shared control (value, steps, slider, chips) -->
+      <MSection>
+        <MGroup>
+          <MItem class="dsk-bitrate" icon="monitoring" :title="t.stream.bitrateLimit" :text="applies('max_bitrate')" stack>
+            <template #trail>
+              <MIconButton icon="remove" :label="`${t.stream.bitrateLimit} −`" @click="nudgeBitrate(-NUDGE_MBPS)" />
+              <span class="m-slider-value dsk-bitrate__value">{{ bitrateDisplay }}</span>
+              <MIconButton icon="add" :label="`${t.stream.bitrateLimit} +`" @click="nudgeBitrate(NUDGE_MBPS)" />
+            </template>
+            <template #control>
+              <MSlider :model-value="bitrateSliderMbps(bitrateKbps)" :min="0" :max="SLIDER_MAX_MBPS" :step="1" unit=" Mbps" :off-text="t.stream.bitrateAuto" size="m" :label="t.stream.bitrateLimit" @update:model-value="(v) => setCfg('max_bitrate', String(bitrateFromMbps(v)))" />
+              <MSeg :model-value="bitrateKbps" block :label="t.stream.bitrateLimit" :options="BITRATE_PRESETS" @update:model-value="(v) => setCfg('max_bitrate', String(v))" />
+            </template>
+          </MItem>
+        </MGroup>
+      </MSection>
 
-        <div class="dsk-stream__col">
-          <!-- codecs -->
-          <section v-for="codec in codecs" :key="codec.key" class="dsk-codec" :class="{ 'is-on': configData[codec.key] > 0 }">
-            <header class="dsk-codec__head">
-              <span class="dsk-tile__icon"><MIcon name="movie" fill /></span>
-              <div class="dsk-codec__name">
-                <h2 class="dsk-codec__title">{{ codec.name }}</h2>
-                <span class="dsk-codec__desc">{{ codec.desc }}</span>
-              </div>
-              <MSwitch :model-value="configData[codec.key] > 0" :label="codec.name" @update:model-value="toggleCodec(codec.key)" />
-            </header>
+      <MSection :title="t.stream.codec.format">
+        <MGroup>
+          <SettingsToggleRow
+            v-for="codec in codecs"
+            :key="codec.key"
+            icon="movie"
+            :name="codec.name"
+            :description="`${codec.desc} · ${applies(codec.key)}`"
+            :model-value="configData[codec.key] > 0"
+            stack
+            @update:model-value="toggleCodec(codec.key)"
+          >
             <MSeg v-if="configData[codec.key] > 0" :model-value="configData[codec.key]" block :label="codec.name" :options="codecModes" @update:model-value="(v) => setCfg(codec.key, v)" />
-            <p class="dsk-applies">{{ applies(codec.key) }}</p>
-          </section>
+          </SettingsToggleRow>
+        </MGroup>
+      </MSection>
 
+      <MSection>
+        <MGroup>
           <!-- HDR -->
-          <section class="dsk-flag" :class="{ 'is-on': configData.hdr_prep === 'automatic' }">
-            <span class="dsk-tile__icon"><MIcon name="hdr_on" fill /></span>
-            <div class="dsk-codec__name">
-              <h2 class="dsk-codec__title">{{ t.stream.hdrAutoSwitch }}</h2>
-              <span class="dsk-codec__desc">{{ t.stream.hdrAutoSwitchDesc }}</span>
-              <p class="dsk-applies">{{ applies('hdr_prep') }}</p>
-            </div>
-            <MSwitch
-              :model-value="configData.hdr_prep === 'automatic'"
-              :label="t.stream.hdrAutoSwitch"
-              @update:model-value="(on) => setCfg('hdr_prep', on ? 'automatic' : 'no_operation')"
-            />
-          </section>
-
+          <SettingsToggleRow
+            icon="hdr_on"
+            :name="t.stream.hdrAutoSwitch"
+            :description="`${t.stream.hdrAutoSwitchDesc} · ${applies('hdr_prep')}`"
+            :model-value="configData.hdr_prep === 'automatic'"
+            @update:model-value="(on) => setCfg('hdr_prep', on ? 'automatic' : 'no_operation')"
+          />
           <!-- launch mode -->
-          <section class="dsk-flag" :class="{ 'is-on': autoLaunchDesktop }">
-            <span class="dsk-tile__icon"><MIcon name="send" fill /></span>
-            <div class="dsk-codec__name">
-              <h2 class="dsk-codec__title">{{ t.stream.autoLaunchDesktopUI }}</h2>
-              <span class="dsk-codec__desc">{{ t.stream.autoLaunchDesktopUIDesc }}</span>
-            </div>
-            <MSwitch :model-value="autoLaunchDesktop" :label="t.stream.autoLaunchDesktopUI" @update:model-value="setAutoLaunch" />
-          </section>
-        </div>
-      </div>
+          <SettingsToggleRow
+            icon="send"
+            :name="t.stream.autoLaunchDesktopUI"
+            :description="t.stream.autoLaunchDesktopUIDesc"
+            :model-value="autoLaunchDesktop"
+            @update:model-value="setAutoLaunch"
+          />
+        </MGroup>
+      </MSection>
 
       <!-- what a sofa does not need often: display and resolution, the virtual display, the virtual mouse driver -->
       <PanelLinkSection :links="['displayModes', 'vdd', 'vmouse']" />
@@ -78,11 +71,12 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { MIcon, MIconButton, MLoading, MSeg, MSlider, MSwitch, createSerialCalls, saveSettingKey } from 'foundation-ui/vue'
+import { MGroup, MIconButton, MItem, MLoading, MSection, MSeg, MSlider, createSerialCalls, saveSettingKey } from 'foundation-ui/vue'
 import { appliesText, bitrateChips, bitrateFromMbps, bitrateKbps as parseBitrateKbps, bitrateNudge, bitrateSliderMbps, bitrateText } from 'foundation-ui/settings/index.js'
 import DeskPage from '../components/DeskPage.vue'
 import PanelLinkSection from '../components/PanelLinkSection.vue'
 import SettingsNotice from '../components/settings/SettingsNotice.vue'
+import SettingsToggleRow from '../components/settings/SettingsToggleRow.vue'
 import { useI18n } from '../i18n/index.js'
 
 const { t, locale } = useI18n()
@@ -105,8 +99,6 @@ const INTEGER_KEYS = ['hevc_mode', 'av1_mode']
 const bitrateKbps = computed(() => parseBitrateKbps(configData.value.max_bitrate))
 const SLIDER_MAX_MBPS = 200
 const NUDGE_MBPS = 5
-const bitrateNumber = computed(() => (bitrateKbps.value <= 0 ? t.value.stream.bitrateAuto : String(Math.round(bitrateKbps.value / 100) / 10)))
-const bitrateUnit = computed(() => (bitrateKbps.value <= 0 ? '' : 'Mbps'))
 const bitrateDisplay = computed(() => bitrateText(bitrateKbps.value, t.value.stream.bitrateAuto))
 
 const codecs = computed(() => [
@@ -121,9 +113,6 @@ const codecModes = computed(() => [
 // the chips: the presets (a value that is none of them gets a chip of its own, so the stored value is always one of the choices)
 const BITRATE_PRESETS = computed(() => bitrateChips(bitrateKbps.value, t.value.stream.bitrateAuto, [20, 50, 100, 0]))
 
-// the hero's fact: what is in force now
-const activeCodecs = computed(() => codecs.value.filter((codec) => configData.value[codec.key] > 0).map((codec) => codec.name))
-const heroText = computed(() => [...activeCodecs.value, bitrateDisplay.value, configData.value.hdr_prep === 'automatic' ? 'HDR' : ''].filter(Boolean).join(' · '))
 const applies = (key) => appliesText(key, hostPlatform.value, locale.value)
 const saveNotice = computed(() => (saveMsg.value ? { type: saveMsg.value.type, message: saveMsg.value.text } : null))
 let noticeTimer = null
@@ -133,7 +122,7 @@ function say(type, text) {
   noticeTimer = setTimeout(() => { saveMsg.value = null }, 5000)
 }
 
-// the step buttons beside the slider (a pad cannot drag): 5 Mbps inside the slider's range; automatic steps up to 5 and 5 steps back to automatic
+// the step buttons beside the value (the slider itself moves by the pad's left and right, useFocusNav): 5 Mbps inside the slider's range; automatic steps up to 5 and 5 steps back to automatic
 const nudgeBitrate = (delta) => setCfg('max_bitrate', String(bitrateNudge(bitrateKbps.value, delta, SLIDER_MAX_MBPS)))
 
 async function initTauri() {
@@ -256,33 +245,7 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* Bold, not a form: the bitrate is a number you can read from the sofa; codecs and HDR are tiles that light up when they are on. */
-.dsk-stream { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; }
-.dsk-stream__col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
-@media (min-width: 1500px) {
-  .dsk-stream { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: stretch; }
-  .dsk-bit { justify-content: space-between; }
-}
 .dsk-stream__wait { display: flex; align-items: center; justify-content: center; gap: 16px; padding: 64px; font: var(--m-title-medium); color: var(--md-sys-color-on-surface-variant); }
-
-.dsk-tile__icon { flex: none; width: 56px; height: 56px; display: grid; place-items: center; font-size: 28px; background: var(--md-sys-color-primary); color: var(--md-sys-color-on-primary); clip-path: var(--m-shape-squircle); transition: clip-path var(--m-spring-default-spatial-duration, 300ms) var(--m-spring-default-spatial, ease); }
-.dsk-bit { position: relative; overflow: hidden; isolation: isolate; display: flex; flex-direction: column; gap: 18px; padding: 28px 30px 24px; border-radius: var(--md-sys-shape-corner-extra-extra-large); background: var(--md-sys-color-primary-container); color: var(--md-sys-color-on-primary-container); }
-.dsk-bit__head { display: flex; align-items: center; gap: 14px; }
-.dsk-bit__title { margin: 0; font: var(--m-headline-small-emphasized); letter-spacing: 0; }
-.dsk-bit__number { display: flex; align-items: baseline; gap: 14px; }
-.dsk-bit__value { font: var(--m-display-large); font-weight: 700; letter-spacing: -0.02em; line-height: 1; font-size: 128px; }
-.dsk-bit__unit { font: var(--m-headline-medium-emphasized); opacity: .85; }
-.dsk-stream__range { display: flex; align-items: center; gap: 12px; }
-.dsk-stream__range .m-slider { flex: 1; min-width: 0; }
-
-.dsk-codec, .dsk-flag { position: relative; display: flex; flex-direction: column; gap: 14px; padding: 20px 22px; border-radius: var(--md-sys-shape-corner-extra-large); background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); transition: background-color var(--m-spring-default-effects-duration, 200ms) var(--m-spring-default-effects, ease), border-radius var(--m-spring-default-spatial-duration, 300ms) var(--m-spring-default-spatial, ease); }
-.dsk-codec .dsk-tile__icon, .dsk-flag .dsk-tile__icon { background: var(--md-sys-color-surface-container-highest); color: var(--md-sys-color-on-surface-variant); clip-path: var(--m-shape-circle); }
-.dsk-codec.is-on, .dsk-flag.is-on { background: var(--dsk-tert-bg); color: var(--dsk-tert-fg); border-radius: var(--md-sys-shape-corner-extra-extra-large); }
-.dsk-codec.is-on .dsk-tile__icon, .dsk-flag.is-on .dsk-tile__icon { background: var(--md-sys-color-tertiary); color: var(--md-sys-color-on-tertiary); clip-path: var(--m-shape-cookie); }
-.dsk-codec__head { display: flex; align-items: center; gap: 16px; }
-.dsk-flag { flex-direction: row; align-items: center; gap: 16px; }
-.dsk-codec__name { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.dsk-codec__title { margin: 0; font: var(--m-title-large); letter-spacing: 0; }
-.dsk-codec__desc { font: var(--m-body-medium); opacity: .82; }
-.dsk-applies { margin: 0; font: var(--m-label-large); opacity: .72; }
+.dsk-bitrate :deep(.m-item__control) { display: flex; flex-direction: column; gap: 16px; }
+.dsk-bitrate__value { min-width: 5.5em; }
 </style>

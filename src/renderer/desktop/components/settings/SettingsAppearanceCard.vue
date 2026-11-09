@@ -1,6 +1,6 @@
 <template>
-  <SettingsCard :title="t.settings.appearance" icon="palette">
-    <SettingsRow :name="t.settings.themeEditorName" :description="t.settings.appearanceDesc">
+  <SettingsCard :title="t.settings.appearance">
+    <SettingsRow icon="palette" :name="t.settings.themeEditorName" :description="t.settings.appearanceDesc">
       <MButton variant="tonal" icon="palette" @click="emit('open-theme-editor')">{{ t.settings.themeEditor }}</MButton>
     </SettingsRow>
   </SettingsCard>

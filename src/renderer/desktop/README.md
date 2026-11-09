@@ -25,17 +25,17 @@ desktop/
 | `apps` | `views/AppsView.vue` | 应用库：筛选、搜索、排序、网格/列表、最近、右键菜单、封面、启动助手 |
 | `dashboard` | `views/DashboardView.vue` | 状态、快捷操作（网页控制台、重启服务、主机性能、诊断与日志）、系统信息、内存监控 |
 | `devices` | `views/DevicesView.vue` | 配对（二维码；PIN 用 `MPinPad`）、已配对设备、重命名、取消配对 |
-| `stream` | `views/StreamView.vue` | 码率（大数字）、编解码器、HDR、自动启动大屏；改一项存一项（`saveSettingKey`），并写明何时生效 |
+| `stream` | `views/StreamView.vue` | 码率（一行：数值、步进、滑块、预设；与 Web UI 同一套）、编解码器、HDR、自动启动大屏；改一项存一项（`saveSettingKey`），并写明何时生效 |
 | `tools` | `views/ToolsView.vue` | 系统检查（GPU、编码器、网络、防火墙）、重启显卡驱动；工具箱各项是 Panel 的页面 |
 | `settings` | `views/SettingsView.vue` | 外观、启动、大屏、通知、关于；其余是 Panel 的页面 |
 
 底部导航：语言（EN/中文）、主题编辑器、设置、退出。`desktop-navigate` 事件、托盘 `open_desktop`、`--desktop`/`-d` 仍然进入这里。
 
-页面（设备、串流、工具、设置）都放在 `components/DeskPage.vue` 里：一条 hero（有形状的图标、页面名、一条真实的事实、标签）加内容，按 `useDeskScale` 放大 1.25 倍（再随主题编辑器的字号）。页面的操作条（保存、重置）用 `components/DeskDock.vue`，停在页面下面独立一行，不浮在内容上。
+页面（设备、串流、工具、设置）都放在 `components/DeskPage.vue` 里：就是 `MPage`（标题行加 `MSection` / `MGroup` / `MItem` 的行，与手机、Web UI、Panel 一致，不自绘卡片、大数字或形状），按 `useDeskScale` 放大 1.25 倍（再随主题编辑器的字号）。页面的操作条（保存、重置）用 `components/DeskDock.vue`，停在页面下面独立一行，不浮在内容上。
 
 ## 在 Panel 中打开
 
-沙发上不常用的东西留在主 Panel：每项是一块磁贴（`components/PanelLink.vue`），手柄按下就通过宿主命令 `open_panel_page` 打开 Panel 的对应页面（`windows::open_main_panel_page`）。
+沙发上不常用的东西留在主 Panel：每项是一行（`components/PanelLink.vue`，一个 `MItem`），手柄按下就通过宿主命令 `open_panel_page` 打开 Panel 的对应页面（`windows::open_main_panel_page`）。
 表在 `panelLinks.js`；页面名是 `composables/panelParts.js` 的 `PANEL_PAGES`，宿主允许表在 `src-tauri/src/commands.rs`，`panelLinks.test.js` 让两份和这张表保持一致。
 哪些功能搬到了哪一页，见 `/var/tmp/dispatch/md-desk3-panel-map.md` 一表（每项都对过 Panel 的代码；Panel 没有对应页面的，例如系统检查和重启显卡驱动，留在大屏）。
 留在大屏的设置和 Panel 走同一份保存代码：`useDesktopSettings.js`、`useBigScreenSettings.js`、串流项用 `saveSettingKey`。
@@ -46,7 +46,7 @@ desktop/
 - 面板里：概览的「打开大屏」磁贴（默认不在智能列表里，可固定）、搜索「大屏」、帮助里的一行、面板设置里的一行，都走 `open_desktop` 命令，与托盘「打开桌面 UI」是同一条路。
 - Web UI 在主机本机（Windows）上有同样的磁贴和搜索动作，经 `/api/tray/action` 的 `open_desktop`；别处没有，不是置灰。
 
-页面（设备、串流、工具、设置）都放在 `components/DeskPage.vue` 里：一个标题加内容，按 `useDeskScale` 放大 1.25 倍（再随主题编辑器的字号）。
+手柄：滑块（`role=slider` 或 range 输入）获得焦点时，方向键左右不再移动焦点而是调值（一步；按住一会儿变十步），上下照常离开（`useFocusNav.js` 的 `nudgeSlider`）。
 
 ## 外观与颜色
 

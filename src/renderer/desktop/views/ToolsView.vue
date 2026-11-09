@@ -1,29 +1,24 @@
 <template>
-  <DeskPage :title="t.tools.pageTitle" icon="build" :text="heroText" wide>
-    <!-- the system check: what the host and this machine can do, in four tiles that turn green or amber -->
-    <section class="dsk-diag">
-      <div class="dsk-diag__grid">
-        <div v-for="row in DIAGNOSTIC_ROWS" :key="row.key" class="dsk-diag__tile" :class="`is-${diagnostics[row.key].status}`">
-          <span class="dsk-diag__icon">
-            <span class="dsk-diag__shape" />
-            <MLoading v-if="diagnostics[row.key].status === 'connecting'" size="30px" />
-            <MIcon v-else :name="row.icon" fill />
-          </span>
-          <div class="dsk-diag__info">
-            <div class="dsk-diag__name">{{ t.tools[row.key] }}</div>
-            <div class="dsk-diag__value">{{ diagnostics[row.key].value }}</div>
-          </div>
-          <MChip :tone="STATUS_TONES[diagnostics[row.key].status] || 'neutral'">{{ diagnostics[row.key].statusText }}</MChip>
-        </div>
-      </div>
-
+  <DeskPage :title="t.tools.pageTitle" wide>
+    <!-- the system check: what the host and this machine can do, one row each -->
+    <MSection>
+      <MGroup>
+        <MItem v-for="row in DIAGNOSTIC_ROWS" :key="row.key" :icon="row.icon" :title="t.tools[row.key]" :text="diagnostics[row.key].value">
+          <template #trail>
+            <MLoading v-if="diagnostics[row.key].status === 'connecting'" size="24px" />
+            <MChip :tone="STATUS_TONES[diagnostics[row.key].status] || 'neutral'">{{ diagnostics[row.key].statusText }}</MChip>
+          </template>
+        </MItem>
+      </MGroup>
       <MNotice v-if="actionError" tone="error">{{ actionError }}</MNotice>
+    </MSection>
 
-      <div class="dsk-diag__actions">
-        <MButton variant="tonal" size="lg" icon="restart_alt" @click="restartGraphicsDriver">{{ t.tools.restartGraphicsDriver }}</MButton>
-        <MButton size="lg" icon="refresh" :loading="diagnosing" @click="runDiagnostics">{{ t.tools.rediagnose }}</MButton>
-      </div>
-    </section>
+    <MSection>
+      <MGroup>
+        <MItem action icon="restart_alt" :title="t.tools.restartGraphicsDriver" @click="restartGraphicsDriver" />
+        <MItem action icon="refresh" :title="t.tools.rediagnose" :disabled="diagnosing" @click="runDiagnostics" />
+      </MGroup>
+    </MSection>
 
     <!-- the tools of the toolbox are pages of the panel -->
     <PanelLinkSection :heading="t.tools.inPanel" :links="['liveSession', 'dpi', 'shortcuts', 'logs']" />
@@ -31,9 +26,9 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { probeSystemDiagnostics } from '../../composables/systemDiagnostics.js'
-import { MButton, MChip, MIcon, MLoading, MNotice } from 'foundation-ui/vue'
+import { MChip, MGroup, MItem, MLoading, MNotice, MSection } from 'foundation-ui/vue'
 import { requestConfirm } from '../composables/useConfirm.js'
 import { useI18n } from '../i18n/index.js'
 import DeskPage from '../components/DeskPage.vue'
@@ -73,13 +68,6 @@ async function restartGraphicsDriver() {
 }
 
 // The tone of a diagnostic, and the glyph of what it checks.
-// the hero's fact: how many of the four checks pass
-const heroText = computed(() => {
-  const rows = Object.values(diagnostics.value)
-  if (rows.some((row) => row.status === 'connecting')) return t.value.tools.status.detecting
-  return t.value.tools.checksSummary.replace('{ok}', rows.filter((row) => row.status === 'good').length).replace('{n}', rows.length)
-})
-
 const STATUS_TONES = { good: 'ok', warning: 'warn', error: 'error', connecting: 'info' }
 const DIAGNOSTIC_ROWS = [
   { key: 'gpu', icon: 'memory' },
@@ -116,29 +104,3 @@ onMounted(async () => {
   runDiagnostics()
 })
 </script>
-
-<style scoped>
-.dsk-diag { display: flex; flex-direction: column; gap: 18px; }
-.dsk-diag__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-.dsk-diag__tile { display: flex; align-items: center; gap: 18px; min-width: 0; padding: 20px 22px; border-radius: var(--md-sys-shape-corner-extra-large); background: var(--md-sys-color-surface-container-high); color: var(--md-sys-color-on-surface); transition: background-color var(--m-spring-default-effects-duration, 200ms) var(--m-spring-default-effects, ease); }
-.dsk-diag__icon { position: relative; flex: none; width: 72px; height: 72px; display: grid; place-items: center; font-size: 34px; color: var(--md-sys-color-on-secondary-container); }
-.dsk-diag__shape { position: absolute; inset: 0; background: var(--md-sys-color-secondary-container); clip-path: var(--m-shape-cookie); animation: m-turn 44s linear infinite; }
-.dsk-diag__icon :deep(.m-icon), .dsk-diag__icon :deep(.m-loading) { position: relative; }
-.dsk-diag__tile.is-good { background: var(--md-sys-color-success-container); color: var(--md-sys-color-on-success-container); }
-.dsk-diag__tile.is-good .dsk-diag__shape { background: var(--md-sys-color-success); }
-.dsk-diag__tile.is-good .dsk-diag__icon { color: var(--md-sys-color-on-success); }
-.dsk-diag__tile.is-warning { background: var(--md-sys-color-warning-container); color: var(--md-sys-color-on-warning-container); }
-.dsk-diag__tile.is-warning .dsk-diag__shape { background: var(--md-sys-color-warning); }
-.dsk-diag__tile.is-warning .dsk-diag__icon { color: var(--md-sys-color-on-warning); }
-.dsk-diag__tile.is-error { background: var(--md-sys-color-error-container); color: var(--md-sys-color-on-error-container); }
-.dsk-diag__tile.is-error .dsk-diag__shape { background: var(--md-sys-color-error); }
-.dsk-diag__tile.is-error .dsk-diag__icon { color: var(--md-sys-color-on-error); }
-.dsk-diag__info { flex: 1; min-width: 0; }
-.dsk-diag__name { font: var(--m-label-large); opacity: .85; }
-.dsk-diag__value { font: var(--m-title-large); overflow-wrap: anywhere; }
-.dsk-diag__actions { display: flex; flex-wrap: wrap; gap: 12px; justify-content: flex-end; }
-
-@media (max-width: 1300px) {
-  .dsk-diag__grid { grid-template-columns: minmax(0, 1fr); }
-}
-</style>

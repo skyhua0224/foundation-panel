@@ -195,6 +195,44 @@ export function focusFirst(root = activeScopeRoot()) {
   return focusElement(readingOrder(focusables)[0] || null)
 }
 
+/** Is this a slider (MSlider's handle, or a native range input)? */
+export function isSliderElement(element) {
+  if (!element || typeof element.getAttribute !== 'function') return false
+  if (element.getAttribute('aria-disabled') === 'true' || element.disabled) return false
+  return element.getAttribute('role') === 'slider' || (element.tagName === 'INPUT' && element.type === 'range')
+}
+
+const SLIDER_STREAK_MS = 300
+const SLIDER_FAST_FROM = 6
+let sliderStreak = { direction: '', at: 0, count: 0 }
+
+/**
+ * The key a slider gets for a left or right press of the pad: one step at first, ten steps once the same direction has been held down for a while
+ * (a slider of 200 steps is not 200 separate presses). Pure but for the streak it keeps; `now` is a clock reading in milliseconds.
+ */
+export function sliderKeyFor(direction, now) {
+  const same = sliderStreak.direction === direction && now - sliderStreak.at <= SLIDER_STREAK_MS
+  sliderStreak = { direction, at: now, count: same ? sliderStreak.count + 1 : 1 }
+  const fast = sliderStreak.count >= SLIDER_FAST_FROM
+  if (direction === 'right') return fast ? 'PageUp' : 'ArrowRight'
+  return fast ? 'PageDown' : 'ArrowLeft'
+}
+
+/** A slider takes the pad's left and right as its own arrow keys (a pad cannot drag): the value moves, the focus stays. Up and down leave it like any control. */
+function nudgeSlider(slider, direction) {
+  const key = sliderKeyFor(direction, performance.now())
+  if (slider.tagName === 'INPUT') {
+    const step = key.startsWith('Page') ? 10 : 1
+    if (direction === 'right') slider.stepUp(step)
+    else slider.stepDown(step)
+    slider.dispatchEvent(new Event('input', { bubbles: true }))
+    slider.dispatchEvent(new Event('change', { bubbles: true }))
+    return true
+  }
+  slider.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true, cancelable: true }))
+  return true
+}
+
 export function navigateFocus(direction, root = activeScopeRoot()) {
   const focusables = collectFocusables(root)
   if (focusables.length === 0) return false
@@ -203,6 +241,8 @@ export function navigateFocus(direction, root = activeScopeRoot()) {
   if (!current || current === document.body || !focusables.includes(current)) {
     return focusFirst(root)
   }
+
+  if ((direction === 'left' || direction === 'right') && isSliderElement(current)) return nudgeSlider(current, direction)
 
   // A control inside the scrolling page area moves to what the page holds first, rows scrolled out of view included; only when the page has nothing
   // that way does the focus leave it (the rail, the docked action bar). Otherwise the docked bar, always on screen, is the nearest thing below the
