@@ -30,8 +30,8 @@ export const translations = {
         },
         {
           icon: '🖥️',
-          title: '杂鱼虚拟显示器',
-          description: '内置杂鱼虚拟显示器管理，无需额外软件即可创建和管理虚拟显示器'
+          title: '基地虚拟显示器',
+          description: '内置基地虚拟显示器管理，无需额外软件即可创建和管理虚拟显示器'
         },
         {
           icon: '🎤',
@@ -138,8 +138,8 @@ export const translations = {
         },
         {
           icon: '🖥️',
-          title: 'ZakoDisplay',
-          description: 'Built-in ZakoDisplay management, a virtual display, without additional software'
+          title: 'Foundation Virtual Display',
+          description: 'Built-in Foundation Virtual Display management, a virtual display, without additional software'
         },
         {
           icon: '🎤',
