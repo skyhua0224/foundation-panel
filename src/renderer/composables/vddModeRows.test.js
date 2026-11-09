@@ -37,3 +37,10 @@ test('the product is named 基地虚拟显示器 in Chinese and Foundation Virtu
   const doctor = readFileSync(new URL('../../../src-tauri/src/doctor_local.rs', import.meta.url), 'utf8')
   assert.match(doctor, /tr\(lang, "Foundation Virtual Display", "基地虚拟显示器"\)/)
 })
+
+test('the picture enhancement page declares what its template uses (the display tree texts and the expander)', () => {
+  const page = read('../components/HdrEnhancedManager.vue')
+  assert.match(page, /const dt = computed\(\(\) => displayTreeTexts\(locale\.value\)\)/)
+  assert.match(page, /const advancedOpen = ref\(false\)/)
+  assert.match(page, /import \{ MExpander, displayTreeTexts,/)
+})

@@ -89,7 +89,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { dlssNr, rtxHdr } from '../tauri-adapter.js'
 import { listen } from '@tauri-apps/api/event'
-import { MIcon, MChip, MPage, MGroup, MSection, MItem, MSwitchItem, MSliderItem, MChoiceItem, MBanner, MNotice, MEmpty, MFooter, MButton, MIconButton, useSubpage } from 'foundation-ui/vue'
+import { MExpander, displayTreeTexts, MIcon, MChip, MPage, MGroup, MSection, MItem, MSwitchItem, MSliderItem, MChoiceItem, MBanner, MNotice, MEmpty, MFooter, MButton, MIconButton, useSubpage } from 'foundation-ui/vue'
 import { displayGamepadShortcut, FIXED_GAMEPAD_SHORTCUTS } from '../composables/controllerButtons.js'
 import NrSessionControls from './NrSessionControls.vue'
 import { noteDlssNrStatus, dlssNrShown } from '../composables/useDlssNrReady.js'
@@ -114,6 +114,8 @@ const { locale } = useI18n()
 const text = computed(() => enhancementControlsText(locale.value)),
   overlayText = computed(() => nrOverlayText(locale.value))
 const t = useI18n().t
+const dt = computed(() => displayTreeTexts(locale.value))
+const advancedOpen = ref(false)
 // a shortcut as separate keys: 'Ctrl + Alt + N' -> ['Ctrl', 'Alt', 'N']
 const keysOf = (label) => String(label || '').split(' + ').map((k) => k.trim()).filter(Boolean)
 const emit = defineEmits(['manage-components'])
