@@ -246,20 +246,56 @@ fn detect_rtss_install_dir() -> Option<String> {
     use winreg::enums::*;
 
     // 32-bit installer view first, then the native view. KEY_WOW64_32KEY reads the view
-    // RTSS actually writes [dr-ms-alt-registry-view-20261109].
-    let mut registry = Vec::new();
+    // RTSS actually writes [dr-ms-alt-registry-view-20261109]. A per-user install writes
+    // HKCU; a moved or repaired install can leave only the uninstall entry.
+    let mut candidates = Vec::new();
     let views = [
-        (r"Software\WOW6432Node\Unwinder\RTSS", KEY_READ | KEY_WOW64_64KEY),
-        (r"Software\Unwinder\RTSS", KEY_READ | KEY_WOW64_32KEY),
-        (r"Software\Unwinder\RTSS", KEY_READ | KEY_WOW64_64KEY),
+        (HKEY_LOCAL_MACHINE, r"Software\Unwinder\RTSS", KEY_READ | KEY_WOW64_32KEY),
+        (HKEY_LOCAL_MACHINE, r"Software\WOW6432Node\Unwinder\RTSS", KEY_READ | KEY_WOW64_64KEY),
+        (HKEY_LOCAL_MACHINE, r"Software\Unwinder\RTSS", KEY_READ | KEY_WOW64_64KEY),
+        (HKEY_CURRENT_USER, r"Software\Unwinder\RTSS", KEY_READ | KEY_WOW64_32KEY),
+        (HKEY_CURRENT_USER, r"Software\WOW6432Node\Unwinder\RTSS", KEY_READ | KEY_WOW64_64KEY),
+        (HKEY_CURRENT_USER, r"Software\Unwinder\RTSS", KEY_READ | KEY_WOW64_64KEY),
     ];
-    for (path, access) in views {
-        let Ok(key) = RegKey::predef(HKEY_LOCAL_MACHINE).open_subkey_with_flags(path, access) else { continue };
+    for (root, path, access) in views {
+        let Ok(key) = RegKey::predef(root).open_subkey_with_flags(path, access) else { continue };
         if let Ok(dir) = key.get_value::<String, _>("InstallDir") {
-            registry.push(dir);
+            candidates.push(dir);
         }
     }
-    crate::rtss_detect::choose_rtss_install_dir(&registry, &rtss_process_images(), |dir| std::path::Path::new(dir).is_dir())
+    // InstallLocation is the Add/Remove Programs key's directory value
+    // [p5u-ms-uninstall-registry-20261109].
+    for (root, base, access) in [
+        (HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Uninstall", KEY_READ | KEY_WOW64_32KEY),
+        (HKEY_LOCAL_MACHINE, r"Software\Microsoft\Windows\CurrentVersion\Uninstall", KEY_READ | KEY_WOW64_64KEY),
+        (HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall", KEY_READ | KEY_WOW64_32KEY),
+        (HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Uninstall", KEY_READ | KEY_WOW64_64KEY),
+    ] {
+        for entry_name in ["RTSS", "RivaTuner Statistics Server"] {
+            let Ok(entry) = RegKey::predef(root).open_subkey_with_flags(format!(r"{base}\{entry_name}"), access) else { continue };
+            if let Ok(location) = entry.get_value::<String, _>("InstallLocation") {
+                if let Some(dir) = crate::rtss_detect::install_dir_from_uninstall_location(&location) {
+                    candidates.push(dir);
+                }
+            }
+            if let Ok(icon) = entry.get_value::<String, _>("DisplayIcon") {
+                if let Some(dir) = crate::rtss_detect::install_dir_from_display_icon(&icon) {
+                    candidates.push(dir);
+                }
+            }
+        }
+    }
+    // The default location follows ProgramFiles even when the system drive is not C:.
+    // ProgramFiles(x86) does not exist on 32-bit Windows.
+    for variable in ["ProgramFiles(x86)", "ProgramFiles"] {
+        if let Ok(root) = std::env::var(variable) {
+            let root = root.trim().trim_end_matches(['\\', '/']);
+            if !root.is_empty() {
+                candidates.push(format!(r"{root}\RivaTuner Statistics Server"));
+            }
+        }
+    }
+    crate::rtss_detect::choose_rtss_install_dir(&candidates, &rtss_process_images(), |dir| std::path::Path::new(dir).is_dir())
 }
 
 #[cfg(target_os = "windows")]

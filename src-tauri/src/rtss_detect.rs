@@ -31,6 +31,28 @@ pub fn install_dir_from_process_image(image: &str) -> Option<String> {
     if dir.is_empty() { None } else { Some(dir) }
 }
 
+/// The directory named by the uninstall entry's DisplayIcon, e.g.
+/// `"C:\Program Files (x86)\RivaTuner Statistics Server\RTSS.exe",0`.
+/// The icon is written by the 32-bit installer and is present even when the
+/// Unwinder key is missing or was left behind by a move.
+pub fn install_dir_from_display_icon(raw: &str) -> Option<String> {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return None;
+    }
+    let path = match trimmed.strip_prefix('"') {
+        Some(rest) => rest.split('"').next().unwrap_or_default(),
+        None => trimmed.split(',').next().unwrap_or_default().trim(),
+    };
+    install_dir_from_process_image(path)
+}
+
+/// An uninstall entry's InstallLocation, normalized like InstallDir.
+pub fn install_dir_from_uninstall_location(raw: &str) -> Option<String> {
+    let dir = normalize_rtss_dir(raw);
+    if dir.is_empty() { None } else { Some(dir) }
+}
+
 fn split_path(path: &str) -> (&str, &str) {
     match path.rfind(['\\', '/']) {
         Some(index) => (&path[..index], &path[index + 1..]),
@@ -39,11 +61,11 @@ fn split_path(path: &str) -> (&str, &str) {
 }
 
 pub fn choose_rtss_install_dir(
-    registry_values: &[String],
+    candidates: &[String],
     process_images: &[String],
     mut exists: impl FnMut(&str) -> bool,
 ) -> Option<String> {
-    for raw in registry_values {
+    for raw in candidates {
         let dir = normalize_rtss_dir(raw);
         if !dir.is_empty() && exists(&dir) {
             return Some(dir);
@@ -91,5 +113,35 @@ mod tests {
     #[test]
     fn an_unrelated_process_is_not_an_install() {
         assert!(install_dir_from_process_image(r"C:\Windows\notepad.exe").is_none());
+    }
+
+    #[test]
+    fn a_quoted_display_icon_names_the_install_directory() {
+        assert_eq!(
+            install_dir_from_display_icon(
+                r#""C:\Program Files (x86)\RivaTuner Statistics Server\RTSS.exe",0"#
+            )
+            .as_deref(),
+            Some(r"C:\Program Files (x86)\RivaTuner Statistics Server")
+        );
+        assert_eq!(
+            install_dir_from_display_icon(r"D:\Tools\RTSS\RTSSHooksLoader64.exe").as_deref(),
+            Some(r"D:\Tools\RTSS")
+        );
+    }
+
+    #[test]
+    fn an_uninstall_location_is_normalized() {
+        assert_eq!(
+            install_dir_from_uninstall_location(r#"  "D:\Tools\RTSS\"  "#).as_deref(),
+            Some(r"D:\Tools\RTSS")
+        );
+        assert!(install_dir_from_uninstall_location("   ").is_none());
+    }
+
+    #[test]
+    fn an_unrelated_display_icon_is_not_an_install() {
+        assert!(install_dir_from_display_icon(r#""C:\Windows\notepad.exe",0"#).is_none());
+        assert!(install_dir_from_display_icon("").is_none());
     }
 }
