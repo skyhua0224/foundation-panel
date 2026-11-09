@@ -219,7 +219,48 @@ fn parse_attached_devices(output: &str) -> Vec<UsbipAttachedDevice> {
     {
         devices.push(device);
     }
+    // The host attaches its own virtual USB devices (the stream microphone and
+    // the virtual touchscreen) through a loopback usbip server. usbip-win2 does
+    // not query their string descriptors, so they appear as
+    // "Generic : unknown product (1209:a1c0)" and would otherwise look like a
+    // user's forwarded device [p5u-usbip-win2-port-cmd-v0.9.8.1]. Keep them out
+    // of the user-facing list; a device exported by another machine on the same
+    // vendor/product pair is still shown.
+    devices.retain(|device| !is_internal_virtual_device(device));
     devices
+}
+
+/// Vendor/product pairs of the virtual USB devices the host creates for a
+/// stream. The pairs are the only stable identity in `usbip port` output: the
+/// description strings are not queried by usbip-win2. 0x1209 is the shared
+/// pid.codes vendor ID; 0xa1c0 is Foundation Sunshine's placeholder, not an
+/// allocated pid.codes product [p5u-pidcodes-1209-20261109].
+const INTERNAL_VIRTUAL_DEVICES: &[(&str, &str)] = &[
+    ("1209", "a1c0"), // virtual USB microphone
+    ("5355", "5401"), // virtual touchscreen
+];
+
+fn is_loopback_host(host: &str) -> bool {
+    let host = host.trim();
+    let bare = host
+        .strip_prefix('[')
+        .and_then(|value| value.strip_suffix(']'))
+        .unwrap_or(host);
+    bare.eq_ignore_ascii_case("localhost")
+        || bare
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|address| address.is_loopback())
+}
+
+fn is_internal_virtual_device(device: &UsbipAttachedDevice) -> bool {
+    if !is_loopback_host(&device.remote_host) {
+        return false;
+    }
+    let description = device.description.to_ascii_lowercase();
+    INTERNAL_VIRTUAL_DEVICES.iter().any(|(vendor, product)| {
+        description.contains(&format!("({vendor}:{product})"))
+            || description.contains(&format!("{vendor}:{product}"))
+    })
 }
 
 /// Enumerates local imports; local failures must not be presented as exporter errors.
@@ -332,6 +373,41 @@ Port 12: device in use at SuperSpeed
         assert_eq!(devices[0].remote_bus_id, "3-3.2");
         assert_eq!(devices[1].remote_host, "fe80::1");
         assert_eq!(devices[1].remote_port, 4324);
+    }
+
+    #[test]
+    fn hides_the_hosts_own_loopback_virtual_devices() {
+        let output = r#"Imported USB devices
+====================
+Port 01: device in use at High Speed
+         Generic : unknown product (1209:a1c0)
+           -> usbip://127.0.0.1:57973/2-1
+           -> remote bus/dev: 002/001
+Port 02: device in use at High Speed
+         Generic : unknown product (5355:5401)
+           -> usbip://[::1]:57974/1-2
+           -> remote bus/dev: 001/002
+"#;
+        assert!(parse_attached_devices(output).is_empty());
+    }
+
+    #[test]
+    fn keeps_forwarded_devices_even_when_a_virtual_pair_matches() {
+        let output = r#"Imported USB devices
+====================
+Port 01: device in use at High Speed
+         DualSense Wireless Controller (054c:0ce6)
+           -> usbip://127.0.0.1:53122/1-1
+           -> remote bus/dev: 001/001
+Port 02: device in use at High Speed
+         Sunshine Virtual Microphone (1209:a1c0)
+           -> usbip://192.0.2.10:3240/2-1
+           -> remote bus/dev: 002/001
+"#;
+        let devices = parse_attached_devices(output);
+        assert_eq!(devices.len(), 2);
+        assert_eq!(devices[0].remote_bus_id, "1-1");
+        assert_eq!(devices[1].remote_host, "192.0.2.10");
     }
 
     #[tokio::test]

@@ -36,6 +36,12 @@ test('the status is read once; a failed read is not installed; a refresh that fi
   assert.equal(await readRtssInstall(async () => { throw new Error('no such command') }), false)
 })
 
+test('a failed re-read keeps an installed answer', async () => {
+  noteRtssStatus({ installed: true, running: false })
+  assert.equal(await readRtssInstall(async () => { throw new Error('the command timed out') }), true)
+  assert.equal(rtssInstalled.value, true)
+})
+
 test('a page link to RTSS is refused where it is known not installed', async () => {
   noteRtssStatus({ installed: false })
   assert.equal(requestPanelPage('rtss'), null)

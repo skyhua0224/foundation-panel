@@ -196,6 +196,10 @@ import { rowKeywords, parseSettingsHash, SEARCH_INDEX } from 'foundation-ui/sett
 import { useI18n } from '../desktop/i18n/index.js'
 import { useDualSenseStatus } from '../composables/useDualSenseStatus.js'
 import { useDualSenseText } from '../composables/useDualSenseText.js'
+let rtssRefresh = 0
+const refreshRtssInstall = () => import('@tauri-apps/api/core')
+  .then(({ invoke }) => readRtssInstall(invoke))
+  .catch(() => { if (rtssInstalled.value === null) rtssInstalled.value = false })
 const UpdateDialog = defineAsyncComponent(() => import('./UpdateDialog.vue'))
 const props = defineProps({ webuiPath: { type: String, default: '/' } })
 const emit = defineEmits(['route-change', 'webui-navigate'])
@@ -229,8 +233,10 @@ const openStartGuide = () => {
 onMounted(() => {
   initClipboardSyncStatus()
   refreshRuntime()
-  // RivaTuner Statistics Server is optional: read once whether it is installed, the RTSS page exists only then
-  import('@tauri-apps/api/core').then(({ invoke }) => readRtssInstall(invoke)).catch(() => { rtssInstalled.value = false })
+  // RivaTuner Statistics Server is optional: read whether it is installed, the RTSS page exists only then. A login-time read can
+  // happen before RTSS's autostart registers it, so keep the answer fresh while the window is open.
+  refreshRtssInstall()
+  rtssRefresh = setInterval(() => { if (!document.hidden) refreshRtssInstall() }, 60000)
 })
 
 const openWebUi = (path) => {
@@ -711,7 +717,7 @@ const onFrameMessage = (event) => {
   else if (data?.type === 'foundation-open' && data.page === 'hdr-enhanced') router.navigate(ROUTES.HDR_ENHANCED)
   else if (data?.type === 'foundation-ds5-status-request') pushDs5Status()}
 onMounted(() => { window.addEventListener('message', onFrameMessage); loadHostData(); componentStatus.start(60000); startPopupMenu() })
-onBeforeUnmount(() => { window.removeEventListener('message', onFrameMessage); componentStatus.stop(); popupMenu?.stop(); popupMenu = null; stopTrayTheme() })
+onBeforeUnmount(() => { window.removeEventListener('message', onFrameMessage); componentStatus.stop(); clearInterval(rtssRefresh); popupMenu?.stop(); popupMenu = null; stopTrayTheme() })
 const contextMenu = ref(null)
 // the window's own context menu (SPEC-context-menu): what this product can do for it; an action that is not here is not an item
 // 运行体检 is 全部检查 of the components page; 打开 Web UI opens the host's address in the system browser (the dashboard card of the old panel did the same); the pet's entry is the 桌宠 sheet of 面板设置, the page
