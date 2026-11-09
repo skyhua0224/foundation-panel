@@ -98,9 +98,11 @@ test('the tools people come for are rows of 系统: the latency clock, the test 
   assert.ok(nav.includes("[ROUTES.LATENCY_CLOCK]: 'latency-clock', [ROUTES.TEST_TOOLS]: 'test-tools', [ROUTES.STREAM_TIMER]: 'stream-timer'"))
 })
 
-test('the list of 串流 has 添加应用 above its rows: the rail and the button are two presses', () => {
+test('the list of 串流 has no 添加应用: adding an app is on the page 串流应用 (its FAB), the list is only pages', () => {
   const menu = read('../components/SidebarMenu.vue')
-  assert.ok(menu.includes(`<template v-if="entry.rail === 'stream'" #top><div class="m-navlist__add"><MButton variant="tonal" icon="add" @click="openDestination('apps:add')">{{ homeTexts(locale)['c_act-add-app'] }}</MButton></div></template>`))
+  assert.ok(!menu.includes('m-navlist__add') && !menu.includes("#top"), 'no button in the list pane')
+  assert.ok(!menu.includes("c_act-add-app"))
+  assert.ok(menu.includes("addApp: () => { emit('webui-navigate', '/apps#guide-add'); router.navigate(ROUTES.WEB_APPS) }"), 'the search action still opens the page to add')
 })
 
 // fs52-gamepad-test-rumble: the panel's gamepad tool rumbles a stream's pad through the host
