@@ -446,7 +446,13 @@ const loadHostData = async () => {
     if (apps.status === 'fulfilled' && Array.isArray(apps.value?.apps)) hostApps.value = apps.value.apps
   } catch { /* the list shows no live lines and the search the pages only */ }
 }
-const listGroups = (rail) => (rail === 'config' ? settingsList.groups.value : [{ id: rail, items: listItems(rail) }])
+// a row marked `separated` (the 高级 of 显示与视频) is a group of its own at the end of the list
+const listGroups = (rail) => {
+  if (rail === 'config') return settingsList.groups.value
+  const items = listItems(rail)
+  const apart = items.filter((i) => i.separated)
+  return apart.length ? [{ id: rail, items: items.filter((i) => !i.separated) }, { id: `${rail}-apart`, items: apart }] : [{ id: rail, items }]
+}
 const currentRow = computed(() => {
   const route = nav.current.value
   if (route === ROUTES.WEB_CONFIG) return `config:${nav.detail.value?.params?.tab || 'general'}`

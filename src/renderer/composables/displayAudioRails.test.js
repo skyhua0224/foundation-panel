@@ -19,7 +19,7 @@ test('音频 and 显示与视频 are two rails of their own, between 输入与�
   assert.match(nav, /audio: 'volume_up'/)
 })
 test('the rows of the two rails: the places of the display and audio tabs, none alone in its list', () => {
-  assert.deepEqual(rowsOf('display').map((r) => r.route), ['WEB_DISPLAY_MODES', 'WEB_DISPLAY_OUTPUT', 'WEB_DISPLAY_ENCODERS', 'WEB_DISPLAY_VIDEO', 'WEB_DISPLAY_HDR', 'VDD_SETTINGS', 'HDR_ENHANCED'])
+  assert.deepEqual(rowsOf('display').map((r) => r.route), ['WEB_DISPLAY_OUTPUT', 'WEB_DISPLAY_MODES', 'WEB_DISPLAY_HDR', 'HDR_ENHANCED', 'WEB_DISPLAY_ENCODERS', 'VDD_SETTINGS', 'WEB_DISPLAY_ADVANCED'])
   assert.deepEqual(rowsOf('audio').map((r) => r.route), ['WEB_AUDIO_SOUND', 'MICROPHONE'])
   assert.deepEqual(rowsOf('input').map((r) => r.route), ['GAMEPAD', 'WEB_INPUT_KEYBOARD', 'WEB_INPUT_MOUSE', 'USB'])
   assert.match(router, /\[ROUTES\.MICROPHONE\]: \{ rail: 'audio' \}/)
@@ -37,7 +37,7 @@ test('every row of the two rails has an icon of its own, and the two rails diffe
   assert.notEqual(rail.audio, rail.display)
 })
 test('each page of the frame has the Web path of its place, and a path of a place leads back to its row', () => {
-  for (const [route, tab, sub] of [['WEB_DISPLAY_OUTPUT', 'display', 'output'], ['WEB_DISPLAY_MODES', 'display', 'modes'], ['WEB_DISPLAY_ENCODERS', 'display', 'encoders'], ['WEB_DISPLAY_VIDEO', 'display', 'video'], ['WEB_DISPLAY_HDR', 'display', 'hdr'], ['WEB_AUDIO_SOUND', 'audio', 'sound'], ['GAMEPAD', 'input', 'gamepad'], ['WEB_INPUT_KEYBOARD', 'input', 'keyboard'], ['WEB_INPUT_MOUSE', 'input', 'mouse']]) {
+  for (const [route, tab, sub] of [['WEB_DISPLAY_OUTPUT', 'display', 'output'], ['WEB_DISPLAY_MODES', 'display', 'modes'], ['WEB_DISPLAY_ENCODERS', 'display', 'encoders'], ['WEB_DISPLAY_ADVANCED', 'display', 'advanced'], ['WEB_DISPLAY_HDR', 'display', 'hdr'], ['WEB_AUDIO_SOUND', 'audio', 'sound'], ['GAMEPAD', 'input', 'gamepad'], ['WEB_INPUT_KEYBOARD', 'input', 'keyboard'], ['WEB_INPUT_MOUSE', 'input', 'mouse']]) {
     assert.match(router, new RegExp(`\\[ROUTES\\.${route}\\]: \`/config\\$\\{settingsHash\\(\\{ tab: '${tab}', sub: '${sub}' \\}\\)\\}\``))
     assert.match(router, new RegExp(`'${tab}:${sub}': ROUTES\\.${route}`))
   }
@@ -54,7 +54,7 @@ test('the picture enhancement setting opens the panel quality place while its We
 })
 
 test('old addresses of 高级 and 编码器 reach the pages that took them', () => {
-  assert.match(router, /MOVED_TAB_ROUTE = \{ advanced: ROUTES\.WEB_DISPLAY_VIDEO, encoders: ROUTES\.WEB_DISPLAY_ENCODERS \}/)
+  assert.match(router, /MOVED_TAB_ROUTE = \{ advanced: ROUTES\.WEB_DISPLAY_ADVANCED, encoders: ROUTES\.WEB_DISPLAY_ENCODERS \}/)
   const source = /const MOVED_TAB_PATH = \/(.+)\/\n/.exec(router)[1]
   const moved = new RegExp(source)
   assert.equal(moved.exec('/config#tab=advanced')?.[1], 'advanced')

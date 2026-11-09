@@ -10,11 +10,11 @@ const emit = defineEmits(['open'])
 const props = defineProps({ groups: { type: Array, default: () => [] }, runtime: { type: Object, default: () => ({}) } })
 const { t } = useI18n()
 const CATEGORIES = ['config', 'input', 'audio', 'display', 'system']
-const sections = computed(() => railItems(t.value).filter((r) => CATEGORIES.includes(r.id)).map((rail) => ({
-  id: rail.id,
-  label: rail.label,
-  items: rail.id === 'config' ? props.groups.flatMap((g) => g.items) : pageItems(t.value, rail.id, props.runtime),
-})))
+const sections = computed(() => railItems(t.value).filter((r) => CATEGORIES.includes(r.id)).map((rail) => {
+  const items = rail.id === 'config' ? props.groups.flatMap((g) => g.items) : pageItems(t.value, rail.id, props.runtime)
+  // a row marked `separated` (the 高级 of 显示与视频) is a group of its own at the end
+  return { id: rail.id, label: rail.label, items: items.filter((i) => !i.separated), apart: items.filter((i) => i.separated) }
+}))
 </script>
 
 <template>
@@ -22,6 +22,9 @@ const sections = computed(() => railItems(t.value).filter((r) => CATEGORIES.incl
     <MSection v-for="section in sections" :key="section.id" :title="section.label">
       <MGroup>
         <MItem v-for="item in section.items" :key="item.id" action :icon="item.icon" :title="item.label" :text="item.text" @click="emit('open', item)" />
+      </MGroup>
+      <MGroup v-if="section.apart.length">
+        <MItem v-for="item in section.apart" :key="item.id" action :icon="item.icon" :title="item.label" :text="item.text" @click="emit('open', item)" />
       </MGroup>
     </MSection>
   </MPage>
