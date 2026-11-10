@@ -40,3 +40,21 @@ test('the driver probe runs on a blocking thread, once for the pages that ask to
   assert.match(vigem, /let _status_changes = VIGEM_STATUS\.invalidating\(\);/)
   assert.match(app, /crate::vdd::get_vdd_status\(\)\.await;[\s\S]*crate::vigem::get_vigem_status\(\)\.await;/)
 })
+
+test('everything that contacts the host at the start waits for it through the same readiness wait (proxy_server::host_ready)', () => {
+  const src = (f) => fs.readFileSync(new URL(`../../../src-tauri/src/${f}`, import.meta.url), 'utf8')
+  assert.match(rs, /pub\(crate\) async fn wait_for_host\(timeout: std::time::Duration\) -> Result<u16, String>/)
+  assert.match(rs, /pub async fn host_ready\(max: std::time::Duration\) -> bool/); assert.match(rs, /pub fn host_not_ready\(\)/)
+  assert.match(rs, /pub async fn probe_sunshine_host\(timeout_ms: Option<u64>\) -> Result<u16, String> \{[\s\S]{0,260}wait_for_host\(timeout\)\.await/, 'the window\'s probe is the same wait')
+  // the DLSS NR status (the shortcuts), tried again until the host answers
+  assert.match(src('nr_overlay.rs'), /for attempt in 0\.\.8u32 \{\s*let _ = crate::proxy_server::host_ready\(std::time::Duration::from_secs\(20\)\)\.await;/)
+  assert.match(src('hdr_enhanced.rs'), /let _ = crate::proxy_server::host_ready\(std::time::Duration::from_secs\(8\)\)\.await;/)
+  // the clipboard event stream: ready first, and a 401 is "not ready yet", asked again at once
+  const clip = src('clipboard.rs')
+  assert.match(clip, /let _ = crate::proxy_server::host_ready\(std::time::Duration::from_secs\(30\)\)\.await;\s*let url = match get_sunshine_url\(\)/)
+  assert.match(clip, /resp\.status\(\) == reqwest::StatusCode::UNAUTHORIZED[\s\S]{0,400}crate::proxy_server::host_not_ready\(\)/)
+  // the tray state and its event stream
+  assert.match(src('tray/events.rs'), /let _ = crate::proxy_server::host_ready\(Duration::from_secs\(30\)\)\.await;\s*match sunshine::get_tray_state\(\)\.await/)
+  // a loopback connect is accepted or refused at once: 500 ms made a starved host a failed call
+  assert.match(src('sunshine.rs'), /\.connect_timeout\(std::time::Duration::from_millis\(3000\)\)\s*\.read_timeout\(std::time::Duration::from_secs\(10\)\)/)
+})

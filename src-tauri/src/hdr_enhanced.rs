@@ -97,6 +97,8 @@ async fn request(
     etag: Option<&HeaderValue>,
     operation_id: Option<&str>,
 ) -> Result<(Value, Option<HeaderValue>), String> {
+    // a call made while the host is starting (the shortcut registration at the panel's start) waits for the host here, as every start-up consumer does (proxy_server::host_ready)
+    let _ = crate::proxy_server::host_ready(std::time::Duration::from_secs(8)).await;
     let base = crate::sunshine::get_local_sunshine_url()
         .await
         .map_err(|_| "HDR-CFG-001: Sunshine is unavailable".to_string())?;

@@ -587,6 +587,8 @@ fn observer_loop(generation: u64, stop: Arc<AtomicBool>, shared: Arc<agent::Shar
 }
 
 async fn post_json(path: &str, body: &impl Serialize) -> Result<(), String> {
+    // the observer starts with the panel: it posts when the host is ready (proxy_server::host_ready), not into a host that is still starting
+    let _ = crate::proxy_server::host_ready(std::time::Duration::from_secs(5)).await;
     let base = get_local_sunshine_url().await?;
     let client = create_https_client()?;
     let response = client

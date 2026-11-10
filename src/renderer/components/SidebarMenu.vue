@@ -96,7 +96,7 @@
     <MContextProvider :locale="locale" :callbacks="ctxCallbacks" :capabilities="{ product: 'panel', developer: developerMode.enabled.value }" />
     <DevReportHost :locale="locale" />
     <!-- every uncaught error is drawn in our own surface: the way back, the restart of Sunshine, then copy, download and the report to the developers -->
-    <MTelemetryConsent v-model="consentOpen" :locale="locale" @answer="telemetry.answer" />
+    <MTelemetryConsent v-model="consentOpen" :locale="locale" :version="currentVersion || ''" :os="osName()" @answer="telemetry.answer" />
     <MErrorHost :locale="locale" report-sheet :can-go-back="nav.canPop.value" :host-online="hostConn.state.status === 'online'" :restart="() => hostConn.restart('service')" :doctor="openDoctor" :open-url="actions_openExternal" @back="errorBack" />
     <!-- 更多 of the bottom bar: what the bar has no room for -->
     <MSheet v-model="moreOpen" :title="t.m3e.nav.moreTitle" side="end" :close-label="t.m3e.home.done">

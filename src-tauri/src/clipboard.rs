@@ -1045,6 +1045,8 @@ async fn sse_pump(stop: Arc<Notify>, echo: Arc<Mutex<EchoState>>) {
         }
         set_transport_state(TRANSPORT_CONNECTING, None);
 
+        // the stream starts when the host is ready (proxy_server::host_ready), not by failing and asking again every backoff
+        let _ = crate::proxy_server::host_ready(std::time::Duration::from_secs(30)).await;
         let url = match get_sunshine_url().await {
             Ok(u) => u,
             Err(e) => {
@@ -1086,6 +1088,16 @@ async fn sse_pump(stop: Arc<Notify>, echo: Arc<Mutex<EchoState>>) {
                 continue;
             }
         };
+        if resp.status() == reqwest::StatusCode::UNAUTHORIZED {
+            // the host has published a credential and does not accept it yet (it was just started or reinstalled): it is not ready after all. Ask again at once, not after the backoff.
+            debug!("clipboard SSE: the host does not accept its credential yet");
+            crate::proxy_server::host_not_ready();
+            set_transport_state(TRANSPORT_DISCONNECTED, Some("service returned 401".to_string()));
+            if wait_or_stop(&stop, std::time::Duration::from_millis(400)).await {
+                return;
+            }
+            continue;
+        }
         if !resp.status().is_success() {
             let error = format!("service returned {}", resp.status());
             warn!("clipboard SSE bad status: {}", resp.status());

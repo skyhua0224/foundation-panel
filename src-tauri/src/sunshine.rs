@@ -1052,7 +1052,8 @@ pub fn create_https_client() -> Result<reqwest::Client, String> {
     reqwest::Client::builder()
         .danger_accept_invalid_certs(true)
         .redirect(reqwest::redirect::Policy::none())
-        .connect_timeout(std::time::Duration::from_millis(500))
+        // a loopback connect is accepted or refused at once; this long only a starved host (a VM that has just started) is waited for, where 500 ms made it a failed call
+        .connect_timeout(std::time::Duration::from_millis(3000))
         .read_timeout(std::time::Duration::from_secs(10))
         .timeout(std::time::Duration::from_secs(10))
         .default_headers(headers)
