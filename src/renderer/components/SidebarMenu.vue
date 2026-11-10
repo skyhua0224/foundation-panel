@@ -191,6 +191,7 @@ import { ROUTES, PAGES, routeForWebPath, routeOfPlace, webPathOf, isPhone } from
 import { framedMove } from '../composables/frameFollow.js'
 import { PANEL_PAGE_PATHS, requestPanelPage } from '../composables/panelParts.js'
 import { proxyBlock } from '../composables/proxyBlock.js'
+import { hostData } from '../composables/hostData.js'
 import { createGuideData } from '../composables/guideData.js'
 import PanelPending from './PanelPending.vue'
 import { recordUpdateCheck } from '../composables/useUpdateCheckTime.js'
@@ -350,7 +351,7 @@ watch(() => router.currentRoute.value, (route) => {
 // and a probe queued behind them made a host that answers in milliseconds look silent.
 // While the window is still connecting (it opened with the computer, the host may be seconds from its first answer: a cold host answered in 2.5 to 4 s on a freshly started VM) a probe waits longer.
 const probeHost = async () => {
-  const status = await sunshine.probeHost(hostConn.state.status === 'connecting' ? 6000 : 2500)
+  const status = await hostData.probe(hostConn.state.status === 'connecting' ? 6000 : 2500)
   // The native probe reaches the configured host directly. Any valid HTTP
   // status proves that the listener answered; 503 is the host's temporary
   // overload/startup response, not a dead service. The shared connection
@@ -461,10 +462,12 @@ onMounted(async () => {
     scopeRecent(hostRecentKey(local ? 'local' : u.origin))
   } catch { scopeRecent(hostRecentKey('local')) }
 })
+const keptHostConfig = hostData.peek('config')
+if (keptHostConfig) hostConfig.value = keptHostConfig // the list draws its live lines from the last answer of the host at once; the fresh one replaces it
 const loadHostData = async () => {
   try {
     const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')
-    const [config, tuning] = await Promise.allSettled([fetch(`${base}/api/config`).then((r) => (r.ok ? r.json() : null)), fetch(`${base}/api/dualsense/tuning`).then((r) => (r.ok ? r.json() : null))])
+    const [config, tuning] = await Promise.allSettled([hostData.refreshConfig(), fetch(`${base}/api/dualsense/tuning`).then((r) => (r.ok ? r.json() : null))])
     if (config.status === 'fulfilled' && config.value) hostConfig.value = config.value
     if (tuning.status === 'fulfilled' && tuning.value?.keys) dualsenseKeys.value = tuning.value.keys
     const [clients, apps] = await Promise.allSettled([fetch(`${base}/api/clients/list`).then((r) => (r.ok ? r.json() : null)), fetch(`${base}/api/apps`).then((r) => (r.ok ? r.json() : null))])
