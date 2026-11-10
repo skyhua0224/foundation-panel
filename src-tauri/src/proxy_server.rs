@@ -156,6 +156,24 @@ pub fn get_proxy_health_check() -> ProxyHealthCheck {
 #[tauri::command]
 pub async fn probe_sunshine_host(timeout_ms: Option<u64>) -> Result<u16, String> {
     let timeout = std::time::Duration::from_millis(timeout_ms.unwrap_or(2500).clamp(500, 10_000));
+    wait_for_host(timeout).await
+}
+
+/// How long one answer of the host counts as "ready" for the callers that only need to know it is up (not the status).
+const HOST_READY_MEMO_MS: u64 = 4000;
+static HOST_READY_UNTIL_MS: AtomicU64 = AtomicU64::new(0);
+
+fn now_ms() -> u64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as u64)
+        .unwrap_or(0)
+}
+
+/// THE host-readiness wait: asks the host for its Web UI until it answers (or `timeout` is over) and returns the HTTP status. Every consumer that contacts the host at the panel's start
+/// goes through it (host_ready below): the window's probe, the DLSS NR status, the clipboard and tray event streams. It tolerates what a host that has just started does for a moment:
+/// refuses the connection, has not published its credential yet, or has published it before it accepts it.
+pub(crate) async fn wait_for_host(timeout: std::time::Duration) -> Result<u16, String> {
     let url = format!("{}/", get_sunshine_target().trim_end_matches('/'));
     // The readiness handshake: this one call waits for the host to be ready, up to the timeout, and answers the moment it is. A host that has just started refuses
     // the connection for a moment, and the credential it publishes (the file read for every request) is not there yet: both end within milliseconds, so the call asks again every 100 ms
@@ -177,6 +195,7 @@ pub async fn probe_sunshine_host(timeout_ms: Option<u64>) -> Result<u16, String>
                 // the host answers: keep its Web UI on this computer (once per address, in the background)
                 tauri::async_runtime::spawn(prewarm_assets());
                 mark_available();
+                HOST_READY_UNTIL_MS.store(now_ms() + HOST_READY_MEMO_MS, Ordering::Relaxed);
                 return Ok(response.status().as_u16());
             }
             Err(error) => {
@@ -188,6 +207,20 @@ pub async fn probe_sunshine_host(timeout_ms: Option<u64>) -> Result<u16, String>
             }
         }
     }
+}
+
+/// True once the host answers, waiting up to `max` for it; a recent answer (4 s) is not asked for again. For the code that starts with the panel and needs the host: it waits here instead of
+/// failing at once and trying again at its own pace.
+pub async fn host_ready(max: std::time::Duration) -> bool {
+    if now_ms() < HOST_READY_UNTIL_MS.load(Ordering::Relaxed) {
+        return true;
+    }
+    wait_for_host(max).await.is_ok()
+}
+
+/// The host refused something that says it is not ready after all (a credential it has published and not yet accepts): the next `host_ready` asks again.
+pub fn host_not_ready() {
+    HOST_READY_UNTIL_MS.store(0, Ordering::Relaxed);
 }
 
 async fn proxy_health_handler(request: Request) -> Response {

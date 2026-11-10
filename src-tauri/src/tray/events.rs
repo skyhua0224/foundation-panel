@@ -13,6 +13,8 @@ pub(super) fn start_tray_state_monitoring<R: Runtime + 'static>(app: &AppHandle<
         let mut disconnected = false;
 
         loop {
+            // the first state is asked for when the host is ready (proxy_server::host_ready), not by failing and asking again every 3 s
+            let _ = crate::proxy_server::host_ready(Duration::from_secs(30)).await;
             match sunshine::get_tray_state().await {
                 Ok(state) => {
                     contract_error_visible = false;

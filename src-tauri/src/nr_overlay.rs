@@ -394,7 +394,21 @@ pub fn initialize<R: Runtime>(app: &AppHandle<R>) {
     // the keys wait for the DLSS NR status: registered only for an installed and usable component
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        let status = crate::native_components::providers::nvidia_dlssnr::component_get_status().await;
+        // The status comes from the host. The panel can start before it (the computer was switched on, the host was reinstalled), so the registration waits for the host and asks again
+        // until it answers (about two minutes at most); a host that never answers leaves the shortcuts off, as before.
+        let mut status = Err(String::new());
+        for attempt in 0..8u32 {
+            let _ = crate::proxy_server::host_ready(std::time::Duration::from_secs(20)).await;
+            status = crate::native_components::providers::nvidia_dlssnr::component_get_status().await;
+            match &status {
+                Ok(_) => break,
+                Err(error) => {
+                    log::info!("DLSS NR status at startup not available yet (try {}): {error}", attempt + 1);
+                    crate::proxy_server::host_not_ready();
+                    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+                }
+            }
+        }
         if let Err(error) = &status {
             log::warn!("DLSS NR status at startup unavailable: {error}");
         }
