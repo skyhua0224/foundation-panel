@@ -1119,6 +1119,13 @@ fn validate_config_save_response(body: &str) -> Result<(), String> {
 pub async fn post_sunshine_config(
     config_data: &serde_json::Map<String, serde_json::Value>,
 ) -> Result<(), String> {
+    post_sunshine_config_reporting(config_data).await.map(|_| ())
+}
+
+/// The same, and the host's answer: a host that applies a saved value at once says so in it (`max_bitrate_in_force`, `sessions_updated`), which the tray's bitrate slider reads back.
+pub async fn post_sunshine_config_reporting(
+    config_data: &serde_json::Map<String, serde_json::Value>,
+) -> Result<serde_json::Value, String> {
     let sunshine_url = get_sunshine_url()
         .await
         .map_err(|e| format!("Cannot get Sunshine URL: {}", e))?;
@@ -1128,7 +1135,7 @@ pub async fn post_sunshine_config(
 async fn post_sunshine_config_to(
     sunshine_url: &str,
     config_data: &serde_json::Map<String, serde_json::Value>,
-) -> Result<(), String> {
+) -> Result<serde_json::Value, String> {
     let config_url = format!("{}/api/config", sunshine_url.trim_end_matches('/'));
 
     let client = create_https_client()?;
@@ -1170,7 +1177,8 @@ async fn post_sunshine_config_to(
             status, response_body
         ));
     }
-    validate_config_save_response(&response_body)
+    validate_config_save_response(&response_body)?;
+    serde_json::from_str(&response_body).map_err(|error| format!("Sunshine Config API returned invalid JSON: {error}"))
 }
 
 #[tauri::command]

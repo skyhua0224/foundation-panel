@@ -445,12 +445,22 @@ async fn write_slider(key: &str, value: &Value) -> Result<Duration, String> {
             let _guard = crate::device_config::DEVICE_CONFIG_LOCK.lock().await;
             let mut config = crate::vdd::read_full_sunshine_config().await?;
             config.insert("max_bitrate".to_string(), json!(kbps.to_string()));
-            sunshine::post_sunshine_config(&config).await?;
+            // The host applies the ceiling to the running process and to every running session before it answers; its answer says what is in force. A host that says something else is told to the person.
+            let answer = sunshine::post_sunshine_config_reporting(&config).await?;
+            check_ceiling_in_force(&answer, kbps)?;
             Duration::from_millis(100)
         }
         other => return Err(format!("未知的滑块 {other}")),
     };
     Ok(settle)
+}
+
+/// The host's answer to a saved bitrate ceiling: when it says which one is in force (a host that applies it at once does), it must be the one that was asked for. A host that does not say is not doubted.
+fn check_ceiling_in_force(answer: &Value, asked_kbps: u64) -> Result<(), String> {
+    match answer.get("max_bitrate_in_force").and_then(Value::as_u64) {
+        Some(in_force) if in_force != asked_kbps => Err(format!("主机实际生效的码率上限是 {} Kbps", in_force)),
+        _ => Ok(()),
+    }
 }
 
 /// A slider of the quick page was released (`tray_popup_set`): the menu stays open; the answer comes when the value is set, and the state the host ended up in is pushed first.
@@ -567,6 +577,16 @@ mod tests {
         sorted.sort();
         sorted.dedup();
         assert_eq!(sorted.len(), 43, "no id twice");
+    }
+
+    #[test]
+    fn the_bitrate_ceiling_must_be_the_one_the_host_says_is_in_force() {
+        assert!(check_ceiling_in_force(&json!({ "status": "true", "max_bitrate_in_force": 50000, "sessions_updated": 1 }), 50000).is_ok());
+        assert!(check_ceiling_in_force(&json!({ "status": "true", "max_bitrate_in_force": 0 }), 0).is_ok());
+        assert_eq!(check_ceiling_in_force(&json!({ "status": "true", "max_bitrate_in_force": 20000 }), 50000).unwrap_err(), "主机实际生效的码率上限是 20000 Kbps");
+        assert!(check_ceiling_in_force(&json!({ "status": "true" }), 50000).is_ok(), "an older host that says nothing is not doubted");
+        // the one writer is told apart from the answer by the source text: the host's own words reach the person through post_sunshine_config_reporting
+        assert!(include_str!("popup_input.rs").contains("post_sunshine_config_reporting(&config).await?"));
     }
 
     #[test]
