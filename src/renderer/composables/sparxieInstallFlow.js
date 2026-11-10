@@ -10,7 +10,7 @@ export async function installFromFile({ status, pick, ask, post, texts }) {
   const path = await pick()
   if (!path) return { ok: false, error_code: 'cancelled' }
   let result = await post(installPayload(path, { acknowledged: true }))
-  if (result && result.error_code === 'unverified') {
+  if (result && (result.error_code === 'unverified' || result.error_code === 'hash_mismatch')) {
     const accepted = await ask(texts.unverified, texts.unverifiedTitle, texts.unverifiedYes)
     if (!accepted) return { ok: false, error_code: 'cancelled' }
     result = await post(installPayload(path, { confirmUnverified: true, acknowledged: true }))

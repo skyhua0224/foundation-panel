@@ -35,3 +35,19 @@ test('uninstall asks before deleting config.json', async () => {
   assert.equal(kept.ok, true)
   assert.deepEqual(bodies[1], { delete_config: false })
 })
+
+test('a same-size checksum mismatch asks, then installs after confirmation', async () => {
+  const posts = []
+  const asks = []
+  const result = await installFromFile({
+    status: { noticeAck: true },
+    pick: async () => 'C:/changed.zip',
+    ask: async (message) => { asks.push(message); return true },
+    post: async (body) => { posts.push(body); return posts.length === 1 ? { ok: false, error_code: 'hash_mismatch', confirm: '未经验证的版本' } : { ok: true, verified: false, mark: '未经验证的版本' } },
+    texts,
+  })
+  assert.equal(result.verified, false)
+  assert.deepEqual(asks, ['unknown'])
+  assert.equal(posts[0].confirm_unverified, false)
+  assert.equal(posts[1].confirm_unverified, true)
+})

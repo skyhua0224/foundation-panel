@@ -6,6 +6,7 @@ import { open as openDialog } from '@tauri-apps/plugin-dialog'
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const stageText = (texts, stage) => texts?.sparxie?.stages?.[stage] || stage || ''
+export const sparxieProgress = { active: false, stage: '', percent: 0 }
 
 export async function postJson(url, body, timeoutMs = 120000) {
   const response = await fetch(url, {
@@ -54,14 +55,22 @@ export function sparxieActions({ base, texts, refresh }) {
         }
         const picked = await openDialog({ multiple: false, directory: false, title: T().fromFile, filters: [{ name: 'ZIP', extensions: ['zip'] }] })
         if (!picked) return
-        const send = (confirmUnverified) => runInstall(root, { path: picked, confirm_unverified: !!confirmUnverified, acknowledged: true }, (row) => { if (row && row.stage) ElMessage.info(stageText(texts(), row.stage)) })
+        const send = (confirmUnverified) => runInstall(root, { path: picked, confirm_unverified: !!confirmUnverified, acknowledged: true }, async (row) => {
+          if (!row || !row.stage) return
+          sparxieProgress.active = row.done !== true
+          sparxieProgress.stage = stageText(texts(), row.stage)
+          sparxieProgress.percent = Number(row.percent) || 0
+          ElMessage.info(sparxieProgress.stage)
+          await refresh()
+        })
         let result = await send(false)
-        if (result && result.error_code === 'unverified') {
+        if (result && (result.error_code === 'unverified' || result.error_code === 'hash_mismatch')) {
           try { await ElMessageBox.confirm(T().unverified + '\n' + (result.sha256 || ''), T().unverifiedTitle, { type: 'warning', confirmButtonText: T().unverifiedYes }) } catch { return }
           result = await send(true)
         }
         if (!result || result.ok === false) ElMessage.error((T().failed + ' ' + ((result && (result.error || result.error_code)) || '')).trim())
         else ElMessage.success(T().done)
+        sparxieProgress.active = false
         await refresh()
       }),
     },
