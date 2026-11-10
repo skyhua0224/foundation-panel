@@ -32,3 +32,7 @@ test('the shell reads the host through hostData only (the module the dedicated h
   const module = read('./hostData.js')
   assert.match(module, /probe: \(timeoutMs\) => sunshine\.probeHost\(timeoutMs\)/); assert.match(module, /peek\(topic\)/)
 })
+
+test("the usage-statistics question shows the example with this install's version and system", () => {
+  assert.match(read('../components/SidebarMenu.vue'), /<MTelemetryConsent v-model="consentOpen" :locale="locale" :version="currentVersion \|\| ''" :os="osName\(\)"/)
+})
