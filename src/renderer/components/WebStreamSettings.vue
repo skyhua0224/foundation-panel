@@ -3,8 +3,8 @@
     <!-- Status -->
     <template v-if="!current">
       <MStatusPill :icon="status.running ? 'play_arrow' : 'stop'" :tone="status.running ? 'ok' : ''" :action="false"
-        :label="(status.running ? t.webStream.statusRunning : (status.installed ? t.webStream.statusStopped : t.webStream.statusNotInstalled)) + (status.version ? ' · v' + status.version : '')">
-        <template #actions>
+        :label="!known ? t.webStream.title : (status.running ? t.webStream.statusRunning : (status.installed ? t.webStream.statusStopped : t.webStream.statusNotInstalled)) + (status.version ? ' · v' + status.version : '')">
+        <template v-if="known" #actions>
           <MButton v-if="!status.installed" icon="download" :loading="downloading" @click="handleInstall">{{ t.webStream.install }}</MButton>
           <MButton v-else-if="status.running" variant="tonal" icon="stop" :loading="stopping" @click="handleStop">{{ t.webStream.stop }}</MButton>
           <MButton v-else icon="play_arrow" :loading="starting" @click="handleStart">{{ t.webStream.start }}</MButton>
@@ -60,6 +60,11 @@
   </MPage>
 </template>
 
+<script>
+// The last status read of Moonlight Web, kept for the next visit to this page.
+let keptStatus = null
+</script>
+
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
@@ -72,7 +77,7 @@ const { t } = useI18n()
 const emit = defineEmits(['close'])
 const { current, open, back } = useSubpage('webstream')
 
-// 状态
+// 状态: what the last visit found stays for the next one, so the page opens on the real state (not on a flash of 「未安装」) and the host's answer replaces it
 const status = reactive({
   installed: false,
   running: false,
@@ -80,7 +85,10 @@ const status = reactive({
   version: '',
   access_url: '',
   port: 8080,
+  ...(keptStatus || {}),
 })
+// the state is certain once it has been read this session; before that the pill names the page and offers no action
+const known = ref(!!keptStatus)
 
 const config = reactive({
   web_server: { bind_address: '0.0.0.0:8080' },
@@ -148,6 +156,8 @@ async function refreshStatus() {
   try {
     const s = await moonlightWeb.getStatus()
     Object.assign(status, s)
+    keptStatus = { ...status }
+    known.value = true
   } catch (e) {
     console.error('Failed to get status:', e)
   }
