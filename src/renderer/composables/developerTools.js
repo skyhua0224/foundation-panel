@@ -47,10 +47,10 @@ export function createDeveloperTools({ invoke, settings, locale = 'zh-CN', versi
   const saveSettings = async (patch) => settings.save({ ...settings.get(), ...patch })
   const tools = {
     environment: async () => {
-      const [info, gpus, dev, host] = await Promise.all([call('get_system_info').catch(() => ({})), call('get_gpus').catch(() => []), call('dev_environment').catch(() => ({})), Promise.resolve(hostVersion?.()).catch(() => null)])
+      const [info, gpus, dev, host, components] = await Promise.all([call('get_system_info').catch(() => ({})), call('get_gpus').catch(() => []), call('dev_environment').catch(() => ({})), Promise.resolve(hostVersion?.()).catch(() => null), call('get_component_inventory').catch(() => [])])
       return {
         product: 'Foundation Sunshine panel', version: version || info.app_version || '', channel: (await tools.update.channel.get().catch(() => '')) || '',
-        builds: [{ name: 'panel', sha: info.app_version || version || '' }], host: host || '', os: info.os_version || '', arch: info.arch || dev.target || '', gpu: Array.isArray(gpus) ? gpus.join(', ') : '',
+        builds: [{ name: 'panel', sha: info.app_version || version || '' }], components: Array.isArray(components) ? components : [], host: host || '', os: info.os_version || '', arch: info.arch || dev.target || '', gpu: Array.isArray(gpus) ? gpus.join(', ') : '',
         webview: dev.webview || '', display: displayText(win), locale,
       }
     },
