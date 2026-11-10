@@ -1157,6 +1157,7 @@ export const ja = {
     open: "画像補正の管理"
   },
   m3e: {
+    appearance: { theme: "テーマ", frost: "すりガラスとアニメーション", overview: "概要", tray: "トレイアイコン" },
     nav: {
       overview: "概要",
       stream: "配信",

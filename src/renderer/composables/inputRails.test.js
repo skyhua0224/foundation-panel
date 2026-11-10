@@ -27,11 +27,11 @@ test('the rail 输入与外设 lists the four pages with their names, and the se
   assert.ok(en.includes("gamepad: 'Controller', keyboard: 'Keyboard', mouse: 'Mouse and touch', microphone: 'Microphone', usb: 'USB forwarding'"))
 })
 
-test('the settings entry of the bottom bar lists every page of the five categories in sections: any page is two presses away', () => {
+test('the settings entry of the bottom bar lists every page of the five categories and of 个性化 in sections: any page is two presses away', () => {
   const hub = read('../components/m3e/SettingsHubPage.vue'); const menu = read('../components/SidebarMenu.vue')
   assert.ok(hub.includes('<MSection v-for="section in sections"')); assert.ok(hub.includes("const CATEGORIES = ['config', 'input', 'audio', 'display', 'system']"))
   assert.ok(hub.includes("emit('open', item)")); assert.ok(!/select/.test(hub), 'a row opens a page, not another list')
-  assert.ok(menu.includes('<SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" :groups="settingsList.groups.value" :runtime="runtimeView" @open="onListNavigate" />'))
+  assert.ok(menu.includes('<SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" :groups="settingsList.groups.value" :runtime="runtimeView" :focus="entry.params?.section || \'\'" @open="onListNavigate" />'))
 })
 
 test('the list of a rail has its title at the top left where the list is a page of its own (the bottom bar of a narrow window), as 设置 has', () => {

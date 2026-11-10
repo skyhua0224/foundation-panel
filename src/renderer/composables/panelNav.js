@@ -18,6 +18,7 @@ export const ROW_OF_ROUTE = {
   [ROUTES.LATENCY_CLOCK]: 'latency-clock', [ROUTES.TEST_TOOLS]: 'test-tools', [ROUTES.STREAM_TIMER]: 'stream-timer',
   [ROUTES.PANEL_SETTINGS]: 'panel', [ROUTES.HELP]: 'help', [ROUTES.AI_ASSISTANT]: 'assistant',
   [ROUTES.LIVE_SESSION]: 'session', [ROUTES.RTSS]: 'rtss', [ROUTES.SUNSHINE_SERVICE]: 'service',
+  [ROUTES.CFG_APPEARANCE]: 'appearance-theme', [ROUTES.CFG_FROST]: 'appearance-frost', [ROUTES.CFG_OVERVIEW]: 'appearance-home', [ROUTES.CFG_TRAY]: 'appearance-tray',
 }
 
 export function pageItems(t, rail, runtime = {}) {
@@ -40,6 +41,13 @@ export function pageItems(t, rail, runtime = {}) {
     ]
   }
   const pages = {
+    // 个性化: four pages; the rail itself is the palette button in the foot of the rail (it is not in RAILS)
+    appearance: [
+      { id: ROUTES.CFG_APPEARANCE, icon: 'palette', tone: 'primary', label: c.appearance.theme, text: lines['appearance-theme'] },
+      { id: ROUTES.CFG_FROST, icon: 'blur_on', tone: 'secondary', label: c.appearance.frost, text: lines['appearance-frost'] },
+      { id: ROUTES.CFG_OVERVIEW, icon: 'grid_view', tone: 'tertiary', label: c.appearance.overview, text: lines['appearance-home'] },
+      { id: ROUTES.CFG_TRAY, icon: 'picture_in_picture', tone: 'success', label: c.appearance.tray, text: lines['appearance-tray'] },
+    ],
     stream: [
       { id: ROUTES.WEB_CLIENTS, icon: 'devices', tone: 'tertiary', label: c.stream.clients[0], text: lines.clients },
       { id: ROUTES.WEB_APPS, icon: 'apps', tone: 'secondary', label: c.stream.apps[0], text: lines.apps },

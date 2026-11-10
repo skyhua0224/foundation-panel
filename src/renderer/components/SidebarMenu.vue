@@ -17,7 +17,7 @@
     <div class="panel-body">
     <MScene :nav="nav" :caption-height="48" :jumps="jumps" :chip="backChip" :rail-items="rail" :bar-items="bar" :bar-current="barCur" :texts="sceneTexts" :overlay="isWebPage || offlineShown" :status="offlineShown" storage-key="foundation-ui.panel.list" @rail="onRail">
       <template #back-chip><MBackChip :page="backPage" :locale="locale" @back="jumps.back()" /></template>
-      <template #rail-foot><MIconButton icon="palette" :label="appearanceLabel" :current="router.currentRoute.value === ROUTES.CFG_APPEARANCE" @click="router.navigate(ROUTES.CFG_APPEARANCE)" /><MIconButton icon="info" :label="aboutTexts(locale).title" :current="router.currentRoute.value === ROUTES.ABOUT" @click="router.navigate(ROUTES.ABOUT, undefined, { root: true })" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
+      <template #rail-foot><MIconButton icon="palette" :label="appearanceLabel" :current="nav.rail.value === 'appearance'" @click="router.navigate(ROUTES.CFG_APPEARANCE)" /><MIconButton icon="info" :label="aboutTexts(locale).title" :current="router.currentRoute.value === ROUTES.ABOUT" @click="router.navigate(ROUTES.ABOUT, undefined, { root: true })" /><MSponsorButton :label="t.m3e.home.sponsor" :title="t.m3e.home.sponsorTitle" :sections="sponsorSections" :close-label="t.m3e.home.done" @open="(it) => actions_openExternal(it.url)" /></template>
       <template #list="{ entry, scene }">
         <MNavList
           :groups="listGroups(entry.rail)"
@@ -38,9 +38,9 @@
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" @webui-navigate="openWebUi" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
         <StreamHubPage v-else-if="entry.id === ROUTES.STREAM_HUB" :runtime="runtimeView" @open="onListNavigate" />
-        <SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" :groups="settingsList.groups.value" :runtime="runtimeView" @open="onListNavigate" />
+        <SettingsHubPage v-else-if="entry.id === ROUTES.SETTINGS_HUB" :groups="settingsList.groups.value" :runtime="runtimeView" :focus="entry.params?.section || ''" @open="onListNavigate" />
         <HdrEnhancedManager v-else-if="entry.id === ROUTES.HDR_ENHANCED" @manage-components="jumpTo(ROUTES.COMPONENTS)" />
-        <AppearancePage v-else-if="entry.id === ROUTES.CFG_APPEARANCE" />
+        <AppearancePage v-else-if="APPEARANCE_ROUTES.includes(entry.id)" :page="entry.id" />
         <MicrophonePage v-else-if="entry.id === ROUTES.MICROPHONE" @manage-components="jumpTo(ROUTES.COMPONENTS)" />
         <UsbPage v-else-if="entry.id === ROUTES.USB" @manage-components="jumpTo(ROUTES.COMPONENTS)" />
         <SunshineServicePage v-else-if="entry.id === ROUTES.SUNSHINE_SERVICE" :locale="locale" />
@@ -105,7 +105,7 @@
         <MItem action icon="search" :title="t.m3e.search" @click="moreGo(() => uni.show())" />
         <MItem action icon="settings" :title="t.m3e.nav.settings" :text="settingsList.lines.value.panel" :tone="notice.dot ? 'warn' : ''" @click="moreGo(() => onRail({ id: 'settings' }))" />
         <MItem v-if="developerMode.enabled.value" action icon="terminal" :title="devmodeTexts(locale).rail" @click="moreGo(() => router.navigate(ROUTES.DEV_HUB))" />
-        <MItem action icon="palette" :title="appearanceLabel" @click="moreGo(() => router.navigate(ROUTES.CFG_APPEARANCE))" />
+        <MItem action icon="palette" :title="appearanceLabel" :text="settingsList.lines.value['config:appearance']" @click="moreGo(() => router.navigate(ROUTES.SETTINGS_HUB, { section: 'appearance' }))" />
         <MItem action icon="info" :title="aboutTexts(locale).title" :text="currentVersion" @click="moreGo(() => router.navigate(ROUTES.ABOUT, undefined, { root: true }))" />
         <MItem action icon="help" :title="t.m3e.nav.help" :text="settingsList.lines.value.help" @click="moreGo(() => onRail({ id: 'help' }))" />
         <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="moreGo(() => { sponsorOpen = true })" />
@@ -187,7 +187,7 @@ import { useWindowControls } from '../composables/useWindowControls.js'
 import { useTools } from '../composables/useTools.js'
 import { useTouchWindowDrag } from '../composables/useTouchWindowDrag.js'
 import { createUtilityTools } from '../composables/toolsRegistry.js'
-import { ROUTES, PAGES, routeForWebPath, routeOfPlace, webPathOf, isPhone } from '../composables/useRouter.js'
+import { ROUTES, PAGES, APPEARANCE_ROUTES, routeForWebPath, routeOfPlace, webPathOf, isPhone } from '../composables/useRouter.js'
 import { framedMove } from '../composables/frameFollow.js'
 import { PANEL_PAGE_PATHS, requestPanelPage } from '../composables/panelParts.js'
 import { proxyBlock } from '../composables/proxyBlock.js'
@@ -319,7 +319,7 @@ const backPage = computed(() => {
   const place = jumps.top.value
   if (!place) return ''
   if (place.params?.tab) return labelOf(locale.value, `tabs.${place.params.tab}`) || railLabel(place.rail)
-  const row = ['stream', 'input', 'audio', 'display', 'system', 'settings', 'help'].flatMap((r) => listItems(r)).find((i) => i.id === place.id)
+  const row = ['stream', 'input', 'audio', 'display', 'system', 'appearance', 'settings', 'help'].flatMap((r) => listItems(r)).find((i) => i.id === place.id)
   return row?.label || (place.id === ROUTES.HOME ? t.value.m3e.nav.overview : '') || railLabel(place.rail)
 })
 const restorePlace = (place) => {
@@ -388,7 +388,7 @@ window.addEventListener('panel-force-host-state', forceHostState)
 window.addEventListener('panel-force-proxy-state', forceProxyState)
 onBeforeUnmount(() => { window.removeEventListener('panel-force-host-state', forceHostState); window.removeEventListener('panel-force-proxy-state', forceProxyState) })
 // the pages of the panel itself, which work without the host: 面板设置, 个性化, 帮助与关于, 公告 (from the announcement feed), the diagnostics, 米塔 AI, the guide
-const NEEDS_NO_HOST = new Set([ROUTES.DOCTOR, ROUTES.SUNSHINE_SERVICE, ROUTES.DEVELOPER, ROUTES.PANEL_SETTINGS, ROUTES.CFG_APPEARANCE, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.ANNOUNCEMENTS, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME, ROUTES.DEV_ISSUES, ROUTES.DEV_LOGS, ROUTES.DEV_API, ROUTES.DEV_FLAGS, ROUTES.DEV_BUILD, ROUTES.DEV_TESTS, ROUTES.DEV_HUB])
+const NEEDS_NO_HOST = new Set([ROUTES.DOCTOR, ROUTES.SUNSHINE_SERVICE, ROUTES.DEVELOPER, ROUTES.PANEL_SETTINGS, ...APPEARANCE_ROUTES, ROUTES.AI_ASSISTANT, ROUTES.HELP, ROUTES.ABOUT, ROUTES.ANNOUNCEMENTS, ROUTES.SETTINGS_HUB, ROUTES.DIAGNOSTICS, ROUTES.WELCOME, ROUTES.DEV_ISSUES, ROUTES.DEV_LOGS, ROUTES.DEV_API, ROUTES.DEV_FLAGS, ROUTES.DEV_BUILD, ROUTES.DEV_TESTS, ROUTES.DEV_HUB])
 // The host cannot be used for one of three causes, and the content area is then ONE status page (MScene status): the host is down, it runs and does not answer, or the panel's own proxy does not answer the window.
 // The rail and the caption bar stay: the pages of the panel itself (NEEDS_NO_HOST) still work and open as always. What needs the host does not look live: the pages give way to the status page and are inert, the
 // frame stays mounted but hidden, so an unsaved edit is there when the connection is back, and 连接设备 (it pairs through the host) is disabled.
@@ -439,7 +439,7 @@ const announcementsUnread = announcements.unread
 // a dot on the help rail while an update is waiting (the about page checks and opens the update sheet)
 const rail = computed(() => railItems(t.value, { developer: devmodeTexts(locale.value).rail }).filter((item) => item.id !== 'developer' || developerMode.enabled.value).map((item) => (item.id === 'overview' && announcementsUnread.value ? { ...item, badge: announcementsUnread.value } : item.id === 'settings' && notice.value.dot ? { ...item, badge: 'dot' } : item.id === 'assistant' && mitaState.unread ? { ...item, badge: 'dot' } : item.id === 'developer' && devActivity.unseen.value ? { ...item, badge: 'dot' } : item)))
 // the one-time thank-you line after the guided first run
-const railLabel = (id) => (id === 'developer' ? devmodeTexts(locale.value).rail : t.value.m3e.nav[id])
+const railLabel = (id) => (id === 'developer' ? devmodeTexts(locale.value).rail : id === 'appearance' ? appearanceLabel.value : t.value.m3e.nav[id])
 // Developer mode (seven taps on the version in 关于): the row of 开发者选项 in 系统, and the overlays the page chose, applied at start
 const developerMode = useDeveloperMode()
 const devActivity = useDevActivity() // the dot of the 开发者 rail: something new in the host's repository since the last look at Issue 与 PR
