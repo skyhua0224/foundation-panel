@@ -6,3 +6,7 @@
 :is(.m-caption-connect, .m-dcard, .m-dadd, .m-dcard__more, .m-dapps__app, .m-dquick__btn, .m-chipset__chip, .m-conn__link, .m-dpill, .m-item--action, .m-sprompt__btn, .m-sprompt__later):active:not(:disabled) {
   filter: var(--panel-pressed-filter);
 }
+/* a finger or a pen: the same on the frame of the press (foundation-ui a11y/touchPress.js sets data-pressed) */
+:is(.m-caption-connect, .m-dcard, .m-dadd, .m-dcard__more, .m-dapps__app, .m-dquick__btn, .m-chipset__chip, .m-conn__link, .m-dpill, .m-item--action, .m-sprompt__btn, .m-sprompt__later)[data-pressed]:not(:disabled) {
+  filter: var(--panel-pressed-filter);
+}
