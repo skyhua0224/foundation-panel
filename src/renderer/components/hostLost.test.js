@@ -58,7 +58,7 @@ test('the pairing code of the connect dialog is an SVG, not a PNG made by a canv
 })
 
 test('the host is probed by the panel\'s own process, not by a fetch that can queue behind the window\'s own first requests', () => {
-  assert.match(shell, /const status = await sunshine\.probeHost\(2500\)/)
+  assert.match(shell, /const status = await sunshine\.probeHost\(hostConn\.state\.status === 'connecting' \? 6000 : 2500\)/)
   assert.match(shell, /return status >= 100 && status < 600/, 'a valid 503 response is host reachability, not a dead service')
   assert.doesNotMatch(shell, /status !== 502|status !== 503/, 'the old single-status offline classification is gone')
   assert.doesNotMatch(shell, /const probeHost = async \(\) => \{\s*\n\s*const base/, 'the old fetch probe')
