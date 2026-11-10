@@ -171,6 +171,16 @@ pub fn setup_application(app: &mut App) -> Result<(), Box<dyn std::error::Error>
             }
         }
     }));
+    // The status probes the pages ask for (the ones with a cache: each starts a process or a WMI query, 0.05 to 1.9 s on the Skyindows VM, 3.4 s at the start) are run once now, one after the other in the
+    // background, so the first entry of a page finds their answer in the cache (probe_cache.rs) instead of waiting for them. Not in an agent-only start: nobody looks at a page there.
+    if !agent_only {
+        tasks.0.push(tauri::async_runtime::spawn(async {
+            tokio::time::sleep(std::time::Duration::from_millis(1500)).await;
+            let _ = crate::sunshine::get_sunshine_build_info().await;
+            let _ = crate::vdd::get_vdd_status().await;
+            let _ = crate::vigem::get_vigem_status().await;
+        }));
+    }
     app.manage(tasks);
 
     Ok(())
