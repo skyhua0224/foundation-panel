@@ -21,6 +21,7 @@ mod actions;
 mod display_sliders;
 mod events;
 mod icons;
+mod input_source;
 mod main_panel;
 mod menu;
 mod notifications;

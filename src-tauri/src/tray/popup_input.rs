@@ -72,6 +72,8 @@ fn gate<T>(f: impl FnOnce(&mut ClickGate) -> T) -> T {
 
 /// An event of the tray icon (called by the icon's callback on the main thread).
 pub(super) fn on_icon_event(event: TrayIconEvent) {
+    // first of all, while the click message is still the one being dispatched: what was it, a finger, a pen or a mouse (input_source.rs)
+    input_source::note_icon_event();
     let Some(app) = ctx_popup::app() else { return };
     let prefs = tray_prefs::current();
     match event {
@@ -322,6 +324,9 @@ pub(super) async fn build_state(app: &AppHandle) -> Value {
         "ds5": ds5,
         "notification": notification,
         "sliders": sliders,
+        // what the press that opened the menu was, and the person's density choice: the page opens in touch density for a finger (input_source.rs; foundation-ui MTrayMenu)
+        "touch": input_source::facts().to_json(),
+        "density": prefs.density,
         // the tiles and sliders the person chose for the quick panel (null = the default of the menu)
         "layout": { "tiles": prefs.tiles, "sliders": prefs.sliders },
         "labels": labels(s),
