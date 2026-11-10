@@ -129,6 +129,7 @@ const messages = {
       nr_session_ended: '已选串流结束，请重新选择',
       nr_no_session: '当前没有串流',
       nr_settings_pending: '正在应用设置，请稍后再试',
+      hdr_save_busy: '正在保存…',
       nr_toggle_unsupported: '此串流不支持 NR 切换'
     },
     failed: '操作失败，请重试'
@@ -223,6 +224,7 @@ const messages = {
       nr_session_ended: 'The selected stream ended. Select another stream.',
       nr_no_session: 'No active stream',
       nr_settings_pending: 'Settings are being applied. Try again shortly.',
+      hdr_save_busy: 'Saving…',
       nr_toggle_unsupported: 'NR switching is unavailable for this stream'
     },
     failed: 'Operation failed. Try again.'

@@ -168,6 +168,13 @@ fn main() {
             .expect("non-empty compatibility value");
         println!("cargo:rustc-env=SUNSHINE_{name}={value}");
     }
+    // The build script of the product records what it knows of the components it ships (the commits of the panel, the Web UI bundle, foundation-ui, the plugins, the haptics
+    // library; see component_inventory.rs). A build without the variable is a dev build.
+    println!("cargo:rerun-if-env-changed=PANEL_COMPONENTS_JSON");
+    if let Ok(manifest) = std::env::var("PANEL_COMPONENTS_JSON") {
+        assert!(serde_json::from_str::<serde_json::Value>(&manifest).is_ok(), "PANEL_COMPONENTS_JSON is not JSON");
+        println!("cargo:rustc-env=PANEL_COMPONENTS_JSON={manifest}");
+    }
     // 告诉 Cargo 当这些文件变化时需要重新编译
     // 这样 include_str! 宏就能读取到最新版本的文件
     println!("cargo:rerun-if-changed=inject-script.js");

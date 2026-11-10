@@ -36,3 +36,17 @@ test('the shell reads the host through hostData only (the module the dedicated h
 test("the usage-statistics question shows the example with this install's version and system", () => {
   assert.match(read('../components/SidebarMenu.vue'), /<MTelemetryConsent v-model="consentOpen" :locale="locale" :version="currentVersion \|\| ''" :os="osName\(\)"/)
 })
+
+test('构建与组件: the panel asks the inventory of everything installed, and a failing command leaves the table to the panel row', async () => {
+  const { createDeveloperTools } = await import('./developerTools.js')
+  const calls = []
+  const invoke = async (name) => { calls.push(name); if (name === 'get_component_inventory') return [{ id: 'host', name: 'Sunshine.exe', version: '2026.1110.165906', commit: 'abc', installed: true }, { id: 'panel', name: 'Panel', version: '2026.1110.165906', commit: 'a6f75d9', installed: true }, { id: 'vigem', name: 'ViGEmBus', version: '', commit: '', installed: false }]; return {} }
+  const tools = createDeveloperTools({ invoke, settings: { get: () => ({}), save: async () => {} }, version: '2026.1110.165906' })
+  const info = await tools.environment()
+  assert.ok(calls.includes('get_component_inventory')); assert.equal(info.components.length, 3); assert.ok(info.components.length > 1)
+  const broken = createDeveloperTools({ invoke: async (name) => { if (name === 'get_component_inventory') throw new Error('x'); return {} }, settings: { get: () => ({}), save: async () => {} } })
+  assert.deepEqual((await broken.environment()).components, [])
+  const src = read('../../../src-tauri/src/component_inventory.rs')
+  assert.match(src, /pub async fn get_component_inventory\(\) -> Result<Vec<ComponentRow>, String>/)
+  assert.match(read('../../../src-tauri/build.rs'), /PANEL_COMPONENTS_JSON/); assert.match(read('../../../src-tauri/src/main.rs'), /component_inventory::get_component_inventory,/)
+})

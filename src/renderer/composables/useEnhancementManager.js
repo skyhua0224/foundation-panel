@@ -146,7 +146,14 @@ export function useEnhancementManager({ api, messages: text, runtimeName, onStat
     operation.value = 'saving'
     operationError.value = ''
     try {
-      const result = await api.setEnabled(enabled)
+      // The host answers `hdr_save_busy` while another save holds its transaction (the panel already asked again for about 10 s). A save is never dropped silently: the page says 「正在保存…」
+      // and asks once more after the other one has finished.
+      let result = await api.setEnabled(enabled)
+      if (!result.success && String(result.message || '').includes('hdr_save_busy')) {
+        ElMessage.info(text.value.saveBusy || '正在保存…')
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+        result = await api.setEnabled(enabled)
+      }
       if (!result.success) throw new Error(result.message)
       applyStatus(result.data)
       ElMessage.success(text.value.saveSuccess)
