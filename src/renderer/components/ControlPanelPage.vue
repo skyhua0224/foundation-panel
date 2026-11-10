@@ -12,6 +12,7 @@
             <template #control><MSeg block :label="t.sidebar.updateChannel" :model-value="includePrerelease" :options="channelOptions" @update:model-value="emit('channel-change', $event)" /></template>
           </MItem>
           <!-- the four sources as radio rows (the same rows as the first run): Mirror酱 carries 国内高速 and 付费 and says what it is -->
+          <MItem plain icon="cloud_download" :title="src.source" />
           <MSourceList :texts="src" :source="updateSource.source.value" @pick="updateSource.setSource" />
           <template v-if="updateSource.source.value === 'mirror'">
             <MFieldItem v-model="cdkDraft" icon="key" type="password" :label="src.cdk" :supporting="updateSource.available.value ? src.cdkHint : src.unavailable" :disabled="!updateSource.available.value || updateSource.busy.value" autocomplete="off" />
