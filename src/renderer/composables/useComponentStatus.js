@@ -2,6 +2,7 @@ import { createComponentStatus, microphoneState, registerComponentStatus } from 
 import { ElMessage, ElMessageBox } from './notifyMessage.js'
 import { sunshine, vdd, vigem, vmouse } from '../tauri-adapter.js'
 import { enhancementActions, enhancementSources } from './useEnhancementComponents.js'
+import { sparxieActions } from './sparxieInstall.js'
 import { dualsenseStatusChannel, micStatusChannel, usbipStatusChannel, vigemStatusChannel } from './deviceStatusStore.js'
 
 // The component status of the control panel: the sources are the ones the panel already reads (the status channels of the device hub, the
@@ -62,7 +63,7 @@ export function useComponentStatus({ locale, go = {}, update = () => ({}), check
       dualsense: channel(dualsenseStatusChannel),
       mic: async () => { const s = data(await micStatusChannel.fetch({ force: false })); return s ? { state: microphoneState(s), backend: s.active_backend || s.configured_backend } : null },
       ...enhancementSources(),
-      // Sparxie is an extension the person installs themselves: its card exists only while the host reports it installed (an absent one answers null and is not drawn)
+      // Sparxie is an extension the person installs themselves: its card is the install entry, so the source answers even when it is not installed
       sparxie: async () => { try { const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, ''); const r = await fetch(`${base}/api/sparxie/status`, { signal: AbortSignal.timeout(4000) }); return r.ok ? r.json() : null } catch { return null } },
       encoder: async () => { const c = await hostConfig(); return { active: c.active_encoder, hevc: c.hevc_mode, av1: c.av1_mode } },
       host: async () => {
@@ -84,6 +85,7 @@ export function useComponentStatus({ locale, go = {}, update = () => ({}), check
       dlssnr: enhancementActions('dlssnr', { texts: () => controller.text(), refresh: () => controller.check('dlssnr') }),
       rtxhdr: enhancementActions('rtxhdr', { texts: () => controller.text(), refresh: () => controller.check('rtxhdr') }),
       host: { update: open(check) },
+      sparxie: sparxieActions({ base: async () => String((await sunshine.getProxyUrl()) || '').replace(/\/$/, ''), texts: () => controller.text(), refresh: () => controller.check('sparxie') }),
     },
   }))
   return controller
