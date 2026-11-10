@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { installTrayTheme } from './trayTheme.js'
 import { trayTransport } from './menuPopupTransport.js'
-import { SLIDER_KEYS, TILE_IDS, TRAY_ITEM_IDS, VARIANTS, modelIds, normalizeLayout, tileItemIds } from 'foundation-ui/tray/trayModel.js'
+import { SLIDER_KEYS, TILE_IDS, TRAY_DENSITIES, TRAY_ITEM_IDS, VARIANTS, modelIds, normalizeLayout, openingDensity, tileItemIds } from 'foundation-ui/tray/trayModel.js'
 import { TRAY_PREFS_DEFAULT } from 'foundation-ui/tray/trayPrefs.js'
 
 // The tray menus in the menu window (docs/tray-menu.md, src-tauri/src/tray/popup_input.rs): the ids, the commands and events both sides name, the settings page, the theme the menus open with.
@@ -142,4 +142,20 @@ test('the sliders are in all three menus from one list, and the native menu has 
   for (const key of ['bitrate_menu', 'bitrate_auto', 'dpi_menu']) assert.equal((read('src-tauri/src/tray.rs').match(new RegExp(`^    ${key}: "`, 'gm')) || []).length, 3, key)
   // the host record keeps its shape (tiles, sliders: null = the default), so a record saved by an older build still reads
   assert.match(prefsRs, /pub sliders: Option<Vec<String>>/); assert.match(inputRs, /unwrap_or_else\(\|\| vec!\["bitrate"\.to_string\(\), "dpi"\.to_string\(\)\]\)/)
+})
+
+test('touch density: the host tells the menu what opened it and the person\'s choice, one rule on both sides, an old record still reads', () => {
+  const src = read('src-tauri/src/tray/input_source.rs'), prefs = read('src-tauri/src/tray_prefs.rs')
+  // the densities of the record are the densities of the menu
+  const list = [...prefs.slice(prefs.indexOf('pub const DENSITIES')).split('];')[0].matchAll(/"([a-z]+)"/g)].map((m) => m[1])
+  assert.deepEqual(list, [...TRAY_DENSITIES])
+  assert.match(prefs, /density: "auto"\.into\(\)/); assert.match(prefs, /#\[serde\(rename_all = "camelCase", default\)\]/)
+  // what the state carries, and where the icon's click is read (first thing in the callback, while the message is being dispatched)
+  assert.match(inputRs, /"touch": input_source::facts\(\)\.to_json\(\)/); assert.match(inputRs, /"density": prefs\.density/)
+  assert.match(inputRs, /input_source::note_icon_event\(\);\n    let Some\(app\) = ctx_popup::app\(\)/)
+  // the Win32 calls named by the documentation, and the documented constants
+  for (const k of ['GetCurrentInputMessageSource', 'GetMessageExtraInfo', '0x2003', 'GetSystemMetrics(95)', '0x04 => Source::Touch', '0x08 => Source::Pen', '0x02 => Source::Mouse']) assert.ok(src.includes(k), k)
+  // the same rule in JS: a finger or a pen, else slate posture when the press is unknown, a digitizer alone never
+  for (const [source, slate, capable, want] of [['touch', false, false, 'touch'], ['pen', false, true, 'touch'], ['mouse', true, true, 'standard'], ['unknown', true, true, 'touch'], ['unknown', false, true, 'standard']]) assert.equal(openingDensity('auto', { source, slate, capable }), want, `${source} ${slate} ${capable}`)
+  assert.ok(src.includes('Source::Unknown if facts.slate => "touch"') && src.includes('Source::Touch | Source::Pen => "touch"'))
 })
