@@ -348,8 +348,9 @@ watch(() => router.currentRoute.value, (route) => {
 // do not need the host (the panel's settings, 米塔 AI, help, about, the diagnostics) stay as they are. When the host is back the frame loads again.
 // The probe is made by the panel's own process (sunshine.probeHost), not by a fetch of this window: at a start the window's connections to the proxy are taken by the pages' first requests,
 // and a probe queued behind them made a host that answers in milliseconds look silent.
+// While the window is still connecting (it opened with the computer, the host may be seconds from its first answer: a cold host answered in 2.5 to 4 s on a freshly started VM) a probe waits longer.
 const probeHost = async () => {
-  const status = await sunshine.probeHost(2500)
+  const status = await sunshine.probeHost(hostConn.state.status === 'connecting' ? 6000 : 2500)
   // The native probe reaches the configured host directly. Any valid HTTP
   // status proves that the listener answered; 503 is the host's temporary
   // overload/startup response, not a dead service. The shared connection
@@ -361,6 +362,8 @@ const probeHost = async () => {
 const hostRestart = createHostRestart({ locale, ask: (options) => useDialogs().ask(options), status: () => sunshineService.status(), restart: (ack) => tools.restartSunshineService(ack), userMode: (ack) => tools.restartSunshineInUserMode(ack) })
 let restartAck = false
 const hostConn = useHostConnection({
+  // the panel opens with the computer: the host may still be starting. Neutral `connecting` until the first answer or a certain failure (m3e status/hostConnection.js), never the error page for a slow start.
+  starting: true,
   probe: probeHost,
   restartService: () => tools.restartSunshineService(restartAck),
   restartUser: () => tools.restartSunshineInUserMode(restartAck),
