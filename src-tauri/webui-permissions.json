@@ -21,5 +21,12 @@
   "allow-toggle-sunshine-mode",
   "allow-get-gpus",
   "allow-get-monitors",
-  "allow-read-image-as-data-url"
+  "allow-read-image-as-data-url",
+  "allow-list-display-modes",
+  "allow-set-display-mode",
+  "allow-get-current-dpi",
+  "allow-set-desktop-dpi",
+  "allow-launch-windows-hdr-calibration",
+  "allow-set-vdd-keep-enabled",
+  "allow-set-vdd-headless-create-enabled"
 ]

@@ -1798,6 +1798,18 @@ mod tests {
             };
         let origin = "http://127.0.0.1:48090/config";
         assert!(invoke(&main, origin, "get_vdd_status").is_ok());
+        // what the Web UI itself invokes in the frame (src_assets/common/assets/web): each is granted to the bound origin, none by accident of a wildcard
+        for web_command in [
+            "list_display_modes",
+            "set_display_mode",
+            "get_current_dpi",
+            "set_desktop_dpi",
+            "launch_windows_hdr_calibration",
+            "set_vdd_keep_enabled",
+            "set_vdd_headless_create_enabled",
+        ] {
+            assert!(invoke(&main, origin, web_command).is_ok(), "{web_command}");
+        }
         for wrong in [
             "http://127.0.0.1:48081/config",
             "https://github.com/",
