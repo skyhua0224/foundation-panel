@@ -23,3 +23,9 @@ test('the big-screen tile draws the marks in one row under the name', () => {
   const grid = readFileSync(new URL('./components/AppGridView.vue', import.meta.url), 'utf8')
   assert.ok(grid.includes('<MChipRow v-if="spxTags(app).length"') && grid.includes('sparxieTags(app, locale.value, spx.installed)'))
 })
+
+test('the Sparxie chip carries the mark; the picture is the panel\'s own public asset', () => {
+  assert.equal(sparxieTags({ sparxie: { region: 'cn', mode: 'touch' } }, 'zh')[0].mark, true)
+  const grid = readFileSync(new URL('./components/AppGridView.vue', import.meta.url), 'utf8')
+  assert.ok(grid.includes("'/sparxie/sparxie-mark-64.png'") && grid.includes('tag.mark ? { ...tag, image: SPARXIE_MARK }'))
+})

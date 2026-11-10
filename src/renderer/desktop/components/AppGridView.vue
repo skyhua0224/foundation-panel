@@ -79,7 +79,9 @@ const { t, locale } = useI18n()
 // a Sparxie application shows its marks under the name while the host reports the component installed
 const spx = useSparxiePresence()
 onMounted(refreshSparxiePresence)
-const spxTags = (app) => sparxieTags(app, locale.value, spx.installed)
+// the Sparxie mark is a picture of the panel's public assets (the art of 暗檬's character; see public/sparxie/SOURCE.md)
+const SPARXIE_MARK = '/sparxie/sparxie-mark-64.png'
+const spxTags = (app) => sparxieTags(app, locale.value, spx.installed).map((tag) => (tag.mark ? { ...tag, image: SPARXIE_MARK } : tag))
 
 const props = defineProps({
   apps: { type: Array, required: true },

@@ -12,7 +12,8 @@ export function sparxieTags(app, locale, present = true) {
   const b = present && app && typeof app.sparxie === 'object' && app.sparxie ? app.sparxie : null
   if (!b) return []
   const W = WORDS[sparxieLang(locale)]
-  const tags = [{ key: 'spx', icon: 'extension', tone: 'tertiary', label: 'Sparxie' }]
+  // `mark`: the chip carries the Sparxie picture (the component maps it to the URL of its own asset)
+  const tags = [{ key: 'spx', icon: 'extension', mark: true, tone: 'tertiary', label: 'Sparxie' }]
   if (b.region && W.regions[b.region]) tags.push({ key: 'region', icon: 'public', tone: 'neutral', label: W.regions[b.region] })
   tags.push(b.mode === 'pc' ? { key: 'mode', icon: 'keyboard', tone: 'neutral', label: W.pc } : { key: 'mode', icon: 'touch_app', tone: 'info', label: W.touch })
   return tags
