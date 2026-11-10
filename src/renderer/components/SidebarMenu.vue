@@ -33,7 +33,7 @@
         <!-- while the host cannot be used the status page (the overlay) is the whole content area; a page that needs the host is not drawn under it -->
         <template v-if="offlineShown && !isWebPage" />
         <PanelHome v-else-if="entry.id === ROUTES.HOME" :runtime="runtime" :update-available="!!updateInfo" @open="openDestination" @webui-navigate="openWebUi" />
-        <Welcome v-else-if="entry.id === ROUTES.WELCOME" :key="guideRun" @close="closeWelcome" @webui-navigate="openWebUi" @open-doctor="openDoctor" />
+        <Welcome v-else-if="entry.id === ROUTES.WELCOME" :key="guideRun" @close="closeWelcome" @open-privacy="closeWelcome(); router.navigate(ROUTES.ABOUT)" @webui-navigate="openWebUi" @open-doctor="openDoctor" />
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" @webui-navigate="openWebUi" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
@@ -63,7 +63,7 @@
         <MAnnouncementPage v-else-if="entry.id === ROUTES.ANNOUNCEMENTS" :items="announcements.list.value" :locale="locale" :acked-at="ackedAt" :open-id="entry.params?.id || ''" :on-refresh="() => announcements.refresh(true)" @dismiss="announcements.dismiss" @read="announcements.read" @open-url="actions_openExternal" @back="back" />
         <DevHub v-else-if="entry.id === ROUTES.DEV_HUB" :locale="locale" :pages="devHubPages" @open="(p) => openRoute(p.route)" />
         <DeveloperPages v-else-if="DEV_PAGES.includes(entry.id)" :key="entry.id" :page="entry.id" :locale="locale" :version="currentVersion" :consent="telemetry.consent.value" :error-context="errorContext" :simulate-host="simulateHost" @disabled="leaveDeveloper" @notify="(text) => useNotify().snack(text)" />
-        <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" :on-refresh="() => announcements.refresh(true)" :consent="telemetry.consent.value" @consent="telemetry.answer" :include-prerelease="includePrerelease" @channel-change="setIncludePrerelease" @open-update="showUpdateDialog = true" @open="actions_openExternal" @open-developer="router.navigate(ROUTES.DEVELOPER)" />
+        <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" :on-refresh="() => announcements.refresh(true)" :consent="telemetry.consent.value" @consent="telemetry.answer" :errors="telemetry.errors.value" @errors="telemetry.setErrors" support-link @open-update-source="router.navigate(ROUTES.PANEL_SETTINGS)" :include-prerelease="includePrerelease" @channel-change="setIncludePrerelease" @open-update="showUpdateDialog = true" @open="actions_openExternal" @open-developer="router.navigate(ROUTES.DEVELOPER)" />
         <ControlPanelPage
           v-else-if="entry.id === ROUTES.PANEL_SETTINGS || entry.id === ROUTES.HELP"
           :page="entry.id"
@@ -191,6 +191,7 @@ import { ROUTES, PAGES, routeForWebPath, routeOfPlace, webPathOf, isPhone } from
 import { framedMove } from '../composables/frameFollow.js'
 import { PANEL_PAGE_PATHS, requestPanelPage } from '../composables/panelParts.js'
 import { proxyBlock } from '../composables/proxyBlock.js'
+import { hostData } from '../composables/hostData.js'
 import { createGuideData } from '../composables/guideData.js'
 import PanelPending from './PanelPending.vue'
 import { recordUpdateCheck } from '../composables/useUpdateCheckTime.js'
@@ -348,8 +349,9 @@ watch(() => router.currentRoute.value, (route) => {
 // do not need the host (the panel's settings, 米塔 AI, help, about, the diagnostics) stay as they are. When the host is back the frame loads again.
 // The probe is made by the panel's own process (sunshine.probeHost), not by a fetch of this window: at a start the window's connections to the proxy are taken by the pages' first requests,
 // and a probe queued behind them made a host that answers in milliseconds look silent.
+// While the window is still connecting (it opened with the computer, the host may be seconds from its first answer: a cold host answered in 2.5 to 4 s on a freshly started VM) a probe waits longer.
 const probeHost = async () => {
-  const status = await sunshine.probeHost(2500)
+  const status = await hostData.probe(hostConn.state.status === 'connecting' ? 6000 : 2500)
   // The native probe reaches the configured host directly. Any valid HTTP
   // status proves that the listener answered; 503 is the host's temporary
   // overload/startup response, not a dead service. The shared connection
@@ -361,6 +363,8 @@ const probeHost = async () => {
 const hostRestart = createHostRestart({ locale, ask: (options) => useDialogs().ask(options), status: () => sunshineService.status(), restart: (ack) => tools.restartSunshineService(ack), userMode: (ack) => tools.restartSunshineInUserMode(ack) })
 let restartAck = false
 const hostConn = useHostConnection({
+  // the panel opens with the computer: the host may still be starting. Neutral `connecting` until the first answer or a certain failure (m3e status/hostConnection.js), never the error page for a slow start.
+  starting: true,
   probe: probeHost,
   restartService: () => tools.restartSunshineService(restartAck),
   restartUser: () => tools.restartSunshineInUserMode(restartAck),
@@ -458,10 +462,12 @@ onMounted(async () => {
     scopeRecent(hostRecentKey(local ? 'local' : u.origin))
   } catch { scopeRecent(hostRecentKey('local')) }
 })
+const keptHostConfig = hostData.peek('config')
+if (keptHostConfig) hostConfig.value = keptHostConfig // the list draws its live lines from the last answer of the host at once; the fresh one replaces it
 const loadHostData = async () => {
   try {
     const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')
-    const [config, tuning] = await Promise.allSettled([fetch(`${base}/api/config`).then((r) => (r.ok ? r.json() : null)), fetch(`${base}/api/dualsense/tuning`).then((r) => (r.ok ? r.json() : null))])
+    const [config, tuning] = await Promise.allSettled([hostData.refreshConfig(), fetch(`${base}/api/dualsense/tuning`).then((r) => (r.ok ? r.json() : null))])
     if (config.status === 'fulfilled' && config.value) hostConfig.value = config.value
     if (tuning.status === 'fulfilled' && tuning.value?.keys) dualsenseKeys.value = tuning.value.keys
     const [clients, apps] = await Promise.allSettled([fetch(`${base}/api/clients/list`).then((r) => (r.ok ? r.json() : null)), fetch(`${base}/api/apps`).then((r) => (r.ok ? r.json() : null))])

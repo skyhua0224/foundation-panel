@@ -1,7 +1,7 @@
 <template>
   <MOnboardWindow :mode="onboardMode" :label="accountTexts?.title || ''" @close="closeGuide">
   <div class="panel-guide">
-    <MLoading v-if="state.account.exists === null || consentShow === null || !entry" class="panel-guide__loading" />
+    <MLoading v-if="state.account.exists === null || !entry" class="panel-guide__loading" />
     <MGuideFlow
       v-else
       :steps="steps"
@@ -41,13 +41,12 @@ import { useUpdateSource } from '../composables/useUpdateSource.js'
 
 // The guided first run of the panel. It opens by itself on a first run, when the host serves its account page (no account yet), and from
 // the help page. The account step is part of the flow only while the host has no account.
-const emit = defineEmits(['close', 'webui-navigate', 'open-doctor'])
+const emit = defineEmits(['close', 'webui-navigate', 'open-doctor', 'open-privacy'])
 const { t, locale } = useWelcomeI18n()
 
 // The language is chosen on the first screen of the flow (跟随系统 by default) and applies at once, to the flow and to the shell; the usage-count question is the step after it, only where it was not answered before
 const desktop = useDesktopI18n()
 const telemetry = useTelemetryConsent({ api: telemetryApi })
-const consentShow = ref(null) // settled once the host has answered: it does not change while the person answers
 
 const data = createGuideData({
   proxyUrl: () => sunshine.getProxyUrl(),
@@ -69,14 +68,14 @@ const updateSource = useUpdateSource()
 const flowState = computed(() => ({
   ...state,
   locale: { choice: localeChoice.value, resolved: systemLocale(), languages: supportedLocales },
-  consent: { value: telemetry.consent.value, show: consentShow.value === true },
   update: { source: updateSource.source.value, available: updateSource.available.value, cdk: true, hasCdk: updateSource.hasCdk.value, status: updateSource.status.value, lastValid: updateSource.lastValid.value, busy: updateSource.busy.value },
 }))
 const callbacks = {
   ...data.callbacks,
   createAccount: data.createAccount(t),
   setLocale: (choice) => { setWelcomeChoice(choice); desktop.setChoice(choice) },
-  setConsent: (value) => telemetry.answer(value),
+  // the first screen's one-time notice about error reports links to the switch (关于 › 隐私)
+  openPrivacy: () => emit('open-privacy'),
   loadUpdate: () => updateSource.refresh(),
   setUpdateSource: (value) => updateSource.setSource(value),
   saveCdk: async (cdk) => ({ ok: await updateSource.saveCdk(cdk) }),
@@ -86,7 +85,7 @@ const callbacks = {
 // Opened by hand on an install that has seen this version, the whole flow is shown.
 const version = ref('')
 const entry = ref(null)
-const steps = computed(() => buildGuideSteps({ mode: entry.value?.mode || 'fresh', skip: [...(entry.value?.skip || []), ...(state.account.exists ? ['account'] : []), ...(consentShow.value === false ? ['consent'] : [])] }))
+const steps = computed(() => buildGuideSteps({ mode: entry.value?.mode || 'fresh', skip: [...(entry.value?.skip || []), ...(state.account.exists ? ['account'] : [])] }))
 const qrMatrix = (text) => QRCode.create(text, { errorCorrectionLevel: 'M' }).modules
 
 // The credential form keeps the texts of the welcome page, in every language it has. The title and the lead of the step say it is the Web UI account (the shared
@@ -115,7 +114,7 @@ onMounted(async () => {
   // `--start-guide` (the installer's done page, or a second launch forwarded here): the first-run flow from its first step, whatever was saved.
   const fromStart = consumeStartGuide()
   if (fromStart) clearProgress(null, GUIDE_STORAGE_KEY)
-  await Promise.all([probeAccount(), telemetry.refresh().then(() => { consentShow.value = telemetry.consent.value === 'ask' }), panelVersion().then((v) => { version.value = v })])
+  await Promise.all([probeAccount(), telemetry.refresh(), panelVersion().then((v) => { version.value = v })])
   if (state.account.exists) await Promise.all([callbacks.loadSetup?.(), callbacks.refreshClients?.(), loadGuideHost().then((h) => { hostProgress.value = h })])
   if (fromStart) {
     entry.value = { ...guideOnLaunch({ fromStart: true }), restart: true }

@@ -162,11 +162,12 @@ const ENTRY_OFFSET = {
 /**
  * 焦点移动的入场动画：从移动方向的反侧轻微滑入并落定。
  * 用 WAAPI + composite: 'add'，与元素自身的 CSS transform（如卡片悬浮位移）
- * 叠加而不是覆盖；prefers-reduced-motion 时完全跳过。
+ * 叠加而不是覆盖；「减少」时完全跳过（设置「动画」: 完整是默认，跟随系统才看 prefers-reduced-motion）。
  */
 function playEntryAnimation(element, direction) {
   if (!direction || !ENTRY_OFFSET[direction]) return
-  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+  const mode = document.documentElement.dataset.motion
+  if (mode === 'reduced' || (mode === 'system' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches)) return
   const offset = ENTRY_OFFSET[direction]
   try {
     element.animate(

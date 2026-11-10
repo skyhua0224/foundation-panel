@@ -194,10 +194,22 @@ fn check_vigem() -> VigemStatus {
     }
 }
 
+/// The driver probe runs PowerShell and a PnP query (0.55 to 0.7 s on the Skyindows VM, 3.4 s at the start) and the window asks every minute: it runs on a blocking thread (it used to
+/// run on the async runtime, which the proxy and every other command share), once for the pages that ask together, and its answer is kept a while. The commands that change
+/// the driver drop it.
+static VIGEM_STATUS: crate::probe_cache::ProbeCache<VigemStatus> =
+    crate::probe_cache::ProbeCache::new("vigem status", std::time::Duration::from_secs(20));
+
 /// 获取 ViGEmBus 驱动状态
 #[tauri::command]
 pub async fn get_vigem_status() -> Result<VigemStatus, String> {
-    Ok(check_vigem())
+    VIGEM_STATUS
+        .get(|| async {
+            tokio::task::spawn_blocking(check_vigem)
+                .await
+                .map_err(|error| format!("ViGEmBus 状态检测失败: {error}"))
+        })
+        .await
 }
 
 /// 调用 scripts/<name> 并等待驱动栈稳定
@@ -216,6 +228,7 @@ async fn run_gamepad_script(
         ));
     }
     log::info!("调用 {} {} ...", name, extra_args.join(" "));
+    let _status_changes = VIGEM_STATUS.invalidating();
     bat_runner::run_elevated(&bat, "vigem", extra_args)?;
     tokio::time::sleep(tokio::time::Duration::from_secs(settle_secs)).await;
     Ok(success_msg.to_string())

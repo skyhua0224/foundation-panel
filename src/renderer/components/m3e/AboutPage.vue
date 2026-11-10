@@ -1,5 +1,5 @@
 <template>
-  <MAbout :version="currentVersion" :channel="channel" :build="build" :update="update" :sponsors="SPONSORS" :locale="locale" :on-refresh="onRefresh" :consent="consent" @consent="(v) => emit('consent', v)" :update-channel="includePrerelease ? 'prerelease' : 'stable'" @channel-change="(value) => emit('channel-change', value === 'prerelease')" @check="runCheck" @open-update="emit('open-update')" @open="(url) => emit('open', url)" @developer-off="options?.off()">
+  <MAbout :version="currentVersion" :channel="channel" :build="build" :update="update" :sponsors="SPONSORS" :locale="locale" :on-refresh="onRefresh" :consent="consent" :errors="errors" :support-link="supportLink" @consent="(v) => emit('consent', v)" @errors="(v) => emit('errors', v)" @open-update-source="emit('open-update-source')" :update-channel="includePrerelease ? 'prerelease' : 'stable'" @channel-change="(value) => emit('channel-change', value === 'prerelease')" @check="runCheck" @open-update="emit('open-update')" @open="(url) => emit('open', url)" @developer-off="options?.off()">
     <template #developer><DeveloperOptions ref="options" :locale="locale" @open="emit('open-developer')" /></template>
   </MAbout>
 </template>
@@ -23,11 +23,14 @@ const props = defineProps({
   /** fetch the announcements again (the developer entry changes their source) */
   onRefresh: { type: Function, default: null },
   consent: { type: String, default: '' },
+  /** error reports ('on' | 'off'): a separate switch from the usage statistics */
+  errors: { type: String, default: '' },
+  supportLink: { type: Boolean, default: false },
   /** the person's update channel (测试版 when true): the same preference as 面板设置; 更新通道 of the page changes it through `channel-change` */
   includePrerelease: { type: Boolean, default: false },
 })
 const options = ref(null)
-const emit = defineEmits(['open-update', 'open', 'consent', 'channel-change', 'open-developer'])
+const emit = defineEmits(['open-update', 'open', 'consent', 'errors', 'open-update-source', 'channel-change', 'open-developer'])
 
 const checking = ref(false)
 const failed = ref(false)

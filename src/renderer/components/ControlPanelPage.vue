@@ -11,9 +11,8 @@
           <MItem icon="system_update_alt" :title="t.sidebar.updateChannel" stack>
             <template #control><MSeg block :label="t.sidebar.updateChannel" :model-value="includePrerelease" :options="channelOptions" @update:model-value="emit('channel-change', $event)" /></template>
           </MItem>
-          <MItem icon="cloud_download" :title="src.source" stack>
-            <template #control><MSeg block :label="src.source" :model-value="updateSource.source.value" :options="sourceOptions" @update:model-value="updateSource.setSource" /></template>
-          </MItem>
+          <!-- the four sources as radio rows (the same rows as the first run): Mirror酱 carries 国内高速 and 付费 and says what it is -->
+          <MSourceList :texts="src" :source="updateSource.source.value" @pick="updateSource.setSource" />
           <template v-if="updateSource.source.value === 'mirror'">
             <MFieldItem v-model="cdkDraft" icon="key" type="password" :label="src.cdk" :supporting="updateSource.available.value ? src.cdkHint : src.unavailable" :disabled="!updateSource.available.value || updateSource.busy.value" autocomplete="off" />
             <MItem action icon="link" :title="src.getCdk" @click="actions.openUrl(MIRRORCHYAN_CDK_URL)"><template #trail><MIcon name="open_in_new" /></template></MItem>
@@ -89,7 +88,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MChoiceItem, MSeg, MChip, MButton, MIcon, MFieldItem, MBanner, MSupportSheet, useNotify, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard, doctorTexts, MFeedbackRow, MFeedbackAccount } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSourceList, MChoiceItem, MSeg, MChip, MButton, MIcon, MFieldItem, MBanner, MSupportSheet, useNotify, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard, doctorTexts, MFeedbackRow, MFeedbackAccount } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import ShortcutsSheet from './m3e/ShortcutsSheet.vue'
 import { usePanelPart } from '../composables/panelParts.js'
@@ -148,7 +147,6 @@ const lastCheck = useUpdateCheckTime()
 // the update source and the Mirror酱 CDK (the CDK stays in the native side; this window only sets it and asks about it)
 const updateSource = useUpdateSource()
 const src = computed(() => updateSourceTexts(props.locale))
-const sourceOptions = computed(() => UPDATE_SOURCES.map((value) => ({ value, label: src.value.sources[value] })))
 const cdkDraft = ref('')
 // the state of the CDK and its sentences are the same words as in the first run (foundation-ui/update cdkView)
 const cdkResult = computed(() => cdkView(updateSource.status.value, src.value, { lastValid: updateSource.lastValid.value }))

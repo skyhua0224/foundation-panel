@@ -2,7 +2,9 @@
 // shares the WebView's connection pool with the pages' own requests (six at a time to one origin): when the first requests of a start are slow, a healthy proxy answers
 // the check late and one 5 s try fails. One failed try is not a verdict. The check is tried again with a short backoff before the page says anything, and keeps being
 // tried in the background while the page does, so the page clears by itself.
-export const FIRST_ROUND_DELAYS = Object.freeze([0, 1000, 2500, 5000]) // ms before each of the first tries
+// A window opened right after the computer started has the same cold-start slowness (the proxy binds its port a moment after the window, the first answers take seconds): the first round
+// is about 25 s of tries (quick at first, then every 5 s) before the page says anything, and the page is a neutral loading state meanwhile (the frame's cover), never the error.
+export const FIRST_ROUND_DELAYS = Object.freeze([0, 500, 1000, 2000, 3000, 5000, 5000, 5000, 5000]) // ms before each of the first tries
 export const BACKGROUND_EVERY_MS = 5000
 
 const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
