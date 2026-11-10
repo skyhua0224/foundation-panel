@@ -73,6 +73,8 @@ async fn persist_latest_locale(revision: u64, locale: String) -> Result<bool, St
         return Ok(false);
     }
 
+    // the tray's language is handed to the host at the panel's start: when the host is ready (proxy_server::host_ready)
+    let _ = crate::proxy_server::host_ready(Duration::from_secs(60)).await;
     sunshine::set_sunshine_locale(locale).await?;
     Ok(true)
 }
