@@ -79,7 +79,8 @@ pub struct TrayPrefs {
     pub force_native: bool,
     /// The tiles of the quick panel (V3), in order, once the person has edited it; None = the default of foundation-ui (`DEFAULT_TILES`).
     pub tiles: Option<Vec<String>>,
-    /// The sliders of the quick panel, in order; None = the default (the scale).
+    /// The sliders of the three menus (V1, V2 and the quick panel read this one list, and so do the native menu's stepped submenus), in order; None = the default (the bitrate cap, then the scale).
+    /// A list saved before the default changed stays as it was saved.
     pub sliders: Option<Vec<String>>,
 }
 

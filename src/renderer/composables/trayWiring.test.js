@@ -102,7 +102,7 @@ test('the sliders: tray_popup_set is registered, its answer reaches the page (a 
   assert.ok(sliderRs.includes('ChangeDisplaySettingsExW') && sliderRs.includes('CDS_TEST') && sliderRs.includes('EnumDisplaySettingsExW'))
   // the page sends exactly the keys the model draws
   assert.deepEqual([...SLIDER_KEYS], ['resolution', 'refresh', 'dpi', 'bitrate'])
-  assert.equal(VARIANTS.v3.pages.quick.rows.find((r) => r.t === 'sliders').source, 'layout', 'which sliders: the person\'s layout, the scale by default')
+  assert.equal(VARIANTS.v3.pages.quick.rows.find((r) => r.t === 'sliders').source, 'layout', 'which sliders: the person\'s layout, the bitrate cap and the scale by default')
 })
 
 test('the quick panel\'s layout: the host keeps it apart from the click settings, accepts exactly the ids the menu knows, and sends it with the state', async () => {
@@ -124,5 +124,22 @@ test('the quick panel\'s layout: the host keeps it apart from the click settings
   assert.match(inputRs, /"layout": \{ "tiles": prefs\.tiles, "sliders": prefs\.sliders \}/); assert.match(inputRs, /"show_toolbar": app\.get_webview_window\("toolbar"\)\.is_some\(\)/)
   assert.match(inputRs, /tray_prefs::save_layout\(tiles, sliders\)\?;[\s\S]*update_tray_state/)
   // what a stored record means to the menu
-  assert.deepEqual(normalizeLayout({ tiles: null, sliders: null }).sliders, ['dpi'])
+  assert.deepEqual(normalizeLayout({ tiles: null, sliders: null }).sliders, ['bitrate', 'dpi'])
+  assert.deepEqual(normalizeLayout({ tiles: null, sliders: ['dpi'] }).sliders, ['dpi'], 'a list saved before the default changed is kept as it was saved')
+})
+
+test('the sliders are in all three menus from one list, and the native menu has stepped stand-ins for them from the same list and the same writer', () => {
+  for (const v of ['v1', 'v2', 'v3']) {
+    const rows = (v === 'v1' ? VARIANTS.v1.pages.root : v === 'v2' ? VARIANTS.v2.pages.root : VARIANTS.v3.pages.quick).rows
+    assert.equal(rows.filter((r) => r.t === 'sliders' && r.source === 'layout').length, 1, v)
+  }
+  const menuRs = read('src-tauri/src/tray/menu.rs'), prefsRs = read('src-tauri/src/tray_prefs.rs')
+  // one writer: the quick page and the native steps both end in write_slider (the config key max_bitrate, SetDpi.exe)
+  assert.match(inputRs, /async fn write_slider\(key: &str, value: &Value\)/); assert.match(inputRs, /let settle = write_slider\(key, value\)\.await\?;/); assert.match(inputRs, /match write_slider\(key, &json!\(value\)\)\.await/)
+  // the steps: the menu builds ids the handler parses; the labels are in three languages
+  assert.match(menuRs, /format!\("slider_bitrate_\{mbps\}"\)/); assert.match(menuRs, /format!\("slider_dpi_\{pct\}"\)/)
+  assert.match(menuRs, /popup_input::native_slider_keys\(\)/); assert.match(actionsRs, /_ if popup_input::native_slider_event\(app, menu_id\) => \{\}/)
+  for (const key of ['bitrate_menu', 'bitrate_auto', 'dpi_menu']) assert.equal((read('src-tauri/src/tray.rs').match(new RegExp(`^    ${key}: "`, 'gm')) || []).length, 3, key)
+  // the host record keeps its shape (tiles, sliders: null = the default), so a record saved by an older build still reads
+  assert.match(prefsRs, /pub sliders: Option<Vec<String>>/); assert.match(inputRs, /unwrap_or_else\(\|\| vec!\["bitrate"\.to_string\(\), "dpi"\.to_string\(\)\]\)/)
 })
