@@ -6,6 +6,8 @@ import { invoke } from '@tauri-apps/api/core'
 // A known checksum is silent; any other package asks before it is installed.
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
+// the host's English sentence is for logs: the person reads the panel's own words for its error code
+const reason = (texts, result) => texts?.sparxie?.errors?.[result?.error_code] || ''
 const stageText = (texts, stage) => texts?.sparxie?.stages?.[stage] || stage || ''
 
 export async function postJson(url, body, timeoutMs = 120000) {
@@ -70,10 +72,10 @@ export function sparxieActions({ base, texts, refresh, progress = () => {} }) {
             progress({ stage: stageText(texts(), 'dependencies'), percent: 0 })
             result = await send(true)
           }
-          if (!result || result.ok === false) ElMessage.error((T().failed + ' ' + ((result && (result.error || result.error_code)) || '')).trim())
+          if (!result || result.ok === false) ElMessage.error((T().failed + ' ' + reason(texts(), result)).trim())
           else ElMessage.success(T().done)
         } catch (error) {
-          ElMessage.error((T().failed + ' ' + String(error?.message || '')).trim())
+          ElMessage.error(T().failed)
         } finally {
           progress(null)
           await refresh()
@@ -88,7 +90,7 @@ export function sparxieActions({ base, texts, refresh, progress = () => {} }) {
         const status = await getJson(root + '/api/sparxie/status')
         if (!status || status.installed === false || !status.exe) { ElMessage.error(T().openFailed); return }
         if (status.running) { ElMessage.info(T().alreadyOpen); return }
-        try { await invoke('open_sparxie', { exe: status.exe }) } catch (error) { ElMessage.error((T().openFailed + ' ' + String(error?.message || error || '')).trim()) }
+        try { await invoke('open_sparxie', { exe: status.exe }) } catch (error) { ElMessage.error(T().openFailed) }
         await refresh()
       }),
     },
@@ -108,7 +110,7 @@ export function sparxieActions({ base, texts, refresh, progress = () => {} }) {
           }
           result = await postJson(root + '/api/sparxie/uninstall', { delete_config: deleteConfig })
         }
-        if (!result || result.ok === false) ElMessage.error((T().failed + ' ' + ((result && result.error) || '')).trim())
+        if (!result || result.ok === false) ElMessage.error((T().failed + ' ' + reason(texts(), result)).trim())
         else ElMessage.success(T().removed)
         await refresh()
       }),
