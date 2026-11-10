@@ -33,7 +33,7 @@
         <!-- while the host cannot be used the status page (the overlay) is the whole content area; a page that needs the host is not drawn under it -->
         <template v-if="offlineShown && !isWebPage" />
         <PanelHome v-else-if="entry.id === ROUTES.HOME" :runtime="runtime" :update-available="!!updateInfo" @open="openDestination" @webui-navigate="openWebUi" />
-        <Welcome v-else-if="entry.id === ROUTES.WELCOME" :key="guideRun" @close="closeWelcome" @webui-navigate="openWebUi" @open-doctor="openDoctor" />
+        <Welcome v-else-if="entry.id === ROUTES.WELCOME" :key="guideRun" @close="closeWelcome" @open-privacy="closeWelcome(); router.navigate(ROUTES.ABOUT)" @webui-navigate="openWebUi" @open-doctor="openDoctor" />
         <WebStreamSettings v-else-if="entry.id === ROUTES.WEB_STREAM" @close="goHome" />
         <VddSettings v-else-if="entry.id === ROUTES.VDD_SETTINGS" @close="back" @webui-navigate="openWebUi" />
         <AiAssistant v-else-if="entry.id === ROUTES.AI_ASSISTANT" @close="back" />
@@ -63,7 +63,7 @@
         <MAnnouncementPage v-else-if="entry.id === ROUTES.ANNOUNCEMENTS" :items="announcements.list.value" :locale="locale" :acked-at="ackedAt" :open-id="entry.params?.id || ''" :on-refresh="() => announcements.refresh(true)" @dismiss="announcements.dismiss" @read="announcements.read" @open-url="actions_openExternal" @back="back" />
         <DevHub v-else-if="entry.id === ROUTES.DEV_HUB" :locale="locale" :pages="devHubPages" @open="(p) => openRoute(p.route)" />
         <DeveloperPages v-else-if="DEV_PAGES.includes(entry.id)" :key="entry.id" :page="entry.id" :locale="locale" :version="currentVersion" :consent="telemetry.consent.value" :error-context="errorContext" :simulate-host="simulateHost" @disabled="leaveDeveloper" @notify="(text) => useNotify().snack(text)" />
-        <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" :on-refresh="() => announcements.refresh(true)" :consent="telemetry.consent.value" @consent="telemetry.answer" :include-prerelease="includePrerelease" @channel-change="setIncludePrerelease" @open-update="showUpdateDialog = true" @open="actions_openExternal" @open-developer="router.navigate(ROUTES.DEVELOPER)" />
+        <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" :on-refresh="() => announcements.refresh(true)" :consent="telemetry.consent.value" @consent="telemetry.answer" :errors="telemetry.errors.value" @errors="telemetry.setErrors" support-link @open-update-source="router.navigate(ROUTES.PANEL_SETTINGS)" :include-prerelease="includePrerelease" @channel-change="setIncludePrerelease" @open-update="showUpdateDialog = true" @open="actions_openExternal" @open-developer="router.navigate(ROUTES.DEVELOPER)" />
         <ControlPanelPage
           v-else-if="entry.id === ROUTES.PANEL_SETTINGS || entry.id === ROUTES.HELP"
           :page="entry.id"
