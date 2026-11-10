@@ -61,6 +61,7 @@
         <span class="tile-name" data-redact="text" :title="app.name">{{ app.name }}</span>
         <span v-if="playtimeLabel(app.name)" class="tile-playtime">{{ playtimeLabel(app.name) }}</span>
         <MChip v-if="app.elevated && app.elevated !== 'false'" class="tile-badge" tone="warn" icon="shield">{{ t.appContext.admin }}</MChip>
+        <MChipRow v-if="spxTags(app).length" class="tile-chips" :chips="spxTags(app)" :more-label="sparxieMore(locale)" />
       </div>
     </div>
   </div>
@@ -68,10 +69,17 @@
 
 <script setup>
 import { useI18n } from '../i18n/index.js'
-import { MChip, MIcon, MLoading } from 'foundation-ui/vue'
+import { onMounted } from 'vue'
+import { MChip, MChipRow, MIcon, MLoading } from 'foundation-ui/vue'
+import { sparxieMore, sparxieTags } from '../composables/sparxieTags.js'
+import { refreshSparxiePresence, useSparxiePresence } from '../composables/useSparxiePresence.js'
 import LaunchHelperIcon from './LaunchHelperIcon.vue'
 import { formatDuration } from '../composables/useGameSession.js'
-const { t } = useI18n()
+const { t, locale } = useI18n()
+// a Sparxie application shows its marks under the name while the host reports the component installed
+const spx = useSparxiePresence()
+onMounted(refreshSparxiePresence)
+const spxTags = (app) => sparxieTags(app, locale.value, spx.installed)
 
 const props = defineProps({
   apps: { type: Array, required: true },
@@ -246,6 +254,9 @@ function playtimeLabel(appName) {
     font: 400 14px/20px var(--md-ref-typeface-brand, system-ui);
     color: var(--md-sys-color-on-surface-variant);
   }
+
+  // the marks of a Sparxie application: one row (MChipRow turns what does not fit into +N), so the tiles keep one height
+  .tile-chips { flex: 1 1 100%; height: 28px; }
 }
 
 .app-tile.launching { pointer-events: none; }

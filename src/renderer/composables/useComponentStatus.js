@@ -62,6 +62,8 @@ export function useComponentStatus({ locale, go = {}, update = () => ({}), check
       dualsense: channel(dualsenseStatusChannel),
       mic: async () => { const s = data(await micStatusChannel.fetch({ force: false })); return s ? { state: microphoneState(s), backend: s.active_backend || s.configured_backend } : null },
       ...enhancementSources(),
+      // Sparxie is an extension the person installs themselves: its card exists only while the host reports it installed (an absent one answers null and is not drawn)
+      sparxie: async () => { try { const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, ''); const r = await fetch(`${base}/api/sparxie/status`, { signal: AbortSignal.timeout(4000) }); return r.ok ? r.json() : null } catch { return null } },
       encoder: async () => { const c = await hostConfig(); return { active: c.active_encoder, hevc: c.hevc_mode, av1: c.av1_mode } },
       host: async () => {
         let version = ''
