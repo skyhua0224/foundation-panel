@@ -216,11 +216,16 @@ onUnmounted(restoreFocus)
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pet-consent-mask,
-  .pet-consent-dialog,
-  .pet-consent-button {
+  :global(html:not([data-motion='full'])) .pet-consent-mask,
+  :global(html:not([data-motion='full'])) .pet-consent-dialog,
+  :global(html:not([data-motion='full'])) .pet-consent-button {
     transition: none;
   }
+}
+:global(html[data-motion='reduced']) .pet-consent-mask,
+:global(html[data-motion='reduced']) .pet-consent-dialog,
+:global(html[data-motion='reduced']) .pet-consent-button {
+  transition: none;
 }
 
 @media (max-width: 520px) {

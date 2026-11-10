@@ -1,6 +1,6 @@
 <script setup>
-import { inject, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { MIcon, MPageLoading } from 'foundation-ui/vue'
+import { inject, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { MIcon, MPageLoading, playPageEnter } from 'foundation-ui/vue'
 import { invoke } from '@tauri-apps/api/core'
 import { revealReport } from '../composables/frameReport.js'
 import { ownBackBar, panelBackMessage, readFrameBack } from '../composables/frameBack.js'
@@ -19,6 +19,11 @@ const props = defineProps({
 // While the frame moves to another page it is hidden and the content area shows the loading state (never the old page, never a blank or black frame). It is shown again when the
 // frame has loaded (a `load` event after its address changed), or, when the page is told its place by a message and nothing reloads, after a short settle.
 const host = ref(null)
+// The page enter is the scene's one (foundation-ui nav/pageEnter.js, played by MScene on the pane of every native page). A page in this frame has no pane of its own, so the frame plays the same enter
+// when it is shown after a page change, and when the frame moves to another place of the page it already shows (the Web UI answers that without a reload and, as one page, has no enter of its own).
+const frameBox = ref(null)
+let enterTimer = 0
+const enter = () => playPageEnter(frameBox.value)
 const covered = ref(true)
 // the first cover (a cold start) shows its loading state at once; the covers of page changes wait 300 ms (a transition delay), so a fast switch does not flash it
 const first = ref(true)
@@ -41,9 +46,11 @@ const uncover = (by = '', fcp = 0) => {
   }
   coveredAt = 0
   clearTimeout(veilTimer)
+  const wasCovered = covered.value
   covered.value = false
   veil.value = false
   first.value = false
+  if (wasCovered) nextTick(enter)
 }
 const cover = () => {
   if (!covered.value || !coveredAt) coveredAt = performance.now()
@@ -93,11 +100,12 @@ onMounted(() => {
 // move the frame (a new address) is covered by the observer above, and that cover shows only after 300 ms of nothing painted (CSS below).
 watch(() => props.page, (page) => {
   if (!page) return
-  if (!covered.value) return
+  // a change that does not cover the frame (the frame answers it as another place of the same page): the enter plays now. The cover comes within a few ms of a change that moves the frame; it takes this back.
+  if (!covered.value) { clearTimeout(enterTimer); enterTimer = setTimeout(() => { if (!covered.value) enter() }, 40); return }
   clearTimeout(settle)
   settle = setTimeout(() => { if (!waitLoad) uncover('settle') }, 320)
 })
-onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); window.removeEventListener('message', onMessage); observer?.disconnect(); clearTimeout(settle); clearTimeout(ceiling) })
+onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); window.removeEventListener('message', onMessage); observer?.disconnect(); clearTimeout(settle); clearTimeout(ceiling); clearTimeout(enterTimer) })
 </script>
 
 <template>
@@ -105,7 +113,7 @@ onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); w
     <div v-if="ownBackBar({ canBack: scene?.canBack.value, sub, inline: inlineBack })" class="panel-web__bar">
       <button type="button" class="m-page__back" @click="scene.back()"><MIcon name="arrow_back" /></button>
     </div>
-    <div class="panel-web__frame">
+    <div ref="frameBox" class="panel-web__frame">
       <slot />
       <div class="panel-web__cover" aria-hidden="true"><MPageLoading :delay="0" /></div>
     </div>
@@ -131,5 +139,7 @@ onBeforeUnmount(() => { host.value?.removeEventListener('load', onLoad, true); w
 .panel-web.is-veil .panel-web__cover { opacity: 1; }
 /* the cover of a page change comes in after 300 ms of nothing painted; going away has no delay. The sweep of the rows runs on the mounted cover all the time (opacity does not restart it), so it does not begin again when .is-covered toggles */
 
-@media (prefers-reduced-motion: reduce) { .panel-web__frame iframe, .panel-web__cover { transition: none; } }
+/* the system's setting only when the person chose 跟随系统 (data-motion), never by itself: a machine that turns animations off still gets the page change */
+@media (prefers-reduced-motion: reduce) { html:not([data-motion='full']) .panel-web__frame iframe, html:not([data-motion='full']) .panel-web__cover { transition: none; } }
+html[data-motion='reduced'] .panel-web__frame iframe, html[data-motion='reduced'] .panel-web__cover { transition: none; }
 </style>
