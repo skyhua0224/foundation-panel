@@ -10,6 +10,8 @@ use std::time::{Duration, Instant};
 
 /// A probe that takes longer than this is written to the log (the pages wait for it).
 const SLOW_PROBE: Duration = Duration::from_millis(250);
+/// ... and a probe that takes longer than this is a warning.
+const WARN_PROBE: Duration = Duration::from_millis(1500);
 
 struct Entry<T> {
     at: Instant,
@@ -70,8 +72,11 @@ impl<T: Clone> ProbeCache<T> {
         let started = Instant::now();
         let value = load().await?;
         let took = started.elapsed();
-        if took >= SLOW_PROBE {
+        // a probe runs off the critical path (a blocking thread, answers kept): 0.25 to 1.5 s is the normal cost of starting a process or a WMI query. Debug; a warning only when it is really slow.
+        if took >= WARN_PROBE {
             log::warn!("probe {} took {} ms", self.name, took.as_millis());
+        } else if took >= SLOW_PROBE {
+            log::debug!("probe {} took {} ms", self.name, took.as_millis());
         }
         *slot = Some(Entry {
             at: Instant::now(),

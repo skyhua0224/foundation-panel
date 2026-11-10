@@ -91,7 +91,30 @@ pub struct ConfigState {
 
 pub use crate::native_components::operation::Maintenance;
 
+/// The host answers 409 `hdr_save_busy` while a save or a maintenance step holds its transaction (a moment, as a stream's HDR analysis is stored, or while a setting is applied). The call is
+/// not dropped: it is asked again with a short backoff (a read for about 3 s, a write for about 10 s), the queue the host has no room for. Only when the host stays busy is the error
+/// `hdr_save_busy` returned, which the page shows as 「正在保存…」 and not as a failure.
 async fn request(
+    route: &str,
+    body: Option<Value>,
+    etag: Option<&HeaderValue>,
+    operation_id: Option<&str>,
+) -> Result<(Value, Option<HeaderValue>), String> {
+    let writes = body.is_some();
+    let delays: &[u64] = if writes { &[200, 400, 800, 1600, 2400, 2400, 2400] } else { &[150, 300, 600, 900, 1100] };
+    let mut attempt = 0;
+    loop {
+        match request_once(route, body.clone(), etag, operation_id).await {
+            Err(error) if error == "hdr_save_busy" && attempt < delays.len() => {
+                tokio::time::sleep(std::time::Duration::from_millis(delays[attempt])).await;
+                attempt += 1;
+            }
+            other => return other,
+        }
+    }
+}
+
+async fn request_once(
     route: &str,
     body: Option<Value>,
     etag: Option<&HeaderValue>,
@@ -155,11 +178,12 @@ async fn request(
             (412, _) => "HDR-CFG-006: settings changed in another window; refresh before saving",
             (428, _) => "HDR-CFG-007: conditional update is required",
             (409, Some("nr_settings_pending")) => "nr_settings_pending",
+            (409, Some("hdr_save_busy")) => "hdr_save_busy",
             (404, Some("nr_session_ended")) => "nr_session_ended",
             (409, _) => "HDR-OP-001: component is in use or awaiting maintenance completion",
             _ => "HDR-CFG-002: Sunshine rejected the component operation",
         };
-        if code != "nr_settings_pending" {
+        if code != "nr_settings_pending" && code != "hdr_save_busy" {
             log::warn!(
                 "HDR operation rejected: HTTP {} / {:?}",
                 status.as_u16(),

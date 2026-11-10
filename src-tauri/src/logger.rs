@@ -251,7 +251,46 @@ pub fn get_all_logs() -> Vec<LogEntry> {
 /// A call of the renderer that took long (a fetch, a native command, a frame that was blocked): the log of the panel has it with the others.
 #[tauri::command]
 pub fn frontend_slow(kind: String, name: String, ms: f64, detail: Option<String>) {
-    log::warn!("[renderer] {kind} {name} {ms:.0} ms {}", detail.unwrap_or_default());
+    let level = slow_call_level(&kind, &name, ms);
+    log::log!(level, "[renderer] {kind} {name} {ms:.0} ms {}", detail.unwrap_or_default());
+}
+
+/// How loud a slow call of the renderer is. A slow fetch of a third party (GitHub, the release metadata) is not a fault of ours or of the host: debug, and a warning only
+/// when it takes a really long time (10 s). A call of the host (the Web UI's API through the proxy) warns from 1.5 s, a native command from 1 s, a blocked frame from 200 ms.
+pub(crate) fn slow_call_level(kind: &str, name: &str, ms: f64) -> log::Level {
+    let third_party = name.starts_with("/repos/") || name.contains("release-metadata") || name.starts_with("http");
+    let limit = match kind {
+        "fetch" | "frame-fetch" if third_party => 10_000.0,
+        "fetch" | "frame-fetch" => 1_500.0,
+        "invoke" => 1_000.0,
+        "frame" => 200.0,
+        _ => 0.0,
+    };
+    if ms >= limit { log::Level::Warn } else { log::Level::Debug }
+}
+
+#[cfg(test)]
+mod slow_level_tests {
+    use super::slow_call_level;
+    use log::Level::{Debug, Warn};
+
+    #[test]
+    fn slow_third_party_fetches_are_not_warnings() {
+        assert_eq!(slow_call_level("fetch", "/repos/AlkaidLab/foundation-sunshine/issues", 1577.0), Debug);
+        assert_eq!(slow_call_level("fetch", "/release-metadata/foundation-sunshine-community.json", 1040.0), Debug);
+        assert_eq!(slow_call_level("frame-fetch", "/config /release-metadata/foundation-sunshine-announcements.json", 8015.0), Debug);
+        assert_eq!(slow_call_level("fetch", "/repos/x/y/pulls", 12_000.0), Warn);
+    }
+
+    #[test]
+    fn the_host_and_native_calls_warn_from_their_own_limits() {
+        assert_eq!(slow_call_level("fetch", "/api/network/reachability", 1655.0), Warn);
+        assert_eq!(slow_call_level("fetch", "/api/config", 600.0), Debug);
+        assert_eq!(slow_call_level("invoke", "get_vigem_status", 700.0), Debug);
+        assert_eq!(slow_call_level("invoke", "dualsense_get_status", 1649.0), Warn);
+        assert_eq!(slow_call_level("frame", "long-animation-frame", 942.0), Warn);
+        assert_eq!(slow_call_level("somethingelse", "x", 1.0), Warn);
+    }
 }
 
 /// Clear all collected logs.
