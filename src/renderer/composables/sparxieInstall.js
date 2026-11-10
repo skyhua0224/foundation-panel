@@ -1,12 +1,12 @@
 import { ElMessage, ElMessageBox } from './notifyMessage.js'
 import { open as openDialog } from '@tauri-apps/plugin-dialog'
+import { invoke } from '@tauri-apps/api/core'
 
 // Sparxie is installed from a ZIP the person already has. There is no download.
 // A known checksum is silent; any other package asks before it is installed.
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 const stageText = (texts, stage) => texts?.sparxie?.stages?.[stage] || stage || ''
-export const sparxieProgress = { active: false, stage: '', percent: 0 }
 
 export async function postJson(url, body, timeoutMs = 120000) {
   const response = await fetch(url, {
@@ -39,7 +39,8 @@ export async function runInstall(base, body, onStage) {
   return { ok: false, error_code: 'busy', error: 'The install did not finish' }
 }
 
-export function sparxieActions({ base, texts, refresh }) {
+// `progress(value | null)` puts the install's stage on the card and takes it off; it is the card's own state, never part of a read of the host's status.
+export function sparxieActions({ base, texts, refresh, progress = () => {} }) {
   const T = () => texts().sparxie
   const busy = { on: false }
   const guard = async (work) => { if (busy.on) return; busy.on = true; try { await work() } finally { busy.on = false } }
@@ -55,22 +56,39 @@ export function sparxieActions({ base, texts, refresh }) {
         }
         const picked = await openDialog({ multiple: false, directory: false, title: T().fromFile, filters: [{ name: 'ZIP', extensions: ['zip'] }] })
         if (!picked) return
-        const send = (confirmUnverified) => runInstall(root, { path: picked, confirm_unverified: !!confirmUnverified, acknowledged: true }, async (row) => {
-          if (!row || !row.stage) return
-          sparxieProgress.active = row.done !== true
-          sparxieProgress.stage = stageText(texts(), row.stage)
-          sparxieProgress.percent = Number(row.percent) || 0
-          ElMessage.info(sparxieProgress.stage)
-          await refresh()
+        const send = (confirmUnverified) => runInstall(root, { path: picked, confirm_unverified: !!confirmUnverified, acknowledged: true }, (row) => {
+          if (!row || !row.stage || row.done === true) return
+          progress({ stage: stageText(texts(), row.stage), percent: Number(row.percent) || 0 })
         })
-        let result = await send(false)
-        if (result && (result.error_code === 'unverified' || result.error_code === 'hash_mismatch')) {
-          try { await ElMessageBox.confirm(T().unverified + '\n' + (result.sha256 || ''), T().unverifiedTitle, { type: 'warning', confirmButtonText: T().unverifiedYes }) } catch { return }
-          result = await send(true)
+        // the line goes away however the install ends: done, refused, cancelled, or a request that failed
+        try {
+          progress({ stage: stageText(texts(), 'dependencies'), percent: 0 })
+          let result = await send(false)
+          if (result && (result.error_code === 'unverified' || result.error_code === 'hash_mismatch')) {
+            progress(null)
+            try { await ElMessageBox.confirm(T().unverified + '\n' + (result.sha256 || ''), T().unverifiedTitle, { type: 'warning', confirmButtonText: T().unverifiedYes }) } catch { return }
+            progress({ stage: stageText(texts(), 'dependencies'), percent: 0 })
+            result = await send(true)
+          }
+          if (!result || result.ok === false) ElMessage.error((T().failed + ' ' + ((result && (result.error || result.error_code)) || '')).trim())
+          else ElMessage.success(T().done)
+        } catch (error) {
+          ElMessage.error((T().failed + ' ' + String(error?.message || '')).trim())
+        } finally {
+          progress(null)
+          await refresh()
         }
-        if (!result || result.ok === false) ElMessage.error((T().failed + ' ' + ((result && (result.error || result.error_code)) || '')).trim())
-        else ElMessage.success(T().done)
-        sparxieProgress.active = false
+      }),
+    },
+    // Sparxie is a window of the person's session: the Control Panel starts it itself (a process of that session); the host service never does
+    open: {
+      label: (S) => S.sparxie.open,
+      run: () => guard(async () => {
+        const root = await base()
+        const status = await getJson(root + '/api/sparxie/status')
+        if (!status || status.installed === false || !status.exe) { ElMessage.error(T().openFailed); return }
+        if (status.running) { ElMessage.info(T().alreadyOpen); return }
+        try { await invoke('open_sparxie', { exe: status.exe }) } catch (error) { ElMessage.error((T().openFailed + ' ' + String(error?.message || error || '')).trim()) }
         await refresh()
       }),
     },

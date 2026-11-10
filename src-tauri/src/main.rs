@@ -299,6 +299,7 @@ fn main() {
             native_components::native_component_recover,
             utils::open_external_url,
             utils::open_local_path,
+            utils::open_sparxie,
             utils::restart_graphics_driver,
             utils::restart_as_admin,
             utils::is_running_as_admin,

@@ -319,6 +319,71 @@ pub async fn open_external_url(url: String) -> Result<bool, String> {
     Ok(true)
 }
 
+/// Start the Sparxie program in this session. Sparxie is a window: it belongs to the person who is signed in, so
+/// the Control Panel (a process of that session) starts it and the host service never does. Only the bundled main
+/// window may call this (local-only command), and only a file named like Sparxie's own programs is started.
+#[tauri::command]
+pub fn open_sparxie(exe: String) -> Result<bool, String> {
+    let raw = exe.trim().trim_matches('"');
+    #[cfg(target_os = "windows")]
+    if raw.starts_with(r"\\") || raw.starts_with(r"\\?\") || raw.starts_with(r"\\.\") {
+        return Err("Network and device paths are not allowed".to_string());
+    }
+    let path = std::path::PathBuf::from(raw)
+        .canonicalize()
+        .map_err(|error| format!("Unable to resolve Sparxie: {error}"))?;
+    if !path.is_file() {
+        return Err("Sparxie is not installed at that path".to_string());
+    }
+    let name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    if name != "sparxie.exe" && name != "sparxie.launcher.exe" {
+        return Err("That file is not the Sparxie program".to_string());
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        use ::windows::Win32::Foundation::HWND;
+        use ::windows::Win32::UI::Shell::ShellExecuteW;
+        use ::windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+        use ::windows::core::PCWSTR;
+
+        fn to_wide(value: &std::ffi::OsStr) -> Vec<u16> {
+            use std::os::windows::ffi::OsStrExt;
+            value.encode_wide().chain(std::iter::once(0)).collect()
+        }
+
+        // Like opening it from Explorer: a program that asks for administrator rights shows the person's own prompt.
+        let operation = to_wide(std::ffi::OsStr::new("open"));
+        let file = to_wide(path.as_os_str());
+        let directory = path.parent().map(|dir| to_wide(dir.as_os_str()));
+        let result = unsafe {
+            ShellExecuteW(
+                Some(HWND(std::ptr::null_mut())),
+                PCWSTR(operation.as_ptr()),
+                PCWSTR(file.as_ptr()),
+                PCWSTR::null(),
+                directory
+                    .as_ref()
+                    .map_or(PCWSTR::null(), |dir| PCWSTR(dir.as_ptr())),
+                SW_SHOWNORMAL,
+            )
+        };
+        let code = result.0 as isize;
+        if code <= 32 {
+            return Err(format!("Sparxie did not start: ShellExecuteW code {code}"));
+        }
+        Ok(true)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("Sparxie only runs on Windows".to_string())
+    }
+}
+
 /// Open a configured application's existing local working directory.
 #[tauri::command]
 pub fn open_local_path(path: String, app_name: String) -> Result<bool, String> {

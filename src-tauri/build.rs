@@ -20,6 +20,7 @@ const LOCAL_ONLY_COMMANDS: &[&str] = &[
     "native_component_remove",
     "open_local_path",
     "open_native_tool",
+    "open_sparxie",
     "check_for_updates",
     "check_for_updates_for_channel",
     "start_update_checker_when_ui_ready",
