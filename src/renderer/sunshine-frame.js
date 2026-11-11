@@ -14,9 +14,14 @@ import './styles/m3e-compat.less'  // restyles the pages that still use their ow
 // 导入 Tauri polyfill
 import './tauri-polyfill.js'
 import { getDefaultLocale, setLocale } from '../i18n/index.js'
+import { configureDevBackend } from 'foundation-ui/vue'
+import { applyDevBackend } from './devBackendConfig.js'
 
 // 初始化语言
 setLocale(getDefaultLocale())
+
+// the GitHub flows of developer mode (sign-in, Issue 与 PR, feedback under the person's name) have their backend from here on
+applyDevBackend(configureDevBackend)
 
 const app = createApp(SunshineFrame)
 app.mount('#app')
