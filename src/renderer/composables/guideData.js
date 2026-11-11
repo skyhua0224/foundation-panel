@@ -251,17 +251,33 @@ export function createGuideData(deps) {
       if (response.status === 404 || response.status === 501) return { ok: false, unsupported: true }
       if (response.status === 409) return { ok: false, busy: true }
       if (!response.ok || !Array.isArray(data.games)) return { ok: false, error: typeof data.error === 'string' ? data.error : '' }
-      return { ok: true, games: data.games.map((g, i) => ({ key: g.install_dir || g.id || `${g.name}|${i}`, name: g.name, platform: g.platform || '', cmd: g.launch || g.exe || '', 'working-dir': g.install_dir || '' })) }
+      return { ok: true, warnings: Array.isArray(data.warnings) ? data.warnings : [], games: data.games.map((g, i) => {
+        const launches = Array.isArray(g.launches) ? g.launches : []
+        const mode = g.platform === 'sparxie' && launches.some((choice) => choice.id === 'touch') ? 'touch' : (launches.find((choice) => choice.launch)?.id || '')
+        return { key: g.install_dir || g.id || `${g.name}|${i}`, name: g.name, platform: g.platform || '', cmd: g.launch || g.exe || '', 'working-dir': g.install_dir || '', exe: g.exe || '', profile: g.profile || '', region: g.region || '', launches, mode, 'image-path': g.cover_hint || '' }
+      }) }
     } catch { return { ok: false } }
   }
 
   /** Adds the chosen games (or the one typed by hand) to the apps list: a name, the program and its folder. */
   async function addGames(games) {
     try {
-      const list = (await getJson('/api/apps')).apps || []
-      const added = games.map((g) => ({ name: g.name, cmd: g.cmd || '', 'working-dir': g['working-dir'] || '', 'image-path': '' }))
-      const { response } = await postJson('/api/apps', { apps: [...list, ...added], editApp: null })
-      return response.ok ? { ok: true, added: added.length } : { ok: false }
+      const sparxie = games.filter((g) => g.profile && (g.mode === 'touch' || g.mode === 'pc' || g.platform === 'sparxie'))
+      const plain = games.filter((g) => !sparxie.includes(g))
+      for (const game of sparxie) {
+        const touch = game.mode !== 'pc'
+        const { response, data } = touch
+          ? await postJson('/api/sparxie/import', { ids: [game.profile] })
+          : await postJson('/api/sparxie/apps', { path: game.exe || game.cmd, name: game.name, mode: 'pc', region: game.region || '' })
+        if (!response.ok || data?.ok === false) return { ok: false, error: data?.error || '' }
+      }
+      if (plain.length) {
+        const list = (await getJson('/api/apps')).apps || []
+        const added = plain.map((g) => ({ name: g.name, cmd: g.cmd || '', 'working-dir': g['working-dir'] || '', 'image-path': g['image-path'] || '' }))
+        const { response } = await postJson('/api/apps', { apps: [...list, ...added], editApp: null })
+        if (!response.ok) return { ok: false }
+      }
+      return { ok: true, added: games.length }
     } catch (error) { return { ok: false, error: error?.message || '' } }
   }
 
