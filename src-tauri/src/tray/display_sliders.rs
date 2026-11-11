@@ -240,7 +240,7 @@ mod win {
         let mut dm = devmode();
         // SAFETY: as in `outputs`.
         if !unsafe { EnumDisplaySettingsExW(PCWSTR(wide.as_ptr()), ENUM_CURRENT_SETTINGS, &mut dm, ENUM_DISPLAY_SETTINGS_FLAGS(0)) }.as_bool() {
-            return Err("读不到显示器现在的模式".to_string());
+            return Err("无法读取显示器当前模式".to_string());
         }
         dm.dmPelsWidth = mode.width;
         dm.dmPelsHeight = mode.height;

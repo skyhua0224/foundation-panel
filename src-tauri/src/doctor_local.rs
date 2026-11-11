@@ -131,9 +131,9 @@ pub fn evaluate_service(f: &ServiceFacts, lang: Lang) -> Vec<Item> {
         f.state,
         if host { format!("sunshine.exe PID {}", f.host_pids[0]) } else { tr(lang, "no sunshine.exe", "没有 sunshine.exe") },
         match f.api_answers {
-            Some(true) => tr(lang, "API answers", "接口有应答"),
-            Some(false) => tr(lang, "API does not answer", "接口没有应答"),
-            None => tr(lang, "API not asked", "未询问接口"),
+            Some(true) => tr(lang, "Host responds", "主机有应答"),
+            Some(false) => tr(lang, "Host does not respond", "主机没有应答"),
+            None => tr(lang, "Host not queried", "未查询主机"),
         }
     );
     if scm_running && host && api {
@@ -167,7 +167,7 @@ pub fn evaluate_service(f: &ServiceFacts, lang: Lang) -> Vec<Item> {
             },
             act(tr(lang, "Set the start type to Automatic.", "把启动方式设为“开机自动”。"), "repair", "service:start_type", 3,
                 tr(lang, "Sets SunshineService to start automatically with Windows.", "把 SunshineService 设为随 Windows 自动启动。")))),
-        _ => items.push(item("service.start_type", "skip", tr(lang, "Start type", "启动方式"), tr(lang, "Not checked: the start type could not be read", "未检查:读不到启动方式"), Fix::default())),
+        _ => items.push(item("service.start_type", "skip", tr(lang, "Start type", "启动方式"), tr(lang, "Not checked: the start type could not be read", "未检查：无法读取启动方式"), Fix::default())),
     }
 
     if f.image_matches_install == Some(false) {
@@ -259,7 +259,7 @@ pub fn evaluate_install(f: &InstallFacts, lang: Lang) -> Vec<Item> {
         }
         None => items.push(item("install.version", if f.file_version.is_empty() { "skip" } else { "pass" }, tr(lang, "Version and build", "版本与构建"),
             if f.file_version.is_empty() {
-                tr(lang, "Not checked: the version could not be read", "未检查:读不到版本")
+                tr(lang, "Not checked: the version could not be read", "未检查：无法读取版本")
             } else {
                 tr(lang, format!("{} · build details are read from the version string (sunshine --version --json is not there yet)", f.file_version), format!("{} · 构建信息由版本号推断(sunshine --version --json 还没合入)", f.file_version))
             }, Fix::default())),
