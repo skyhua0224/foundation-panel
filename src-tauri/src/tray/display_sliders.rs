@@ -3,18 +3,21 @@
 //! The menu page draws what `state.sliders` says and sends back `tray_popup_set(token, key, value)` when a slider is released (popup_input.rs `set`). Where each value goes:
 //!   resolution, refresh  Win32 on the TARGET display: EnumDisplaySettingsExW lists its modes, ChangeDisplaySettingsExW (CDS_TEST first, then CDS_UPDATEREGISTRY) sets one. The Panel had no
 //!                        call for this, and the host has no endpoint for it (its display_device module changes modes only for a stream's start and end), so it is done here, in the Panel.
-//!   scale                `system::set_desktop_dpi` (tools/SetDpi.exe, 100-300 %): the call of the 桌面缩放 section. It takes no monitor, so it changes the PRIMARY display; the slider is offered
-//!                        only when the target is the primary display.
+//!   scale                `system::set_desktop_dpi` (tools/SetDpi.exe, 100-300 %): the call of the 桌面缩放 section. It takes no monitor, so it changes the PRIMARY display. The scale is a property of the
+//!                        desktop, not of the display the mode sliders point at: the slider is always offered (the value is the primary display's) and the menu says so when the target is another display.
 //!   bitrate cap          `max_bitrate` (Kbps, 0 = 自动) in the host's configuration: the same read-modify-write as `save_microphone_backend` (DEVICE_CONFIG_LOCK, vdd::read_full_sunshine_config,
 //!                        sunshine::post_sunshine_config), because the config API replaces the whole table. It applies to the next connection (the host's own table calls it a client setting).
 //!
-//! The target: the display that is being streamed; when nothing is streamed, the virtual display (基地虚拟显示器) if it exists; else none, and the display sliders are not drawn.
+//! The target of the mode sliders: the display that is being streamed; when nothing is streamed, the display a stream would go to: the virtual display (基地虚拟显示器) while it exists and Windows lists it,
+//! else the primary display of the desktop. None only when Windows lists no display at all.
 //! A stream's display is the virtual one when `output_name` is the virtual display's; else the physical display whose current mode is the stream's, else the primary one.
 
 use serde_json::{Value, json};
 
 /// The monitor name of the virtual display's EDID (foundation-sunshine globals.cpp `ZAKO_NAME`): how its Win32 monitor is told from a real one.
 pub(super) const VIRTUAL_MONITOR_NAME: &str = "Zako HDR";
+/// The PnP id of that monitor's EDID (`DISPLAY\ZAK2333`): GDI lists it in the monitor's DeviceID, which is how it is told from a real display whatever name the monitor has there.
+const VIRTUAL_MONITOR_PNP_ID: &str = "ZAK2333";
 /// The smallest resolution the slider offers (the lists of physical monitors carry modes nobody streams).
 const MIN_WIDTH: u32 = 800;
 const MIN_HEIGHT: u32 = 600;
@@ -45,6 +48,8 @@ pub(super) enum Kind {
     Stream,
     /// the virtual display, nothing streams
     Virtual,
+    /// the primary display of the desktop: nothing streams and there is no virtual display (or Windows does not list it)
+    Desktop,
 }
 
 /// What decides the target.
@@ -71,9 +76,24 @@ pub(super) fn choose(outputs: &[Output], facts: &Facts) -> Option<(usize, Kind)>
             same.sort_by_key(|(_, d)| *d);
             same.first().map(|(i, _)| *i).or_else(|| physical().find(|(_, o)| o.primary).map(|(i, _)| i)).or_else(|| physical().next().map(|(i, _)| i)).map(|i| (i, Kind::Stream))
         }
-        None if facts.virtual_active => virtual_at.map(|i| (i, Kind::Virtual)),
-        None => None,
+        None => {
+            if facts.virtual_active {
+                if let Some(i) = virtual_at {
+                    return Some((i, Kind::Virtual));
+                }
+            }
+            // no virtual display (or Windows does not list it as attached): the desktop's own primary display, else the first physical one
+            let physical = || outputs.iter().enumerate().filter(|(_, o)| !o.virtual_display);
+            physical().find(|(_, o)| o.primary).or_else(|| physical().next()).map(|(i, _)| (i, Kind::Desktop))
+        }
     }
+}
+
+/// Whether a display is the virtual one, from what EnumDisplayDevices says of it. The host tells it by the EDID's monitor name ("Zako HDR", DisplayConfig), which GDI does not give: the monitor of an EDID display is
+/// listed as "Generic PnP Monitor" (or by its INF), and only the monitor's PnP id (`MONITOR\ZAK2333\...`, the EDID's vendor and product) and the display adapter ("Zako Display Adapter", `ROOT\DISPLAY\0001`) carry the name.
+pub(super) fn is_virtual_display(adapter_name: &str, adapter_id: &str, monitor_name: &str, monitor_id: &str) -> bool {
+    let zako = |s: &str| s.to_ascii_lowercase().contains("zako");
+    monitor_name.eq_ignore_ascii_case(VIRTUAL_MONITOR_NAME) || zako(monitor_name) || zako(adapter_name) || zako(adapter_id) || monitor_id.to_ascii_uppercase().contains(VIRTUAL_MONITOR_PNP_ID)
 }
 
 /// "2560x1440" -> (2560, 1440)
@@ -117,20 +137,25 @@ fn mode_text(m: Mode) -> String {
     format!("{}×{}@{}", m.width, m.height, m.hz)
 }
 
-/// The `sliders` of the menu state. `dpi` is the scale in percent (None: unknown), `bitrate_kbps` the cap (None: the host is not connected, no slider).
+/// The `sliders` of the menu state. `dpi` is the desktop's scale in percent (None: unknown; it is not tied to the target), `bitrate_kbps` the cap (None: the host is not connected, no slider).
 pub(super) fn sliders_json(outputs: &[Output], target: Option<(usize, Kind)>, dpi: Option<u32>, bitrate_kbps: Option<u64>) -> Value {
     let bitrate = bitrate_kbps.map(|kbps| json!({ "kbps": kbps }));
+    let scale = dpi.map(|v| json!({ "value": v }));
     let Some((at, kind)) = target.filter(|(i, _)| *i < outputs.len()) else {
-        return json!({ "target": Value::Null, "resolution": Value::Null, "refresh": Value::Null, "dpi": Value::Null, "bitrate": bitrate });
+        return json!({ "target": Value::Null, "resolution": Value::Null, "refresh": Value::Null, "dpi": scale, "bitrate": bitrate });
     };
     let o = &outputs[at];
     // the virtual display has no name here: the menu says 基地虚拟显示器 in the person's language
     let name = if o.virtual_display { String::new() } else { o.name.clone() };
     let size = |(w, h): (u32, u32)| format!("{w}x{h}");
-    // the scale is the primary display's (SetDpi.exe takes no monitor here)
-    let scale = o.primary.then_some(dpi).flatten().map(|v| json!({ "value": v }));
+    // the scale is the desktop's, the primary display's (SetDpi.exe takes no monitor): `dpiNote` says it when the target is another display
+    let kind = match kind {
+        Kind::Stream => "stream",
+        Kind::Virtual => "vdd",
+        Kind::Desktop => "desktop",
+    };
     json!({
-        "target": { "kind": if kind == Kind::Stream { "stream" } else { "vdd" }, "name": name, "mode": mode_text(o.current), "dpiNote": !o.primary },
+        "target": { "kind": kind, "name": name, "mode": mode_text(o.current), "dpiNote": !o.primary },
         "resolution": { "options": resolution_options(o).into_iter().map(size).collect::<Vec<_>>(), "value": size((o.current.width, o.current.height)) },
         "refresh": { "options": refresh_options(o), "value": o.current.hz },
         "dpi": scale,
@@ -155,7 +180,7 @@ pub(super) fn change_words(code: i32) -> String {
 
 #[cfg(target_os = "windows")]
 mod win {
-    use super::{Mode, Output, VIRTUAL_MONITOR_NAME, change_words};
+    use super::{Mode, Output, change_words, is_virtual_display};
     use windows::Win32::Graphics::Gdi::{
         CDS_TEST, CDS_UPDATEREGISTRY, ChangeDisplaySettingsExW, DEVMODEW, DISP_CHANGE_SUCCESSFUL, DISPLAY_DEVICEW, DM_DISPLAYFREQUENCY, DM_PELSHEIGHT, DM_PELSWIDTH, ENUM_CURRENT_SETTINGS,
         ENUM_DISPLAY_SETTINGS_FLAGS, ENUM_DISPLAY_SETTINGS_MODE, EnumDisplayDevicesW, EnumDisplaySettingsExW,
@@ -198,6 +223,8 @@ mod win {
             // SAFETY: `adapter.DeviceName` is NUL terminated; `monitor` is valid.
             let has_monitor = unsafe { EnumDisplayDevicesW(PCWSTR(adapter.DeviceName.as_ptr()), 0, &mut monitor, 0) }.as_bool();
             let name = if has_monitor && !text(&monitor.DeviceString).is_empty() { text(&monitor.DeviceString) } else { text(&adapter.DeviceString) };
+            let monitor_name = if has_monitor { text(&monitor.DeviceString) } else { String::new() };
+            let monitor_id = if has_monitor { text(&monitor.DeviceID) } else { String::new() };
             let wide = nul_terminated(&device);
             let mut now = devmode();
             // SAFETY: `wide` is NUL terminated; `now` is a valid DEVMODEW with `dmSize` set.
@@ -224,7 +251,7 @@ mod win {
             modes.dedup();
             list.push(Output {
                 device,
-                virtual_display: name.eq_ignore_ascii_case(VIRTUAL_MONITOR_NAME) || name.to_ascii_lowercase().contains("zako"),
+                virtual_display: is_virtual_display(&text(&adapter.DeviceString), &text(&adapter.DeviceID), &monitor_name, &monitor_id),
                 name,
                 primary: adapter.StateFlags.0 & PRIMARY_DEVICE != 0,
                 current: mode_of(&now),
@@ -295,8 +322,17 @@ mod tests {
         let outputs = desk();
         // nothing streams, the virtual display exists
         assert_eq!(choose(&outputs, &Facts { virtual_active: true, ..Facts::default() }), Some((2, Kind::Virtual)));
-        // nothing streams, no virtual display: no target
-        assert_eq!(choose(&outputs, &Facts::default()), None);
+        // nothing streams, no virtual display: the primary display of the desktop (the scale and the modes of what a stream would use)
+        assert_eq!(choose(&outputs, &Facts::default()), Some((0, Kind::Desktop)));
+        // the core says the virtual display is on but Windows does not list it (not attached): the desktop's primary display, never "no display"
+        assert_eq!(choose(&outputs[..2], &Facts { virtual_active: true, ..Facts::default() }), Some((0, Kind::Desktop)));
+        // no primary flag anywhere: the first physical display
+        let mut no_primary = desk();
+        no_primary[0].primary = false;
+        assert_eq!(choose(&no_primary, &Facts::default()), Some((0, Kind::Desktop)));
+        // Windows lists nothing (or only the virtual display while it is not on): no target
+        assert_eq!(choose(&[], &Facts::default()), None);
+        assert_eq!(choose(&outputs[2..], &Facts::default()), None);
         // a stream of the virtual display
         assert_eq!(choose(&outputs, &Facts { virtual_active: true, output_is_virtual: true, stream: Some((2560, 1440, 120)) }), Some((2, Kind::Stream)));
         // a stream of a physical display: the one with the stream's mode, the nearest rate first
@@ -353,8 +389,10 @@ mod tests {
     fn the_slider_state_names_the_target_and_hides_what_has_no_target() {
         let outputs = desk();
         let none = sliders_json(&outputs, None, Some(150), Some(0));
-        assert!(none["target"].is_null() && none["resolution"].is_null() && none["refresh"].is_null() && none["dpi"].is_null());
+        assert!(none["target"].is_null() && none["resolution"].is_null() && none["refresh"].is_null());
+        assert_eq!(none["dpi"]["value"], 150, "the scale is the desktop's: it needs no target display");
         assert_eq!(none["bitrate"]["kbps"], 0, "the bitrate cap needs no display");
+        assert!(sliders_json(&outputs, None, None, Some(0))["dpi"].is_null(), "a scale that cannot be read is no slider");
         let offline = sliders_json(&outputs, None, None, None);
         assert!(offline["bitrate"].is_null(), "no connection, no bitrate slider");
 
@@ -363,7 +401,7 @@ mod tests {
         assert_eq!(vdd["target"]["name"], "", "the menu names the virtual display itself");
         assert_eq!(vdd["target"]["mode"], "2560×1440@120");
         assert_eq!(vdd["target"]["dpiNote"], true);
-        assert!(vdd["dpi"].is_null(), "SetDpi.exe changes the primary display only");
+        assert_eq!(vdd["dpi"]["value"], 150, "the scale is still offered: it is the desktop's (SetDpi.exe changes the primary display), and dpiNote says the target is another display");
         assert_eq!(vdd["resolution"]["value"], "2560x1440");
         assert_eq!(vdd["resolution"]["options"], json!(["1920x1080", "2560x1440", "3840x2160"]));
         assert_eq!(vdd["refresh"]["value"], 120);
@@ -374,6 +412,22 @@ mod tests {
         assert_eq!(primary["target"]["name"], "DISPLAY1");
         assert_eq!(primary["dpi"]["value"], 150);
         assert_eq!(primary["target"]["dpiNote"], false);
+
+        let desktop = sliders_json(&outputs, Some((0, Kind::Desktop)), Some(125), None);
+        assert_eq!(desktop["target"]["kind"], "desktop");
+        assert_eq!(desktop["dpi"]["value"], 125);
+        assert!(desktop["bitrate"].is_null());
+    }
+
+    #[test]
+    fn the_virtual_display_is_told_by_its_pnp_id_and_adapter_not_by_a_monitor_name_gdi_does_not_give() {
+        // what Windows lists for the Foundation virtual display: the monitor is a generic one, the adapter and the monitor's PnP id say Zako
+        assert!(is_virtual_display("Zako Display Adapter", "ROOT\\DISPLAY\\0001", "Generic PnP Monitor", "MONITOR\\ZAK2333\\{4d36e96e-e325-11ce-bfc1-08002be10318}\\0001"));
+        assert!(is_virtual_display("Microsoft Basic Display", "", "Zako HDR", ""), "the EDID's name where GDI does give it");
+        assert!(is_virtual_display("", "", "", "monitor\\zak2333\\0001"), "the PnP id alone");
+        // real displays and another virtual display driver are not it
+        assert!(!is_virtual_display("NVIDIA GeForce RTX 4080", "PCI\\VEN_10DE&DEV_2704", "Generic PnP Monitor", "MONITOR\\DEL41B5\\{4d36e96e}\\0004"));
+        assert!(!is_virtual_display("GameViewer Virtual Display Adapter", "ROOT\\DISPLAY\\0000", "Generic PnP Monitor", "MONITOR\\GVV0001\\0005"));
     }
 
     #[test]

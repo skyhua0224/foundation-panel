@@ -366,7 +366,8 @@ async fn displays_and_facts(vdd_active: bool, stream: Option<(u32, u32, u32)>, f
 async fn slider_state(connected: bool, vdd_active: bool, stream: Option<(u32, u32, u32)>) -> Value {
     let (outputs, facts, config) = displays_and_facts(vdd_active, stream, false).await;
     let target = display_sliders::choose(&outputs, &facts);
-    let dpi = if target.is_some() { crate::system::get_current_dpi().await.ok() } else { None };
+    // the scale is the desktop's, not the target's: it is read whatever the target is
+    let dpi = crate::system::get_current_dpi().await.ok();
     let bitrate = connected.then(|| config_text(&config, "max_bitrate").and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(0));
     display_sliders::sliders_json(&outputs, target, dpi, bitrate)
 }
@@ -397,7 +398,12 @@ async fn change_mode(want_size: Option<(u32, u32)>, want_hz: Option<u32>) -> Res
         if mode == output.current {
             return Ok(());
         }
-        info!("tray: {} {} -> {}x{}@{}", if kind == Kind::Stream { "stream display" } else { "virtual display" }, output.device, mode.width, mode.height, mode.hz);
+        let which = match kind {
+            Kind::Stream => "stream display",
+            Kind::Virtual => "virtual display",
+            Kind::Desktop => "primary display",
+        };
+        info!("tray: {} {} -> {}x{}@{}", which, output.device, mode.width, mode.height, mode.hz);
         display_sliders::set_mode(&output.device, mode)
     })
     .await
