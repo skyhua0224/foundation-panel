@@ -28,7 +28,7 @@ const props = defineProps({
   page: { type: String, default: ROUTES.DEV_ISSUES },
   locale: { type: String, default: 'zh' },
   version: { type: String, default: '' },
-  consent: { type: String, default: 'ask' },
+  consent: { type: String, default: 'on' },
   /** whether the answer about telemetry is known (the cache of this window, or the host's answer) */
   consentReady: { type: Boolean, default: true },
   errorContext: { type: Function, default: null },

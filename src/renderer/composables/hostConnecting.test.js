@@ -33,8 +33,10 @@ test('the shell reads the host through hostData only (the module the dedicated h
   assert.match(module, /probe: \(timeoutMs\) => sunshine\.probeHost\(timeoutMs\)/); assert.match(module, /peek\(topic\)/)
 })
 
-test("the usage-statistics question shows the example with this install's version and system", () => {
-  assert.match(read('../components/SidebarMenu.vue'), /<MTelemetryConsent v-model="consentOpen" :locale="locale" :version="currentVersion \|\| ''" :os="osName\(\)"/)
+test('nobody is asked about usage statistics: the shell has no question, no quiet-moment prompt, and 关于 › 隐私 holds both switches', () => {
+  const shell = read('../components/SidebarMenu.vue')
+  assert.doesNotMatch(shell, /MTelemetryConsent|askWhenQuiet|consentOpen/)
+  assert.match(shell, /:consent="telemetry\.consent\.value" @consent="telemetry\.answer" :errors="telemetry\.errors\.value" @errors="telemetry\.setErrors"/)
 })
 
 test('构建与组件: the panel asks the inventory of everything installed, and a failing command leaves the table to the panel row', async () => {
