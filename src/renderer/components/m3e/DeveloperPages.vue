@@ -1,11 +1,12 @@
 <template>
   <MPage :title="title" :wide="wide" :cols="false" :lead="lead">
+    <template #actions><DevSimChip :locale="locale" /></template>
     <DevIssues v-if="page === ROUTES.DEV_ISSUES" :locale="locale" :open-url="openUrl" @notify="(text) => $emit('notify', text)" />
     <DevLogs v-else-if="page === ROUTES.DEV_LOGS" :locale="locale" :text="tools.logText" @notify="(text) => $emit('notify', text)" />
     <DevApi v-else-if="page === ROUTES.DEV_API" :locale="locale" :api-base="apiBase" @notify="(text) => $emit('notify', text)" />
     <DevFlags v-else-if="page === ROUTES.DEV_FLAGS" :locale="locale" />
     <DevBuild v-else-if="page === ROUTES.DEV_BUILD" :locale="locale" :environment="tools.environment" @notify="(text) => $emit('notify', text)" />
-    <DevTests v-else-if="page === ROUTES.DEV_TESTS" :locale="locale" :tools="tools" :trigger-error="triggerError" :consent-on="consent === 'on'" @notify="(text) => $emit('notify', text)" />
+    <DevTests v-else-if="page === ROUTES.DEV_TESTS" :locale="locale" :tools="tools" :trigger-error="triggerError" :consent-on="consent === 'on'" :consent-ready="consentReady" @notify="(text) => $emit('notify', text)" />
     <MDeveloperPage v-else :locale="locale" :tools="tools" :api-base="apiBase" :omit="['render', 'api', 'env', 'host', 'telemetry']" @disabled="$emit('disabled')" @notify="(text) => $emit('notify', text)" />
   </MPage>
 </template>
@@ -13,7 +14,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { MPage, MDeveloperPage, DevIssues, DevLogs, DevApi, DevFlags, DevBuild, DevTests, devmodeTexts, reportError } from 'foundation-ui/vue'
+import { MPage, MDeveloperPage, DevIssues, DevLogs, DevApi, DevFlags, DevBuild, DevTests, DevSimChip, devmodeTexts, reportError } from 'foundation-ui/vue'
 import { developerTexts } from 'foundation-ui/developer'
 import { buildReport, reportToDocument, sendDocument, loadQueue } from 'foundation-ui/telemetry'
 import { sunshine, openExternalUrl } from '../../tauri-adapter.js'
@@ -28,8 +29,10 @@ const props = defineProps({
   locale: { type: String, default: 'zh' },
   version: { type: String, default: '' },
   consent: { type: String, default: 'ask' },
+  /** whether the answer about telemetry is known (the cache of this window, or the host's answer) */
+  consentReady: { type: Boolean, default: true },
   errorContext: { type: Function, default: null },
-  /** show the surfaces of a host that is away: '' (back to normal) | 'offline' | 'stopped' */
+  /** show the surfaces of a host that is away: '' (back to normal) | 'offline' | 'stopped' | 'unresponsive' */
   simulateHost: { type: Function, default: null },
 })
 defineEmits(['disabled', 'notify'])

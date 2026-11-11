@@ -12,7 +12,7 @@ test("the frame host has no full-area loading screen and never hides the page wh
   assert.ok(!/t\.sunshineFrame\.preparing/.test(frame))
   assert.ok(!/proxyHealthFailed|loading-overlay/.test(frame), "the frame draws no state of its own: a proxy that does not answer is one cause of the shell's status page")
   const shell = read("../components/SidebarMenu.vue")
-  assert.ok(/offlineCause = computed\(\(\) => \((?:hostSimulated\.value === 'offline' \? 'down' : )?proxyBlock\.blocked \? 'proxy'/.test(shell), "the proxy is one cause of the one status page")
+  assert.ok(/offlineCause = computed\(\(\) => \((?:hostSimulated\.value === 'offline' \? 'down' : )?(?:hostSimulated\.value === 'unresponsive' \? 'unresponsive' : )?proxyBlock\.blocked \? 'proxy'/.test(shell), "the proxy is one cause of the one status page")
 })
 
 test("the start of the panel shows no splash text", () => {
