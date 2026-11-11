@@ -114,7 +114,7 @@ fn validate_snapshot(snapshot: TuningSnapshot) -> Result<TuningSnapshot, String>
 /// Parses a response body that must be a tuning table.
 pub(crate) fn parse_snapshot(bytes: &[u8]) -> Result<TuningSnapshot, String> {
     let snapshot: TuningSnapshot = serde_json::from_slice(bytes)
-        .map_err(|_| coded("DS5-HOST-005", "the host answered with something unexpected"))?;
+        .map_err(|_| coded("DS5-HOST-005", "the host sent an unexpected response"))?;
     validate_snapshot(snapshot)
 }
 
@@ -124,7 +124,7 @@ fn status_error(status: reqwest::StatusCode) -> String {
         401 | 403 => coded("DS5-HOST-003", "the host did not authorize the request"),
         // An older host answers unknown routes with 404 (or 405 for a verb).
         404 | 405 | 501 => coded("DS5-HOST-002", "the host has no DualSense tuning"),
-        code => coded("DS5-HOST-005", &format!("the host answered with HTTP {code}")),
+        code => coded("DS5-HOST-005", &format!("the host responded with HTTP status {code}")),
     }
 }
 
@@ -193,7 +193,7 @@ pub(crate) fn parse_save_response(status: u16, bytes: &[u8]) -> Result<TuningSav
     let body: Value = serde_json::from_slice(bytes).map_err(|_| match status {
         401 | 403 => coded("DS5-HOST-003", "the host did not authorize the request"),
         404 | 405 | 501 => coded("DS5-HOST-002", "the host has no DualSense tuning"),
-        _ => coded("DS5-HOST-005", "the host answered with something unexpected"),
+        _ => coded("DS5-HOST-005", "the host sent an unexpected response"),
     })?;
     if matches!(status, 401 | 403 | 404 | 405 | 501) {
         return Err(status_error(

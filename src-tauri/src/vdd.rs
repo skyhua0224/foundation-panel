@@ -306,7 +306,7 @@ fn vdd_status_from_fields(fields: VddFields) -> VddStatus {
                     installed_version, bundled_version
                 )
             } else {
-                "驱动已安装，但现代控制接口不可用".to_string()
+                "驱动已安装，但新版控制通道不可用".to_string()
             },
         )
     } else {
