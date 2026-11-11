@@ -974,8 +974,10 @@ pub async fn get_tray_state() -> Result<TrayState, String> {
 
 async fn request_tray_state(tray_state_url: &str) -> Result<TrayState, String> {
     let client = create_https_client()?;
+    // The shared client waits up to ten seconds (a starved host). The tray menu must not: a core that accepts and then stalls has three seconds, on the headers and on the body.
     let response = client
         .get(tray_state_url)
+        .timeout(TRAY_STATE_TIMEOUT)
         .send()
         .await
         .map_err(|e| format!("Request tray state failed: {}", e))?;
