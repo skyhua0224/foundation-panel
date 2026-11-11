@@ -155,7 +155,7 @@ test('the style takes links and images out of the drag, keeps chrome from select
 })
 
 test('every window of the panel loads the guard, and the proxy puts it in front of the page script of the framed Web pages', () => {
-  const entries = ['../sunshine-frame.js', '../desktop/main.js', '../toolbar/main.js', '../tool-window/main.js', '../home/main.js', '../latency-clock/main.js']
+  const entries = ['../sunshine-frame.js', '../desktop/main.js', '../toolbar/main.js', '../tool-window/main.js', '../home/main.js', '../latency-clock/main.js', '../launch-splash/main.js']
   for (const entry of entries) assert.match(read(entry), /^import '[./]*\/src-tauri\/inject-traces\.js'/, `${entry} imports the guard first`)
   const proxy = read('../../../src-tauri/src/proxy_server.rs')
   assert.ok(proxy.indexOf('result.push_str(INJECT_TRACES)') > 0 && proxy.indexOf('result.push_str(INJECT_TRACES)') < proxy.indexOf('result.push_str(INJECT_SCRIPT)'))
