@@ -1,10 +1,10 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { firstImage, micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, useNotify, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
+import { firstImage, micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, coverKnown, heroArtReady, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, useNotify, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
 import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, useSessionClock, useSystemInfo, reachProblemOf, registeredComponentStatus, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf, recentKeys, rememberRecent, isLoopbackHost, createQueuedCalls, createSerialCalls } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
-import { usePanelHome } from '../composables/usePanelHome.js'
+import { usePanelHome, seen, SETTLE_CAP_MS } from '../composables/usePanelHome.js'
 import { useHostReach } from '../composables/useHostReach.js'
 import { useGamepadType } from '../composables/useGamepadType.js'
 import { SPONSORS } from '../config/sponsors.js'
@@ -20,7 +20,10 @@ const props = defineProps({
 const emit = defineEmits(['open', 'webui-navigate'])
 const { t, locale } = useI18n()
 const h = computed(() => t.value.m3e.home)
-const { state, proxyUrl, session, uptimeMs, perfSession, restart, stopAll, openTool } = usePanelHome()
+const { state, proxyUrl, session: rawSession, uptimeMs, perfSession, restart, stopAll, openTool } = usePanelHome()
+// The session the overview is drawn from. It follows the host at once, except for one moment: a stream that STARTS while the page is open is held back until what its tiles are drawn from (the DualSense keys, the cover and
+// the hero's colours from it) is known, so the page changes once, with the motion of a change, instead of in four steps. From the kept data of an earlier visit it is the host's from the first frame.
+const session = ref(state.settled ? rawSession.value : null)
 // the running time of the stream ticks every second from the session's start (a poll of three seconds only corrects it)
 const sessionClock = useSessionClock({ live: () => !!session.value, report: () => { const u = perfSession.value?.uptime_ms; return Number.isFinite(u) ? { uptimeMs: u, at: state.perfAt || Date.now() } : null } })
 const pad = useGamepadType()
@@ -122,6 +125,9 @@ const vddStore = createVddStore(vddAdapter, { autosave: true })
 onMounted(async () => { try { await vddAdapter.load() } catch { /* the card then shows the defaults */ } vddStore.refresh() })
 const sysJson = async (path) => { const r = await hostFetch(base, path); if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}`), { status: r.status }); return r.json() }
 const nics = useSystemInfo({ fetchJson: sysJson })
+// the system information is kept between visits too (the network and system tiles, the Wi-Fi and slow-link signals of the smart plan come from it): a visit starts from it and the read replaces it in place
+if (seen.nics) nics.info.value = seen.nics
+watch(nics.info, (v) => { if (v) seen.nics = v })
 const hostReach = useHostReach()
 const reachProblem = computed(() => reachProblemOf(hostReach.view.report))
 onMounted(() => { void hostReach.refresh(); nics.start() })
@@ -162,7 +168,28 @@ const smartSignals = computed(() => ({
   wifiHost: nics.defaultNic.value?.type === 'wifi', linkSlowMbps: nics.defaultNic.value?.link_speed_mbps && nics.defaultNic.value.link_speed_mbps < 1000 ? nics.defaultNic.value.link_speed_mbps : 0,
   reachBad: reachProblem.value, updateAvailable: props.updateAvailable,
 }))
-const dashCtx = computed(() => ({ live: !!session.value, isNew: isNew.value, ...journey.ctx.value, star: star.visible.value, starNames: (state.clients || []).map((c) => c.name), clientList: (state.clients || []).map((c) => ({ name: c.name, uuid: c.uuid, family: c.family, official: c.official, os: c.os, version: c.version, last_seen: c.last_seen })), sessionClient: session.value ? { uuid: session.value.client_cert_uuid || session.value.uuid || session.value.client_uuid || '', name: session.value.client_name || '', family: session.value.client_family || '', os: session.value.client_os || '', official: session.value.client_official } : null, signals: smartSignals.value }))
+// the overview is drawn (not its skeleton) once what it is drawn from is known: the session and the clients of the host, the DualSense keys of a running stream, the covers the tiles take a class from
+// (has-art) and the colours the host card takes from the game's cover. From the kept data of an earlier visit that is the first frame; a first visit waits for the reads (they go out together) and for at most
+// SETTLE_CAP_MS, so a host that answers slowly does not hold the page. The system information is not waited for: it only adds a tile when the link is bad, which then comes in with the motion of a change.
+// The covers are read from the catalogue's cards, which are built further down: the computeds below are only read once the page is drawn.
+const ds5Keys = ref(seen.ds5Keys || [])
+const ds5Known = ref(!!seen.ds5Keys)
+const capped = ref(false)
+let capTimer = 0
+onMounted(() => { capTimer = setTimeout(() => { capped.value = true }, SETTLE_CAP_MS) })
+onBeforeUnmount(() => clearTimeout(capTimer))
+const liveArt = computed(() => { const app = (state.apps || []).find((a) => a.name === rawSession.value?.app_name); return app ? coverOf(app) : '' })
+const startReady = computed(() => ds5Known.value && coverKnown(liveArt.value) && heroArtReady(liveArt.value))
+const pending = computed(() => !(capped.value || (state.settled && (!rawSession.value || startReady.value) && coverKnown(catalogue.value['last-session']?.cover || ''))))
+let startTimer = 0
+watch([rawSession, startReady], () => {
+  const raw = rawSession.value
+  clearTimeout(startTimer)
+  if (!raw || session.value || startReady.value) { session.value = raw; return }
+  startTimer = setTimeout(() => { session.value = rawSession.value }, SETTLE_CAP_MS)
+}, { immediate: true })
+onBeforeUnmount(() => clearTimeout(startTimer))
+const dashCtx = computed(() => ({ pending: pending.value, live: !!session.value, isNew: isNew.value, ...journey.ctx.value, star: star.visible.value, starNames: (state.clients || []).map((c) => c.name), clientList: (state.clients || []).map((c) => ({ name: c.name, uuid: c.uuid, family: c.family, official: c.official, os: c.os, version: c.version, last_seen: c.last_seen })), sessionClient: session.value ? { uuid: session.value.client_cert_uuid || session.value.uuid || session.value.client_uuid || '', name: session.value.client_name || '', family: session.value.client_family || '', os: session.value.client_os || '', official: session.value.client_official } : null, signals: smartSignals.value }))
 
 // the date of a post in the 资讯 tile, YYYY-MM-DD
 const dateOfPost = (at) => { if (!at) return ''; const d = new Date(at); const p = (n) => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}` }
@@ -230,9 +257,8 @@ async function pairPin(pin, name = '') {
 const saveSetting = createSerialCalls(async ({ key, value, failed }) => { const r = await saveSettingKey(hostApi, key, value); if (r.ok) { state.config = r.config; rememberRecent(key) } else { say(T.value.saveFailed); failed?.() } }, (a) => a.key)
 // what acts on a running stream (host audit 2026-11-05): the host takes the bitrate command from this computer only; the DualSense tuning applies to the controller in use
 const canRuntime = computed(() => { try { return !proxyUrl.value || isLoopbackHost(new URL(proxyUrl.value).hostname) } catch { return true } })
-const ds5Keys = ref([])
-async function loadDs5() { try { ds5Keys.value = (await hostApi.getJson('/api/dualsense/tuning'))?.keys || [] } catch { ds5Keys.value = [] } }
-watch(() => !!session.value, (live) => { if (live) loadDs5() }, { immediate: true })
+async function loadDs5() { try { ds5Keys.value = (await hostApi.getJson('/api/dualsense/tuning'))?.keys || [] } catch { ds5Keys.value = [] } seen.ds5Keys = ds5Keys.value; ds5Known.value = true }
+watch(() => !!rawSession.value, (live) => { if (live) loadDs5() }, { immediate: true })
 const runtimeBitrate = createQueuedCalls(async ({ client, kbps }) => {
   try { const r = await hostFetch(base, `/api/runtime/bitrate?bitrate=${kbps}&clientname=${encodeURIComponent(client)}`); const d = await r.json().catch(() => ({})); say(r.ok && d.success !== false ? T.value.lbSent.replace('{client}', client) : T.value.lbFailed) } catch { say(T.value.lbFailed) }
 }, (a) => a.client)
