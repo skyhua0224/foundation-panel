@@ -11,8 +11,15 @@ const safe = async (fn, fallback = null) => { try { return await fn() } catch { 
 
 // The last data of the overview (stale-while-revalidate): a visit after the first starts from it, so the tiles show their numbers at once and the
 // reads below replace them in place. The first visit waited for the slowest of its reads (the driver probe, 0.5 s) before anything showed.
+// The live state is part of it: the session (who streams, with which client), the perf reading its clock counts from, the curves and the CPU / GPU load. A visit while a stream runs draws
+// the streaming overview in its first frame; the tiles were once drawn idle and then flipped, because the session was the one thing this list did not keep.
 let remembered = null
-const REMEMBER = ['version', 'startMs', 'gpus', 'config', 'memory', 'vdd', 'vddSettings', 'logs', 'logText', 'clients', 'clientsTotal', 'apps', 'appsTotal', 'recent', 'errorLog']
+const REMEMBER = ['version', 'startMs', 'gpus', 'config', 'memory', 'vdd', 'vddSettings', 'logs', 'logText', 'clients', 'clientsTotal', 'apps', 'appsTotal', 'recent', 'errorLog', 'sessions', 'perf', 'perfAt']
+const SERIES_KEYS = ['bitrate', 'fps', 'latency', 'cpu', 'gpu', 'memory', 'loss', 'dropped']
+// the first reads of a visit that has nothing kept may take this long before the overview is drawn anyway (its skeleton is up until then)
+export const SETTLE_CAP_MS = 1500
+// what the overview's own readers keep between visits (the system information of the host, the DualSense keys of the stream): the same rule, read at the start of a visit
+export const seen = { nics: null, ds5Keys: null }
 
 /**
  * Live data of the overview tiles. Every value comes from a real source (host API through the local proxy, Tauri commands);
@@ -22,25 +29,34 @@ const REMEMBER = ['version', 'startMs', 'gpus', 'config', 'memory', 'vdd', 'vddS
 export function usePanelHome() {
   const state = reactive({
     version: '', startMs: 0, now: Date.now(), sessions: [], clientsTotal: null, appsTotal: null,
-    perf: null, config: null, memory: null, gpus: [], vdd: null, vddSettings: null, logs: null, loaded: false,
+    perf: null, perfAt: 0, config: null, memory: null, gpus: [], vdd: null, vddSettings: null, logs: null, loaded: false,
     // CPU and GPU load come from native Windows counters (system_load); temperatures only exist through HWiNFO, if it is running
     sys: { cpu: null, gpu: null },
     hw: { available: false, cpuTemp: null, gpuTemp: null },
     series: { bitrate: [], fps: [], latency: [], cpu: [], gpu: [], memory: [], loss: [], dropped: [] },
     logText: '',
     clients: null, apps: null, recent: null, errorLog: null,
+    // false until what the overview is drawn from is known: the session, the paired clients and the host's reads. From the kept data of an earlier visit it is true at once.
+    settled: false,
   })
   const proxy = ref('')
   if (remembered) {
     for (const key of REMEMBER) state[key] = remembered.state[key]
+    for (const key of SERIES_KEYS) state.series[key] = [...remembered.series[key]]
+    state.sys.cpu = remembered.sys.cpu
+    state.sys.gpu = remembered.sys.gpu
     state.hw.available = remembered.hwAvailable
     state.hw.cpuTemp = remembered.cpuTemp
     state.hw.gpuTemp = remembered.gpuTemp
     proxy.value = remembered.proxy
     state.loaded = true
+    state.settled = true
   }
   const remember = () => {
-    remembered = { state: Object.fromEntries(REMEMBER.map((key) => [key, state[key]])), hwAvailable: state.hw.available, cpuTemp: state.hw.cpuTemp, gpuTemp: state.hw.gpuTemp, proxy: proxy.value }
+    remembered = {
+      state: Object.fromEntries(REMEMBER.map((key) => [key, state[key]])), series: Object.fromEntries(SERIES_KEYS.map((key) => [key, [...state.series[key]]])), sys: { cpu: state.sys.cpu, gpu: state.sys.gpu },
+      hwAvailable: state.hw.available, cpuTemp: state.hw.cpuTemp, gpuTemp: state.hw.gpuTemp, proxy: proxy.value,
+    }
   }
   const fetchJson = async (path, init) => {
     const r = await fetch(`${proxy.value}${path}`, init)
@@ -59,14 +75,13 @@ export function usePanelHome() {
   async function fast() {
     state.now = Date.now()
     const body = await safe(() => fetchJson('/api/runtime/sessions'))
-    state.sessions = (body && Array.isArray(body.sessions) ? body.sessions : (await safe(() => sunshine.getActiveSessions(), []))) || []
-    if (hasStartingSession(state.sessions)) boostUntil = boostUntilFor(Date.now(), 'starting', boostUntil)
-    const s = state.sessions[0]
+    const sessions = (body && Array.isArray(body.sessions) ? body.sessions : (await safe(() => sunshine.getActiveSessions(), []))) || []
+    if (hasStartingSession(sessions)) boostUntil = boostUntilFor(Date.now(), 'starting', boostUntil)
+    const s = sessions[0]
     if (s) {
-      push(state.series.loss, s.packet_loss); push(state.series.dropped, s.dropped_frames)
+      // the session and its perf reading are taken together: a stream that starts is one change of the page, not the session first and its numbers a moment later
       const perf = await safe(() => fetchJson('/api/perf/current'))
-      state.perf = perf
-      state.perfAt = Date.now() // the instant the host's uptime_ms was read: the session clock counts from it (useSessionClock)
+      push(state.series.loss, s.packet_loss); push(state.series.dropped, s.dropped_frames)
       const psess = perf?.sessions?.find((x) => x.active) || perf?.sessions?.[0]
       // the measured bitrate comes in sessions[] or in perf/current (a newer host); `bitrate` stays the session's budget
       if (!Number.isFinite(s.measured_bitrate_kbps) && Number.isFinite(psess?.measured_bitrate_kbps)) s.measured_bitrate_kbps = psess.measured_bitrate_kbps
@@ -74,7 +89,10 @@ export function usePanelHome() {
       const ps = perf?.sessions?.find((x) => x.active) || perf?.sessions?.[0]
       push(state.series.latency, ps?.host_latency?.avg_ms)
       push(state.series.fps, ps?.frame_rates?.encoded?.fps ?? ps?.host_latency?.recent_fps ?? s.fps)
-    } else { state.perf = null; state.series.bitrate = []; state.series.fps = []; state.series.latency = []; state.series.loss = []; state.series.dropped = [] }
+      state.sessions = sessions
+      state.perf = perf
+      state.perfAt = Date.now() // the instant the host's uptime_ms was read: the session clock counts from it (useSessionClock)
+    } else { state.sessions = sessions; state.perf = null; state.series.bitrate = []; state.series.fps = []; state.series.latency = []; state.series.loss = []; state.series.dropped = [] }
     const load = await safe(() => invoke('system_load'))
     if (load) {
       state.sys.cpu = typeof load.cpu_percent === 'number' ? load.cpu_percent : null
@@ -82,6 +100,7 @@ export function usePanelHome() {
       push(state.series.cpu, state.sys.cpu); push(state.series.gpu, state.sys.gpu)
     }
     push(state.series.memory, memoryShare(state.memory))
+    remember()
   }
   async function slow() {
     const [clients, apps, config, memory, vdd, logs] = await Promise.all([
@@ -132,12 +151,16 @@ export function usePanelHome() {
     state.hw.available = hwAvailable === true
     remember()
   }
-  let timer = 0, t2 = 0, boostUntil = 0, nudge = () => {}
+  let timer = 0, t2 = 0, capTimer = 0, boostUntil = 0, nudge = () => {}
   const onSeen = () => { if (document.visibilityState !== 'hidden') nudge('returned') }
   onMounted(async () => {
     proxy.value = (await safe(() => sunshine.getProxyUrl(), '')) || proxy.value
-    await Promise.all([facts(), slow()])
-    await Promise.all([fast(), hardware()])
+    // The session and the paired clients decide what the overview draws (idle or streaming, the star of the client in use), so the first read of the session goes out with the others, not after the slowest
+    // of them (it used to wait for the log and the driver probe). What is drawn from them waits for all of them (state.settled) instead of being drawn idle and redrawn.
+    capTimer = setTimeout(() => { state.settled = true }, SETTLE_CAP_MS)
+    await Promise.all([facts().then(() => hardware()), slow(), fast()])
+    clearTimeout(capTimer)
+    state.settled = true
     // the poll follows pollPlan.js: three seconds, one second for a few seconds after the panel is looked at again and while a session is starting
     const loop = async () => { await fast(); timer = setTimeout(loop, pollDelay(Date.now(), boostUntil)) }
     nudge = (reason) => { boostUntil = boostUntilFor(Date.now(), reason, boostUntil); clearTimeout(timer); loop() }
@@ -145,7 +168,7 @@ export function usePanelHome() {
     document.addEventListener('visibilitychange', onSeen); window.addEventListener('focus', onSeen)
     t2 = setInterval(() => { slow(); hardware() }, 15000)
   })
-  onBeforeUnmount(() => { clearTimeout(timer); clearInterval(t2); document.removeEventListener('visibilitychange', onSeen); window.removeEventListener('focus', onSeen) })
+  onBeforeUnmount(() => { clearTimeout(timer); clearTimeout(capTimer); clearInterval(t2); document.removeEventListener('visibilitychange', onSeen); window.removeEventListener('focus', onSeen) })
 
   // the session with the real name of its client (realSession: the placeholder 「Named Zako」 becomes the paired device's name, else the client family), the same rule in every tile
   const session = computed(() => realSession(state.sessions[0] || null, state.clients))
