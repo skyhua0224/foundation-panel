@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { installTrayTheme } from './trayTheme.js'
 import { trayTransport } from './menuPopupTransport.js'
-import { SLIDER_KEYS, TILE_IDS, TRAY_ITEM_IDS, VARIANTS, modelIds, normalizeLayout, tileItemIds } from 'foundation-ui/tray/trayModel.js'
+import { SLIDER_KEYS, TILE_IDS, TRAY_DENSITIES, TRAY_ITEM_IDS, VARIANTS, modelIds, normalizeLayout, openingDensity, tileItemIds } from 'foundation-ui/tray/trayModel.js'
 import { TRAY_PREFS_DEFAULT } from 'foundation-ui/tray/trayPrefs.js'
 
 // The tray menus in the menu window (docs/tray-menu.md, src-tauri/src/tray/popup_input.rs): the ids, the commands and events both sides name, the settings page, the theme the menus open with.
@@ -102,7 +102,7 @@ test('the sliders: tray_popup_set is registered, its answer reaches the page (a 
   assert.ok(sliderRs.includes('ChangeDisplaySettingsExW') && sliderRs.includes('CDS_TEST') && sliderRs.includes('EnumDisplaySettingsExW'))
   // the page sends exactly the keys the model draws
   assert.deepEqual([...SLIDER_KEYS], ['resolution', 'refresh', 'dpi', 'bitrate'])
-  assert.equal(VARIANTS.v3.pages.quick.rows.find((r) => r.t === 'sliders').source, 'layout', 'which sliders: the person\'s layout, the scale by default')
+  assert.equal(VARIANTS.v3.pages.quick.rows.find((r) => r.t === 'sliders').source, 'layout', 'which sliders: the person\'s layout, the bitrate cap and the scale by default')
 })
 
 test('the quick panel\'s layout: the host keeps it apart from the click settings, accepts exactly the ids the menu knows, and sends it with the state', async () => {
@@ -124,5 +124,38 @@ test('the quick panel\'s layout: the host keeps it apart from the click settings
   assert.match(inputRs, /"layout": \{ "tiles": prefs\.tiles, "sliders": prefs\.sliders \}/); assert.match(inputRs, /"show_toolbar": app\.get_webview_window\("toolbar"\)\.is_some\(\)/)
   assert.match(inputRs, /tray_prefs::save_layout\(tiles, sliders\)\?;[\s\S]*update_tray_state/)
   // what a stored record means to the menu
-  assert.deepEqual(normalizeLayout({ tiles: null, sliders: null }).sliders, ['dpi'])
+  assert.deepEqual(normalizeLayout({ tiles: null, sliders: null }).sliders, ['bitrate', 'dpi'])
+  assert.deepEqual(normalizeLayout({ tiles: null, sliders: ['dpi'] }).sliders, ['dpi'], 'a list saved before the default changed is kept as it was saved')
+})
+
+test('the sliders are in all three menus from one list, and the native menu has stepped stand-ins for them from the same list and the same writer', () => {
+  for (const v of ['v1', 'v2', 'v3']) {
+    const rows = (v === 'v1' ? VARIANTS.v1.pages.root : v === 'v2' ? VARIANTS.v2.pages.root : VARIANTS.v3.pages.quick).rows
+    assert.equal(rows.filter((r) => r.t === 'sliders' && r.source === 'layout').length, 1, v)
+  }
+  const menuRs = read('src-tauri/src/tray/menu.rs'), prefsRs = read('src-tauri/src/tray_prefs.rs')
+  // one writer: the quick page and the native steps both end in write_slider (the config key max_bitrate, SetDpi.exe)
+  assert.match(inputRs, /async fn write_slider\(key: &str, value: &Value\)/); assert.match(inputRs, /let settle = write_slider\(key, value\)\.await\?;/); assert.match(inputRs, /match write_slider\(key, &json!\(value\)\)\.await/)
+  // the steps: the menu builds ids the handler parses; the labels are in three languages
+  assert.match(menuRs, /format!\("slider_bitrate_\{mbps\}"\)/); assert.match(menuRs, /format!\("slider_dpi_\{pct\}"\)/)
+  assert.match(menuRs, /popup_input::native_slider_keys\(\)/); assert.match(actionsRs, /_ if popup_input::native_slider_event\(app, menu_id\) => \{\}/)
+  for (const key of ['bitrate_menu', 'bitrate_auto', 'dpi_menu']) assert.equal((read('src-tauri/src/tray.rs').match(new RegExp(`^    ${key}: "`, 'gm')) || []).length, 3, key)
+  // the host record keeps its shape (tiles, sliders: null = the default), so a record saved by an older build still reads
+  assert.match(prefsRs, /pub sliders: Option<Vec<String>>/); assert.match(inputRs, /unwrap_or_else\(\|\| vec!\["bitrate"\.to_string\(\), "dpi"\.to_string\(\)\]\)/)
+})
+
+test('touch density: the host tells the menu what opened it and the person\'s choice, one rule on both sides, an old record still reads', () => {
+  const src = read('src-tauri/src/tray/input_source.rs'), prefs = read('src-tauri/src/tray_prefs.rs')
+  // the densities of the record are the densities of the menu
+  const list = [...prefs.slice(prefs.indexOf('pub const DENSITIES')).split('];')[0].matchAll(/"([a-z]+)"/g)].map((m) => m[1])
+  assert.deepEqual(list, [...TRAY_DENSITIES])
+  assert.match(prefs, /density: "auto"\.into\(\)/); assert.match(prefs, /#\[serde\(rename_all = "camelCase", default\)\]/)
+  // what the state carries, and where the icon's click is read (first thing in the callback, while the message is being dispatched)
+  assert.match(inputRs, /"touch": input_source::facts\(\)\.to_json\(\)/); assert.match(inputRs, /"density": prefs\.density/)
+  assert.match(inputRs, /input_source::note_icon_event\(\);\n    let Some\(app\) = ctx_popup::app\(\)/)
+  // the Win32 calls named by the documentation, and the documented constants
+  for (const k of ['GetCurrentInputMessageSource', 'GetMessageExtraInfo', '0x2003', 'GetSystemMetrics(95)', '0x04 => Source::Touch', '0x08 => Source::Pen', '0x02 => Source::Mouse']) assert.ok(src.includes(k), k)
+  // the same rule in JS: a finger or a pen, else slate posture when the press is unknown, a digitizer alone never
+  for (const [source, slate, capable, want] of [['touch', false, false, 'touch'], ['pen', false, true, 'touch'], ['mouse', true, true, 'standard'], ['unknown', true, true, 'touch'], ['unknown', false, true, 'standard']]) assert.equal(openingDensity('auto', { source, slate, capable }), want, `${source} ${slate} ${capable}`)
+  assert.ok(src.includes('Source::Unknown if facts.slate => "touch"') && src.includes('Source::Touch | Source::Pen => "touch"'))
 })

@@ -45,6 +45,7 @@ pub(super) fn apply_menu_mode<R: Runtime>(app: &AppHandle<R>) {
                 if let Err(e) = tray.set_menu(Some(menu)) {
                     error!("tray: the native menu could not be attached: {}", e);
                 }
+                refresh_native_sliders_if_native(app);
             }
             Err(e) => error!("tray: the native menu could not be built: {}", e),
         }
@@ -71,6 +72,8 @@ fn gate<T>(f: impl FnOnce(&mut ClickGate) -> T) -> T {
 
 /// An event of the tray icon (called by the icon's callback on the main thread).
 pub(super) fn on_icon_event(event: TrayIconEvent) {
+    // first of all, while the click message is still the one being dispatched: what was it, a finger, a pen or a mouse (input_source.rs)
+    input_source::note_icon_event();
     let Some(app) = ctx_popup::app() else { return };
     let prefs = tray_prefs::current();
     match event {
@@ -321,6 +324,9 @@ pub(super) async fn build_state(app: &AppHandle) -> Value {
         "ds5": ds5,
         "notification": notification,
         "sliders": sliders,
+        // what the press that opened the menu was, and the person's density choice: the page opens in touch density for a finger (input_source.rs; foundation-ui MTrayMenu)
+        "touch": input_source::facts().to_json(),
+        "density": prefs.density,
         // the tiles and sliders the person chose for the quick panel (null = the default of the menu)
         "layout": { "tiles": prefs.tiles, "sliders": prefs.sliders },
         "labels": labels(s),
@@ -413,11 +419,9 @@ pub(super) fn act(app: &AppHandle, token: u64, id: &str) {
     handle_tray_menu_event(app, id);
 }
 
-/// A slider of the quick page was released (`tray_popup_set`): the menu stays open; the answer comes when the value is set, and the state the host ended up in is pushed first.
-pub(super) async fn set(app: &AppHandle, key: &str, value: &Value) -> Result<(), String> {
-    if !ctx_popup::tray_menu_open() {
-        return Err("菜单已经关闭".to_string());
-    }
+/// Writes one slider's value to the machine (the display's mode, the scale, the bitrate cap) and returns how long the system needs to show it. The quick page and the native menu's stepped items both
+/// come here, so the two cannot disagree about what a value means.
+async fn write_slider(key: &str, value: &Value) -> Result<Duration, String> {
     let settle = match key {
         "resolution" => {
             let size = value.as_str().and_then(display_sliders::parse_resolution).ok_or("分辨率无效")?;
@@ -441,15 +445,109 @@ pub(super) async fn set(app: &AppHandle, key: &str, value: &Value) -> Result<(),
             let _guard = crate::device_config::DEVICE_CONFIG_LOCK.lock().await;
             let mut config = crate::vdd::read_full_sunshine_config().await?;
             config.insert("max_bitrate".to_string(), json!(kbps.to_string()));
-            sunshine::post_sunshine_config(&config).await?;
+            // The host applies the ceiling to the running process and to every running session before it answers; its answer says what is in force. A host that says something else is told to the person.
+            let answer = sunshine::post_sunshine_config_reporting(&config).await?;
+            check_ceiling_in_force(&answer, kbps)?;
             Duration::from_millis(100)
         }
         other => return Err(format!("未知的滑块 {other}")),
     };
+    Ok(settle)
+}
+
+/// The host's answer to a saved bitrate ceiling: when it says which one is in force (a host that applies it at once does), it must be the one that was asked for. A host that does not say is not doubted.
+fn check_ceiling_in_force(answer: &Value, asked_kbps: u64) -> Result<(), String> {
+    match answer.get("max_bitrate_in_force").and_then(Value::as_u64) {
+        Some(in_force) if in_force != asked_kbps => Err(format!("主机实际生效的码率上限是 {} Kbps", in_force)),
+        _ => Ok(()),
+    }
+}
+
+/// A slider of the quick page was released (`tray_popup_set`): the menu stays open; the answer comes when the value is set, and the state the host ended up in is pushed first.
+pub(super) async fn set(app: &AppHandle, key: &str, value: &Value) -> Result<(), String> {
+    if !ctx_popup::tray_menu_open() {
+        return Err("菜单已经关闭".to_string());
+    }
+    let settle = write_slider(key, value).await?;
     tokio::time::sleep(settle).await;
     *OUTPUT_CACHE.lock().unwrap_or_else(|p| p.into_inner()) = None; // what the display has now, not what it had
     ctx_popup::update_tray_state(app, build_state(app).await);
     Ok(())
+}
+
+// ---- the native menu's stepped sliders --------------------------------------------------------------------------------------------------------------------------------------------------------
+//
+// The native menu cannot draw a slider, so 码率上限 and 缩放 are two submenus of steps (the same two values the menus' sliders set, through `write_slider`). Which of them the menu has follows the same
+// list as the sliders of the three menus (`layout.sliders`, default bitrate + dpi); the ticks show what was read a moment ago (the menu is built synchronously).
+
+/// The steps of the native 码率上限 submenu, in Mbps (0 = 自动), and of the 缩放 submenu, in percent (SetDpi.exe takes 100-300 in steps of 25).
+pub(super) const NATIVE_BITRATE_MBPS: [u64; 5] = [0, 10, 20, 50, 100];
+pub(super) const NATIVE_DPI_STEPS: [u32; 9] = [100, 125, 150, 175, 200, 225, 250, 275, 300];
+const NATIVE_SLIDER_PREFIX: &str = "slider_";
+
+/// (bitrate cap in kbps, scale in percent) as the native menu last read them.
+static NATIVE_SLIDERS: Mutex<(Option<u64>, Option<u32>)> = Mutex::new((None, None));
+
+pub(super) fn native_slider_values() -> (Option<u64>, Option<u32>) {
+    *NATIVE_SLIDERS.lock().unwrap_or_else(|p| p.into_inner())
+}
+
+/// The sliders the native menu has: the person's list (`layout.sliders`) else the default, only those that have a step list.
+pub(super) fn native_slider_keys() -> Vec<String> {
+    let list = tray_prefs::current().sliders.unwrap_or_else(|| vec!["bitrate".to_string(), "dpi".to_string()]);
+    list.into_iter().filter(|k| k == "bitrate" || k == "dpi").collect()
+}
+
+/// `slider_bitrate_20` -> ("bitrate", 20000 kbps); `slider_dpi_150` -> ("dpi", 150); anything else None.
+pub(super) fn parse_native_slider(id: &str) -> Option<(&'static str, u64)> {
+    let rest = id.strip_prefix(NATIVE_SLIDER_PREFIX)?;
+    if let Some(n) = rest.strip_prefix("bitrate_").and_then(|n| n.parse::<u64>().ok()).filter(|n| NATIVE_BITRATE_MBPS.contains(n)) {
+        return Some(("bitrate", n * 1000));
+    }
+    rest.strip_prefix("dpi_").and_then(|n| n.parse::<u64>().ok()).filter(|n| NATIVE_DPI_STEPS.iter().any(|d| u64::from(*d) == *n)).map(|n| ("dpi", n))
+}
+
+/// Reads the cap and the scale for the ticks of the native menu, then rebuilds the menu.
+pub(super) async fn refresh_native_sliders<R: Runtime + 'static>(app: AppHandle<R>) {
+    let (_, connection, _) = TRAY_RUNTIME_STATE.lock().unwrap_or_else(|p| p.into_inner()).menu_snapshot();
+    let connected = connection == CoreConnectionState::Connected;
+    let keys = native_slider_keys();
+    let bitrate = if connected && keys.iter().any(|k| k == "bitrate") {
+        let config = crate::vdd::read_full_sunshine_config().await.unwrap_or_default();
+        Some(config_text(&config, "max_bitrate").and_then(|v| v.trim().parse::<u64>().ok()).unwrap_or(0))
+    } else {
+        None
+    };
+    let dpi = if cfg!(target_os = "windows") && keys.iter().any(|k| k == "dpi") { crate::system::get_current_dpi().await.ok() } else { None };
+    *NATIVE_SLIDERS.lock().unwrap_or_else(|p| p.into_inner()) = (bitrate, dpi);
+    let handle = app.clone();
+    let _ = app.run_on_main_thread(move || rebuild_tray_menu(&handle));
+}
+
+/// The native menu has stepped sliders: read them in the background when the menu is the native one (it is rebuilt when they are read).
+pub(super) fn refresh_native_sliders_if_native<R: Runtime + 'static>(app: &AppHandle<R>) {
+    if !use_native_menu() || native_slider_keys().is_empty() {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(refresh_native_sliders(app));
+}
+
+/// A stepped item of the native menu was chosen: set the value, wait for the system to show it, read the ticks again. Returns whether `id` was one of them.
+pub(super) fn native_slider_event<R: Runtime + 'static>(app: &AppHandle<R>, id: &str) -> bool {
+    let Some((key, value)) = parse_native_slider(id) else { return false };
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        match write_slider(key, &json!(value)).await {
+            Ok(settle) => {
+                info!("tray: native menu set {} = {}", key, value);
+                tokio::time::sleep(settle).await;
+            }
+            Err(e) => warn!("tray: native menu could not set {}: {}", key, e),
+        }
+        refresh_native_sliders(app).await;
+    });
+    true
 }
 
 /// The quick panel was edited in the menu (`tray_popup_layout`): the layout is stored and the menu gets the state with it.
@@ -479,6 +577,39 @@ mod tests {
         sorted.sort();
         sorted.dedup();
         assert_eq!(sorted.len(), 43, "no id twice");
+    }
+
+    #[test]
+    fn the_bitrate_ceiling_must_be_the_one_the_host_says_is_in_force() {
+        assert!(check_ceiling_in_force(&json!({ "status": "true", "max_bitrate_in_force": 50000, "sessions_updated": 1 }), 50000).is_ok());
+        assert!(check_ceiling_in_force(&json!({ "status": "true", "max_bitrate_in_force": 0 }), 0).is_ok());
+        assert_eq!(check_ceiling_in_force(&json!({ "status": "true", "max_bitrate_in_force": 20000 }), 50000).unwrap_err(), "主机实际生效的码率上限是 20000 Kbps");
+        assert!(check_ceiling_in_force(&json!({ "status": "true" }), 50000).is_ok(), "an older host that says nothing is not doubted");
+        // the one writer is told apart from the answer by the source text: the host's own words reach the person through post_sunshine_config_reporting
+        assert!(include_str!("popup_input.rs").contains("post_sunshine_config_reporting(&config).await?"));
+    }
+
+    #[test]
+    fn the_native_menu_has_stepped_stand_ins_for_the_sliders() {
+        assert_eq!(parse_native_slider("slider_bitrate_0"), Some(("bitrate", 0)));
+        assert_eq!(parse_native_slider("slider_bitrate_20"), Some(("bitrate", 20_000)));
+        assert_eq!(parse_native_slider("slider_dpi_150"), Some(("dpi", 150)));
+        for bad in ["slider_bitrate_7", "slider_dpi_130", "slider_dpi_350", "slider_refresh_60", "slider_bitrate_", "bitrate_10", "open_main_panel"] {
+            assert_eq!(parse_native_slider(bad), None, "{bad}");
+        }
+        // every step of both submenus parses back to what it was built from, so a tick and its event cannot drift apart
+        for m in NATIVE_BITRATE_MBPS {
+            assert_eq!(parse_native_slider(&format!("slider_bitrate_{m}")), Some(("bitrate", m * 1000)));
+        }
+        for d in NATIVE_DPI_STEPS {
+            assert_eq!(parse_native_slider(&format!("slider_dpi_{d}")), Some(("dpi", u64::from(d))));
+            assert!(d % 25 == 0 && (100..=300).contains(&d), "SetDpi.exe takes 100-300 in steps of 25");
+        }
+        // the one handler passes them on, and the builder makes them from the same lists
+        assert!(ACTIONS.contains("popup_input::native_slider_event(app, menu_id)"));
+        assert!(MENU.contains("NATIVE_BITRATE_MBPS") && MENU.contains("NATIVE_DPI_STEPS") && MENU.contains("slider_bitrate_") && MENU.contains("slider_dpi_"));
+        // the slider written by the menus and by the native steps is one function
+        assert!(include_str!("popup_input.rs").contains("write_slider(key, value).await?"));
     }
 
     #[test]

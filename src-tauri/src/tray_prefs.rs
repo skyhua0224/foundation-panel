@@ -79,13 +79,20 @@ pub struct TrayPrefs {
     pub force_native: bool,
     /// The tiles of the quick panel (V3), in order, once the person has edited it; None = the default of foundation-ui (`DEFAULT_TILES`).
     pub tiles: Option<Vec<String>>,
-    /// The sliders of the quick panel, in order; None = the default (the scale).
+    /// The sliders of the three menus (V1, V2 and the quick panel read this one list, and so do the native menu's stepped submenus), in order; None = the default (the bitrate cap, then the scale).
+    /// A list saved before the default changed stays as it was saved.
     pub sliders: Option<Vec<String>>,
+    /// The density of the three menus: "auto" (a finger or a pen that opens the menu, or slate posture, makes it touch; the page corrects the guess with its first pointer), "standard" or "touch".
+    /// A record saved before this existed has none and reads as "auto".
+    pub density: String,
 }
+
+/// The densities a record may hold (foundation-ui `TRAY_DENSITIES`).
+pub const DENSITIES: [&str; 3] = ["auto", "standard", "touch"];
 
 impl Default for TrayPrefs {
     fn default() -> Self {
-        Self { right: "v1".into(), click: "panel".into(), double: "none".into(), force_native: false, tiles: None, sliders: None }
+        Self { right: "v1".into(), click: "panel".into(), double: "none".into(), force_native: false, tiles: None, sliders: None, density: "auto".into() }
     }
 }
 
@@ -120,6 +127,7 @@ impl TrayPrefs {
             force_native: self.force_native,
             tiles: known_ids(self.tiles, &TILE_IDS),
             sliders: known_ids(self.sliders, &SLIDER_KEYS),
+            density: if DENSITIES.contains(&self.density.as_str()) { self.density } else { d.density },
         }
     }
 
@@ -271,6 +279,15 @@ mod tests {
 
     fn prefs(click: &str, double: &str) -> TrayPrefs {
         TrayPrefs { right: "v1".into(), click: click.into(), double: double.into(), ..TrayPrefs::default() }
+    }
+
+    #[test]
+    fn the_density_defaults_to_auto_and_an_old_record_without_it_still_reads() {
+        assert_eq!(TrayPrefs::default().density, "auto");
+        let old = parse(r#"{"right":"v3","click":"panel","double":"none","forceNative":false,"tiles":null,"sliders":null}"#);
+        assert_eq!(old.density, "auto");
+        assert_eq!(parse(r#"{"density":"touch"}"#).density, "touch");
+        assert_eq!(TrayPrefs { density: "huge".into(), ..TrayPrefs::default() }.normalized().density, "auto");
     }
 
     #[test]

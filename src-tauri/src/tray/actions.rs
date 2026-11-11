@@ -109,6 +109,8 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
         "sponsor_yundi339" => utils::open_url_in_browser("https://www.ifdian.net/a/Yundi339"),
         "sponsor_skyhua" => utils::open_url_in_browser("https://ifdian.net/a/skyhua"),
         "restart" => restart_sunshine(app),
+        // the native menu's stepped stand-ins for the menus' bitrate and scale sliders (menu.rs)
+        _ if popup_input::native_slider_event(app, menu_id) => {}
         _ => warn!("⚠️ 未知的托盘菜单事件: {}", menu_id),
     }
 }

@@ -190,6 +190,39 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
         core_connected,
         None::<&str>,
     )?;
+    // the stepped stand-ins for the sliders of the three menus (the native menu cannot draw a slider): 码率上限 and 缩放, the ones the person's list (`layout.sliders`) has; the tick is what was read a moment ago
+    let slider_keys = popup_input::native_slider_keys();
+    let (bitrate_now, dpi_now) = popup_input::native_slider_values();
+    let bitrate_submenu = if slider_keys.iter().any(|k| k == "bitrate") {
+        let mut steps = Vec::new();
+        for mbps in popup_input::NATIVE_BITRATE_MBPS {
+            let label = if mbps == 0 { s.bitrate_auto.to_string() } else { format!("{mbps} Mbps") };
+            steps.push(CheckMenuItem::with_id(app, format!("slider_bitrate_{mbps}"), label, core_connected, bitrate_now == Some(mbps * 1000), None::<&str>)?);
+        }
+        let refs: Vec<&dyn tauri::menu::IsMenuItem<R>> = steps.iter().map(|i| i as &dyn tauri::menu::IsMenuItem<R>).collect();
+        let now = match bitrate_now {
+            Some(0) => format!(": {}", s.bitrate_auto),
+            Some(kbps) => format!(": {} Mbps", kbps as f64 / 1000.0),
+            None => String::new(),
+        };
+        Some(Submenu::with_id_and_items(app, "bitrate", format!("{}{}", s.bitrate_menu, now), core_connected, &refs)?)
+    } else {
+        None
+    };
+    #[cfg(target_os = "windows")]
+    let dpi_submenu = if slider_keys.iter().any(|k| k == "dpi") {
+        let mut steps = Vec::new();
+        for pct in popup_input::NATIVE_DPI_STEPS {
+            steps.push(CheckMenuItem::with_id(app, format!("slider_dpi_{pct}"), format!("{pct}%"), true, dpi_now == Some(pct), None::<&str>)?);
+        }
+        let refs: Vec<&dyn tauri::menu::IsMenuItem<R>> = steps.iter().map(|i| i as &dyn tauri::menu::IsMenuItem<R>).collect();
+        let now = dpi_now.map(|p| format!(": {p}%")).unwrap_or_default();
+        Some(Submenu::with_id_and_items(app, "dpi", format!("{}{}", s.dpi_menu, now), true, &refs)?)
+    } else {
+        None
+    };
+    #[cfg(not(target_os = "windows"))]
+    let _ = dpi_now;
     let interfaces_submenu = Submenu::with_id_and_items(
         app,
         "interfaces",
@@ -470,6 +503,14 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
     items.push(&open_desktop);
     #[cfg(target_os = "windows")]
     items.push(&auto_start);
+    // right under the first group, where the sliders are in the three menus
+    if let Some(submenu) = &bitrate_submenu {
+        items.push(submenu);
+    }
+    #[cfg(target_os = "windows")]
+    if let Some(submenu) = &dpi_submenu {
+        items.push(submenu);
+    }
     items.push(&interfaces_submenu);
     items.push(&display_submenu);
     items.push(&tools_submenu);

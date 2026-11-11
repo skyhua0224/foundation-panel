@@ -21,6 +21,7 @@ mod actions;
 mod display_sliders;
 mod events;
 mod icons;
+mod input_source;
 mod main_panel;
 mod menu;
 mod notifications;
@@ -319,6 +320,10 @@ struct TrayStrings {
     visit_bilibili: &'static str,
     star_github: &'static str,
     sponsor_menu: &'static str,
+    // the native menu's stepped stand-ins for the menus' 码率 and 缩放 sliders (tray/menu.rs)
+    bitrate_menu: &'static str,
+    bitrate_auto: &'static str,
+    dpi_menu: &'static str,
     restart: &'static str,
     recover_service: &'static str,
     recovery_timeout: &'static str,
@@ -404,6 +409,9 @@ const ZH_STRINGS: TrayStrings = TrayStrings {
     visit_bilibili: "B 站",
     star_github: "在 GitHub 点 Star",
     sponsor_menu: "赞助",
+    bitrate_menu: "码率上限",
+    bitrate_auto: "自动",
+    dpi_menu: "缩放",
     restart: "重启 Sunshine",
     recover_service: "重新启动 Sunshine 服务",
     recovery_timeout: "Sunshine 服务未能在等待时间内恢复，请检查服务日志后重试。",
@@ -489,6 +497,9 @@ const EN_STRINGS: TrayStrings = TrayStrings {
     visit_bilibili: "Bilibili",
     star_github: "Star on GitHub",
     sponsor_menu: "Sponsor",
+    bitrate_menu: "Bitrate cap",
+    bitrate_auto: "Auto",
+    dpi_menu: "Scale",
     restart: "Restart Sunshine",
     recover_service: "Restart Sunshine Service",
     recovery_timeout: "The Sunshine service did not recover in time. Check the service log and try again.",
@@ -574,6 +585,9 @@ const JA_STRINGS: TrayStrings = TrayStrings {
     visit_bilibili: "Bilibili",
     star_github: "GitHub でスターを付ける",
     sponsor_menu: "支援",
+    bitrate_menu: "ビットレート上限",
+    bitrate_auto: "自動",
+    dpi_menu: "スケール",
     restart: "Sunshine を再起動",
     recover_service: "Sunshine サービスを再起動",
     recovery_timeout: "Sunshine サービスが時間内に復旧しませんでした。サービスログを確認して再試行してください。",
@@ -1160,6 +1174,7 @@ fn apply_tray_state<R: Runtime + 'static>(
 
     if should_rebuild_menu {
         rebuild_tray_menu(app);
+        popup_input::refresh_native_sliders_if_native(app);
     }
 
     if let Some(tray) = app.tray_by_id(TRAY_ID) {
