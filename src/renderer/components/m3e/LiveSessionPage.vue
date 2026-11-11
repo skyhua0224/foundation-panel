@@ -1,6 +1,5 @@
 <template>
-  <MPage :title="l.title">
-    <template #actions><MIconButton icon="refresh" :label="l.refresh" :disabled="refreshing" @click="refresh(true)" /></template>
+  <MPage :title="l.title" :updated="readAt" :refreshing="refreshing" refreshable :locale="String(locale)" @refresh="refresh(true)">
 
     <MPageLoading v-if="!loaded" :rows="4" />
     <template v-else>
@@ -108,6 +107,7 @@ const emit = defineEmits(['open-quality', 'webui-navigate'])
 const say = (text) => useNotify().snack(text)
 
 const sessions = ref([]), loaded = ref(false), refreshing = ref(false), loadError = ref('')
+const readAt = ref(0)
 const live = computed(() => liveSessions(sessions.value))
 const idleCount = computed(() => (sessions.value.length && !live.value.length ? sessions.value.length : 0))
 const client = ref(''), bitrate = ref(DEFAULT_BITRATE), applying = ref(false)
@@ -197,7 +197,7 @@ async function refresh(manual = false) {
   if (inFlight) return
   inFlight = true
   if (manual) refreshing.value = true
-  try { await Promise.all([loadSessions(), loadPerf(), pollNr()]) } finally { inFlight = false; refreshing.value = false; loaded.value = true }
+  try { await Promise.all([loadSessions(), loadPerf(), pollNr()]); readAt.value = Date.now() } finally { inFlight = false; refreshing.value = false; loaded.value = true }
 }
 let timer = null
 onMounted(() => { refresh(); timer = setInterval(refresh, 2000) })

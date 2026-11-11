@@ -1,5 +1,5 @@
 <template>
-  <MServiceStatus :status="status" :locale="locale" :busy="busy" :refreshing="refreshing" @refresh="refresh()" @action="runAction" @start-type="setStartType" />
+  <MServiceStatus :status="status" :locale="locale" :busy="busy" :refreshing="refreshing" :read-at="readAt" @refresh="refresh()" @action="runAction" @start-type="setStartType" />
 </template>
 
 <script setup>
@@ -15,12 +15,13 @@ const props = defineProps({ locale: { type: String, default: 'zh' } })
 const status = ref(null)
 const busy = ref('')
 const refreshing = ref(false)
+const readAt = ref(0)
 const T = () => serviceTexts(props.locale)
 
 // `quiet`: the background read shows no spinner and no error snack (the page keeps the last state)
 async function refresh(quiet = false) {
   if (!quiet) refreshing.value = true
-  try { status.value = await sunshineService.status() } catch (e) { if (!quiet) useNotify().snack(`${T().failed} ${e?.message || e || ''}`.trim()) } finally { if (!quiet) refreshing.value = false }
+  try { status.value = await sunshineService.status(); readAt.value = Date.now() } catch (e) { if (!quiet) useNotify().snack(`${T().failed} ${e?.message || e || ''}`.trim()) } finally { if (!quiet) refreshing.value = false }
 }
 async function change(kind, call) {
   busy.value = kind

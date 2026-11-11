@@ -33,21 +33,22 @@ const options = ref(null)
 const emit = defineEmits(['open-update', 'open', 'consent', 'errors', 'open-update-source', 'channel-change', 'open-developer'])
 
 const checking = ref(false)
+const checkedAt = ref(0)
 const failed = ref(false)
 const channel = ref('')
 const build = ref(null)
 const update = computed(() => {
-  if (checking.value) return { state: 'checking', version: '' }
-  if (failed.value) return { state: 'error', version: '' }
+  if (checking.value) return { state: 'checking', version: '', checkedAt: checkedAt.value }
+  if (failed.value) return { state: 'error', version: '', checkedAt: checkedAt.value }
   const info = props.updateInfo
-  if (info && !info.is_latest) return { state: 'available', version: info.version || '' }
-  if (info?.is_latest) return { state: 'latest', version: '' }
-  return { state: 'idle', version: '' }
+  if (info && !info.is_latest) return { state: 'available', version: info.version || '', checkedAt: checkedAt.value }
+  if (info?.is_latest) return { state: 'latest', version: '', checkedAt: checkedAt.value }
+  return { state: 'idle', version: '', checkedAt: checkedAt.value }
 })
 async function runCheck() {
   checking.value = true
   failed.value = false
-  try { failed.value = !(await props.check()) } finally { checking.value = false }
+  try { failed.value = !(await props.check()); if (!failed.value) checkedAt.value = Date.now() } finally { checking.value = false }
 }
 // The channel and the build time are what the host recorded when it was built (its build identity, read from sunshine.exe without a
 // request). Only a host that predates the identity falls back to the public release metadata for its version; then unknown builds show none.
