@@ -53,7 +53,11 @@ export const ROUTES = {
   WEB_APPS: 'web-apps',
   WEB_CONFIG: 'web-config',
   CAT_CONFIG: 'cat-config',
-  CFG_APPEARANCE: 'cfg-appearance', // 个性化: a destination of its own, the palette button in the foot of the rail
+  // 个性化: a section of its own (the palette button in the foot of the rail opens its first page), four pages like 输入与外设: 主题, 磨砂与动效, 概览, 托盘图标
+  CFG_APPEARANCE: 'cfg-appearance', // 主题: the first page (the old address of the one 个性化 page lands here)
+  CFG_FROST: 'cfg-frost', // 磨砂与动效
+  CFG_OVERVIEW: 'cfg-overview', // 概览: the options of the overview tiles
+  CFG_TRAY: 'cfg-tray', // 托盘图标
   WEB_DOWNLOADS: 'web-downloads',
   WEB_PASSWORD: 'web-password',
   // Places of 显示与视频 and 音频 that are pages of the Web UI, shown in the frame (/config#tab=display&sub=output)
@@ -79,7 +83,10 @@ export const PAGES = {
   [ROUTES.WEB_DOWNLOADS]: { rail: 'stream' },
   [ROUTES.LIVE_SESSION]: { rail: 'stream' },
   [ROUTES.WEB_CONFIG]: { rail: 'config' },
-  [ROUTES.CFG_APPEARANCE]: { rail: 'appearance', list: false },
+  [ROUTES.CFG_APPEARANCE]: { rail: 'appearance' }, // the first page of a rail is the one the rail opens on
+  [ROUTES.CFG_FROST]: { rail: 'appearance' },
+  [ROUTES.CFG_OVERVIEW]: { rail: 'appearance' },
+  [ROUTES.CFG_TRAY]: { rail: 'appearance' },
   [ROUTES.WEB_PASSWORD]: { rail: 'config' },
   [ROUTES.GAMEPAD]: { rail: 'input' },
   [ROUTES.WEB_INPUT_KEYBOARD]: { rail: 'input' },
@@ -124,6 +131,8 @@ export const PAGES = {
   [ROUTES.STREAM_HUB]: { rail: 'stream', list: false }, // after the pages of its rail: the first page of 串流 stays 客户端
 }
 // 开发者 sits above 面板设置 and 帮助与关于, the bottom group, so the rail above it is the same with developer mode off (the shell leaves the item out then)
+/** The pages of 个性化, in list order (the rail itself is not in RAILS: its button is in the foot of the rail). */
+export const APPEARANCE_ROUTES = Object.freeze([ROUTES.CFG_APPEARANCE, ROUTES.CFG_FROST, ROUTES.CFG_OVERVIEW, ROUTES.CFG_TRAY])
 export const RAILS = ['overview', 'stream', 'config', 'input', 'audio', 'display', 'system', 'assistant', 'developer', 'settings', 'help']
 
 // the old component page is part of the component status page now
@@ -180,7 +189,7 @@ for (const rail of new Set(Object.values(PAGES).filter((p) => p.list !== false).
 for (const [id, p] of Object.entries(PAGES)) routes[id] = { role: 'detail', rail: p.rail, list: p.list, supporting: p.supporting, push: p.push, rootRail: p.rootRail }
 
 // a phone has no list pages of the rails: 串流 is the stream hub, every other category is in the 设置 hub; Back from a page is that hub, whatever way the page was reached (as in the Web UI)
-export const HUB_OF = { stream: ROUTES.STREAM_HUB, config: ROUTES.SETTINGS_HUB, input: ROUTES.SETTINGS_HUB, audio: ROUTES.SETTINGS_HUB, display: ROUTES.SETTINGS_HUB, system: ROUTES.SETTINGS_HUB, developer: ROUTES.DEV_HUB }
+export const HUB_OF = { stream: ROUTES.STREAM_HUB, config: ROUTES.SETTINGS_HUB, input: ROUTES.SETTINGS_HUB, audio: ROUTES.SETTINGS_HUB, display: ROUTES.SETTINGS_HUB, system: ROUTES.SETTINGS_HUB, appearance: ROUTES.SETTINGS_HUB, developer: ROUTES.DEV_HUB }
 export const PHONE_MAX = 600
 export const isPhone = () => typeof window !== 'undefined' && window.innerWidth < PHONE_MAX
 

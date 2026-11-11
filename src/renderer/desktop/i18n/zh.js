@@ -1162,6 +1162,8 @@ export const zh = {
   },
   m3e: {
     nav: { overview: '概览', stream: '串流', config: '主机设置', input: '输入与外设', audio: '音频', display: '显示与视频', system: '系统', assistant: '米塔 AI', settings: '面板设置', help: '帮助与关于', main: '主导航', barSettings: '设置', barMore: '更多', moreTitle: '更多选项', expand: '展开导航', collapse: '收起导航' },
+    // 个性化: the four pages (the second lines are the rows of foundation-ui rowLines)
+    appearance: { theme: '主题', frost: '磨砂与动效', overview: '概览', tray: '托盘图标' },
     live: {
       title: '当前串流', refresh: '刷新', ok: '确定', cancel: '取消', noStream: '没有正在进行的串流', idle: '有 {count} 个会话，都没有在串流', loadFailed: '读取会话失败：{error}',
       values: '当前值', display: '显示', encoding: '编码', toSettings: '去设置', bitrateTemporary: '码率只对本次串流生效；长期上限在编码与码率中设置。', bitrate: '码率', client: '客户端', current: '当前码率', target: '目标码率', presets: '常用码率', input: '输入码率', apply: '应用码率', applying: '调整中…', selectFirst: '先选择一个客户端',

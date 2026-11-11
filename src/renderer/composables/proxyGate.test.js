@@ -68,5 +68,6 @@ test('the status page is one design for the three causes, in the shell, and the 
 test('the pages of the panel itself still open while the host cannot be used', () => {
   const shell = fs.readFileSync(new URL('../components/SidebarMenu.vue', import.meta.url), 'utf8')
   const set = shell.match(/const NEEDS_NO_HOST = new Set\(\[([^\]]+)\]\)/)[1]
-  for (const route of ['PANEL_SETTINGS', 'CFG_APPEARANCE', 'HELP', 'ABOUT', 'ANNOUNCEMENTS']) assert.match(set, new RegExp(`ROUTES\\.${route}\\b`), `${route} works without the host`)
+  for (const route of ['PANEL_SETTINGS', 'HELP', 'ABOUT', 'ANNOUNCEMENTS']) assert.match(set, new RegExp(`ROUTES\\.${route}\\b`), `${route} works without the host`)
+  assert.match(set, /\.\.\.APPEARANCE_ROUTES\b/, 'the four pages of 个性化 work without the host')
 })

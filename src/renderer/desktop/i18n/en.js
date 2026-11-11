@@ -1162,6 +1162,8 @@ Output only one short sentence, no explanation. Reply in English.`,
   },
   m3e: {
     nav: { overview: 'Overview', stream: 'Stream', config: 'Host settings', input: 'Input & devices', audio: 'Audio', display: 'Display & video', system: 'System', assistant: 'Mita AI', settings: 'Panel settings', help: 'Help & about', main: 'Main navigation', barSettings: 'Settings', barMore: 'More', moreTitle: 'More options', expand: 'Expand navigation', collapse: 'Collapse navigation' },
+    // 个性化: the four pages (the second lines are the rows of foundation-ui rowLines)
+    appearance: { theme: 'Theme', frost: 'Frost and motion', overview: 'Overview', tray: 'Tray icon' },
     live: {
       title: 'Live stream', refresh: 'Refresh', ok: 'OK', cancel: 'Cancel', noStream: 'No stream is running', idle: '{count} sessions, none of them streaming', loadFailed: 'Could not read the sessions: {error}',
       values: 'Now', display: 'Display', encoding: 'Encoding', toSettings: 'Settings', bitrateTemporary: 'The bitrate applies to this stream only; the lasting cap is set in Encoding & bitrate.', bitrate: 'Bitrate', client: 'Client', current: 'Current bitrate', target: 'Target bitrate', presets: 'Common bitrates', input: 'Enter bitrate', apply: 'Apply bitrate', applying: 'Applying…', selectFirst: 'Choose a client first',

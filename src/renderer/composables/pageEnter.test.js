@@ -20,6 +20,7 @@ const NAME_OF = Object.fromEntries(Object.entries(ROUTES).map(([name, id]) => [i
 // pages that are drawn by the branch of another route, or by one shared component, in the #detail template
 const SAME_BRANCH = { [ROUTES.WEB_TROUBLESHOOTING]: ROUTES.DIAGNOSTICS, [ROUTES.COMPONENTS]: ROUTES.COMPONENT_STATUS }
 const DEV_PAGES = [ROUTES.DEV_ISSUES, ROUTES.DEV_LOGS, ROUTES.DEV_API, ROUTES.DEV_FLAGS, ROUTES.DEV_BUILD, ROUTES.DEV_TESTS, ROUTES.DEVELOPER]
+const APPEARANCE_PAGES = [ROUTES.CFG_APPEARANCE, ROUTES.CFG_FROST, ROUTES.CFG_OVERVIEW, ROUTES.CFG_TRAY] // 个性化: four routes, one shell branch (APPEARANCE_ROUTES.includes(entry.id))
 const detail = shell.slice(shell.indexOf('<template #detail="{ entry }">'), shell.indexOf('<template #overlay>'))
 
 test('every routed page is drawn either in the scene pane (MScene plays the enter) or in the Web UI frame (PanelWebHost plays it)', () => {
@@ -28,7 +29,7 @@ test('every routed page is drawn either in the scene pane (MScene plays the ente
   for (const route of Object.keys(PAGES)) {
     const framed = !!webPathOf(route)
     const target = SAME_BRANCH[route] || route
-    const drawn = detail.includes(`entry.id === ROUTES.${NAME_OF[target]}`) || (DEV_PAGES.includes(route) && detail.includes('DEV_PAGES.includes(entry.id)'))
+    const drawn = detail.includes(`entry.id === ROUTES.${NAME_OF[target]}`) || (DEV_PAGES.includes(route) && detail.includes('DEV_PAGES.includes(entry.id)')) || (APPEARANCE_PAGES.includes(route) && detail.includes('APPEARANCE_ROUTES.includes(entry.id)'))
     kinds[route] = framed ? 'frame' : drawn ? 'scene' : 'none'
     if (!framed && !drawn) unwrapped.push(route)
     assert.ok(!(framed && drawn), `${route} is drawn twice: in the frame and in the scene`)
