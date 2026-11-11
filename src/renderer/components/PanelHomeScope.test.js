@@ -16,3 +16,11 @@ test('losing say again is what this test is for', () => {
   const without = source.replace(/const say = .+\n/, '')
   assert.ok(undeclaredIdentifiers(without, { filename: 'PanelHome.vue' }).some((x) => x.name === 'say'), 'an undeclared say is reported')
 })
+
+// home-streaming-fix 2026-11-11: the overview gave MHomeDash neither the host configuration nor the language, so the pinned 自动 FEC tile showed its default state in English (「Off」 under a Chinese
+// title) whatever the host had set. The pinned setting tiles read `config` and speak `locale`; losing either prop brings the wrong state back.
+test("the overview gives the dashboard the host's configuration and the language (the pinned setting tiles read them)", () => {
+  const tag = /<MHomeDash\b[^>]*>/s.exec(source)?.[0] || ''
+  assert.match(tag, /:config="state\.config"/)
+  assert.match(tag, /:locale="locale"/)
+})
