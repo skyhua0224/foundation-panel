@@ -97,7 +97,6 @@
     <MContextProvider :locale="locale" :callbacks="ctxCallbacks" :capabilities="{ product: 'panel', developer: developerMode.enabled.value }" />
     <DevReportHost :locale="locale" />
     <!-- every uncaught error is drawn in our own surface: the way back, the restart of Sunshine, then copy, download and the report to the developers -->
-    <MTelemetryConsent v-model="consentOpen" :locale="locale" :version="currentVersion || ''" :os="osName()" @answer="telemetry.answer" />
     <MErrorHost :locale="locale" report-sheet :can-go-back="nav.canPop.value" :host-online="hostConn.state.status === 'online'" :restart="() => hostConn.restart('service')" :doctor="openDoctor" :open-url="actions_openExternal" @back="errorBack" />
     <!-- 更多 of the bottom bar: what the bar has no room for -->
     <MSheet v-model="moreOpen" :title="t.m3e.nav.moreTitle" side="end" :close-label="t.m3e.home.done">
@@ -142,7 +141,7 @@ import { qrSvgDataUrl } from '../composables/qrSvg.js'
 import { openBigScreenWithNotice } from '../composables/openBigScreen.js'
 import { installMenuPopup } from '../composables/menuPopup.js'
 import { installTrayTheme } from '../composables/trayTheme.js'
-import { DevSimChip, MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MCaptionVersion, MCaptionBack, MBackChip, useCaptionRoom, createJumpHistory, useBackVariant, showsButton, showsChip, captionTexts, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, doctorTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode, useDialogs, DevReportHost, DevHub, openDevReport, devmodeTexts, useDevActivity } from 'foundation-ui/vue'
+import { DevSimChip, MContextProvider, contextTexts, pinSpecForPage, pinTexts, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MCaptionVersion, MCaptionBack, MBackChip, useCaptionRoom, createJumpHistory, useBackVariant, showsButton, showsChip, captionTexts, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, doctorTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode, useDialogs, DevReportHost, DevHub, openDevReport, devmodeTexts, useDevActivity } from 'foundation-ui/vue'
 import { developerOverlays, developerTexts, DEFAULT_FLAGS } from 'foundation-ui/developer'
 import { afterCheck, afterOpened, noticeView, readNotice, writeNotice } from 'foundation-ui/update'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
@@ -412,10 +411,9 @@ function simulateHost(kind) {
 }
 const back = () => nav.pop()
 // the way out of the error surface: the previous page, or the overview when there is none
-// The choice about usage counts and error information: the host keeps it, the Web UI and this window agree; asked once when nothing else is on screen, changed later in 关于
+// The choice about usage counts and error information: the host keeps it, the Web UI and this window agree; both are on by default, nobody is asked (the first run tells once), changed in 关于 › 隐私
 const telemetryApi = { getJson: async (path) => (await fetch(`${String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')}${path}`)).json(), postJson: async (path, body) => (await fetch(`${String((await sunshine.getProxyUrl()) || '').replace(/\/$/, '')}${path}`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })).json() }
 const telemetry = useTelemetryConsent({ api: telemetryApi })
-const consentOpen = ref(false)
 const errorBack = () => { if (nav.canPop.value) nav.pop(); else router.navigate(ROUTES.HOME) }
 const osName = () => (typeof navigator === 'undefined' ? '' : String(navigator.userAgentData?.platform || navigator.platform || ''))
 // the last host log lines go along with a report (scrubbed by buildReport): read once at start, as the Web UI does
@@ -569,7 +567,7 @@ onMounted(async () => {
   try { const { listen } = await import('@tauri-apps/api/event'); unlistenConnect = await listen('open-connect', (event) => connect.show(event.payload?.tab === 'install' ? 'install' : 'pair')) } catch { /* not in the app window */ }
 })
 onBeforeUnmount(() => { pairing.stop(); window.removeEventListener('message', onFramePin); if (unlistenConnect) unlistenConnect(); removeErrorHandlers?.() })
-onMounted(async () => { removeErrorHandlers = installErrorHandlers({ app: shellApp }); startAutoReport({ context: errorContext }); void refreshLogs(); await telemetry.refresh(); telemetry.askWhenQuiet(consentOpen) })
+onMounted(async () => { removeErrorHandlers = installErrorHandlers({ app: shellApp }); startAutoReport({ context: errorContext }); void refreshLogs(); await telemetry.refresh() })
 // what the buttons of 日志与诊断 do, from the search: the same host calls, the answer in the snackbar
 const hostAction = async (path, doneText, method = 'POST') => {
   try {
