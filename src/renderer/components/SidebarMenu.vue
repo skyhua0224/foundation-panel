@@ -828,6 +828,9 @@ defineExpose({
 .panel-caption__btn:active { background: color-mix(in srgb, var(--md-sys-color-on-surface) 14%, transparent); }
 .panel-caption__btn--close:hover { background: #c42b1c; color: #fff; } .panel-caption__btn--close:active { background: #b02417; color: #fff; }
 .panel-caption__btn:focus-visible { outline: 2px solid var(--md-sys-color-primary); outline-offset: -2px; }
+/* touch: the three window buttons are a finger wide (48 px, see foundation-ui css/touch.css) */
+@media (pointer: coarse) { .panel-caption__btn { width: 48px; } }
+@media (any-pointer: coarse) { .panel-caption__btn[data-pressed] { background: color-mix(in srgb, var(--md-sys-color-on-surface) 14%, transparent); } .panel-caption__btn--close[data-pressed] { background: #b02417; color: #fff; } }
 .panel-body { position: absolute; inset: 0; min-height: 0; overflow: clip; }
 .panel-web-keep { height: 100%; min-height: 0; }
 .panel-body > .m-scene { position: absolute; inset: 0; height: auto; }

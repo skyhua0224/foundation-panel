@@ -47,3 +47,10 @@ html.m-has-wallpaper .ai-hint { background: var(--m-card); border-radius: 28px; 
 
 /* a short or narrow window: the welcome card stays within the pane, with the settings button first and fewer examples, so nothing hides under the input */
 @media (max-height: 860px) { .ai-hint, html.m-has-wallpaper .ai-hint { gap: 10px; padding: 14px 12px; } .ai-hint .ai-avatar--lg { width: 56px; height: 56px; } .ai-example:nth-child(n+5) { display: none; } }
+
+/* touch (foundation-ui css/touch.css): the example chips are a finger high (hit slop) and their rows far enough apart for it */
+@media (pointer: coarse) { .ai-examples { gap: 12px 8px; } }
+@media (any-pointer: coarse) {
+  .ai-example { position: relative; }
+  .ai-example::after { content: ''; position: absolute; inset-block: min(0px, calc((100% - var(--m-hit, 48px)) / 2)); inset-inline: min(0px, calc((100% - var(--m-hit, 48px)) / 2)); }
+}
