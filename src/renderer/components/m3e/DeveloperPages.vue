@@ -39,7 +39,7 @@ defineEmits(['disabled', 'notify'])
 
 const D = computed(() => devmodeTexts(props.locale))
 const title = computed(() => ({ [ROUTES.DEV_ISSUES]: D.value.pages.issues, [ROUTES.DEV_LOGS]: D.value.pages.logs, [ROUTES.DEV_API]: D.value.pages.api, [ROUTES.DEV_FLAGS]: D.value.pages.flags, [ROUTES.DEV_BUILD]: D.value.pages.build, [ROUTES.DEV_TESTS]: D.value.pages.tests }[props.page] || developerTexts(props.locale).title))
-const wide = computed(() => props.page === ROUTES.DEV_ISSUES || props.page === ROUTES.DEV_LOGS || props.page === ROUTES.DEV_API || props.page === ROUTES.DEV_BUILD)
+const wide = computed(() => props.page === ROUTES.DEV_ISSUES || props.page === ROUTES.DEV_LOGS || props.page === ROUTES.DEV_API)
 const lead = computed(() => '')
 
 const apiBase = ref('')
