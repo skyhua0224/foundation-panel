@@ -574,6 +574,44 @@ pub struct TrayState {
     pub notification: TrayNotificationState,
     #[serde(default)]
     pub operation: TrayOperationState,
+    #[serde(default)]
+    pub launch: TrayLaunchState,
+}
+
+/// The launch splash the host asks for (`launch` in the tray state, capability `launch-splash-v1`). It is handled on its own path (launch_splash.rs), so two
+/// tray states that differ only here count as equal: a stage line must not rebuild the tray menu.
+#[derive(Debug, Serialize, Deserialize, Clone, Default)]
+pub struct TrayLaunchState {
+    #[serde(default)]
+    pub id: String,
+    #[serde(default)]
+    pub active: bool,
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub app_id: String,
+    #[serde(default)]
+    pub app_name: String,
+    #[serde(default)]
+    pub art: String,
+    #[serde(default)]
+    pub stage: String,
+    #[serde(default)]
+    pub notice: String,
+    #[serde(default)]
+    pub display: String,
+    #[serde(default)]
+    pub pids: Vec<u32>,
+    #[serde(default)]
+    pub started_at_ms: i64,
+    #[serde(default)]
+    pub deadline_ms: i64,
+}
+
+impl PartialEq for TrayLaunchState {
+    fn eq(&self, _other: &Self) -> bool {
+        true
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
@@ -630,6 +668,32 @@ mod tray_protocol_tests {
             capabilities: vec!["state-v1".to_string(), "actions-v1".to_string()],
             ..Default::default()
         }
+    }
+
+    #[test]
+    fn reads_the_launch_splash_state_and_does_not_count_it_when_comparing_states() {
+        let json = format!(
+            r#"{{"protocol_version":{TRAY_PROTOCOL_VERSION},"instance_id":"core","owner":"gui","capabilities":["state-v1","launch-splash-v1"],
+                "launch":{{"id":"1-1","active":true,"kind":"launch","app_id":"13","app_name":"原神","art":"C:/covers/a.jpg","stage":"preparing",
+                "notice":"direct","display":"\\\\.\\DISPLAY3","pids":[4,5],"started_at_ms":10,"deadline_ms":60010}}}}"#
+        );
+        let state = parse_tray_state_json(&json).unwrap();
+        assert_eq!(state.launch.id, "1-1");
+        assert!(state.launch.active);
+        assert_eq!(state.launch.app_name, "原神");
+        assert_eq!(state.launch.stage, "preparing");
+        assert_eq!(state.launch.pids, vec![4, 5]);
+        assert_eq!(state.launch.deadline_ms, 60010);
+        // a host without the field is a state with no launch
+        let old = parse_tray_state_json(&format!(r#"{{"protocol_version":{TRAY_PROTOCOL_VERSION},"instance_id":"core","owner":"gui","capabilities":["state-v1"]}}"#)).unwrap();
+        assert_eq!(old.launch.id, "");
+        assert!(!old.launch.active);
+        // only the launch differs: the tray menu is not rebuilt for it
+        let mut other = state.clone();
+        other.launch.stage = "waiting-window".to_string();
+        assert_eq!(state, other);
+        other.status = "streaming".to_string();
+        assert_ne!(state, other);
     }
 
     #[test]

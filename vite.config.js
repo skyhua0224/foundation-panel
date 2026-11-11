@@ -44,6 +44,7 @@ export default defineConfig(() => ({
         ctxMenu: resolve(rendererSrcPath, 'ctxmenu/index.html'),
         toolWindow: resolve(rendererSrcPath, 'tool-window/index.html'),
         desktop: resolve(rendererSrcPath, 'desktop/index.html'),
+        launchSplash: resolve(rendererSrcPath, 'launch-splash/index.html'),
       },
     },
   },
