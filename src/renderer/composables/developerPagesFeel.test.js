@@ -27,3 +27,8 @@ test('测试工具 is told whether the answer about telemetry is known', () => {
   assert.match(pages, /:consent-on="consent === 'on'" :consent-ready="consentReady"/)
   assert.match(pages, /consentReady: \{ type: Boolean, default: true \}/)
 })
+
+test('构建与组件 is made of sections and rows, so it has the width of 测试工具 and the settings pages; only the pages with their own wide layout are wide', () => {
+  assert.match(pages, /const wide = computed\(\(\) => props\.page === ROUTES\.DEV_ISSUES \|\| props\.page === ROUTES\.DEV_LOGS \|\| props\.page === ROUTES\.DEV_API\)/)
+  assert.doesNotMatch(pages, /const wide[^\n]*DEV_BUILD/)
+})
