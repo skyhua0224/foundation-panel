@@ -62,7 +62,7 @@
         <DoctorPage v-else-if="entry.id === ROUTES.DOCTOR" :autostart="entry.params?.autostart || false" @go="goDoctorTarget" @restart="hostConn.restart('service')" @ai="askMita" />
         <MAnnouncementPage v-else-if="entry.id === ROUTES.ANNOUNCEMENTS" :items="announcements.list.value" :locale="locale" :acked-at="ackedAt" :open-id="entry.params?.id || ''" :on-refresh="() => announcements.refresh(true)" @dismiss="announcements.dismiss" @read="announcements.read" @open-url="actions_openExternal" @back="back" />
         <DevHub v-else-if="entry.id === ROUTES.DEV_HUB" :locale="locale" :pages="devHubPages" @open="(p) => openRoute(p.route)" />
-        <DeveloperPages v-else-if="DEV_PAGES.includes(entry.id)" :key="entry.id" :page="entry.id" :locale="locale" :version="currentVersion" :consent="telemetry.consent.value" :error-context="errorContext" :simulate-host="simulateHost" @disabled="leaveDeveloper" @notify="(text) => useNotify().snack(text)" />
+        <DeveloperPages v-else-if="DEV_PAGES.includes(entry.id)" :key="entry.id" :page="entry.id" :locale="locale" :version="currentVersion" :consent="telemetry.consent.value" :consent-ready="telemetry.loaded.value" :error-context="errorContext" :simulate-host="simulateHost" @disabled="leaveDeveloper" @notify="(text) => useNotify().snack(text)" />
         <AboutPage v-else-if="entry.id === ROUTES.ABOUT" :current-version="currentVersion" :update-info="updateInfo" :locale="locale" :check="handleCheckForUpdates" :on-refresh="() => announcements.refresh(true)" :consent="telemetry.consent.value" @consent="telemetry.answer" :errors="telemetry.errors.value" @errors="telemetry.setErrors" support-link @open-update-source="router.navigate(ROUTES.PANEL_SETTINGS)" :include-prerelease="includePrerelease" @channel-change="setIncludePrerelease" @open-update="showUpdateDialog = true" @open="actions_openExternal" @open-developer="router.navigate(ROUTES.DEVELOPER)" />
         <ControlPanelPage
           v-else-if="entry.id === ROUTES.PANEL_SETTINGS || entry.id === ROUTES.HELP"
@@ -89,6 +89,7 @@
         <!-- the frame stays mounted while the host is away (it only is hidden): it loads again when the host is back -->
         <div v-show="!offlineShown" class="panel-web-keep" :inert="offlineShown ? '' : undefined"><PanelWebHost :sub="frameSub" :page="isWebPage ? router.currentRoute.value : ''"><slot /></PanelWebHost></div>
         <MHostOffline v-if="offlineShown" :cause="offlineCause" :state="offlineState" :locale="locale" :port="hostPort" :can-restart="offlineCause !== 'proxy'" :can-user-mode="offlineCause !== 'proxy'" can-logs can-doctor @retry="retryOffline" @restart="confirmedRestart('service')" @user-mode="confirmedRestart('user')" @logs="jumpTo(ROUTES.DIAGNOSTICS)" @doctor="openDoctor" />
+        <div v-if="offlineShown" class="panel-sim-end"><DevSimChip :locale="locale" /></div>
       </template>
     </MScene>
     </div>
@@ -141,7 +142,7 @@ import { qrSvgDataUrl } from '../composables/qrSvg.js'
 import { openBigScreenWithNotice } from '../composables/openBigScreen.js'
 import { installMenuPopup } from '../composables/menuPopup.js'
 import { installTrayTheme } from '../composables/trayTheme.js'
-import { MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MCaptionVersion, MCaptionBack, MBackChip, useCaptionRoom, createJumpHistory, useBackVariant, showsButton, showsChip, captionTexts, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, doctorTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode, useDialogs, DevReportHost, DevHub, openDevReport, devmodeTexts, useDevActivity } from 'foundation-ui/vue'
+import { DevSimChip, MContextProvider, contextTexts, pinSpecForPage, pinTexts, MTelemetryConsent, useTelemetryConsent, MErrorHost, installErrorHandlers, setErrorContext, startAutoReport, reportHostStop, reportHostHung, dismissHostHung, useNotify, useSystemNotices, MStatusBell, connectTexts, guideTexts, filterHash, MConnectDialog, MPairPrompt, pinToHome, unpinFromHome, isPinnedOnHome, createPairingPending, MSnackbar, useConnectDialog, MAnnouncementButton, MAnnouncementPage, MAnnouncementPopup, ackedAt, useAnnouncements, MCaption, MCoachMarks, MRemoteWindow, MUnifiedSearch, useUnifiedSearch, searchTexts, actionDocs, settingDocs, clientDocs, appDocs, tileDocs, addTileToHome, MHostOffline, useHostConnection, MSheet, MGroup, MItem, MSupportSheet, MBrand, MScene, MNavList, MCaptionVersion, MCaptionBack, MBackChip, useCaptionRoom, createJumpHistory, useBackVariant, showsButton, showsChip, captionTexts, MIconButton, MIcon, MContextMenu, aboutTexts, statusTexts, diagnosticsTexts, doctorTexts, useAnnouncementBadge, useSettingsList, useAppearance, registerModeHandler, MSponsorButton, scopeRecent, hostRecentKey, useErrors, useDeveloperMode, useDialogs, DevReportHost, DevHub, openDevReport, devmodeTexts, useDevActivity } from 'foundation-ui/vue'
 import { developerOverlays, developerTexts, DEFAULT_FLAGS } from 'foundation-ui/developer'
 import { afterCheck, afterOpened, noticeView, readNotice, writeNotice } from 'foundation-ui/update'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
@@ -378,9 +379,11 @@ const hostConn = useHostConnection({
   onHung: ({ at, seconds }) => reportHostHung({ at, seconds }),
   onHungEnd: () => dismissHostHung(),
 })
-// The developer page shows the surfaces of a host that is away without the host going anywhere: 'offline' is the offline page, 'stopped' the 「意外停止」 error surface. It ends by itself after a minute.
+// The developer page shows the surfaces of a host that is away without the host going anywhere: 'offline' is the offline page, 'unresponsive' the page of a host that runs and does not answer, 'stopped' the 「意外停止」 error surface.
+// It ends by itself after a minute (m3e's useHostSimulation counts the same minute and shows it; this timer is the one that puts the panel back if that page never runs again).
 const hostSimulated = ref('')
 let hostSimulatedTimer = 0
+let hostStopSimulated = false
 // tools/realshot and the QA harness show the failure states with events of the page itself (a real fault is not repeatable on a guarded instance, where the panel would show its window): the verdict and the numbers the card shows; the next real probe of a host that answers puts it back
 const forceHostState = (event) => { const d = event.detail || {}; Object.assign(hostConn.state, { verdict: d.verdict || 'down', status: 'offline', fails: d.fails ?? 3, round: 1, nextIn: d.nextIn ?? 12, probing: false }) }
 const forceProxyState = (event) => { proxyBlock.attempts = Number(event.detail?.attempts) || 4; proxyBlock.blocked = event.detail?.on !== false }
@@ -392,17 +395,19 @@ const NEEDS_NO_HOST = new Set([ROUTES.DOCTOR, ROUTES.SUNSHINE_SERVICE, ROUTES.DE
 // The host cannot be used for one of three causes, and the content area is then ONE status page (MScene status): the host is down, it runs and does not answer, or the panel's own proxy does not answer the window.
 // The rail and the caption bar stay: the pages of the panel itself (NEEDS_NO_HOST) still work and open as always. What needs the host does not look live: the pages give way to the status page and are inert, the
 // frame stays mounted but hidden, so an unsaved edit is there when the connection is back, and 连接设备 (it pairs through the host) is disabled.
-const hostUnusable = computed(() => hostSimulated.value === 'offline' || proxyBlock.blocked || hostConn.state.status !== 'online')
-const offlineCause = computed(() => (hostSimulated.value === 'offline' ? 'down' : proxyBlock.blocked ? 'proxy' : hostConn.state.verdict === 'unresponsive' ? 'unresponsive' : 'down'))
-const offlineState = computed(() => (hostSimulated.value === 'offline' ? { ...hostConn.state, status: 'offline', verdict: 'down', fails: 3, round: 1, nextIn: 5, probing: false, error: '' } : proxyBlock.blocked ? { status: 'offline', verdict: 'proxy', fails: proxyBlock.attempts, round: 1, nextIn: 0, probing: proxyBlock.checking, mode: '', error: '' } : hostConn.state))
+const hostUnusable = computed(() => hostSimulated.value === 'offline' || hostSimulated.value === 'unresponsive' || proxyBlock.blocked || hostConn.state.status !== 'online')
+const offlineCause = computed(() => (hostSimulated.value === 'offline' ? 'down' : hostSimulated.value === 'unresponsive' ? 'unresponsive' : proxyBlock.blocked ? 'proxy' : hostConn.state.verdict === 'unresponsive' ? 'unresponsive' : 'down'))
+const offlineState = computed(() => (hostSimulated.value === 'offline' ? { ...hostConn.state, status: 'offline', verdict: 'down', fails: 3, round: 1, nextIn: 5, probing: false, error: '' } : hostSimulated.value === 'unresponsive' ? { ...hostConn.state, status: 'offline', verdict: 'unresponsive', fails: 3, round: 1, nextIn: 5, probing: false, error: '' } : proxyBlock.blocked ? { status: 'offline', verdict: 'proxy', fails: proxyBlock.attempts, round: 1, nextIn: 0, probing: proxyBlock.checking, mode: '', error: '' } : hostConn.state))
 const retryOffline = () => (proxyBlock.blocked ? proxyBlock.retryNow() : hostConn.retry())
 const offlineShown = computed(() => hostUnusable.value && !NEEDS_NO_HOST.has(router.currentRoute.value))
 watch(hostUnusable, (on) => { if (on) connect.open.value = false })
 function simulateHost(kind) {
   clearTimeout(hostSimulatedTimer)
-  hostSimulated.value = kind === 'offline' ? 'offline' : ''
+  const wasStopped = hostStopSimulated
+  hostStopSimulated = kind === 'stopped'
+  hostSimulated.value = kind === 'offline' || kind === 'unresponsive' ? kind : ''
   if (kind === 'stopped') reportHostStop({ at: Date.now() })
-  else if (!kind) useErrors().dismissError()
+  else if (wasStopped || !kind) useErrors().dismissError() // the error surface of a simulated stop goes when the simulation ends or turns into another one
   if (kind) hostSimulatedTimer = setTimeout(() => simulateHost(''), 60000)
 }
 const back = () => nav.pop()
@@ -833,6 +838,8 @@ defineExpose({
 @media (any-pointer: coarse) { .panel-caption__btn[data-pressed] { background: color-mix(in srgb, var(--md-sys-color-on-surface) 14%, transparent); } .panel-caption__btn--close[data-pressed] { background: #b02417; color: #fff; } }
 .panel-body { position: absolute; inset: 0; min-height: 0; overflow: clip; }
 .panel-web-keep { height: 100%; min-height: 0; }
+// a simulation of the host that is away shows the offline page, which has no header of its own: its chip and the way to end it sit in the corner of that page
+.panel-sim-end { position: fixed; top: 60px; right: 20px; z-index: 5; }
 .panel-body > .m-scene { position: absolute; inset: 0; height: auto; }
 /* a framed page has no scrollbar (inject-styles.css); a page of the panel has none either, or a page that scrolls would sit its title 5 px left of the same title in the frame */
 .panel-body .m-scene__pane--detail { scrollbar-width: none; }
