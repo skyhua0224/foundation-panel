@@ -1,8 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { registerDevReport } from 'foundation-ui/vue'
 import { environmentText } from 'foundation-ui/developer'
-import { buildReport, reportToDocument, submitReport } from 'foundation-ui/telemetry'
-import { sunshine, openExternalUrl } from '../tauri-adapter.js'
+import { sunshine } from '../tauri-adapter.js'
 import { desktopSettings, saveDesktopSettings } from '../desktop/composables/useDesktopSettings.js'
 import { createDeveloperTools, logLine } from './developerTools.js'
 
@@ -14,7 +13,7 @@ export const bytesOfBase64 = (text) => {
   return out
 }
 
-/** Gives foundation-ui's report and sign-in sheets what only the panel can: the capture of its window, the log, the environment, saving a file, the system browser, the anonymous send. */
+/** Gives foundation-ui's report and sign-in sheets what only the panel can: the capture of its window, the log, the environment, saving a file. */
 export function registerPanelReport({ locale, version, errorContext, hostNames = () => [] }) {
   const tools = createDeveloperTools({
     invoke,
@@ -39,12 +38,7 @@ export function registerPanelReport({ locale, version, errorContext, hostNames =
       link.remove()
       setTimeout(() => URL.revokeObjectURL(link.href), 4000)
     },
-    openUrl: (url) => { openExternalUrl(url).catch(() => {}) },
-    // text only, through the same path as the error dialog's own form (Firestore, kept for later where the network is away)
-    anon: async (r) => {
-      const report = buildReport(new Error(r.title), { kind: 'manual', fatal: false, context: errorContext() })
-      const answer = await submitReport(reportToDocument(report, { title: r.title, description: r.body }))
-      return answer.state === 'sent' ? 'sent' : answer.state
-    },
+    // the report sheet sends privately to the developers (a user_report event through the host) or saves the zip: nothing public, no address to open
+    product: 'panel',
   })
 }
