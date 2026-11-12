@@ -14,8 +14,8 @@
     </div>
     <template v-if="pipeline.nr_live_controls_version >= 2">
       <MGroup>
-        <MSliderItem :model-value="draft.scale" icon="aspect_ratio" :title="text.scale" :text="text.scaleHint" :min="20" :max="100" :step="5" :decimals="0" unit="%" size="m" :disabled="!canChange || !pipeline.nr_requested_enabled" @update:model-value="draft.scale = $event" @commit="commit('scale')" />
-        <MSliderItem :model-value="draft.intensity" icon="tune" :title="overlayText.intensity" :text="overlayText.applyHint" :min="0" :max="100" :step="5" :decimals="0" unit="%" size="m" :disabled="!canChange" @update:model-value="draft.intensity = $event" @commit="commit('intensity')" />
+        <MSliderItem :model-value="draft.scale" icon="aspect_ratio" :title="text.scale" :text="text.scaleHint" :min="20" :max="100" :step="5" :decimals="0" unit="%" size="m" icon-start="photo_size_select_small" icon-end="photo_size_select_large" :disabled="!canChange || !pipeline.nr_requested_enabled" @update:model-value="draft.scale = $event" @commit="commit('scale')" />
+        <MSliderItem :model-value="draft.intensity" icon="tune" :title="overlayText.intensity" :text="overlayText.applyHint" :min="0" :max="100" :step="5" :decimals="0" unit="%" size="m" icon-start="remove" icon-end="add" :disabled="!canChange" @update:model-value="draft.intensity = $event" @commit="commit('intensity')" />
       </MGroup>
       <MSection :title="overlayText.advanced">
         <MGroup>
@@ -23,7 +23,7 @@
             <MItem icon="palette" :title="overlayText.style" stack>
               <template #control><MSeg :model-value="pipeline.nr_requested_style ?? 0" :label="overlayText.style" :options="STYLES" :disabled="!canChange" @update:model-value="(style) => send({ style: Number(style) }, pipeline.id)" /></template>
             </MItem>
-            <MSliderItem :model-value="draft.skin" icon="face" :title="overlayText.skinStructure" :min="0" :max="100" :step="5" :decimals="0" unit="%" :disabled="!canChange" @update:model-value="draft.skin = $event" @commit="commit('skin')" />
+            <MSliderItem :model-value="draft.skin" icon="face" :title="overlayText.skinStructure" :min="0" :max="100" :step="5" :decimals="0" unit="%" size="m" icon-start="remove" icon-end="add" :disabled="!canChange" @update:model-value="draft.skin = $event" @commit="commit('skin')" />
             <MSwitchItem :model-value="!!pipeline.nr_requested_auto_mask" icon="auto_awesome_mosaic" :title="overlayText.autoMask" :disabled="!canChange" @update:model-value="(autoMask) => send({ autoMask }, pipeline.id)" />
           </template>
           <MSwitchItem :model-value="!!pipeline.nr_requested_ui_correction" icon="dashboard" :title="overlayText.uiCorrection" :disabled="!canChange" @update:model-value="(uiCorrection) => send({ uiCorrection }, pipeline.id)" />

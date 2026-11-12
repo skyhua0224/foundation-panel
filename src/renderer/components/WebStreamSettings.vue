@@ -47,7 +47,7 @@
         <MGroup>
           <MChoiceItem v-model="defaultVideoCodec" icon="videocam" :title="t.webStream.videoCodec" :options="codecOptions" :cancel-label="t.common.cancel" />
           <MChoiceItem v-model="defaultFps" icon="speed" :title="t.webStream.defaultFps" :options="[30, 60, 120].map((v) => ({ value: v, label: String(v) }))" :cancel-label="t.common.cancel" />
-          <MSliderItem v-model="defaultBitrate" icon="bolt" :title="t.webStream.bitrate" :min="1000" :max="150000" :step="1000" :decimals="0" unit=" kbps" />
+          <MSliderItem v-model="defaultBitrate" icon="bolt" :title="t.webStream.bitrate" :min="1000" :max="150000" :step="1000" :decimals="0" unit=" kbps" size="m" icon-start="signal_cellular_alt_1_bar" icon-end="signal_cellular_alt" />
           <MChoiceItem v-model="defaultTransport" icon="swap_horiz" :title="t.webStream.transportMode" :options="transportOptions" :cancel-label="t.common.cancel" />
         </MGroup>
       </MSection>

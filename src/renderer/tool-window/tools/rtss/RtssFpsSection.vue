@@ -2,7 +2,7 @@
   <MSection>
     <MGroup>
       <MSwitchItem :model-value="limiterEnabled" icon="speed" :title="t.rtssTool.fpsLimiter" :disabled="applying" @update:model-value="onToggleLimiter" />
-      <MSliderItem v-model="fpsValue" icon="tune" title="FPS" :min="15" :max="360" :step="1" :decimals="0" unit=" FPS" size="m" :disabled="applying" />
+      <MSliderItem v-model="fpsValue" icon="tune" title="FPS" :min="15" :max="360" :step="1" :decimals="0" unit=" FPS" size="m" icon-start="slow_motion_video" icon-end="speed" :disabled="applying" />
       <MItem stack title=""><template #control><MChipSet v-model="fpsValue" :label="t.rtssTool.fpsLimiter" :options="presets.map((v) => ({ value: v, label: String(v) }))" :disabled="applying" /></template></MItem>
     </MGroup>
     <div class="m-rtss__actions">

@@ -110,7 +110,7 @@
                 <template #control>
                   <div class="dsk-te__range">
                     <MIconButton icon="remove" tonal :label="`${row.label} −`" :disabled="rangeValue(row) <= row.min" @click="nudge(row, -1)" />
-                    <MSlider :model-value="rangeValue(row)" :min="row.min" :max="row.max" :step="1" size="s" :label="row.label" @update:model-value="(v) => setRange(row, v)" />
+                    <MSlider :model-value="rangeValue(row)" :min="row.min" :max="row.max" :step="1" size="m" :label="row.label" @update:model-value="(v) => setRange(row, v)" />
                     <MIconButton icon="add" tonal :label="`${row.label} +`" :disabled="rangeValue(row) >= row.max" @click="nudge(row, 1)" />
                   </div>
                 </template>

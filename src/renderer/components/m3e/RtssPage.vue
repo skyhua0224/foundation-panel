@@ -15,7 +15,7 @@
         <MSection v-if="status.cli_path" :title="r.fps">
           <MGroup>
             <MSwitchItem :model-value="limiterOn" icon="speed" :title="r.limiter" @update:model-value="toggleLimiter" />
-            <MSliderItem v-model="fps" icon="timer" :title="r.limit" :min="FPS_LIMITS.min" :max="FPS_LIMITS.max" :step="1" :decimals="0" unit=" FPS" :readout-text="fps ? '' : r.unlimited" :disabled="fpsBusy" />
+            <MSliderItem v-model="fps" icon="timer" :title="r.limit" :min="FPS_LIMITS.min" :max="FPS_LIMITS.max" :step="1" :decimals="0" unit=" FPS" size="m" icon-start="slow_motion_video" icon-end="speed" :readout-text="fps ? '' : r.unlimited" :disabled="fpsBusy" />
             <MItem stack :title="r.presets"><template #control><MChipSet v-model="fps" :label="r.presets" :options="FPS_PRESETS.map((v) => ({ value: v, label: String(v) }))" :disabled="fpsBusy" /></template></MItem>
           </MGroup>
           <div class="m-rtss__actions">

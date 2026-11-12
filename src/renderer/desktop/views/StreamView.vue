@@ -26,7 +26,7 @@
               <MIconButton icon="add" :label="`${t.stream.bitrateLimit} +`" @click="nudgeBitrate(NUDGE_MBPS)" />
             </template>
             <template #control>
-              <MSlider :model-value="bitrateSliderProgress(bitrateKbps)" :min="0" :max="SLIDER_MAX_PROGRESS" :step="1" unit="" :marks="bitrateSegmentMarks" :off-text="t.stream.bitrateAuto" size="m" :label="t.stream.bitrateLimit" @update:model-value="(v) => setCfg('max_bitrate', String(bitrateFromProgress(v)))" />
+              <MSlider :model-value="bitrateSliderProgress(bitrateKbps)" :min="0" :max="SLIDER_MAX_PROGRESS" :step="1" unit="" :marks="bitrateSegmentMarks" :off-text="t.stream.bitrateAuto" size="m" icon-start="signal_cellular_alt_1_bar" icon-end="signal_cellular_alt" :label="t.stream.bitrateLimit" @update:model-value="(v) => setCfg('max_bitrate', String(bitrateFromProgress(v)))" />
               <MSeg :model-value="bitrateKbps" block :label="t.stream.bitrateLimit" :options="BITRATE_PRESETS" @update:model-value="(v) => setCfg('max_bitrate', String(v))" />
             </template>
           </MItem>

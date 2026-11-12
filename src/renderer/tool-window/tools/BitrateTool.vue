@@ -19,7 +19,7 @@
         <MChip v-if="currentBitrate" tone="info" icon="monitoring">{{ t.bitrateTool.currentBitrate }} {{ formatBitrate(currentBitrate) }}</MChip>
       </div>
       <MGroup>
-        <MSliderItem v-model="bitrateValue" icon="speed" :title="t.bitrateTool.targetBitrate" :min="BITRATE_LIMITS.MIN" :max="BITRATE_LIMITS.MAX" :step="BITRATE_LIMITS.STEP" :decimals="0" size="m" :readout-text="formatBitrate(bitrateValue)" :disabled="applying" />
+        <MSliderItem v-model="bitrateValue" icon="speed" :title="t.bitrateTool.targetBitrate" :min="BITRATE_LIMITS.MIN" :max="BITRATE_LIMITS.MAX" :step="BITRATE_LIMITS.STEP" :decimals="0" size="m" icon-start="signal_cellular_alt_1_bar" icon-end="signal_cellular_alt" :readout-text="formatBitrate(bitrateValue)" :disabled="applying" />
         <MItem stack title=""><template #control><MChipSet v-model="bitrateValue" :label="t.bitrateTool.targetBitrate" :options="BITRATE_PRESETS.map((v) => ({ value: v, label: formatBitrate(v) }))" :disabled="applying" /></template></MItem>
         <MItem stack icon="edit" title=""><template #control><MField v-model.number="bitrateValue" type="number" :label="t.bitrateTool.inputPlaceholder" suffix="Kbps" :error="inRange ? '' : rangeText" :disabled="applying" /></template></MItem>
       </MGroup>
