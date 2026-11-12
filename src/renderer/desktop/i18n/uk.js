@@ -1592,6 +1592,17 @@ export const uk = {
       missingHintAuto: "Автоматичний режим тепер використовує VB-CABLE. Щоб використовувати власний віртуальний мікрофон USB хоста, спочатку встановіть транспорт usbip-win2.",
       missingHintUsb: "Неможливо створити віртуальний мікрофон USB. Наразі перейдіть на VB-CABLE або встановіть транспорт usbip-win2.",
       useVbCable: "Використовуйте VB-CABLE",
+      vbCable: "VB-CABLE",
+      vbCableStates: {
+        ready: "Готово",
+        partial: "Частково доступно",
+        disabled: "Встановлено, але вимкнено в Диспетчері пристроїв",
+        unavailable: "Встановлено, але наразі недоступно",
+        missing: "Не встановлено",
+        unknown: "Перевірка"
+      },
+      vbCableDownload: "Завантажити",
+      vbCableOpenDevmgmt: "Відкрити Диспетчер пристроїв",
       installTransport: "Перейти до встановлення usbip-win2",
       fallback: "Замість цього використовується VB-CABLE",
       fallbackReason: "Причина: {reason}",

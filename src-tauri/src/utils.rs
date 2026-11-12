@@ -319,6 +319,48 @@ pub async fn open_external_url(url: String) -> Result<bool, String> {
     Ok(true)
 }
 
+/// Open the Windows Device Manager (devmgmt.msc) in this session, to enable a disabled device such as VB-CABLE. The target is
+/// fixed and the command takes no argument, so the Web UI in the frame may call it; it never enables or changes a device itself.
+#[tauri::command]
+pub fn open_device_manager() -> Result<bool, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use ::windows::Win32::Foundation::HWND;
+        use ::windows::Win32::UI::Shell::ShellExecuteW;
+        use ::windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
+        use ::windows::core::PCWSTR;
+
+        fn to_wide(value: &str) -> Vec<u16> {
+            value.encode_utf16().chain(std::iter::once(0)).collect()
+        }
+
+        let operation = to_wide("open");
+        let target = to_wide("devmgmt.msc");
+        let result = unsafe {
+            ShellExecuteW(
+                Some(HWND(std::ptr::null_mut())),
+                PCWSTR(operation.as_ptr()),
+                PCWSTR(target.as_ptr()),
+                PCWSTR::null(),
+                PCWSTR::null(),
+                SW_SHOWNORMAL,
+            )
+        };
+        let code = result.0 as isize;
+        if code <= 32 {
+            return Err(format!(
+                "Failed to open the Device Manager: ShellExecuteW code {}",
+                code
+            ));
+        }
+        Ok(true)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        Err("The Device Manager only exists on Windows".to_string())
+    }
+}
+
 /// Start the Sparxie program in this session. Sparxie is a window: it belongs to the person who is signed in, so
 /// the Control Panel (a process of that session) starts it and the host service never does. Only the bundled main
 /// window may call this (local-only command), and only a file named like Sparxie's own programs is started.

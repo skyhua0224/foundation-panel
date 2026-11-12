@@ -1312,6 +1312,17 @@ export const zh_TW = {
       "missingHintAuto": "自動模式現在會使用 VB-CABLE。要用本機自帶的 USB 虛擬麥克風，請先安裝 usbip-win2 傳輸。",
       "missingHintUsb": "USB 虛擬麥克風無法建立。你可以先改用 VB-CABLE，或安裝 usbip-win2 傳輸後再用。",
       "useVbCable": "改用 VB-CABLE",
+      "vbCable": "VB-CABLE",
+      "vbCableStates": {
+        "ready": "已就緒",
+        "partial": "僅部分可用",
+        "disabled": "已安裝但已在裝置管理員中停用",
+        "unavailable": "已安裝但目前無法使用",
+        "missing": "未安裝",
+        "unknown": "檢查中"
+      },
+      "vbCableDownload": "下載",
+      "vbCableOpenDevmgmt": "開啟裝置管理員",
       "installTransport": "前往安裝 usbip-win2",
       "fallback": "已改用 VB-CABLE",
       "fallbackReason": "原因：{reason}",

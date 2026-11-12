@@ -1280,11 +1280,13 @@ Output only one short sentence, no explanation. Reply in English.`,
       "vbCableStates": {
         "ready": "Ready",
         "partial": "Partly available",
-        "unavailable": "Unavailable: disabled or removed",
+        "disabled": "Installed but disabled in Device Manager",
+        "unavailable": "Installed but currently unavailable",
         "missing": "Not installed",
         "unknown": "Checking"
       },
       "vbCableDownload": "Download",
+      "vbCableOpenDevmgmt": "Open Device Manager",
       "backends": {
         "auto": "Automatic",
         "usbip_experimental": "USB virtual microphone",

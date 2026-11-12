@@ -13,6 +13,7 @@ import {
   microphoneTestIsLive,
   VB_CABLE_PAGE,
   VB_CABLE_STATES,
+  vbCableNeedsEnable,
   vbCableNeedsInstall,
   vbCableState,
 } from './deviceHubStatus.js'
@@ -105,9 +106,16 @@ test('VB-CABLE: the state of the host answer, `unknown` before it and for a stat
   assert.equal(vbCableState({ vb_cable: { state: 'something-new' } }), 'unknown')
 })
 
-test('VB-CABLE: the download is offered for every reported state but ready, and never before the host has answered', () => {
+test('VB-CABLE: the download is offered when it is not installed or not usable, never before the host has answered', () => {
   assert.equal(vbCableNeedsInstall('ready'), false)
   assert.equal(vbCableNeedsInstall('unknown'), false)
   for (const state of ['partial', 'unavailable', 'missing']) assert.equal(vbCableNeedsInstall(state), true, state)
   assert.match(VB_CABLE_PAGE, /^https:\/\/vb-audio\.com\//)
+})
+
+test('VB-CABLE: installed but disabled offers the Device Manager, not a download', () => {
+  assert.equal(vbCableNeedsEnable('disabled'), true)
+  assert.equal(vbCableNeedsInstall('disabled'), false)
+  for (const state of ['ready', 'partial', 'unavailable', 'missing', 'unknown']) assert.equal(vbCableNeedsEnable(state), false, state)
+  assert.equal(vbCableState({ vb_cable: { state: 'disabled', installed: true } }), 'disabled')
 })

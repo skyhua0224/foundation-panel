@@ -1593,6 +1593,17 @@ export const ja = {
       missingHintAuto: "自動モードでは VB-CABLE が使用されるようになりました。ホスト独自の USB 仮想マイクを使用するには、まず usbip-win2 トランスポートをインストールします。",
       missingHintUsb: "USB 仮想マイクを作成できません。とりあえずVB-CABLEに切り替えるか、usbip-win2トランスポートをインストールしてください。",
       useVbCable: "VB-CABLEを使用してください",
+      vbCable: "VB-CABLE",
+      vbCableStates: {
+        ready: "使用可能",
+        partial: "一部のみ使用可能",
+        disabled: "インストール済みですが、デバイス マネージャーで無効になっています",
+        unavailable: "インストール済みですが、現在使用できません",
+        missing: "未インストール",
+        unknown: "確認中"
+      },
+      vbCableDownload: "ダウンロード",
+      vbCableOpenDevmgmt: "デバイス マネージャーを開く",
       installTransport: "usbip-win2 のインストールに進みます",
       fallback: "代わりに VB-CABLE を使用してください",
       fallbackReason: "理由: {reason}",

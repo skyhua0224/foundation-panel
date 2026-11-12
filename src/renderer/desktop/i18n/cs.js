@@ -1592,6 +1592,17 @@ export const cs = {
       missingHintAuto: "Automatický režim nyní používá VB-CABLE. Chcete-li použít vlastní virtuální mikrofon hostitele USB, nainstalujte nejprve přenos usbip-win2.",
       missingHintUsb: "Virtuální mikrofon USB nelze vytvořit. Prozatím přejděte na VB-CABLE nebo si nainstalujte transport usbip-win2.",
       useVbCable: "Použijte VB-CABLE",
+      vbCable: "VB-CABLE",
+      vbCableStates: {
+        ready: "Připraveno",
+        partial: "Částečně dostupné",
+        disabled: "Nainstalováno, ale zakázáno ve Správci zařízení",
+        unavailable: "Nainstalováno, ale momentálně nedostupné",
+        missing: "Není nainstalováno",
+        unknown: "Kontrola"
+      },
+      vbCableDownload: "Stáhnout",
+      vbCableOpenDevmgmt: "Otevřít Správce zařízení",
       installTransport: "Přejít na instalaci usbip-win2",
       fallback: "Místo toho použijte VB-CABLE",
       fallbackReason: "Důvod: {reason}",

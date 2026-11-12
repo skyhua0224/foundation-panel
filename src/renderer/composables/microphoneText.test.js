@@ -44,3 +44,24 @@ for (const [name, locale] of [['zh', zh], ['en', en]]) {
     assert.doesNotMatch(all, /experimental|实验|Virtual Device Host|prototype|原型|Sidecar|DualSense/i)
   })
 }
+
+// Every desktop language has the VB-CABLE row texts in its own words (English only where the language is English).
+import { DESKTOP_LOCALES } from '../desktop/i18n/merge.js'
+const ENGLISH_CODES = new Set(['en', 'en_GB', 'en_US'])
+test('the VB-CABLE row is translated in every desktop language file', async () => {
+  const { en: english } = await import('../desktop/i18n/en.js')
+  const base = english.deviceHub.microphone
+  const states = [...VB_CABLE_STATES, 'unknown']
+  for (const code of DESKTOP_LOCALES) {
+    const file = await import(`../desktop/i18n/${code}.js`)
+    const text = file[code].deviceHub.microphone
+    for (const state of states) {
+      assert.ok(text.vbCableStates?.[state], `${code}: VB-CABLE ${state}`)
+      if (!ENGLISH_CODES.has(code)) assert.notEqual(text.vbCableStates[state], base.vbCableStates[state], `${code}: VB-CABLE ${state} left in English`)
+    }
+    for (const key of ['vbCableDownload', 'vbCableOpenDevmgmt']) {
+      assert.ok(text[key], `${code}: ${key}`)
+      if (!ENGLISH_CODES.has(code)) assert.notEqual(text[key], base[key], `${code}: ${key} left in English`)
+    }
+  }
+})

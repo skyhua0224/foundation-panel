@@ -16,6 +16,7 @@
   "allow-scan-game-libraries",
   "allow-refresh-sunshine-target",
   "allow-open-external-url",
+  "allow-open-device-manager",
   "allow-save-text-file",
   "allow-is-sunshine-running-in-user-mode",
   "allow-toggle-sunshine-mode",

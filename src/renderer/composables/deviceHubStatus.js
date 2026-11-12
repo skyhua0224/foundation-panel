@@ -11,7 +11,7 @@ export function usbipTransportNeedsCleanup(status = {}) {
 export const MICROPHONE_BACKENDS = Object.freeze(['auto', 'vb_cable', 'usbip_experimental', 'disabled'])
 
 /** The states of VB-CABLE the host reports (GET /api/audio/devices, vb_cable.state). */
-export const VB_CABLE_STATES = Object.freeze(['ready', 'partial', 'unavailable', 'missing'])
+export const VB_CABLE_STATES = Object.freeze(['ready', 'partial', 'disabled', 'unavailable', 'missing'])
 
 /** VB-CABLE's state from the host's answer; `unknown` while there is none or for a state this version does not know. */
 export function vbCableState(devices) {
@@ -19,8 +19,11 @@ export function vbCableState(devices) {
   return VB_CABLE_STATES.includes(state) ? state : 'unknown'
 }
 
-/** Only a state the host has reported and that is not ready offers the download. */
-export const vbCableNeedsInstall = (state) => VB_CABLE_STATES.includes(state) && state !== 'ready'
+/** Not installed, or installed but not usable for another reason: the download is offered. */
+export const vbCableNeedsInstall = (state) => VB_CABLE_STATES.includes(state) && state !== 'ready' && state !== 'disabled'
+
+/** Installed, its device disabled in the Device Manager: the way out is to enable it there, not to download it again. */
+export const vbCableNeedsEnable = (state) => state === 'disabled'
 
 /** The official page of VB-CABLE (the driver pack is downloaded from there). */
 export const VB_CABLE_PAGE = 'https://vb-audio.com/Cable/'

@@ -1592,6 +1592,17 @@ export const tr = {
       missingHintAuto: "Otomatik mod artık VB-CABLE kullanıyor. Ana bilgisayarın kendi USB sanal mikrofonunu kullanmak için önce usbip-win2 aktarımını yükleyin.",
       missingHintUsb: "USB sanal mikrofon oluşturulamıyor. Şimdilik VB-CABLE'ye geçin veya usbip-win2 aktarımını yükleyin.",
       useVbCable: "VB-CABLE kullanın",
+      vbCable: "VB-CABLE",
+      vbCableStates: {
+        ready: "Hazır",
+        partial: "Kısmen kullanılabilir",
+        disabled: "Yüklü, ancak Aygıt Yöneticisi’nde devre dışı",
+        unavailable: "Yüklü, ancak şu anda kullanılamıyor",
+        missing: "Yüklü değil",
+        unknown: "Denetleniyor"
+      },
+      vbCableDownload: "İndir",
+      vbCableOpenDevmgmt: "Aygıt Yöneticisi’ni aç",
       installTransport: "Kuruluma git usbip-win2",
       fallback: "Bunun yerine VB-CABLE kullanma",
       fallbackReason: "Sebep: {reason}",

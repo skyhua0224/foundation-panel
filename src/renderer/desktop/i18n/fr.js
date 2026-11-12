@@ -1592,6 +1592,17 @@ export const fr = {
       missingHintAuto: "Le mode automatique utilise désormais VB-CABLE. Pour utiliser le microphone virtuel USB de l'hôte, installez d'abord le transport usbip-win2.",
       missingHintUsb: "Le microphone virtuel USB ne peut pas être créé. Passez à VB-CABLE pour l'instant, ou installez le transport usbip-win2.",
       useVbCable: "Utilisez VB-CABLE",
+      vbCable: "VB-CABLE",
+      vbCableStates: {
+        ready: "Prêt",
+        partial: "Partiellement disponible",
+        disabled: "Installé, mais désactivé dans le Gestionnaire de périphériques",
+        unavailable: "Installé, mais actuellement indisponible",
+        missing: "Non installé",
+        unknown: "Vérification"
+      },
+      vbCableDownload: "Télécharger",
+      vbCableOpenDevmgmt: "Ouvrir le Gestionnaire de périphériques",
       installTransport: "Allez installer usbip-win2",
       fallback: "Utiliser VB-CABLE à la place",
       fallbackReason: "Raison : {reason}",

@@ -33,7 +33,7 @@ for (const f of fs.readdirSync(`${tauri}capabilities`)) {
 const REMOTE = new Set(JSON.parse(read(`${tauri}webui-permissions.json`)).filter((p) => p.startsWith('allow-')).map(commandOf))
 // the commands the Web UI itself invokes in the frame (src_assets/common/assets/web: window.__TAURI__.core.invoke and the save dialog); the Web repo's own test keeps this list true
 const WEBUI_INVOKES = ['scan_directory_for_apps', 'scan_game_libraries', 'list_display_modes', 'set_display_mode', 'get_current_dpi', 'set_desktop_dpi', 'is_sunshine_running_in_user_mode', 'toggle_sunshine_mode',
-  'launch_windows_hdr_calibration', 'set_vdd_keep_enabled', 'set_vdd_headless_create_enabled', 'refresh_sunshine_target', 'open_external_url', 'save_text_file']
+  'launch_windows_hdr_calibration', 'set_vdd_keep_enabled', 'set_vdd_headless_create_enabled', 'refresh_sunshine_target', 'open_external_url', 'open_device_manager', 'save_text_file']
 
 // the window a file of the renderer runs in
 const windowOf = (file) => (file.includes('/renderer/toolbar/') ? 'toolbar' : file.includes('/renderer/desktop/') ? 'desktop' : 'main')

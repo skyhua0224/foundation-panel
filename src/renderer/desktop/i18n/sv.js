@@ -1592,6 +1592,17 @@ export const sv = {
       missingHintAuto: "Automatiskt läge använder nu VB-CABLE. För att använda värdens egen virtuella mikrofon USB, installera först usbip-win2-transporten.",
       missingHintUsb: "Den virtuella mikrofonen USB kan inte skapas. Byt till VB-CABLE för nu, eller installera usbip-win2-transporten.",
       useVbCable: "Använd VB-CABLE",
+      vbCable: "VB-CABLE",
+      vbCableStates: {
+        ready: "Redo",
+        partial: "Delvis tillgänglig",
+        disabled: "Installerad, men inaktiverad i Enhetshanteraren",
+        unavailable: "Installerad, men inte tillgänglig just nu",
+        missing: "Inte installerad",
+        unknown: "Kontrollerar"
+      },
+      vbCableDownload: "Ladda ner",
+      vbCableOpenDevmgmt: "Öppna Enhetshanteraren",
       installTransport: "Gå till installera usbip-win2",
       fallback: "Använder VB-CABLE istället",
       fallbackReason: "Orsak: {reason}",

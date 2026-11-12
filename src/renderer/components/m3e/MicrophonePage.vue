@@ -37,6 +37,9 @@
           <template v-if="vbNeedsInstall" #trail>
             <MButton variant="tonal" size="sm" icon="download" @click="openVbCablePage">{{ text.vbCableDownload }}</MButton>
           </template>
+          <template v-else-if="vbNeedsEnable" #trail>
+            <MButton variant="tonal" size="sm" icon="open_in_new" @click="openDevices">{{ text.vbCableOpenDevmgmt }}</MButton>
+          </template>
         </MItem>
       </MGroup>
     </MSection>
@@ -64,12 +67,12 @@
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, reactive, ref, watch, watchEffect } from 'vue'
 import { ElMessage } from '../../composables/notifyMessage.js'
 import { MPage, MSection, MGroup, MItem, MChip, MStatusPill, MFooter, useNotify, MSeg, MNotice, MButton, MIconButton, MSkeleton, MIcon, MProgress, MStatusPills } from 'foundation-ui/vue'
-import { openExternalUrl, virtualMicrophone } from '../../tauri-adapter.js'
+import { openDeviceManager, openExternalUrl, virtualMicrophone } from '../../tauri-adapter.js'
 import { audioDevicesChannel, micStatusChannel } from '../../composables/deviceStatusStore.js'
 import {
   MICROPHONE_BACKENDS, canTestMicrophone, microphoneBufferedMs, microphoneComponentMissing,
   microphoneOverviewState, microphoneStatusTone, microphoneUsesUsbip, microphoneInputFresh,
-  microphoneInputLevel, microphoneTestIsLive, VB_CABLE_PAGE, vbCableNeedsInstall, vbCableState,
+  microphoneInputLevel, microphoneTestIsLive, VB_CABLE_PAGE, vbCableNeedsEnable, vbCableNeedsInstall, vbCableState,
 } from '../../composables/deviceHubStatus.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
@@ -97,7 +100,9 @@ const usesUsbip = computed(() => microphoneUsesUsbip(status))
 // VB-CABLE as the host finds it (the audio endpoint list); `unknown` until the host has answered
 const vbState = computed(() => vbCableState(devices.value))
 const vbNeedsInstall = computed(() => vbCableNeedsInstall(vbState.value))
+const vbNeedsEnable = computed(() => vbCableNeedsEnable(vbState.value))
 const openVbCablePage = () => { void openExternalUrl(VB_CABLE_PAGE) }
+const openDevices = () => { void openDeviceManager() }
 const componentMissing = computed(() => microphoneComponentMissing(status))
 const bufferedMs = computed(() => microphoneBufferedMs(status))
 const liveInput = computed(() => Number(status.input_frames) > 0)

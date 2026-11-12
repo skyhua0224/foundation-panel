@@ -40,6 +40,11 @@ export function isAllowedExternalUrl(url) {
   return /^(https?:\/\/|ms-windows-store:\/\/)/i.test(String(url || '').trim())
 }
 
+// the Windows Device Manager, to enable a disabled device (VB-CABLE); never changes a device itself
+export async function openDeviceManager() {
+  return invoke('open_device_manager')
+}
+
 export async function openExternalUrl(url) {
   try {
     if (!isAllowedExternalUrl(url)) return false
@@ -269,6 +274,7 @@ export async function readDirectory(path) {
 export default {
   darkMode,
   openExternalUrl,
+  openDeviceManager,
   vdd,
   vmouse,
   vigem,

@@ -1592,6 +1592,17 @@ export const ko = {
       missingHintAuto: "이제 자동 모드에서는 VB-CABLE를 사용합니다. 호스트의 USB 가상 마이크를 사용하려면 먼저 usbip-win2 전송을 설치하세요.",
       missingHintUsb: "USB 가상 마이크를 생성할 수 없습니다. 지금은 VB-CABLE로 전환하거나 usbip-win2 전송을 설치하세요.",
       useVbCable: "VB-CABLE 사용",
+      vbCable: "VB-CABLE",
+      vbCableStates: {
+        ready: "사용 가능",
+        partial: "일부만 사용 가능",
+        disabled: "설치되었지만 장치 관리자에서 사용 안 함으로 설정됨",
+        unavailable: "설치되었지만 현재 사용할 수 없음",
+        missing: "설치되지 않음",
+        unknown: "확인 중"
+      },
+      vbCableDownload: "다운로드",
+      vbCableOpenDevmgmt: "장치 관리자 열기",
       installTransport: "설치하러 가기 usbip-win2",
       fallback: "대신 VB-CABLE 사용",
       fallbackReason: "이유: {reason}",

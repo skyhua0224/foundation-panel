@@ -1280,11 +1280,13 @@ export const zh = {
       "vbCableStates": {
         "ready": "已就绪",
         "partial": "仅部分可用",
-        "unavailable": "不可用：已禁用或已卸载",
+        "disabled": "已安装但已在设备管理器中禁用",
+        "unavailable": "已安装但当前不可用",
         "missing": "未安装",
         "unknown": "正在检查"
       },
       "vbCableDownload": "下载",
+      "vbCableOpenDevmgmt": "打开设备管理器",
       "backends": {
         "auto": "自动",
         "usbip_experimental": "USB 虚拟麦克风",
