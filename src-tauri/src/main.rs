@@ -312,6 +312,7 @@ fn main() {
             controller_hub::get_controller_hub_config,
             controller_hub::save_controller_hub_config,
             controller_hub::get_virtual_microphone_status,
+            controller_hub::get_audio_devices,
             controller_hub::test_virtual_microphone,
             controller_hub::save_microphone_backend,
             vigem::get_vigem_status,

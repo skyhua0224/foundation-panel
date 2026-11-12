@@ -32,6 +32,12 @@
             <MSeg :model-value="backendChoice" block :label="text.backend" :options="backendOptions" :disabled="loadError || savingBackend || !status.configured_backend" @update:model-value="onBackend" />
           </template>
         </MItem>
+        <!-- VB-CABLE is listed whatever backend is chosen: its state, and the way to get it when the host does not find it -->
+        <MItem data-vb-cable :data-vb-state="vbState" icon="cable" :title="text.vbCable" :text="text.vbCableStates[vbState]">
+          <template v-if="vbNeedsInstall" #trail>
+            <MButton variant="tonal" size="sm" icon="download" @click="openVbCablePage">{{ text.vbCableDownload }}</MButton>
+          </template>
+        </MItem>
       </MGroup>
     </MSection>
 
@@ -58,12 +64,12 @@
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, reactive, ref, watch, watchEffect } from 'vue'
 import { ElMessage } from '../../composables/notifyMessage.js'
 import { MPage, MSection, MGroup, MItem, MChip, MStatusPill, MFooter, useNotify, MSeg, MNotice, MButton, MIconButton, MSkeleton, MIcon, MProgress, MStatusPills } from 'foundation-ui/vue'
-import { virtualMicrophone } from '../../tauri-adapter.js'
-import { micStatusChannel } from '../../composables/deviceStatusStore.js'
+import { openExternalUrl, virtualMicrophone } from '../../tauri-adapter.js'
+import { audioDevicesChannel, micStatusChannel } from '../../composables/deviceStatusStore.js'
 import {
   MICROPHONE_BACKENDS, canTestMicrophone, microphoneBufferedMs, microphoneComponentMissing,
   microphoneOverviewState, microphoneStatusTone, microphoneUsesUsbip, microphoneInputFresh,
-  microphoneInputLevel, microphoneTestIsLive,
+  microphoneInputLevel, microphoneTestIsLive, VB_CABLE_PAGE, vbCableNeedsInstall, vbCableState,
 } from '../../composables/deviceHubStatus.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
@@ -74,6 +80,7 @@ const loading = ref(true)
 const testing = ref(false)
 const loadError = ref(false)
 const status = reactive({})
+const devices = ref(null)
 let pollTimer
 let disposed = false
 let pending = false
@@ -87,6 +94,10 @@ const flow = computed(() => [
   { id: 'apps', icon: 'apps', label: t.value.m3e.micFlow.apps, on: !!status.online },
 ])
 const usesUsbip = computed(() => microphoneUsesUsbip(status))
+// VB-CABLE as the host finds it (the audio endpoint list); `unknown` until the host has answered
+const vbState = computed(() => vbCableState(devices.value))
+const vbNeedsInstall = computed(() => vbCableNeedsInstall(vbState.value))
+const openVbCablePage = () => { void openExternalUrl(VB_CABLE_PAGE) }
 const componentMissing = computed(() => microphoneComponentMissing(status))
 const bufferedMs = computed(() => microphoneBufferedMs(status))
 const liveInput = computed(() => Number(status.input_frames) > 0)
@@ -126,10 +137,14 @@ async function refresh(options = {}) {
   pending = true
   loading.value = true
   try {
-    const result = await micStatusChannel.fetch({ force: options?.force === true })
+    const [result, audio] = await Promise.all([
+      micStatusChannel.fetch({ force: options?.force === true }),
+      audioDevicesChannel.fetch({ force: options?.force === true }).catch(() => null),
+    ])
     if (disposed) return
     loadError.value = !result?.success
     if (result?.success) Object.assign(status, result.data)
+    if (audio?.success) devices.value = audio.data
   } catch {
     if (!disposed) loadError.value = true
   } finally {

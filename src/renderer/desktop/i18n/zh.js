@@ -1276,6 +1276,15 @@ export const zh = {
         "stopping": "串流已结束，正在移除虚拟麦克风。"
       },
       "backend": "麦克风后端",
+      "vbCable": "VB-CABLE",
+      "vbCableStates": {
+        "ready": "已就绪",
+        "partial": "仅部分可用",
+        "unavailable": "不可用：已禁用或已卸载",
+        "missing": "未安装",
+        "unknown": "正在检查"
+      },
+      "vbCableDownload": "下载",
       "backends": {
         "auto": "自动",
         "usbip_experimental": "USB 虚拟麦克风",

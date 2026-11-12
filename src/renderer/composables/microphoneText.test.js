@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { zh } from '../desktop/i18n/zh.js'
 import { en } from '../desktop/i18n/en.js'
-import { MICROPHONE_BACKENDS } from './deviceHubStatus.js'
+import { MICROPHONE_BACKENDS, VB_CABLE_STATES } from './deviceHubStatus.js'
 
 const STATES = ['unknown', 'disabled', 'unsupported', 'faulted', 'missing', 'waiting', 'active', 'starting', 'idle', 'capturing', 'streaming', 'stopping']
 const CODES = [
@@ -24,6 +24,8 @@ for (const [name, locale] of [['zh', zh], ['en', en]]) {
       assert.ok(text.backendHints[backend], `${backend} hint`)
     }
     for (const code of [...CODES, 'unknown']) assert.ok(text.errors[code], code)
+    for (const state of [...VB_CABLE_STATES, 'unknown']) assert.ok(text.vbCableStates[state], `VB-CABLE ${state}`)
+    assert.ok(text.vbCable && text.vbCableDownload, 'VB-CABLE row texts')
     for (const key of LIVE_KEYS) assert.ok(typeof text[key] === 'string' && text[key], key)
   })
 

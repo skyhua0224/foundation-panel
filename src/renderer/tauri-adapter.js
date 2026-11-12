@@ -115,6 +115,11 @@ export const controllerHub = {
   }),
 }
 
+// the audio endpoints of the host and the VB-CABLE state (GET /api/audio/devices)
+export const audioDevices = {
+  get: () => wrapResult('get_audio_devices'),
+}
+
 export const virtualMicrophone = {
   getStatus: () => wrapResult('get_virtual_microphone_status'),
   test: () => wrapResult('test_virtual_microphone'),
@@ -269,6 +274,7 @@ export default {
   vigem,
   controllerHub,
   virtualMicrophone,
+  audioDevices,
   dualsense,
   usbip,
   rtxHdr,

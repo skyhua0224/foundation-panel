@@ -74,6 +74,19 @@ pub async fn get_virtual_microphone_status() -> Result<MicrophoneStatus, String>
     read_device_api_response(response, "virtual microphone status").await
 }
 
+/// The audio endpoints of the host (GET /api/audio/devices): render and capture lists with the known virtual devices
+/// flagged, and the VB-CABLE state. Passed through as the host sends it; the pages read the fields they need.
+#[tauri::command]
+pub async fn get_audio_devices() -> Result<serde_json::Value, String> {
+    let endpoint = device_api_url("/api/audio/devices").await?;
+    let response = sunshine::create_https_client()?
+        .get(endpoint)
+        .send()
+        .await
+        .map_err(|error| format!("Unable to query audio devices: {error}"))?;
+    read_device_api_response(response, "audio devices").await
+}
+
 #[tauri::command]
 pub async fn test_virtual_microphone() -> Result<MicrophoneTestResult, String> {
     let endpoint = device_api_url("/api/microphone/test").await?;

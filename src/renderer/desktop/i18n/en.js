@@ -1276,6 +1276,15 @@ Output only one short sentence, no explanation. Reply in English.`,
         "stopping": "Streaming ended; the virtual microphone is being removed."
       },
       "backend": "Microphone backend",
+      "vbCable": "VB-CABLE",
+      "vbCableStates": {
+        "ready": "Ready",
+        "partial": "Partly available",
+        "unavailable": "Unavailable: disabled or removed",
+        "missing": "Not installed",
+        "unknown": "Checking"
+      },
+      "vbCableDownload": "Download",
       "backends": {
         "auto": "Automatic",
         "usbip_experimental": "USB virtual microphone",

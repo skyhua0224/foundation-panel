@@ -11,6 +11,10 @@ import {
   microphoneInputFresh,
   microphoneInputLevel,
   microphoneTestIsLive,
+  VB_CABLE_PAGE,
+  VB_CABLE_STATES,
+  vbCableNeedsInstall,
+  vbCableState,
 } from './deviceHubStatus.js'
 
 const usb = { configured_backend: 'usbip_experimental', component_available: true, active_backend: 'usbip_experimental' }
@@ -91,4 +95,19 @@ test('a live test answer is recognized regardless of its backend', () => {
   assert.equal(microphoneTestIsLive({ mode: 'live', backend: 'vb_cable', success: true }), true)
   assert.equal(microphoneTestIsLive({ mode: 'tone', backend: 'usbip_experimental', success: true }), false)
   assert.equal(microphoneTestIsLive({}), false)
+})
+
+test('VB-CABLE: the state of the host answer, `unknown` before it and for a state this version does not know', () => {
+  for (const state of VB_CABLE_STATES) assert.equal(vbCableState({ success: true, vb_cable: { state } }), state)
+  assert.equal(vbCableState(null), 'unknown')
+  assert.equal(vbCableState({}), 'unknown')
+  assert.equal(vbCableState({ vb_cable: { state: 'unsupported' } }), 'unknown')
+  assert.equal(vbCableState({ vb_cable: { state: 'something-new' } }), 'unknown')
+})
+
+test('VB-CABLE: the download is offered for every reported state but ready, and never before the host has answered', () => {
+  assert.equal(vbCableNeedsInstall('ready'), false)
+  assert.equal(vbCableNeedsInstall('unknown'), false)
+  for (const state of ['partial', 'unavailable', 'missing']) assert.equal(vbCableNeedsInstall(state), true, state)
+  assert.match(VB_CABLE_PAGE, /^https:\/\/vb-audio\.com\//)
 })
