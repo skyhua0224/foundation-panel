@@ -1553,7 +1553,7 @@ export const fr = {
         streaming: "Une application est en cours d'enregistrement et l'audio du client arrive.",
         stopping: "La diffusion est terminée ; le microphone virtuel est supprimé."
       },
-      backend: "Back-end du microphone",
+      backend: "Mode du microphone",
       backends: {
         auto: "Automatique",
         usbip_experimental: "USB microphone virtuel",
@@ -1592,6 +1592,33 @@ export const fr = {
       missingHintAuto: "Le mode automatique utilise désormais VB-CABLE. Pour utiliser le microphone virtuel USB de l'hôte, installez d'abord le transport usbip-win2.",
       missingHintUsb: "Le microphone virtuel USB ne peut pas être créé. Passez à VB-CABLE pour l'instant, ou installez le transport usbip-win2.",
       useVbCable: "Utilisez VB-CABLE",
+      vbCable: "VB-CABLE",
+      vbCableStates: {
+        ready: "Prêt",
+        partial: "Partiellement disponible",
+        disabled: "Installé, mais désactivé dans le Gestionnaire de périphériques",
+        unavailable: "Installé, mais actuellement indisponible",
+        missing: "Non installé",
+        unknown: "Vérification"
+      },
+      vbCableDownload: "Télécharger",
+      vbCableOpenDevmgmt: "Ouvrir le Gestionnaire de périphériques",
+      vbCableInstall: "Installer VB-CABLE",
+      vbCableEnable: "Activer VB-CABLE",
+      vbCableInstallConfirm: "L’hôte télécharge le pilote VB-CABLE depuis VB-Audio, vérifie la signature de son programme d’installation et l’installe en mode silencieux avec les droits d’administrateur. Cela ajoute un périphérique audio virtuel à Windows. Continuer ?",
+      vbCableEnableConfirm: "L’hôte active le périphérique VB-CABLE désactivé dans le Gestionnaire de périphériques (pnputil /enable-device). Continuer ?",
+      vbCableJobs: {
+        downloading: "Téléchargement de VB-CABLE…",
+        verifying: "Vérification de la signature…",
+        installing: "Installation de VB-CABLE…",
+        enabling: "Activation de VB-CABLE…"
+      },
+      vbCableErrors: {
+        download: "Le téléchargement a échoué. Vérifiez le réseau et réessayez, ou téléchargez-le manuellement.",
+        signature: "Le programme d’installation n’a pas de signature valide de VB-Audio. L’installation a été arrêtée.",
+        admin: "Sunshine ne s’exécute pas avec les droits d’administrateur et ne peut donc ni installer ni activer de pilotes.",
+        failed: "Échec : VB-CABLE reste indisponible. Ouvrez le Gestionnaire de périphériques ou installez-le manuellement."
+      },
       installTransport: "Allez installer usbip-win2",
       fallback: "Utiliser VB-CABLE à la place",
       fallbackReason: "Raison : {reason}",

@@ -1553,7 +1553,7 @@ export const es = {
         streaming: "Se está grabando una aplicación y llega el audio del cliente.",
         stopping: "La transmisión terminó; Se está quitando el micrófono virtual."
       },
-      backend: "Parte trasera del micrófono",
+      backend: "Modo de micrófono",
       backends: {
         auto: "Automático",
         usbip_experimental: "USB micrófono virtual",
@@ -1592,6 +1592,33 @@ export const es = {
       missingHintAuto: "El modo automático ahora usa VB-CABLE. Para utilizar el micrófono virtual USB del anfitrión, instale primero el transporte usbip-win2.",
       missingHintUsb: "No se puede crear el micrófono virtual USB. Cambie a VB-CABLE por ahora o instale el transporte usbip-win2.",
       useVbCable: "Utilice VB-CABLE",
+      vbCable: "VB-CABLE",
+      vbCableStates: {
+        ready: "Listo",
+        partial: "Disponible parcialmente",
+        disabled: "Instalado, pero deshabilitado en el Administrador de dispositivos",
+        unavailable: "Instalado, pero no disponible por ahora",
+        missing: "No instalado",
+        unknown: "Comprobando"
+      },
+      vbCableDownload: "Descargar",
+      vbCableOpenDevmgmt: "Abrir el Administrador de dispositivos",
+      vbCableInstall: "Instalar VB-CABLE",
+      vbCableEnable: "Habilitar VB-CABLE",
+      vbCableInstallConfirm: "El host descarga el controlador VB-CABLE de VB-Audio, comprueba la firma de su programa de instalación y lo instala en silencio con permisos de administrador. Esto añade un dispositivo de audio virtual a Windows. ¿Continuar?",
+      vbCableEnableConfirm: "El host habilita el dispositivo VB-CABLE que está deshabilitado en el Administrador de dispositivos (pnputil /enable-device). ¿Continuar?",
+      vbCableJobs: {
+        downloading: "Descargando VB-CABLE…",
+        verifying: "Comprobando la firma…",
+        installing: "Instalando VB-CABLE…",
+        enabling: "Habilitando VB-CABLE…"
+      },
+      vbCableErrors: {
+        download: "La descarga falló. Comprueba la red e inténtalo de nuevo, o descárgalo manualmente.",
+        signature: "El programa de instalación no tiene una firma válida de VB-Audio. Se detuvo la instalación.",
+        admin: "Sunshine no se ejecuta con permisos de administrador, por lo que no puede instalar ni habilitar controladores.",
+        failed: "No funcionó: VB-CABLE sigue sin estar disponible. Abre el Administrador de dispositivos o instálalo manualmente."
+      },
       installTransport: "Ir a instalar usbip-win2",
       fallback: "Usando VB-CABLE en su lugar",
       fallbackReason: "Razón: {reason}",

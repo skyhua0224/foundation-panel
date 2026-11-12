@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { zh } from '../desktop/i18n/zh.js'
 import { en } from '../desktop/i18n/en.js'
-import { MICROPHONE_BACKENDS } from './deviceHubStatus.js'
+import { MICROPHONE_BACKENDS, VB_CABLE_STATES } from './deviceHubStatus.js'
 
 const STATES = ['unknown', 'disabled', 'unsupported', 'faulted', 'missing', 'waiting', 'active', 'starting', 'idle', 'capturing', 'streaming', 'stopping']
 const CODES = [
@@ -24,6 +24,8 @@ for (const [name, locale] of [['zh', zh], ['en', en]]) {
       assert.ok(text.backendHints[backend], `${backend} hint`)
     }
     for (const code of [...CODES, 'unknown']) assert.ok(text.errors[code], code)
+    for (const state of [...VB_CABLE_STATES, 'unknown']) assert.ok(text.vbCableStates[state], `VB-CABLE ${state}`)
+    assert.ok(text.vbCable && text.vbCableDownload, 'VB-CABLE row texts')
     for (const key of LIVE_KEYS) assert.ok(typeof text[key] === 'string' && text[key], key)
   })
 
@@ -42,3 +44,33 @@ for (const [name, locale] of [['zh', zh], ['en', en]]) {
     assert.doesNotMatch(all, /experimental|实验|Virtual Device Host|prototype|原型|Sidecar|DualSense/i)
   })
 }
+
+// Every desktop language has the VB-CABLE row texts in its own words (English only where the language is English).
+import { DESKTOP_LOCALES } from '../desktop/i18n/merge.js'
+const ENGLISH_CODES = new Set(['en', 'en_GB', 'en_US'])
+test('the VB-CABLE row is translated in every desktop language file', async () => {
+  const { en: english } = await import('../desktop/i18n/en.js')
+  const base = english.deviceHub.microphone
+  const states = [...VB_CABLE_STATES, 'unknown']
+  for (const code of DESKTOP_LOCALES) {
+    const file = await import(`../desktop/i18n/${code}.js`)
+    const text = file[code].deviceHub.microphone
+    for (const state of states) {
+      assert.ok(text.vbCableStates?.[state], `${code}: VB-CABLE ${state}`)
+      if (!ENGLISH_CODES.has(code)) assert.notEqual(text.vbCableStates[state], base.vbCableStates[state], `${code}: VB-CABLE ${state} left in English`)
+    }
+    for (const job of ['downloading', 'verifying', 'installing', 'enabling']) {
+      assert.ok(text.vbCableJobs?.[job], `${code}: job ${job}`)
+      if (!ENGLISH_CODES.has(code)) assert.notEqual(text.vbCableJobs[job], base.vbCableJobs[job], `${code}: job ${job} left in English`)
+    }
+    for (const kind of ['download', 'signature', 'admin', 'failed']) {
+      assert.ok(text.vbCableErrors?.[kind], `${code}: error ${kind}`)
+      if (!ENGLISH_CODES.has(code)) assert.notEqual(text.vbCableErrors[kind], base.vbCableErrors[kind], `${code}: error ${kind} left in English`)
+    }
+    if (!ENGLISH_CODES.has(code)) assert.notEqual(text.backend, base.backend, `${code}: the microphone mode title is left in English`)
+    for (const key of ['vbCableInstall', 'vbCableEnable', 'vbCableInstallConfirm', 'vbCableEnableConfirm', 'vbCableDownload', 'vbCableOpenDevmgmt']) {
+      assert.ok(text[key], `${code}: ${key}`)
+      if (!ENGLISH_CODES.has(code)) assert.notEqual(text[key], base[key], `${code}: ${key} left in English`)
+    }
+  }
+})

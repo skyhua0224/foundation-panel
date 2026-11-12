@@ -1553,7 +1553,7 @@ export const ko = {
         streaming: "애플리케이션이 녹음 중이고 클라이언트 오디오가 도착하고 있습니다.",
         stopping: "스트리밍이 종료되었습니다. 가상 마이크가 제거되고 있습니다."
       },
-      backend: "마이크 백엔드",
+      backend: "마이크 방식",
       backends: {
         auto: "자동 설정",
         usbip_experimental: "USB 가상 마이크",
@@ -1592,6 +1592,33 @@ export const ko = {
       missingHintAuto: "이제 자동 모드에서는 VB-CABLE를 사용합니다. 호스트의 USB 가상 마이크를 사용하려면 먼저 usbip-win2 전송을 설치하세요.",
       missingHintUsb: "USB 가상 마이크를 생성할 수 없습니다. 지금은 VB-CABLE로 전환하거나 usbip-win2 전송을 설치하세요.",
       useVbCable: "VB-CABLE 사용",
+      vbCable: "VB-CABLE",
+      vbCableStates: {
+        ready: "사용 가능",
+        partial: "일부만 사용 가능",
+        disabled: "설치되었지만 장치 관리자에서 사용 안 함으로 설정됨",
+        unavailable: "설치되었지만 현재 사용할 수 없음",
+        missing: "설치되지 않음",
+        unknown: "확인 중"
+      },
+      vbCableDownload: "다운로드",
+      vbCableOpenDevmgmt: "장치 관리자 열기",
+      vbCableInstall: "VB-CABLE 설치",
+      vbCableEnable: "VB-CABLE 사용",
+      vbCableInstallConfirm: "호스트가 VB-Audio에서 VB-CABLE 드라이버를 내려받고 설치 프로그램의 서명을 확인한 뒤 관리자 권한으로 자동 설치합니다. Windows에 가상 오디오 장치가 추가됩니다. 계속할까요?",
+      vbCableEnableConfirm: "호스트가 장치 관리자에서 사용 안 함으로 설정된 VB-CABLE 장치를 사용하도록 설정합니다(pnputil /enable-device). 계속할까요?",
+      vbCableJobs: {
+        downloading: "VB-CABLE을 내려받는 중…",
+        verifying: "서명을 확인하는 중…",
+        installing: "VB-CABLE을 설치하는 중…",
+        enabling: "VB-CABLE을 사용하도록 설정하는 중…"
+      },
+      vbCableErrors: {
+        download: "내려받지 못했습니다. 네트워크를 확인하고 다시 시도하거나 직접 내려받으세요.",
+        signature: "설치 프로그램에 VB-Audio의 유효한 서명이 없습니다. 설치를 중단했습니다.",
+        admin: "Sunshine이 관리자 권한으로 실행되고 있지 않아 드라이버를 설치하거나 사용 설정할 수 없습니다.",
+        failed: "실패했습니다. VB-CABLE을 아직 사용할 수 없습니다. 장치 관리자에서 확인하거나 직접 설치하세요."
+      },
       installTransport: "설치하러 가기 usbip-win2",
       fallback: "대신 VB-CABLE 사용",
       fallbackReason: "이유: {reason}",

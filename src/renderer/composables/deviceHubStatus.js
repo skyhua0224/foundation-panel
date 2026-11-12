@@ -10,6 +10,42 @@ export function usbipTransportNeedsCleanup(status = {}) {
 
 export const MICROPHONE_BACKENDS = Object.freeze(['auto', 'vb_cable', 'usbip_experimental', 'disabled'])
 
+/** The states of VB-CABLE the host reports (GET /api/audio/devices, vb_cable.state). */
+export const VB_CABLE_STATES = Object.freeze(['ready', 'partial', 'disabled', 'unavailable', 'missing'])
+
+/** VB-CABLE's state from the host's answer; `unknown` while there is none or for a state this version does not know. */
+export function vbCableState(devices) {
+  const state = devices?.vb_cable?.state
+  return VB_CABLE_STATES.includes(state) ? state : 'unknown'
+}
+
+/** Not installed, or installed but not usable for another reason: the download is offered. */
+export const vbCableNeedsInstall = (state) => VB_CABLE_STATES.includes(state) && state !== 'ready' && state !== 'disabled'
+
+/** Installed, its device disabled in the Device Manager: the way out is to enable it there, not to download it again. */
+export const vbCableNeedsEnable = (state) => state === 'disabled'
+
+/** The job of the host that installs or enables VB-CABLE, as GET /api/audio/devices reports it (`vb_cable.job`). */
+export function vbCableJob(devices) {
+  const job = devices?.vb_cable?.job || {}
+  const step = ['downloading', 'verifying', 'installing', 'enabling'].includes(job.step) ? job.step : ''
+  return { running: job.running === true, step: job.running === true ? step || 'downloading' : step, failed: job.step === 'failed', errorCode: typeof job.error_code === 'string' ? job.error_code : '' }
+}
+
+/** What a failed job tells the person: the download or the pack, the signature, the missing administrator rights, or "still unavailable". */
+export function vbCableErrorKind(code) {
+  switch (code) {
+    case 'VB_DOWNLOAD_FAILED': case 'VB_EXTRACT_FAILED': case 'VB_SETUP_MISSING': return 'download'
+    case 'VB_SIGNATURE_INVALID': case 'VB_SIGNER_UNEXPECTED': return 'signature'
+    case 'VB_NEEDS_ADMIN': return 'admin'
+    case '': return ''
+    default: return 'failed'
+  }
+}
+
+/** The official page of VB-CABLE (the driver pack is downloaded from there). */
+export const VB_CABLE_PAGE = 'https://vb-audio.com/Cable/'
+
 /** Backends that need the usbip-win2 host component. */
 const needsUsbip = (backend) => backend === 'usbip_experimental' || backend === 'auto'
 

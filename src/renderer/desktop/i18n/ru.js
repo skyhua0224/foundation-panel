@@ -1553,7 +1553,7 @@ export const ru = {
         streaming: "Приложение выполняет запись, и поступает клиентский звук.",
         stopping: "Стриминг завершен; виртуальный микрофон удаляется."
       },
-      backend: "Серверная часть микрофона",
+      backend: "Режим микрофона",
       backends: {
         auto: "Автоматически",
         usbip_experimental: "USB виртуальный микрофон",
@@ -1592,6 +1592,33 @@ export const ru = {
       missingHintAuto: "В автоматическом режиме теперь используется VB-CABLE. Чтобы использовать собственный виртуальный микрофон USB хоста, сначала установите транспорт usbip-win2.",
       missingHintUsb: "Виртуальный микрофон USB создать невозможно. Переключитесь на VB-CABLE или установите транспорт usbip-win2.",
       useVbCable: "Используйте VB-CABLE",
+      vbCable: "VB-CABLE",
+      vbCableStates: {
+        ready: "Готово",
+        partial: "Доступно частично",
+        disabled: "Установлено, но отключено в Диспетчере устройств",
+        unavailable: "Установлено, но сейчас недоступно",
+        missing: "Не установлено",
+        unknown: "Проверка"
+      },
+      vbCableDownload: "Скачать",
+      vbCableOpenDevmgmt: "Открыть Диспетчер устройств",
+      vbCableInstall: "Установить VB-CABLE",
+      vbCableEnable: "Включить VB-CABLE",
+      vbCableInstallConfirm: "Хост скачает драйвер VB-CABLE с сайта VB-Audio, проверит подпись его установщика и установит его в тихом режиме с правами администратора. В Windows появится виртуальное аудиоустройство. Продолжить?",
+      vbCableEnableConfirm: "Хост включит устройство VB-CABLE, отключённое в Диспетчере устройств (pnputil /enable-device). Продолжить?",
+      vbCableJobs: {
+        downloading: "Скачивание VB-CABLE…",
+        verifying: "Проверка подписи…",
+        installing: "Установка VB-CABLE…",
+        enabling: "Включение VB-CABLE…"
+      },
+      vbCableErrors: {
+        download: "Не удалось скачать. Проверьте сеть и повторите попытку или скачайте вручную.",
+        signature: "У установщика нет действительной подписи VB-Audio. Установка остановлена.",
+        admin: "Sunshine запущен без прав администратора и не может устанавливать или включать драйверы.",
+        failed: "Не получилось: VB-CABLE по-прежнему недоступен. Откройте Диспетчер устройств или установите его вручную."
+      },
       installTransport: "Перейти к установке usbip-win2",
       fallback: "Вместо этого используйте VB-CABLE",
       fallbackReason: "Причина: {reason}",

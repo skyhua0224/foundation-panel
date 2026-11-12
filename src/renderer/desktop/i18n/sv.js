@@ -1553,7 +1553,7 @@ export const sv = {
         streaming: "En applikation spelar in och klientljud anländer.",
         stopping: "Streaming avslutad; den virtuella mikrofonen tas bort."
       },
-      backend: "Mikrofon backend",
+      backend: "Mikrofonläge",
       backends: {
         auto: "Automatisk",
         usbip_experimental: "USB virtuell mikrofon",
@@ -1592,6 +1592,33 @@ export const sv = {
       missingHintAuto: "Automatiskt läge använder nu VB-CABLE. För att använda värdens egen virtuella mikrofon USB, installera först usbip-win2-transporten.",
       missingHintUsb: "Den virtuella mikrofonen USB kan inte skapas. Byt till VB-CABLE för nu, eller installera usbip-win2-transporten.",
       useVbCable: "Använd VB-CABLE",
+      vbCable: "VB-CABLE",
+      vbCableStates: {
+        ready: "Redo",
+        partial: "Delvis tillgänglig",
+        disabled: "Installerad, men inaktiverad i Enhetshanteraren",
+        unavailable: "Installerad, men inte tillgänglig just nu",
+        missing: "Inte installerad",
+        unknown: "Kontrollerar"
+      },
+      vbCableDownload: "Ladda ner",
+      vbCableOpenDevmgmt: "Öppna Enhetshanteraren",
+      vbCableInstall: "Installera VB-CABLE",
+      vbCableEnable: "Aktivera VB-CABLE",
+      vbCableInstallConfirm: "Värden hämtar VB-CABLE-drivrutinen från VB-Audio, kontrollerar signaturen på installationsprogrammet och installerar det tyst med administratörsbehörighet. Det lägger till en virtuell ljudenhet i Windows. Fortsätta?",
+      vbCableEnableConfirm: "Värden aktiverar VB-CABLE-enheten som är inaktiverad i Enhetshanteraren (pnputil /enable-device). Fortsätta?",
+      vbCableJobs: {
+        downloading: "Hämtar VB-CABLE…",
+        verifying: "Kontrollerar signaturen…",
+        installing: "Installerar VB-CABLE…",
+        enabling: "Aktiverar VB-CABLE…"
+      },
+      vbCableErrors: {
+        download: "Hämtningen misslyckades. Kontrollera nätverket och försök igen, eller hämta manuellt.",
+        signature: "Installationsprogrammet har ingen giltig signatur från VB-Audio. Installationen avbröts.",
+        admin: "Sunshine körs inte med administratörsbehörighet och kan därför inte installera eller aktivera drivrutiner.",
+        failed: "Det fungerade inte: VB-CABLE är fortfarande inte tillgänglig. Öppna Enhetshanteraren eller installera manuellt."
+      },
       installTransport: "Gå till installera usbip-win2",
       fallback: "Använder VB-CABLE istället",
       fallbackReason: "Orsak: {reason}",

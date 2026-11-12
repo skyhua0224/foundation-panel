@@ -1553,7 +1553,7 @@ export const tr = {
         streaming: "Bir uygulama kayıt yapıyor ve istemci sesi geliyor.",
         stopping: "Akış sona erdi; sanal mikrofon kaldırılıyor."
       },
-      backend: "Mikrofon arka ucu",
+      backend: "Mikrofon modu",
       backends: {
         auto: "Otomatik",
         usbip_experimental: "USB sanal mikrofon",
@@ -1592,6 +1592,33 @@ export const tr = {
       missingHintAuto: "Otomatik mod artık VB-CABLE kullanıyor. Ana bilgisayarın kendi USB sanal mikrofonunu kullanmak için önce usbip-win2 aktarımını yükleyin.",
       missingHintUsb: "USB sanal mikrofon oluşturulamıyor. Şimdilik VB-CABLE'ye geçin veya usbip-win2 aktarımını yükleyin.",
       useVbCable: "VB-CABLE kullanın",
+      vbCable: "VB-CABLE",
+      vbCableStates: {
+        ready: "Hazır",
+        partial: "Kısmen kullanılabilir",
+        disabled: "Yüklü, ancak Aygıt Yöneticisi’nde devre dışı",
+        unavailable: "Yüklü, ancak şu anda kullanılamıyor",
+        missing: "Yüklü değil",
+        unknown: "Denetleniyor"
+      },
+      vbCableDownload: "İndir",
+      vbCableOpenDevmgmt: "Aygıt Yöneticisi’ni aç",
+      vbCableInstall: "VB-CABLE’ı yükle",
+      vbCableEnable: "VB-CABLE’ı etkinleştir",
+      vbCableInstallConfirm: "Ana bilgisayar, VB-CABLE sürücüsünü VB-Audio’dan indirir, kurulum programının imzasını denetler ve yönetici haklarıyla sessizce yükler. Bu işlem Windows’a sanal bir ses aygıtı ekler. Devam edilsin mi?",
+      vbCableEnableConfirm: "Ana bilgisayar, Aygıt Yöneticisi’nde devre dışı bırakılmış VB-CABLE aygıtını etkinleştirir (pnputil /enable-device). Devam edilsin mi?",
+      vbCableJobs: {
+        downloading: "VB-CABLE indiriliyor…",
+        verifying: "İmza denetleniyor…",
+        installing: "VB-CABLE yükleniyor…",
+        enabling: "VB-CABLE etkinleştiriliyor…"
+      },
+      vbCableErrors: {
+        download: "İndirme başarısız oldu. Ağı denetleyip yeniden deneyin ya da elle indirin.",
+        signature: "Kurulum programının VB-Audio’ya ait geçerli bir imzası yok. Yükleme durduruldu.",
+        admin: "Sunshine yönetici haklarıyla çalışmıyor; bu yüzden sürücü yükleyemez veya etkinleştiremez.",
+        failed: "Olmadı: VB-CABLE hâlâ kullanılamıyor. Aygıt Yöneticisi’ni açın ya da elle yükleyin."
+      },
       installTransport: "Kuruluma git usbip-win2",
       fallback: "Bunun yerine VB-CABLE kullanma",
       fallbackReason: "Sebep: {reason}",

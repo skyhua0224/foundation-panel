@@ -40,6 +40,11 @@ export function isAllowedExternalUrl(url) {
   return /^(https?:\/\/|ms-windows-store:\/\/)/i.test(String(url || '').trim())
 }
 
+// the Windows Device Manager, to enable a disabled device (VB-CABLE); never changes a device itself
+export async function openDeviceManager() {
+  return invoke('open_device_manager')
+}
+
 export async function openExternalUrl(url) {
   try {
     if (!isAllowedExternalUrl(url)) return false
@@ -113,6 +118,13 @@ export const controllerHub = {
     enableDsuServer: patch.enable_dsu_server,
     dsuServerPort: patch.dsu_server_port,
   }),
+}
+
+// the audio endpoints of the host and the VB-CABLE state (GET /api/audio/devices)
+export const audioDevices = {
+  get: () => wrapResult('get_audio_devices'),
+  // 'install' (download, verify, silent setup) or 'enable' (pnputil); ask the person first
+  startVbCableJob: (action) => wrapResult('start_vb_cable_job', { action }),
 }
 
 export const virtualMicrophone = {
@@ -264,11 +276,13 @@ export async function readDirectory(path) {
 export default {
   darkMode,
   openExternalUrl,
+  openDeviceManager,
   vdd,
   vmouse,
   vigem,
   controllerHub,
   virtualMicrophone,
+  audioDevices,
   dualsense,
   usbip,
   rtxHdr,

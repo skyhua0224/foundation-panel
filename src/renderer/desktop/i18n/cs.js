@@ -1553,7 +1553,7 @@ export const cs = {
         streaming: "Aplikace nahrává a zvuk klienta přichází.",
         stopping: "Streamování skončilo; virtuální mikrofon se odebírá."
       },
-      backend: "Backend mikrofonu",
+      backend: "Režim mikrofonu",
       backends: {
         auto: "Automaticky",
         usbip_experimental: "USB virtuální mikrofon",
@@ -1592,6 +1592,33 @@ export const cs = {
       missingHintAuto: "Automatický režim nyní používá VB-CABLE. Chcete-li použít vlastní virtuální mikrofon hostitele USB, nainstalujte nejprve přenos usbip-win2.",
       missingHintUsb: "Virtuální mikrofon USB nelze vytvořit. Prozatím přejděte na VB-CABLE nebo si nainstalujte transport usbip-win2.",
       useVbCable: "Použijte VB-CABLE",
+      vbCable: "VB-CABLE",
+      vbCableStates: {
+        ready: "Připraveno",
+        partial: "Částečně dostupné",
+        disabled: "Nainstalováno, ale zakázáno ve Správci zařízení",
+        unavailable: "Nainstalováno, ale momentálně nedostupné",
+        missing: "Není nainstalováno",
+        unknown: "Kontrola"
+      },
+      vbCableDownload: "Stáhnout",
+      vbCableOpenDevmgmt: "Otevřít Správce zařízení",
+      vbCableInstall: "Nainstalovat VB-CABLE",
+      vbCableEnable: "Povolit VB-CABLE",
+      vbCableInstallConfirm: "Hostitel stáhne ovladač VB-CABLE od VB-Audio, zkontroluje podpis jeho instalačního programu a tiše jej nainstaluje s právy správce. Do Windows se tím přidá virtuální zvukové zařízení. Pokračovat?",
+      vbCableEnableConfirm: "Hostitel povolí zařízení VB-CABLE, které je ve Správci zařízení zakázané (pnputil /enable-device). Pokračovat?",
+      vbCableJobs: {
+        downloading: "Stahování VB-CABLE…",
+        verifying: "Kontrola podpisu…",
+        installing: "Instalace VB-CABLE…",
+        enabling: "Povolování VB-CABLE…"
+      },
+      vbCableErrors: {
+        download: "Stahování selhalo. Zkontrolujte síť a zkuste to znovu, nebo stáhněte ručně.",
+        signature: "Instalační program nemá platný podpis VB-Audio. Instalace byla zastavena.",
+        admin: "Sunshine neběží s právy správce, a proto nemůže instalovat ani povolovat ovladače.",
+        failed: "Nepodařilo se: VB-CABLE je stále nedostupný. Otevřete Správce zařízení, nebo jej nainstalujte ručně."
+      },
       installTransport: "Přejít na instalaci usbip-win2",
       fallback: "Místo toho použijte VB-CABLE",
       fallbackReason: "Důvod: {reason}",
