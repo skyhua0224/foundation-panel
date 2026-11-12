@@ -33,12 +33,11 @@
           </template>
         </MItem>
         <!-- VB-CABLE is listed whatever backend is chosen: its state, and the way to get it when the host does not find it -->
-        <MItem data-vb-cable :data-vb-state="vbState" icon="cable" :title="text.vbCable" :text="text.vbCableStates[vbState]">
-          <template v-if="vbNeedsInstall" #trail>
-            <MButton variant="tonal" size="sm" icon="download" @click="openVbCablePage">{{ text.vbCableDownload }}</MButton>
-          </template>
-          <template v-else-if="vbNeedsEnable" #trail>
-            <MButton variant="tonal" size="sm" icon="open_in_new" @click="openDevices">{{ text.vbCableOpenDevmgmt }}</MButton>
+        <MItem data-vb-cable :data-vb-state="vbState" :data-vb-failure="vbFailure || undefined" icon="cable" :title="text.vbCable" :text="vbText" wrap>
+          <template v-if="vbAction" #trail>
+            <MButton v-if="vbNeedsEnable" variant="text" size="sm" icon="open_in_new" :disabled="vbBusy" @click="openDevices">{{ text.vbCableOpenDevmgmt }}</MButton>
+            <MButton v-if="vbNeedsInstall" variant="text" size="sm" icon="download" :disabled="vbBusy" @click="openVbCablePage">{{ text.vbCableDownload }}</MButton>
+            <MButton variant="tonal" size="sm" :icon="vbAction === 'enable' ? 'power_settings_new' : 'download'" :loading="vbBusy" :disabled="vbBusy" @click="askVbCable(vbAction)">{{ vbAction === 'enable' ? text.vbCableEnable : text.vbCableInstall }}</MButton>
           </template>
         </MItem>
       </MGroup>
@@ -66,13 +65,13 @@
 <script setup>
 import { computed, onActivated, onDeactivated, onMounted, onUnmounted, reactive, ref, watch, watchEffect } from 'vue'
 import { ElMessage } from '../../composables/notifyMessage.js'
-import { MPage, MSection, MGroup, MItem, MChip, MStatusPill, MFooter, useNotify, MSeg, MNotice, MButton, MIconButton, MSkeleton, MIcon, MProgress, MStatusPills } from 'foundation-ui/vue'
-import { openDeviceManager, openExternalUrl, virtualMicrophone } from '../../tauri-adapter.js'
+import { MPage, MSection, MGroup, MItem, MChip, MStatusPill, MFooter, useNotify, MSeg, MNotice, MButton, MIconButton, MSkeleton, MIcon, MProgress, MStatusPills, useDialogs } from 'foundation-ui/vue'
+import { audioDevices, openDeviceManager, openExternalUrl, virtualMicrophone } from '../../tauri-adapter.js'
 import { audioDevicesChannel, micStatusChannel } from '../../composables/deviceStatusStore.js'
 import {
   MICROPHONE_BACKENDS, canTestMicrophone, microphoneBufferedMs, microphoneComponentMissing,
   microphoneOverviewState, microphoneStatusTone, microphoneUsesUsbip, microphoneInputFresh,
-  microphoneInputLevel, microphoneTestIsLive, VB_CABLE_PAGE, vbCableNeedsEnable, vbCableNeedsInstall, vbCableState,
+  microphoneInputLevel, microphoneTestIsLive, VB_CABLE_PAGE, vbCableErrorKind, vbCableJob, vbCableNeedsEnable, vbCableNeedsInstall, vbCableState,
 } from '../../composables/deviceHubStatus.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
@@ -101,6 +100,34 @@ const usesUsbip = computed(() => microphoneUsesUsbip(status))
 const vbState = computed(() => vbCableState(devices.value))
 const vbNeedsInstall = computed(() => vbCableNeedsInstall(vbState.value))
 const vbNeedsEnable = computed(() => vbCableNeedsEnable(vbState.value))
+// the job of the host that installs VB-CABLE or enables its device: asked for first, run by the host, followed here
+const vbJob = computed(() => vbCableJob(devices.value))
+const requesting = ref(false)
+const requestFailed = ref(false)
+const vbBusy = computed(() => vbJob.value.running || requesting.value)
+const vbAction = computed(() => (vbNeedsEnable.value ? 'enable' : vbNeedsInstall.value ? 'install' : ''))
+const vbFailure = computed(() => (requestFailed.value ? 'failed' : vbState.value !== 'ready' && vbJob.value.failed ? vbCableErrorKind(vbJob.value.errorCode) : ''))
+const vbText = computed(() => {
+  if (vbJob.value.running) return text.value.vbCableJobs[vbJob.value.step]
+  if (vbFailure.value) return text.value.vbCableErrors[vbFailure.value]
+  return text.value.vbCableStates[vbState.value]
+})
+async function askVbCable(action) {
+  const label = action === 'enable' ? text.value.vbCableEnable : text.value.vbCableInstall
+  const confirmed = await useDialogs().confirm(action === 'enable' ? text.value.vbCableEnableConfirm : text.value.vbCableInstallConfirm, label, { type: 'warning', confirmText: label }).then(() => true, () => false)
+  if (!confirmed) return
+  requesting.value = true
+  requestFailed.value = false
+  try {
+    const result = await audioDevices.startVbCableJob(action)
+    if (!result?.success || (result.data?.success !== true && result.data?.error_code !== 'VB_BUSY')) requestFailed.value = true
+  } catch {
+    requestFailed.value = true
+  } finally {
+    requesting.value = false
+    if (!disposed) await refresh({ force: true })
+  }
+}
 const openVbCablePage = () => { void openExternalUrl(VB_CABLE_PAGE) }
 const openDevices = () => { void openDeviceManager() }
 const componentMissing = computed(() => microphoneComponentMissing(status))
@@ -150,6 +177,7 @@ async function refresh(options = {}) {
     loadError.value = !result?.success
     if (result?.success) Object.assign(status, result.data)
     if (audio?.success) devices.value = audio.data
+    if (vbJob.value.running && !disposed) window.setTimeout(() => refresh({ force: true }), 1500)
   } catch {
     if (!disposed) loadError.value = true
   } finally {

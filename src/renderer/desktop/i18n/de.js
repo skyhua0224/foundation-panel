@@ -1553,7 +1553,7 @@ export const de = {
         streaming: "Eine Anwendung zeichnet auf und Client-Audio kommt an.",
         stopping: "Streaming beendet; Das virtuelle Mikrofon wird entfernt."
       },
-      backend: "Mikrofon-Backend",
+      backend: "Mikrofonmodus",
       backends: {
         auto: "Automatisch",
         usbip_experimental: "USB virtuelles Mikrofon",
@@ -1603,6 +1603,22 @@ export const de = {
       },
       vbCableDownload: "Herunterladen",
       vbCableOpenDevmgmt: "Geräte-Manager öffnen",
+      vbCableInstall: "VB-CABLE installieren",
+      vbCableEnable: "VB-CABLE aktivieren",
+      vbCableInstallConfirm: "Der Host lädt den VB-CABLE-Treiber von VB-Audio herunter, prüft die Signatur des Setup-Programms und installiert ihn mit Administratorrechten im Hintergrund. Dadurch wird Windows ein virtuelles Audiogerät hinzugefügt. Fortfahren?",
+      vbCableEnableConfirm: "Der Host aktiviert das im Geräte-Manager deaktivierte VB-CABLE-Gerät (pnputil /enable-device). Fortfahren?",
+      vbCableJobs: {
+        downloading: "VB-CABLE wird heruntergeladen …",
+        verifying: "Signatur wird geprüft …",
+        installing: "VB-CABLE wird installiert …",
+        enabling: "VB-CABLE wird aktiviert …"
+      },
+      vbCableErrors: {
+        download: "Der Download ist fehlgeschlagen. Prüfen Sie das Netzwerk und versuchen Sie es erneut oder laden Sie die Datei manuell herunter.",
+        signature: "Das Setup-Programm ist nicht gültig von VB-Audio signiert. Die Installation wurde abgebrochen.",
+        admin: "Sunshine läuft nicht mit Administratorrechten und kann daher keine Treiber installieren oder aktivieren.",
+        failed: "Das hat nicht funktioniert: VB-CABLE ist weiterhin nicht verfügbar. Öffnen Sie den Geräte-Manager oder installieren Sie es manuell."
+      },
       installTransport: "Gehen Sie zur Installation usbip-win2",
       fallback: "Verwenden Sie stattdessen VB-CABLE",
       fallbackReason: "Grund: {reason}",

@@ -123,6 +123,8 @@ export const controllerHub = {
 // the audio endpoints of the host and the VB-CABLE state (GET /api/audio/devices)
 export const audioDevices = {
   get: () => wrapResult('get_audio_devices'),
+  // 'install' (download, verify, silent setup) or 'enable' (pnputil); ask the person first
+  startVbCableJob: (action) => wrapResult('start_vb_cable_job', { action }),
 }
 
 export const virtualMicrophone = {

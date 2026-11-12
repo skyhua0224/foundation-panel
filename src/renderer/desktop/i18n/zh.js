@@ -1275,7 +1275,7 @@ export const zh = {
         "streaming": "有应用正在录音，客户端声音正在传入。",
         "stopping": "串流已结束，正在移除虚拟麦克风。"
       },
-      "backend": "麦克风后端",
+      "backend": "麦克风方式",
       "vbCable": "VB-CABLE",
       "vbCableStates": {
         "ready": "已就绪",
@@ -1287,6 +1287,22 @@ export const zh = {
       },
       "vbCableDownload": "下载",
       "vbCableOpenDevmgmt": "打开设备管理器",
+      "vbCableInstall": "安装 VB-CABLE",
+      "vbCableEnable": "启用 VB-CABLE",
+      "vbCableInstallConfirm": "主机将从 VB-Audio 官网下载 VB-CABLE 驱动，校验安装程序的数字签名后，以管理员权限静默安装。安装会向 Windows 添加一个虚拟音频设备。继续吗？",
+      "vbCableEnableConfirm": "主机将启用在设备管理器中被禁用的 VB-CABLE 设备（pnputil /enable-device）。继续吗？",
+      "vbCableJobs": {
+        "downloading": "正在下载 VB-CABLE…",
+        "verifying": "正在校验数字签名…",
+        "installing": "正在安装 VB-CABLE…",
+        "enabling": "正在启用 VB-CABLE…"
+      },
+      "vbCableErrors": {
+        "download": "下载失败。请检查网络后重试，或手动下载。",
+        "signature": "安装程序没有 VB-Audio 的有效数字签名，已停止安装。",
+        "admin": "Sunshine 没有以管理员权限运行，无法安装或启用驱动。",
+        "failed": "没有成功：VB-CABLE 仍不可用。可打开设备管理器查看，或手动安装。"
+      },
       "backends": {
         "auto": "自动",
         "usbip_experimental": "USB 虚拟麦克风",

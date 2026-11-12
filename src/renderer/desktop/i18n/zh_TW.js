@@ -1273,7 +1273,7 @@ export const zh_TW = {
         "streaming": "有應用正在錄音，客戶端聲音正在傳入。",
         "stopping": "串流已結束，正在移除虛擬麥克風。"
       },
-      "backend": "麥克風後端",
+      "backend": "麥克風方式",
       "backends": {
         "auto": "自動",
         "usbip_experimental": "USB 虛擬麥克風",
@@ -1323,6 +1323,22 @@ export const zh_TW = {
       },
       "vbCableDownload": "下載",
       "vbCableOpenDevmgmt": "開啟裝置管理員",
+      "vbCableInstall": "安裝 VB-CABLE",
+      "vbCableEnable": "啟用 VB-CABLE",
+      "vbCableInstallConfirm": "主機將從 VB-Audio 官網下載 VB-CABLE 驅動程式，驗證安裝程式的數位簽章後，以系統管理員權限靜默安裝。安裝會在 Windows 新增一個虛擬音訊裝置。要繼續嗎？",
+      "vbCableEnableConfirm": "主機將啟用在裝置管理員中被停用的 VB-CABLE 裝置（pnputil /enable-device）。要繼續嗎？",
+      "vbCableJobs": {
+        "downloading": "正在下載 VB-CABLE…",
+        "verifying": "正在驗證數位簽章…",
+        "installing": "正在安裝 VB-CABLE…",
+        "enabling": "正在啟用 VB-CABLE…"
+      },
+      "vbCableErrors": {
+        "download": "下載失敗。請檢查網路後重試，或手動下載。",
+        "signature": "安裝程式沒有 VB-Audio 的有效數位簽章，已停止安裝。",
+        "admin": "Sunshine 沒有以系統管理員權限執行，無法安裝或啟用驅動程式。",
+        "failed": "沒有成功：VB-CABLE 仍無法使用。可開啟裝置管理員查看，或手動安裝。"
+      },
       "installTransport": "前往安裝 usbip-win2",
       "fallback": "已改用 VB-CABLE",
       "fallbackReason": "原因：{reason}",

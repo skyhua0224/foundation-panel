@@ -1553,7 +1553,7 @@ export const bg = {
         streaming: "Приложение записва и аудиото на клиента пристига.",
         stopping: "Поточното предаване приключи; виртуалният микрофон се премахва."
       },
-      backend: "Задна част на микрофона",
+      backend: "Режим на микрофона",
       backends: {
         auto: "Автоматичен",
         usbip_experimental: "USB виртуален микрофон",
@@ -1603,6 +1603,22 @@ export const bg = {
       },
       vbCableDownload: "Изтегли",
       vbCableOpenDevmgmt: "Отваряне на Диспечера на устройствата",
+      vbCableInstall: "Инсталиране на VB-CABLE",
+      vbCableEnable: "Включване на VB-CABLE",
+      vbCableInstallConfirm: "Хостът изтегля драйвера VB-CABLE от VB-Audio, проверява подписа на инсталатора му и го инсталира тихо с права на администратор. Това добавя виртуално аудио устройство във Windows. Продължаване?",
+      vbCableEnableConfirm: "Хостът включва устройството VB-CABLE, което е деактивирано в „Диспечер на устройствата“ (pnputil /enable-device). Продължаване?",
+      vbCableJobs: {
+        downloading: "Изтегляне на VB-CABLE…",
+        verifying: "Проверка на подписа…",
+        installing: "Инсталиране на VB-CABLE…",
+        enabling: "Включване на VB-CABLE…"
+      },
+      vbCableErrors: {
+        download: "Изтеглянето не успя. Проверете мрежата и опитайте отново или изтеглете ръчно.",
+        signature: "Инсталаторът няма валиден подпис на VB-Audio. Инсталирането е спряно.",
+        admin: "Sunshine не работи с права на администратор и не може да инсталира или включва драйвери.",
+        failed: "Не се получи: VB-CABLE все още не е достъпен. Отворете „Диспечер на устройствата“ или го инсталирайте ръчно."
+      },
       installTransport: "Отидете на инсталиране usbip-win2",
       fallback: "Използвайки VB-CABLE вместо това",
       fallbackReason: "Причина: {reason}",

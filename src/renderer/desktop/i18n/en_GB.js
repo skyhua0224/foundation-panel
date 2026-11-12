@@ -1548,7 +1548,7 @@ export const en_GB = {
         "streaming": "An application is recording and client audio is arriving.",
         "stopping": "Streaming ended; the virtual microphone is being removed."
       },
-      "backend": "Microphone backend",
+      "backend": "Microphone mode",
       "backends": {
         "auto": "Automatic",
         "usbip_experimental": "USB virtual microphone",
@@ -1598,6 +1598,22 @@ export const en_GB = {
       },
       "vbCableDownload": "Download",
       "vbCableOpenDevmgmt": "Open Device Manager",
+      "vbCableInstall": "Install VB-CABLE",
+      "vbCableEnable": "Enable VB-CABLE",
+      "vbCableInstallConfirm": "The host downloads the VB-CABLE driver from VB-Audio, checks the signature of its setup program and installs it silently with administrator rights. This adds a virtual audio device to Windows. Continue?",
+      "vbCableEnableConfirm": "The host enables the VB-CABLE device that is disabled in Device Manager (pnputil /enable-device). Continue?",
+      "vbCableJobs": {
+        "downloading": "Downloading VB-CABLE…",
+        "verifying": "Checking the signature…",
+        "installing": "Installing VB-CABLE…",
+        "enabling": "Enabling VB-CABLE…"
+      },
+      "vbCableErrors": {
+        "download": "The download failed. Check the network and try again, or download it manually.",
+        "signature": "The setup program is not validly signed by VB-Audio. Installation was stopped.",
+        "admin": "Sunshine is not running with administrator rights, so it cannot install or enable drivers.",
+        "failed": "That did not work: VB-CABLE is still unavailable. Open Device Manager to look, or install it manually."
+      },
       "installTransport": "Go to install usbip-win2",
       "fallback": "Using VB-CABLE instead",
       "fallbackReason": "Reason: {reason}",

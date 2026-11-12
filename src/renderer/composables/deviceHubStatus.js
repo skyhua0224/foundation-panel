@@ -25,6 +25,24 @@ export const vbCableNeedsInstall = (state) => VB_CABLE_STATES.includes(state) &&
 /** Installed, its device disabled in the Device Manager: the way out is to enable it there, not to download it again. */
 export const vbCableNeedsEnable = (state) => state === 'disabled'
 
+/** The job of the host that installs or enables VB-CABLE, as GET /api/audio/devices reports it (`vb_cable.job`). */
+export function vbCableJob(devices) {
+  const job = devices?.vb_cable?.job || {}
+  const step = ['downloading', 'verifying', 'installing', 'enabling'].includes(job.step) ? job.step : ''
+  return { running: job.running === true, step: job.running === true ? step || 'downloading' : step, failed: job.step === 'failed', errorCode: typeof job.error_code === 'string' ? job.error_code : '' }
+}
+
+/** What a failed job tells the person: the download or the pack, the signature, the missing administrator rights, or "still unavailable". */
+export function vbCableErrorKind(code) {
+  switch (code) {
+    case 'VB_DOWNLOAD_FAILED': case 'VB_EXTRACT_FAILED': case 'VB_SETUP_MISSING': return 'download'
+    case 'VB_SIGNATURE_INVALID': case 'VB_SIGNER_UNEXPECTED': return 'signature'
+    case 'VB_NEEDS_ADMIN': return 'admin'
+    case '': return ''
+    default: return 'failed'
+  }
+}
+
 /** The official page of VB-CABLE (the driver pack is downloaded from there). */
 export const VB_CABLE_PAGE = 'https://vb-audio.com/Cable/'
 

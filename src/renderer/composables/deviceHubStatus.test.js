@@ -13,6 +13,8 @@ import {
   microphoneTestIsLive,
   VB_CABLE_PAGE,
   VB_CABLE_STATES,
+  vbCableErrorKind,
+  vbCableJob,
   vbCableNeedsEnable,
   vbCableNeedsInstall,
   vbCableState,
@@ -118,4 +120,23 @@ test('VB-CABLE: installed but disabled offers the Device Manager, not a download
   assert.equal(vbCableNeedsInstall('disabled'), false)
   for (const state of ['ready', 'partial', 'unavailable', 'missing', 'unknown']) assert.equal(vbCableNeedsEnable(state), false, state)
   assert.equal(vbCableState({ vb_cable: { state: 'disabled', installed: true } }), 'disabled')
+})
+
+test('VB-CABLE: the job of the host is read as it is reported, an older host has none', () => {
+  assert.deepEqual(vbCableJob(null), { running: false, step: '', failed: false, errorCode: '' })
+  assert.deepEqual(vbCableJob({ vb_cable: { state: 'missing' } }), { running: false, step: '', failed: false, errorCode: '' })
+  assert.deepEqual(vbCableJob({ vb_cable: { job: { action: 'install', step: 'verifying', running: true } } }), { running: true, step: 'verifying', failed: false, errorCode: '' })
+  assert.equal(vbCableJob({ vb_cable: { job: { step: 'something-new', running: true } } }).step, 'downloading')
+  const failed = vbCableJob({ vb_cable: { job: { action: 'enable', step: 'failed', running: false, error_code: 'VB_NEEDS_ADMIN' } } })
+  assert.equal(failed.failed, true)
+  assert.equal(failed.errorCode, 'VB_NEEDS_ADMIN')
+})
+
+test('VB-CABLE: a failed job is told by what a person can do about it', () => {
+  assert.equal(vbCableErrorKind('VB_DOWNLOAD_FAILED'), 'download')
+  assert.equal(vbCableErrorKind('VB_SIGNATURE_INVALID'), 'signature')
+  assert.equal(vbCableErrorKind('VB_SIGNER_UNEXPECTED'), 'signature')
+  assert.equal(vbCableErrorKind('VB_NEEDS_ADMIN'), 'admin')
+  assert.equal(vbCableErrorKind('VB_ENABLE_FAILED'), 'failed')
+  assert.equal(vbCableErrorKind(''), '')
 })

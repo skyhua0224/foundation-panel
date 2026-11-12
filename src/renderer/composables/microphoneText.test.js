@@ -59,7 +59,16 @@ test('the VB-CABLE row is translated in every desktop language file', async () =
       assert.ok(text.vbCableStates?.[state], `${code}: VB-CABLE ${state}`)
       if (!ENGLISH_CODES.has(code)) assert.notEqual(text.vbCableStates[state], base.vbCableStates[state], `${code}: VB-CABLE ${state} left in English`)
     }
-    for (const key of ['vbCableDownload', 'vbCableOpenDevmgmt']) {
+    for (const job of ['downloading', 'verifying', 'installing', 'enabling']) {
+      assert.ok(text.vbCableJobs?.[job], `${code}: job ${job}`)
+      if (!ENGLISH_CODES.has(code)) assert.notEqual(text.vbCableJobs[job], base.vbCableJobs[job], `${code}: job ${job} left in English`)
+    }
+    for (const kind of ['download', 'signature', 'admin', 'failed']) {
+      assert.ok(text.vbCableErrors?.[kind], `${code}: error ${kind}`)
+      if (!ENGLISH_CODES.has(code)) assert.notEqual(text.vbCableErrors[kind], base.vbCableErrors[kind], `${code}: error ${kind} left in English`)
+    }
+    if (!ENGLISH_CODES.has(code)) assert.notEqual(text.backend, base.backend, `${code}: the microphone mode title is left in English`)
+    for (const key of ['vbCableInstall', 'vbCableEnable', 'vbCableInstallConfirm', 'vbCableEnableConfirm', 'vbCableDownload', 'vbCableOpenDevmgmt']) {
       assert.ok(text[key], `${code}: ${key}`)
       if (!ENGLISH_CODES.has(code)) assert.notEqual(text[key], base[key], `${code}: ${key} left in English`)
     }

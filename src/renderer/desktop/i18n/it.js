@@ -1553,7 +1553,7 @@ export const it = {
         streaming: "Un'applicazione sta registrando e sta arrivando l'audio del client.",
         stopping: "Lo streaming è terminato; il microfono virtuale viene rimosso."
       },
-      backend: "Backend del microfono",
+      backend: "Modalità del microfono",
       backends: {
         auto: "Automatico",
         usbip_experimental: "USB microfono virtuale",
@@ -1603,6 +1603,22 @@ export const it = {
       },
       vbCableDownload: "Scarica",
       vbCableOpenDevmgmt: "Apri Gestione dispositivi",
+      vbCableInstall: "Installa VB-CABLE",
+      vbCableEnable: "Abilita VB-CABLE",
+      vbCableInstallConfirm: "L’host scarica il driver VB-CABLE da VB-Audio, verifica la firma del programma di installazione e lo installa in modo silenzioso con i diritti di amministratore. Verrà aggiunto un dispositivo audio virtuale a Windows. Continuare?",
+      vbCableEnableConfirm: "L’host abilita il dispositivo VB-CABLE disattivato in Gestione dispositivi (pnputil /enable-device). Continuare?",
+      vbCableJobs: {
+        downloading: "Download di VB-CABLE…",
+        verifying: "Verifica della firma…",
+        installing: "Installazione di VB-CABLE…",
+        enabling: "Abilitazione di VB-CABLE…"
+      },
+      vbCableErrors: {
+        download: "Download non riuscito. Controlla la rete e riprova, oppure scaricalo manualmente.",
+        signature: "Il programma di installazione non ha una firma valida di VB-Audio. L’installazione è stata interrotta.",
+        admin: "Sunshine non è in esecuzione con i diritti di amministratore, quindi non può installare né abilitare driver.",
+        failed: "Non ha funzionato: VB-CABLE risulta ancora non disponibile. Apri Gestione dispositivi o installalo manualmente."
+      },
       installTransport: "Vai all'installazione usbip-win2",
       fallback: "Usando invece VB-CABLE",
       fallbackReason: "Motivo: {reason}",
