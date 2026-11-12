@@ -19,10 +19,10 @@ test('no Panel slider asks for the thin xs or s track', () => {
 
 test('the bitrate, frame rate, scale and strength sliders carry their less / more icons', () => {
   const need = {
-    'components/m3e/LiveSessionPage.vue': 'signal_cellular_alt_1_bar',
-    'tool-window/tools/BitrateTool.vue': 'signal_cellular_alt_1_bar',
-    'desktop/views/StreamView.vue': 'signal_cellular_alt_1_bar',
-    'components/WebStreamSettings.vue': 'signal_cellular_alt_1_bar',
+    'components/m3e/LiveSessionPage.vue': 'signal_cellular_alt_2_bar',
+    'tool-window/tools/BitrateTool.vue': 'signal_cellular_alt_2_bar',
+    'desktop/views/StreamView.vue': 'signal_cellular_alt_2_bar',
+    'components/WebStreamSettings.vue': 'signal_cellular_alt_2_bar',
     'components/m3e/RtssPage.vue': 'slow_motion_video',
     'tool-window/tools/rtss/RtssFpsSection.vue': 'slow_motion_video',
     'components/m3e/DpiScaleSection.vue': 'text_decrease',
@@ -35,9 +35,18 @@ test('the bitrate, frame rate, scale and strength sliders carry their less / mor
   }
 })
 
+test('every bitrate slider of the Panel runs on the shared segmented scale with the marks under its chips', () => {
+  for (const rel of ['components/m3e/LiveSessionPage.vue', 'components/WebStreamSettings.vue', 'tool-window/tools/BitrateTool.vue']) {
+    const src = fs.readFileSync(path.join(root, rel), 'utf8')
+    assert.match(src, /bitrateSliderSpan\(/, rel); assert.match(src, /bitrateChipMarks\(/, rel); assert.match(src, /bitrateFromProgress\(position\)/, rel); assert.match(src, /:marks="bitrateMarks"/, rel)
+    assert.doesNotMatch(src, /<MSliderItem[^>]*:max="(BITRATE\.max|150000|BITRATE_LIMITS\.MAX)"/, `${rel}: a linear Kbps track`)
+  }
+  assert.match(fs.readFileSync(path.join(root, 'desktop/views/StreamView.vue'), 'utf8'), /BITRATE_PRESET_MBPS = \[20, 50, 100, 0\][\s\S]*bitrateChips\([^)]*BITRATE_PRESET_MBPS\)/)
+})
+
 test('the sliders write when they did before: the commit and the model stay on the same tags', () => {
   const live = fs.readFileSync(path.join(root, 'components/m3e/LiveSessionPage.vue'), 'utf8')
-  assert.match(live, /<MSliderItem v-model="bitrate"[^>]*:readout-text="formatBitrate\(bitrate\)"/)
+  assert.match(live, /<MSliderItem v-model="bitrateProgress"[^>]*:readout-text="formatBitrate\(bitrate\)"/)
   const stream = fs.readFileSync(path.join(root, 'desktop/views/StreamView.vue'), 'utf8')
-  assert.match(stream, /:marks="bitrateSegmentMarks" :off-text="t\.stream\.bitrateAuto" size="m"/)
+  assert.match(stream, /:marks="bitrateChipMarks\(BITRATE_PRESET_MBPS\)" :off-text="t\.stream\.bitrateAuto" size="m"/)
 })

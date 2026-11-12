@@ -25,7 +25,7 @@ test('0 is 自动 everywhere on the page: the number, the chip and the slider; n
   assert.equal(zh.stream.bitrateUnlimited, undefined); assert.equal(en.stream.bitrateUnlimited, undefined)
   assert.doesNotMatch(view, /∞|bitrateUnlimited/)
   assert.match(view, /<MSlider :model-value="bitrateSliderProgress\(bitrateKbps\)" :min="0" :max="SLIDER_MAX_PROGRESS" :step="1" unit=""/)
-  assert.match(view, /bitrateChips\(bitrateKbps\.value, t\.value\.stream\.bitrateAuto, \[20, 50, 100, 0\]\)/)
+  assert.match(view, /BITRATE_PRESET_MBPS = \[20, 50, 100, 0\]/); assert.match(view, /bitrateChips\(bitrateKbps\.value, t\.value\.stream\.bitrateAuto, BITRATE_PRESET_MBPS\)/)
   assert.deepEqual(bitrateChips(undefined, '自动', [20, 50, 100, 0]).map((c) => [c.value, c.label]), [[0, '自动'], [20000, '20 Mbps'], [50000, '50 Mbps'], [100000, '100 Mbps']])
 })
 

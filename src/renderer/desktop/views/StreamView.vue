@@ -26,7 +26,7 @@
               <MIconButton icon="add" :label="`${t.stream.bitrateLimit} +`" @click="nudgeBitrate(NUDGE_MBPS)" />
             </template>
             <template #control>
-              <MSlider :model-value="bitrateSliderProgress(bitrateKbps)" :min="0" :max="SLIDER_MAX_PROGRESS" :step="1" unit="" :marks="bitrateSegmentMarks" :off-text="t.stream.bitrateAuto" size="m" icon-start="signal_cellular_alt_1_bar" icon-end="signal_cellular_alt" :label="t.stream.bitrateLimit" @update:model-value="(v) => setCfg('max_bitrate', String(bitrateFromProgress(v)))" />
+              <MSlider :model-value="bitrateSliderProgress(bitrateKbps)" :min="0" :max="SLIDER_MAX_PROGRESS" :step="1" unit="" :marks="bitrateChipMarks(BITRATE_PRESET_MBPS)" :off-text="t.stream.bitrateAuto" size="m" icon-start="signal_cellular_alt_2_bar" icon-end="signal_cellular_alt" :label="t.stream.bitrateLimit" @update:model-value="(v) => setCfg('max_bitrate', String(bitrateFromProgress(v)))" />
               <MSeg :model-value="bitrateKbps" block :label="t.stream.bitrateLimit" :options="BITRATE_PRESETS" @update:model-value="(v) => setCfg('max_bitrate', String(v))" />
             </template>
           </MItem>
@@ -80,7 +80,7 @@
 <script setup>
 import { ref, computed, onMounted, onBeforeUnmount } from 'vue'
 import { MGroup, MIconButton, MItem, MLoading, MSection, MSeg, MSlider, MSwitch, createSerialCalls, saveSettingKey } from 'foundation-ui/vue'
-import { appliesText, bitrateChips, bitrateFromProgress, bitrateKbps as parseBitrateKbps, bitrateNudge, bitrateSliderProgress, bitrateText, bitrateSegmentMarks, BITRATE_SLIDER_MAX_PROGRESS } from 'foundation-ui/settings/index.js'
+import { appliesText, bitrateChips, bitrateFromProgress, bitrateKbps as parseBitrateKbps, bitrateNudge, bitrateSliderProgress, bitrateText, bitrateChipMarks, BITRATE_SLIDER_MAX_PROGRESS } from 'foundation-ui/settings/index.js'
 import DeskPage from '../components/DeskPage.vue'
 import PanelLinkSection from '../components/PanelLinkSection.vue'
 import SettingsNotice from '../components/settings/SettingsNotice.vue'
@@ -122,7 +122,9 @@ const codecModes = computed(() => [
   { value: 3, label: t.value.stream.codec.alwaysHdr },
 ])
 // the chips: the presets (a value that is none of them gets a chip of its own, so the stored value is always one of the choices)
-const BITRATE_PRESETS = computed(() => bitrateChips(bitrateKbps.value, t.value.stream.bitrateAuto, [20, 50, 100, 0]))
+// the chips and the marks of the slider are the same list: a mark stands under the value its chip writes
+const BITRATE_PRESET_MBPS = [20, 50, 100, 0]
+const BITRATE_PRESETS = computed(() => bitrateChips(bitrateKbps.value, t.value.stream.bitrateAuto, BITRATE_PRESET_MBPS))
 
 const applies = (key) => appliesText(key, hostPlatform.value, locale.value)
 const saveNotice = computed(() => (saveMsg.value ? { type: saveMsg.value.type, message: saveMsg.value.text } : null))

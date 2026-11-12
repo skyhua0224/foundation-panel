@@ -19,7 +19,7 @@
         <MChip v-if="currentBitrate" tone="info" icon="monitoring">{{ t.bitrateTool.currentBitrate }} {{ formatBitrate(currentBitrate) }}</MChip>
       </div>
       <MGroup>
-        <MSliderItem v-model="bitrateValue" icon="speed" :title="t.bitrateTool.targetBitrate" :min="BITRATE_LIMITS.MIN" :max="BITRATE_LIMITS.MAX" :step="BITRATE_LIMITS.STEP" :decimals="0" size="m" icon-start="signal_cellular_alt_1_bar" icon-end="signal_cellular_alt" :readout-text="formatBitrate(bitrateValue)" :disabled="applying" />
+        <MSliderItem v-model="bitrateProgress" icon="speed" :title="t.bitrateTool.targetBitrate" :min="bitrateSpan.min" :max="bitrateSpan.max" :step="1" :decimals="0" :marks="bitrateMarks" size="m" icon-start="signal_cellular_alt_2_bar" icon-end="signal_cellular_alt" :readout-text="formatBitrate(bitrateValue)" :disabled="applying" />
         <MItem stack title=""><template #control><MChipSet v-model="bitrateValue" :label="t.bitrateTool.targetBitrate" :options="BITRATE_PRESETS.map((v) => ({ value: v, label: formatBitrate(v) }))" :disabled="applying" /></template></MItem>
         <MItem stack icon="edit" title=""><template #control><MField v-model.number="bitrateValue" type="number" :label="t.bitrateTool.inputPlaceholder" suffix="Kbps" :error="inRange ? '' : rangeText" :disabled="applying" /></template></MItem>
       </MGroup>
@@ -32,6 +32,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { sunshine } from '../../tauri-adapter.js'
+import { bitrateChipMarks, bitrateFromProgress, bitrateSliderProgress, bitrateSliderSpan } from 'foundation-ui/settings/index.js'
 import { MBanner, MButton, MChip, MChipSet, MChoiceItem, MEmpty, MField, MGroup, MIconButton, MItem, MLoading, MSliderItem, useNotify } from 'foundation-ui/vue'
 import { useI18n } from '../../desktop/i18n/index.js'
 
@@ -63,6 +64,13 @@ const activeSessions = ref([])
 const allSessions = ref([])
 const selectedClient = ref('')
 const bitrateValue = ref(DEFAULT_BITRATE)
+// the shared segmented bitrate scale between the limits; the marks stand under the chips
+const bitrateSpan = bitrateSliderSpan(BITRATE_LIMITS.MIN, BITRATE_LIMITS.MAX)
+const bitrateMarks = bitrateChipMarks(BITRATE_PRESETS.map((kbps) => kbps / 1000), BITRATE_LIMITS.MIN, BITRATE_LIMITS.MAX)
+const bitrateProgress = computed({
+  get: () => Math.max(bitrateSpan.min, bitrateSliderProgress(bitrateValue.value)),
+  set: (position) => { bitrateValue.value = Math.max(BITRATE_LIMITS.MIN, bitrateFromProgress(position)) },
+})
 const loading = ref(true)
 const refreshing = ref(false)
 const applying = ref(false)

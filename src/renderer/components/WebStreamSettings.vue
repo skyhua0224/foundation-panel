@@ -47,7 +47,7 @@
         <MGroup>
           <MChoiceItem v-model="defaultVideoCodec" icon="videocam" :title="t.webStream.videoCodec" :options="codecOptions" :cancel-label="t.common.cancel" />
           <MChoiceItem v-model="defaultFps" icon="speed" :title="t.webStream.defaultFps" :options="[30, 60, 120].map((v) => ({ value: v, label: String(v) }))" :cancel-label="t.common.cancel" />
-          <MSliderItem v-model="defaultBitrate" icon="bolt" :title="t.webStream.bitrate" :min="1000" :max="150000" :step="1000" :decimals="0" unit=" kbps" size="m" icon-start="signal_cellular_alt_1_bar" icon-end="signal_cellular_alt" />
+          <MSliderItem v-model="bitrateProgress" icon="bolt" :title="t.webStream.bitrate" :min="bitrateSpan.min" :max="bitrateSpan.max" :step="1" :decimals="0" :marks="bitrateMarks" :readout-text="`${defaultBitrate} kbps`" size="m" icon-start="signal_cellular_alt_2_bar" icon-end="signal_cellular_alt" />
           <MChoiceItem v-model="defaultTransport" icon="swap_horiz" :title="t.webStream.transportMode" :options="transportOptions" :cancel-label="t.common.cancel" />
         </MGroup>
       </MSection>
@@ -70,6 +70,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
 import { MPage, MGroup, MSection, MItem, MSwitchItem, MSliderItem, MChoiceItem, MValueItem, MFooter, MStatusPill, MProgress, MButton, MIconButton, MChip, useSubpage } from 'foundation-ui/vue'
 import { moonlightWeb } from '../tauri-adapter.js'
+import { bitrateChipMarks, bitrateFromProgress, bitrateSliderProgress, bitrateSliderSpan } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
 const { t } = useI18n()
@@ -111,6 +112,13 @@ const certKeyPath = ref('./server/key.pem')
 const certPemPath = ref('./server/cert.pem')
 const defaultVideoCodec = ref('h264')
 const defaultBitrate = ref(20000)
+// the shared segmented bitrate scale between 1 and 150 Mbps; the marks stand at the usual values
+const bitrateSpan = bitrateSliderSpan(1000, 150000)
+const bitrateMarks = bitrateChipMarks([5, 10, 20, 50, 100], 1000, 150000)
+const bitrateProgress = computed({
+  get: () => Math.max(bitrateSpan.min, bitrateSliderProgress(defaultBitrate.value)),
+  set: (position) => { defaultBitrate.value = Math.max(1000, bitrateFromProgress(position)) },
+})
 const defaultFps = ref(60)
 const defaultTransport = ref('auto')
 

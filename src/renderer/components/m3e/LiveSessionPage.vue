@@ -12,7 +12,7 @@
             <MChoiceItem v-if="live.length > 1" data-redact="client" v-model="client" icon="devices" :title="l.client" :options="live.map((s) => ({ value: s.client_name, label: sessionLabel(s) }))" :disabled="applying" :cancel-label="l.cancel" />
             <MItem v-else data-redact="client" icon="devices" :title="live[0].client_name" :value="modeOf(live[0])" />
             <MItem v-if="current?.bitrate" icon="network_check" :title="l.current" :value="formatBitrate(current.bitrate)" />
-            <MSliderItem v-model="bitrate" icon="speed" :title="l.target" :min="BITRATE.min" :max="BITRATE.max" :step="BITRATE.step" :decimals="0" size="m" icon-start="signal_cellular_alt_1_bar" icon-end="signal_cellular_alt" :readout-text="formatBitrate(bitrate)" :disabled="applying" />
+            <MSliderItem v-model="bitrateProgress" icon="speed" :title="l.target" :min="bitrateSpan.min" :max="bitrateSpan.max" :step="1" :decimals="0" :marks="bitrateMarks" size="m" icon-start="signal_cellular_alt_2_bar" icon-end="signal_cellular_alt" :readout-text="formatBitrate(bitrate)" :disabled="applying" />
             <MItem stack :title="l.presets"><template #control><MChipSet v-model="bitrate" :label="l.presets" :options="BITRATE_PRESETS.map((v) => ({ value: v, label: formatBitrate(v) }))" :disabled="applying" /></template></MItem>
             <MValueItem v-model.number="bitrate" icon="edit_note" :label="l.input" type="number" suffix="Kbps" :min="BITRATE.min" :max="BITRATE.max" :step="BITRATE.step" :check="(v) => (validBitrate(Number(v)) ? '' : rangeText)" :disabled="applying" :ok-label="l.ok" :cancel-label="l.cancel" />
           </MGroup>
@@ -98,6 +98,7 @@ import { enhancementControlsText, enhancementError } from '../../composables/enh
 import { nrOverlayText as overlayTexts } from '../../composables/nrOverlayMessages.js'
 import { nrOutputLabel, nrOverlayState, nrPipelines } from '../../composables/nrOverlayState.js'
 import { useI18n } from '../../desktop/i18n/index.js'
+import { bitrateChipMarks, bitrateFromProgress, bitrateSliderProgress, bitrateSliderSpan } from 'foundation-ui/settings/index.js'
 import { BITRATE, BITRATE_PRESETS, DEFAULT_BITRATE, formatBitrate, validBitrate, liveSessions, perfSessionOf, budgetUsage, perfStatus, pipelineSegments, formatMs, formatNumber, formatPercent, formatInteger, formatUptime } from '../../composables/liveSession.js'
 
 // 当前串流: the old 码率调整 tool (a live session's bitrate: change_bitrate) and the old 主机性能 window (/api/perf/current) on one page of 串流.
@@ -111,6 +112,13 @@ const readAt = ref(0)
 const live = computed(() => liveSessions(sessions.value))
 const idleCount = computed(() => (sessions.value.length && !live.value.length ? sessions.value.length : 0))
 const client = ref(''), bitrate = ref(DEFAULT_BITRATE), applying = ref(false)
+// the target slider runs on the shared segmented bitrate scale (fine steps where the usual values are, as the 串流 page and the Web UI draw it) between the limits of the host; the marks stand under the 常用码率 chips
+const bitrateSpan = bitrateSliderSpan(BITRATE.min, BITRATE.max)
+const bitrateMarks = bitrateChipMarks(BITRATE_PRESETS.map((kbps) => kbps / 1000), BITRATE.min, BITRATE.max)
+const bitrateProgress = computed({
+  get: () => Math.max(bitrateSpan.min, bitrateSliderProgress(bitrate.value)),
+  set: (position) => { bitrate.value = Math.max(BITRATE.min, bitrateFromProgress(position)) },
+})
 const current = computed(() => live.value.find((s) => s.client_name === client.value) || null)
 const modeOf = (s) => `${s.width}×${s.height}@${s.fps}fps`
 const sessionLabel = (s) => `${s.client_name} (${modeOf(s)})`
