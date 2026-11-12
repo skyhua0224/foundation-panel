@@ -1,4 +1,4 @@
-import { createEventSender, installEventListeners } from 'foundation-ui/telemetry'
+import { createEventSender, installEventListeners, setReportTransport } from 'foundation-ui/telemetry'
 
 // Usage counts, experience numbers and errors of the control panel (telemetry v1, docs/privacy_telemetry.md). The panel hands its events to the host it controls (POST /api/telemetry/events through its
 // local proxy) instead of sending them itself. Reason: the host already owns the two choices (config keys telemetry_consent and telemetry_errors), the install identity and the queue that survives a restart and
@@ -15,6 +15,8 @@ export function createPanelTelemetry({ getBase, getVersion = async () => '', get
       return fetchFn(`${base}/api/telemetry/events`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), keepalive })
     },
   })
+  // the reports the person sends by hand and the automatic issues travel the same way: to the host through the proxy
+  setReportTransport((events) => sender.postNow(events))
   let removeListeners = () => {}
   return {
     sender,
