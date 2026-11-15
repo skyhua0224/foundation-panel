@@ -398,16 +398,17 @@ fn webview_kind(kind: i32) -> &'static str {
     }
 }
 
-/// Records every WebView2 process failure of this webview (a few per run) as kind "panic": the kind and the exit code are the frame.
-pub(crate) fn register_webview_failures(core_webview: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2) {
+/// Watches the WebView2 processes of this webview. Every failure (a few per run) is recorded as kind "panic": the kind and the exit code are the frame. A dead renderer is
+/// reloaded and a dead browser starts the panel again (`recover.rs` decides; `restart` starts it), so the window does not stay blank.
+pub(crate) fn register_webview_failures(core_webview: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2, restart: impl Fn() + 'static) {
+    use super::recover::{self, Action};
     use webview2_com::Microsoft::Web::WebView2::Win32::{COREWEBVIEW2_PROCESS_FAILED_KIND, ICoreWebView2ProcessFailedEventArgs2};
     use webview2_com::ProcessFailedEventHandler;
     use wv2_windows_core::Interface;
-    let handler = ProcessFailedEventHandler::create(Box::new(|_, args| {
+    let webview = core_webview.clone();
+    let mut history = recover::History::default();
+    let handler = ProcessFailedEventHandler::create(Box::new(move |_, args| {
         let Some(args) = args else { return Ok(()) };
-        if WEBVIEW_REPORTS.fetch_add(1, Ordering::Relaxed) >= 3 {
-            return Ok(());
-        }
         let mut kind = COREWEBVIEW2_PROCESS_FAILED_KIND::default();
         // SAFETY: COM calls on the event's own arguments.
         unsafe { args.ProcessFailedKind(&mut kind)? };
@@ -419,8 +420,29 @@ pub(crate) fn register_webview_failures(core_webview: &webview2_com::Microsoft::
         let name = webview_kind(kind.0);
         let mut label = meta::Buf::<48>::new();
         let _ = write!(label, "webview2:{name}");
-        let frame = Frame::new(label.as_str(), u64::from(exit_code as u32));
-        super::record("panic", label.as_str(), &[frame]);
+        if WEBVIEW_REPORTS.fetch_add(1, Ordering::Relaxed) < 3 {
+            let frame = Frame::new(label.as_str(), u64::from(exit_code as u32));
+            super::record("panic", label.as_str(), &[frame]);
+        }
+        // a panel that has run for ten minutes has recovered from the last restart
+        let restarts = match super::state() {
+            Some(state) if state.started.elapsed() < std::time::Duration::from_secs(600) => recover::restarts_so_far(std::env::var(recover::RESTARTS_ENV).ok().as_deref()),
+            _ => 0,
+        };
+        match recover::decide(name, std::time::Instant::now(), &mut history, restarts) {
+            Action::Reload => {
+                log::warn!("WebView2 {name} (exit code {exit_code:#x}): reloading the page");
+                // SAFETY: the event runs on the thread of the webview.
+                let _ = unsafe { webview.Reload() };
+            }
+            Action::Restart => {
+                log::warn!("WebView2 {name} (exit code {exit_code:#x}): starting the panel again");
+                // SAFETY: nothing else reads the environment of this process at this point.
+                unsafe { std::env::set_var(recover::RESTARTS_ENV, (restarts + 1).to_string()) };
+                restart();
+            }
+            Action::Nothing => {}
+        }
         Ok(())
     }));
     let mut token = 0;

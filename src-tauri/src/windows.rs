@@ -915,6 +915,7 @@ fn navigate_to_url(window: &WebviewWindow, url: &str) {
 #[cfg(target_os = "windows")]
 pub(crate) fn configure_webview_security<R: Runtime>(window: &WebviewWindow<R>) {
     let label = window.label().to_string();
+    let window_app = window.app_handle().clone();
     let _ = window.with_webview(move |webview| {
         // 引入 webview2-com 的 COM 接口类型
         use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings4;
@@ -961,7 +962,8 @@ pub(crate) fn configure_webview_security<R: Runtime>(window: &WebviewWindow<R>) 
                 }
             }
             // a WebView2 process that fails (renderer, GPU, browser) is recorded for the crash report
-            crate::crash::register_webview_failures(&core_webview);
+            let app = window_app.clone();
+            crate::crash::register_webview_failures(&core_webview, move || app.restart());
             let Ok(settings) = core_webview.Settings() else {
                 log::warn!("⚠️ 无法获取 ICoreWebView2Settings [{}]", label);
                 return;

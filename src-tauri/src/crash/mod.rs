@@ -12,6 +12,7 @@
 //! waits on anything the panel needs to start.
 
 mod meta;
+mod recover;
 mod redact;
 mod upload;
 #[cfg(windows)]
