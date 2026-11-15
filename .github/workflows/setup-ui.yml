@@ -1,0 +1,173 @@
+name: Publish setup UI
+
+# Builds the Foundation Sunshine installer's setup UI (foundation-setup-ui.exe: the installer pages of foundation-ui plus
+# the Tauri window in installer-ui/) once per Panel commit and publishes it as a release asset with a build-provenance
+# attestation. The Foundation Sunshine CI downloads the asset that matches its pinned Panel submodule commit instead of
+# compiling it (about 4 minutes there, about 2 seconds to download and verify), and builds from source when no asset exists.
+#
+# Assets live on one rolling pre-release, tag `setup-ui`, named foundation-setup-ui-<panel commit>-<foundation-ui commit>.exe.
+# The name carries both commits because the pages come from foundation-ui; an asset is never replaced once published, so
+# the sha256 the host repository pins (scripts/installer-inputs.json, entry setupUi) stays valid.
+#
+# Verify a download:
+#   gh attestation verify <asset> --repo AlkaidLab/foundation-panel \
+#     --signer-workflow AlkaidLab/foundation-panel/.github/workflows/setup-ui.yml --source-digest <panel commit>
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      foundation_ui_sha:
+        description: 'foundation-ui commit to build the pages from (default: its current default branch head)'
+        required: false
+        default: ''
+        type: string
+
+# Two builds of different commits must both finish: every commit gets its asset.
+concurrency:
+  group: setup-ui-${{ github.sha }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  SCCACHE_GHA_ENABLED: 'true'
+  RUSTC_WRAPPER: sccache
+
+jobs:
+  publish:
+    name: Build and publish the setup UI
+    runs-on: windows-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write       # create the release and upload the asset
+      id-token: write       # sign the attestation (Sigstore, OIDC)
+      attestations: write   # store the attestation
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Resolve the asset name
+        id: names
+        shell: bash
+        env:
+          INPUT_FOUNDATION_UI_SHA: ${{ inputs.foundation_ui_sha }}
+        run: |
+          set -euo pipefail
+          fui="$INPUT_FOUNDATION_UI_SHA"
+          if [[ -z "$fui" ]]; then
+            fui="$(git ls-remote https://github.com/AlkaidLab/foundation-ui HEAD | cut -f1)"
+          fi
+          [[ "$fui" =~ ^[0-9a-f]{40}$ ]] || { echo "foundation-ui commit must be a full 40-character sha: '$fui'"; exit 1; }
+          echo "foundation_ui=$fui" >> "$GITHUB_OUTPUT"
+          echo "asset=foundation-setup-ui-${GITHUB_SHA}-${fui}.exe" >> "$GITHUB_OUTPUT"
+
+      # An asset is published once per (Panel commit, foundation-ui commit): re-runs stop here instead of replacing it.
+      - name: Skip when the asset already exists
+        id: existing
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSET: ${{ steps.names.outputs.asset }}
+        run: |
+          set -euo pipefail
+          if gh release view setup-ui --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2>/dev/null | grep -Fxq "$ASSET"; then
+            echo "::notice::$ASSET is already published"
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Setup Node.js
+        if: steps.existing.outputs.present != 'true'
+        uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24.21.0
+          cache: npm
+
+      - name: Setup Rust
+        if: steps.existing.outputs.present != 'true'
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-pc-windows-msvc
+
+      - name: Setup Rust compiler cache
+        if: steps.existing.outputs.present != 'true'
+        uses: mozilla-actions/sccache-action@v0.0.11
+
+      # The pages import foundation-ui from a sibling checkout named ds5-ui-m3e (vite.installer.config.js).
+      - name: Fetch foundation-ui
+        if: steps.existing.outputs.present != 'true'
+        shell: bash
+        env:
+          FOUNDATION_UI_SHA: ${{ steps.names.outputs.foundation_ui }}
+        run: |
+          set -euo pipefail
+          dir="$GITHUB_WORKSPACE/../ds5-ui-m3e"
+          git init -q "$dir"
+          git -C "$dir" fetch -q --depth 1 https://github.com/AlkaidLab/foundation-ui "$FOUNDATION_UI_SHA"
+          git -C "$dir" -c advice.detachedHead=false checkout -q FETCH_HEAD
+          npm ci --prefix "$dir"
+
+      - name: Install npm dependencies
+        if: steps.existing.outputs.present != 'true'
+        run: npm ci
+
+      - name: Build the setup UI
+        if: steps.existing.outputs.present != 'true'
+        id: build
+        shell: pwsh
+        env:
+          ASSET: ${{ steps.names.outputs.asset }}
+        run: |
+          $PSNativeCommandUseErrorActionPreference = $true
+          $env:FOUNDATION_UI_DIR = (Resolve-Path "$env:GITHUB_WORKSPACE/../ds5-ui-m3e").Path
+          npm run build:installer-pages
+          cargo build --release --locked --manifest-path installer-ui/Cargo.toml
+          $built = 'installer-ui/target/release/foundation-setup-ui.exe'
+          if (-not (Test-Path -LiteralPath $built) -or (Get-Item -LiteralPath $built).Length -eq 0) { throw 'foundation-setup-ui.exe was not produced' }
+          New-Item -ItemType Directory -Force -Path dist-asset | Out-Null
+          Copy-Item -LiteralPath $built -Destination "dist-asset/$env:ASSET"
+          $sha = (Get-FileHash -LiteralPath "dist-asset/$env:ASSET" -Algorithm SHA256).Hash.ToLowerInvariant()
+          "sha256=$sha" >> $env:GITHUB_OUTPUT
+          Write-Output "$env:ASSET sha256 $sha ($((Get-Item "dist-asset/$env:ASSET").Length) bytes)"
+
+      # Build provenance: ties the file to this repository, this workflow and this commit
+      # (https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations).
+      - name: Attest build provenance
+        if: steps.existing.outputs.present != 'true'
+        uses: actions/attest-build-provenance@v4
+        with:
+          subject-path: dist-asset/${{ steps.names.outputs.asset }}
+
+      - name: Publish the release asset
+        if: steps.existing.outputs.present != 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ASSET: ${{ steps.names.outputs.asset }}
+          SHA256: ${{ steps.build.outputs.sha256 }}
+          FOUNDATION_UI_SHA: ${{ steps.names.outputs.foundation_ui }}
+        run: |
+          set -euo pipefail
+          # One rolling pre-release holds every asset. It is not "latest", so release listings of the Panel keep pointing
+          # at the Panel bundles.
+          if ! gh release view setup-ui --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release create setup-ui --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease --latest=false \
+              --title "Installer setup UI builds" \
+              --notes "foundation-setup-ui.exe builds of the installer's setup UI, one per Panel commit, named foundation-setup-ui-<Panel commit>-<foundation-ui commit>.exe. Each file carries a build-provenance attestation: gh attestation verify <file> --repo $GITHUB_REPOSITORY --signer-workflow $GITHUB_REPOSITORY/.github/workflows/setup-ui.yml"
+          fi
+          gh release upload setup-ui "dist-asset/$ASSET" --repo "$GITHUB_REPOSITORY"
+          {
+            echo "### Setup UI published"
+            echo "- asset: \`$ASSET\`"
+            echo "- sha256: \`$SHA256\`"
+            echo "- Panel commit: \`$GITHUB_SHA\`"
+            echo "- foundation-ui commit: \`$FOUNDATION_UI_SHA\`"
+          } >> "$GITHUB_STEP_SUMMARY"
