@@ -15,4 +15,4 @@ jobs:
         run: mkdir -p dist && echo '<html></html>' > dist/index.html
       - name: Test the crash module and compile the panel
         shell: bash
-        run: cargo test --manifest-path src-tauri/Cargo.toml --lib crash 2>&1 | tail -40
+        run: cargo test --manifest-path src-tauri/Cargo.toml --bins crash 2>&1 | tail -60
