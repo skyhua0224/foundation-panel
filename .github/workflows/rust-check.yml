@@ -1,6 +1,7 @@
 name: Rust check (fork)
 on:
-  workflow_dispatch:
+  push:
+    branches: [ci/webview-recover-check]
 jobs:
   check:
     runs-on: windows-latest
