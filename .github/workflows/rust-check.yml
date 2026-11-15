@@ -1,0 +1,17 @@
+name: Rust check (fork)
+on:
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Empty frontend folder (the check does not build the web part)
+        shell: bash
+        run: mkdir -p dist && echo '<html></html>' > dist/index.html
+      - name: Test the crash module and compile the panel
+        shell: bash
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib crash 2>&1 | tail -40
