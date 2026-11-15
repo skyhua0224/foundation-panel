@@ -117,3 +117,8 @@ webview2-com = "0.39"
 wv2-windows-core = { package = "windows-core", version = "0.62" }
 winreg = "0.55"
 image = "0.25.9"
+
+# Line tables for the release build: on the MSVC target they go to the .pdb next to the exe (the exe does not grow), so a stack frame of an error report (module+0xoffset) can be mapped to src/file.rs:line
+# by the symbol workflow (scripts/release/symbolize.py of the host repo); the .pdb is archived with the release, never shipped.
+[profile.release]
+debug = "line-tables-only"
