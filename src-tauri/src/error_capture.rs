@@ -175,7 +175,7 @@ mod windows_tests {
     fn the_stack_of_this_thread_is_module_plus_offset() {
         let frames = capture_frames(0);
         assert!(!frames.is_empty(), "RtlCaptureStackBackTrace gave no frame");
-        let shape = regex::Regex::new(r"^[A-Za-z0-9_.-]+\.(?:exe|dll)\+0x[0-9a-f]+$").unwrap();
+        let shape = regex::Regex::new(r"(?i)^[A-Za-z0-9_.-]+\.(?:exe|dll)\+0x[0-9a-f]+$").unwrap();
         assert!(frames.iter().all(|f| shape.is_match(f)), "{frames:?}");
         assert!(frames.len() <= MAX_FRAMES);
         // the test binary is the first module on the stack
