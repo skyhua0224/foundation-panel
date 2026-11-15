@@ -421,6 +421,9 @@ const panelTelemetry = createPanelTelemetry({
   getBase: async () => sunshine.getProxyUrl(),
   getVersion: panelVersion,
   getUpdateSource: () => { try { return localStorage.getItem(SOURCE_KEY) || '' } catch { return '' } },
+  // the Rust shell's panic reports (error_capture.rs): taken at start and when the shell says it wrote one
+  drainShellErrors: () => invoke('error_capture_drain'),
+  onShellError: async (fn) => { const { listen } = await import('@tauri-apps/api/event'); return listen('error-capture', fn) },
 })
 watch(() => nav.current.value, (page) => { if (page) panelTelemetry.page(String(page)) }, { immediate: true })
 const errorBack = () => { if (nav.canPop.value) nav.pop(); else router.navigate(ROUTES.HOME) }

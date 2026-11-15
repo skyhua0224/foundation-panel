@@ -19,6 +19,8 @@ mod doctor_local;
 mod dualsense;
 #[cfg(target_os = "windows")]
 mod elevation;
+mod error_capture;
+mod error_report;
 mod file_mapping;
 mod file_transfer;
 mod fs_utils;
@@ -28,6 +30,7 @@ mod github_download;
 mod host_facts;
 mod host_facts_math;
 mod hwinfo;
+mod log_scrub;
 mod logger;
 mod menu_place;
 mod moonlight_web;
@@ -140,6 +143,9 @@ fn configure_loopback_proxy_bypass() {
 }
 
 fn main() {
+    // First, so that a panic anywhere after this line leaves a report (location, stack, recent actions, scrubbed log tail) for the page to send.
+    error_capture::install(env!("CARGO_PKG_VERSION"));
+
     #[cfg(target_os = "windows")]
     configure_loopback_proxy_bypass();
 
@@ -208,6 +214,7 @@ fn main() {
             // 初始化日志系统（需要在 setup 中获取 app handle）
             logger::init_logger();
             client_fingerprint_rules::start();
+            error_capture::attach(app.handle());
             stall_watch::start(app.handle().clone());
             info!("🚀 Sunshine Control Panel 启动中...");
 
@@ -216,7 +223,8 @@ fn main() {
         .on_window_event(|window, event| {
             windows::handle_window_event(window, event);
         })
-        .invoke_handler(tauri::generate_handler![
+        .invoke_handler(error_capture::record_commands(tauri::generate_handler![
+            error_capture::error_capture_drain,
             commands::toggle_dark_mode,
             toolbar::handle_toolbar_menu_action,
             toolbar::save_toolbar_position,
@@ -449,7 +457,7 @@ fn main() {
             tray::main_panel_ready,
             panel_page::take_pending_panel_page,
             start_guide::take_pending_start_guide,
-        ])
+        ]))
         .build(tauri::generate_context!())
         .expect("error while building tauri application");
 

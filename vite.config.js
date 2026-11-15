@@ -1,7 +1,7 @@
 import { resolve, join } from 'path'
 import vuePlugin from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { dirname } from 'node:path'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -9,6 +9,11 @@ const __dirname = dirname(__filename)
 
 const rendererSrcPath = join(__dirname, 'src', 'renderer')
 const foundationUi = process.env.FOUNDATION_UI_DIR || join(__dirname, '..', 'ds5-ui-m3e')
+
+// Release builds keep their source maps OUT of the shipped files: with SOURCEMAP_DIR set, the maps are built "hidden" (no reference in the bundle) and moved to that folder, which CI keeps as a private
+// artifact; error reports carry minified positions and the private pipeline maps them back to source lines (foundation-ui src/build/privateSourcemaps.js, tools/map-stack.mjs). Unset: nothing changes.
+const privateMapsDir = process.env.SOURCEMAP_DIR
+const privateSourcemaps = privateMapsDir ? (await import(pathToFileURL(join(foundationUi, 'src', 'build', 'privateSourcemaps.js')).href)).privateSourcemaps : null
 
 /**
  * https://vitejs.dev/config
@@ -50,6 +55,7 @@ export default defineConfig(() => ({
   },
   plugins: [
     vuePlugin({ template: { compilerOptions: { isCustomElement: (tag) => tag.startsWith('md-') } } }),
+    ...(privateSourcemaps ? [privateSourcemaps({ dir: privateMapsDir })] : []),
   ],
   resolve: {
     // foundation-ui is the shared Material 3 Expressive package (sibling checkout); Vue must stay a single copy.
