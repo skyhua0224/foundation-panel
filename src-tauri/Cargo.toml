@@ -3,7 +3,7 @@ name = "sunshine-gui"
 version = "0.0.0-dev"
 description = "A GUI for sunshine"
 authors = ["qiin2333"]
-license = ""
+license = "MIT"
 repository = "https://github.com/qiin2333/sunshine"
 edition = "2024"
 

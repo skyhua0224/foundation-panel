@@ -2,7 +2,7 @@
 name = "alkaidlab-native-tool-plugin-api"
 version = "0.1.0"
 edition = "2024"
-license = "GPL-3.0-only"
+license = "MIT"
 
 [lib]
 path = "src/lib.rs"

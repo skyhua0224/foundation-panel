@@ -7,7 +7,7 @@ name = "foundation-setup-ui"
 version = "0.1.0"
 edition = "2021"
 publish = false
-license = "GPL-3.0-only"
+license = "MIT"
 
 [[bin]]
 name = "foundation-setup-ui"

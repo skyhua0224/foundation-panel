@@ -2,7 +2,7 @@
 name = "alkaidlab-plugin-stylus"
 version = "1.0.0"
 edition = "2024"
-license = "GPL-3.0-only"
+license = "MIT"
 
 [lib]
 name = "alkaidlab_plugin_stylus"
