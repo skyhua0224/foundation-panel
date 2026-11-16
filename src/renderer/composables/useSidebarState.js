@@ -3,6 +3,7 @@ import { ElMessage } from './notifyMessage.js'
 import { useRouter, ROUTES } from './useRouter.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { formatMessage } from '../shared/format-message.js'
+import { isPrereleaseUnavailable, updateCheckFailureText } from './updateCheckError.js'
 
 const STORAGE_KEYS = {
   SKIPPED_VERSION: 'sunshine-skipped-version',
@@ -248,7 +249,9 @@ export function useSidebarState() {
       const { error } = payload
       if (error) {
         console.error('Update check failed:', error)
-        ElMessage.error(t.value.toolActions.checkUpdatesFailed)
+        const text = updateCheckFailureText(error, t.value.toolActions)
+        if (isPrereleaseUnavailable(error)) ElMessage.warning(text)
+        else ElMessage.error(text)
       }
     })
     cleanupFns.push(unlistenCheckResult)

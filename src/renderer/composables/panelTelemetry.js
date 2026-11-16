@@ -24,7 +24,7 @@ export function createPanelTelemetry({ getBase, getVersion = async () => '', get
     async start({ startMs } = {}) {
       removeListeners = installEventListeners(sender, win, doc)
       sender.setContext({ version: await getVersion() })
-      sender.track.appStart({ startMs, updateSource: getUpdateSource() })
+      sender.track.appStart({ startMs, updateSource: await getUpdateSource() })
     },
     /** What the host would send next (GET /api/telemetry/preview): the records waiting and the fields every batch carries. For 关于 › 隐私 › 查看将发送的内容. */
     async preview() {

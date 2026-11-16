@@ -21,10 +21,13 @@ mod preferences;
 pub(crate) use preferences::{include_prerelease as get_include_prerelease, save_last_check_time};
 
 use metadata::{
-    ReleaseAsset, ReleaseCandidate, ReleaseCatalog, UpdateChannel, candidate_is_newer_than,
-    resolve_catalog, select_candidate,
+    ReleaseAsset, ReleaseCandidate, ReleaseCatalog, UpToDateNote, UpdateChannel, candidate_is_newer_than,
+    resolve_catalog, select_candidate, up_to_date_note,
 };
 
+/// The start of the error text of a manual check that could not say "up to date" because the prerelease information was unreachable;
+/// the panel shows its own sentence for it (it matches this prefix).
+pub(crate) const PRERELEASE_UNAVAILABLE_ERROR: &str = "prerelease_unavailable";
 const UPDATER_HELPER_ARG: &str = "--updater-helper";
 const UPDATE_RESULT_ARG: &str = "--update-result";
 
@@ -118,6 +121,10 @@ pub struct UpdateInfo {
     /// `true` = 已是最新（只读浏览），`false`（默认）= 有可用更新
     #[serde(default)]
     pub is_latest: bool,
+    /// 仅在 `is_latest` 时有值：`installed_prerelease_no_newer`（当前是预发布版本，没有更新的版本）。
+    /// 预发布信息取不到时不返回“已是最新”，手动检查返回以 `prerelease_unavailable` 开头的错误。
+    #[serde(default)]
+    pub latest_note: Option<String>,
 }
 
 /// temp 目录中已下载安装包的缓存标记，用于跳过重复下载并免于被清理。
@@ -274,6 +281,7 @@ fn select_compatible_candidate(
             .as_ref()
             .filter(|candidate| selected_asset(candidate).is_some())
             .cloned(),
+        prerelease_unavailable: catalog.prerelease_unavailable.clone(),
     };
     select_candidate(&compatible_catalog, channel)
 }
@@ -291,6 +299,7 @@ fn create_update_info(candidate: &ReleaseCandidate) -> UpdateInfo {
         download_type: asset.map(|asset| asset.asset_type.clone()),
         release_page: candidate.release_page.clone(),
         is_latest: false,
+        latest_note: None,
     }
 }
 
@@ -354,9 +363,25 @@ async fn check_for_updates_in_channel(
 
     note_seen_update(candidate_is_newer_than(&current_version, &candidate).then(|| candidate.version.clone()));
     if !candidate_is_newer_than(&current_version, &candidate) {
+        let note = up_to_date_note(&current_version, &catalog, channel);
+        match (note, catalog.prerelease_unavailable.as_deref()) {
+            (Some(UpToDateNote::PrereleaseUnavailable), reason) => {
+                // Nothing newer was found, but the prerelease side could not be asked: "up to date" would be a claim the check cannot make.
+                let reason = reason.unwrap_or("unknown");
+                warn!("⚠️ 预发布信息此刻取不到，不能断言已是最新: {reason}");
+                if manual {
+                    return Err(format!("{PRERELEASE_UNAVAILABLE_ERROR}: {reason}"));
+                }
+            }
+            (Some(UpToDateNote::InstalledPrereleaseNoNewer), _) => {
+                info!("当前是预发布版本 {current_version}，没有更新的版本");
+            }
+            (None, _) => {}
+        }
         if manual {
             let mut info = create_update_info(&candidate);
             info.is_latest = true;
+            info.latest_note = note.map(|note| note.code().to_string());
             return Ok(Some(info));
         }
         return Ok(None);
@@ -1354,6 +1379,13 @@ pub fn set_update_source(app: AppHandle, source: String) -> Result<bool, String>
     Ok(true)
 }
 
+/// Tauri命令：匿名使用统计里的 update_source 取值来源：最近一次真正用到的来源（mirror / cnb / github），
+/// 还没有下载过时是用户的设置（auto / cnb / github / mirror），永远不是空串。
+#[tauri::command]
+pub fn get_update_source_used(app: AppHandle) -> String {
+    preferences::used_update_source(&app)
+}
+
 /// 读取安全存储中的 CDK；存储不可用或为空都按“无 CDK”处理。
 async fn read_stored_cdk() -> Option<String> {
     match tauri::async_runtime::spawn_blocking(|| cdk_store::read(mirrorchyan::CREDENTIAL_TARGET))
@@ -2176,6 +2208,7 @@ pub async fn download_update(
             .unwrap_or(outcome.downloaded),
     );
 
+    preferences::record_used_update_source(&app_handle, outcome.source);
     info!(
         "✅ 下载完成: {} bytes，来源: {}",
         outcome.downloaded, outcome.source
@@ -2376,6 +2409,7 @@ mod download_source_tests {
         let catalog = ReleaseCatalog {
             latest: Some(latest),
             pre_latest: Some(pre_without_asset),
+            prerelease_unavailable: None,
         };
 
         let selected =

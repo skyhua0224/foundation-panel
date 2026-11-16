@@ -29,13 +29,17 @@
     @retry="handleRetry"
     @open-release="handleOpenBrowser()"
     @open-changelog="handleOpenBrowser"
-  />
+  >
+    <template v-if="latestNote" #notice>
+      <MBanner tone="info" icon="info">{{ latestNote }}</MBanner>
+    </template>
+  </MUpdateSheet>
 </template>
 
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
-import { MUpdateSheet, sheetFromPanelInfo } from 'foundation-ui/vue'
+import { MBanner, MUpdateSheet, sheetFromPanelInfo } from 'foundation-ui/vue'
 import { channelOfVersion, fetchReleaseMetadata, orderedDownloadUrls } from 'foundation-ui/update'
 import { useUpdateSource } from '../composables/useUpdateSource.js'
 import { useUpdateDownload } from '../composables/updateDownload.js'
@@ -81,6 +85,8 @@ let installProgressUnlisten = null
 let installWaitTimer = null
 
 const isLatest = computed(() => !!props.updateInfo?.is_latest)
+// "up to date" plus what else is true: the installed version is a prerelease and nothing newer exists
+const latestNote = computed(() => (isLatest.value && props.updateInfo?.latest_note === 'installed_prerelease_no_newer' ? t.value.updateDialog.latestNoteInstalledPrerelease : ''))
 
 // Notes, driver notice, release page and installer facts of the update the host reported.
 const sheet = computed(() => sheetFromPanelInfo(props.updateInfo, { current: props.currentVersion }))

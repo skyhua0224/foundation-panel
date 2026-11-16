@@ -421,7 +421,8 @@ const telemetry = useTelemetryConsent({ api: telemetryApi })
 const panelTelemetry = createPanelTelemetry({
   getBase: async () => sunshine.getProxyUrl(),
   getVersion: panelVersion,
-  getUpdateSource: () => { try { return localStorage.getItem(SOURCE_KEY) || '' } catch { return '' } },
+  // the source the last download really came from, else the setting (the native side never answers empty); outside the app: the remembered choice
+  getUpdateSource: async () => { try { return String(await invoke('get_update_source_used')) } catch { try { return localStorage.getItem(SOURCE_KEY) || 'auto' } catch { return 'auto' } } },
 })
 watch(() => nav.current.value, (page) => { if (page) panelTelemetry.page(String(page)) }, { immediate: true })
 const errorBack = () => { if (nav.canPop.value) nav.pop(); else router.navigate(ROUTES.HOME) }

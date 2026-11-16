@@ -21,6 +21,7 @@ export const zh = {
     "restartFailed": "重启失败，请查看日志了解详情。",
     "checkingUpdates": "正在检查更新...",
     "checkUpdatesFailed": "检查更新失败，请查看日志了解详情。",
+    "prereleaseUnavailable": "暂时取不到预发布版本的信息，无法确认是否有更新的预发布版本，请稍后再试。",
     "versionSkipped": "已忽略版本 {version}，下次自动检查更新时将跳过此版本",
     "windowCreateFailed": "{title}窗口创建失败，请查看日志了解详情。",
     "windowOpenFailed": "打开{title}失败，请查看日志了解详情。"
@@ -1931,6 +1932,7 @@ export const zh = {
     skipVersion: '忽略此版本',
     remindLater: '稍后提醒',
     downloadAndInstall: '下载并安装',
+    latestNoteInstalledPrerelease: '当前是预发布版本，没有更新的版本。',
     installNow: '立即安装',
     installReadyHint: '安装包已下载完成，可以直接安装，无需重新下载。',
     installing: '正在安装...',
