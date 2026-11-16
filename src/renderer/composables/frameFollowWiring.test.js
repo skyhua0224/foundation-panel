@@ -6,6 +6,14 @@ import test from 'node:test'
 const frame = fs.readFileSync(new URL('../components/SunshineFrame.vue', import.meta.url), 'utf8')
 const shell = fs.readFileSync(new URL('../components/SidebarMenu.vue', import.meta.url), 'utf8')
 const inject = fs.readFileSync(new URL('../../../src-tauri/inject-script.js', import.meta.url), 'utf8')
+const entry = fs.readFileSync(new URL('../sunshine-frame.js', import.meta.url), 'utf8')
+const vite = fs.readFileSync(new URL('../../../vite.config.js', import.meta.url), 'utf8')
+
+test('the panel supplies Foundation Sunshine settings data before the frame draws', () => {
+  assert.ok(vite.includes('find: /^@settings-data\\/(.*)$/'), 'vite aliases the generated settings data')
+  assert.match(entry, /import ['"]@settings-data\/index\.js['"]/, 'the frame entry supplies the data before mounting')
+  assert.match(frame, /parseSettingsHash\(path\.slice\(at\), getSearchIndex\(\)\)/, 'same-page hash moves use the supplied index')
+})
 
 test('every address the frame reports (a loaded document, a link, a hash) is handed to the shell, which makes the route follow it', () => {
   const pathUpdate = frame.slice(frame.indexOf("'path-update'"), frame.indexOf("'navigation-start'"))

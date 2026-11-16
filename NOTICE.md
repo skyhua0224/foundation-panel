@@ -10,4 +10,6 @@ Third-party components keep their own licences:
 
 - Tauri, Vue, Vite and the other packages listed in `package.json` and `src-tauri/Cargo.toml`.
 - foundation-ui, the Material 3 Expressive component package used by the renderer.
+- Foundation Sunshine's generated settings index and labels, supplied at build time under the licence
+  carried by those source files.
 - Material Symbols and the Material colour utilities, under their own terms.

@@ -1,4 +1,5 @@
 import '../../src-tauri/inject-traces.js'  // no trace of a browser: drag ghosts, browser keys and menus, zoom, selected chrome
+import '@settings-data/index.js'  // supplies the host settings index and labels before the panel draws
 import { createApp } from 'vue'
 import SunshineFrame from './components/SunshineFrame.vue'
 import { invoke } from '@tauri-apps/api/core'
