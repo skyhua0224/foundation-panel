@@ -750,7 +750,12 @@ fn parse_cnb_download_links(html: &str) -> Result<(String, bool, Vec<(String, St
         .as_str()
         .to_string();
     let tag = decode_segment(&encoded_tag)?;
-    let release_window = &html[tag_match.start()..html.len().min(tag_match.end() + 4096)];
+    // 4096 bytes after the tag link; the cut must fall on a character boundary (the page is Chinese: a cut inside a character panicked the update check)
+    let mut window_end = html.len().min(tag_match.end() + 4096);
+    while !html.is_char_boundary(window_end) {
+        window_end -= 1;
+    }
+    let release_window = &html[tag_match.start()..window_end];
     let prerelease_re = Regex::new(r#"(?is)>\s*(?:pre-release|prerelease|预发布)\s*<"#)
         .map_err(|error| error.to_string())?;
     let is_prerelease = prerelease_re.is_match(release_window);
@@ -1092,6 +1097,23 @@ mod tests {
         assert!(!is_prerelease);
         assert_eq!(assets.len(), 1);
         assert_eq!(assets[0].0, "Sunshine.v2026.0925.WindowsInstaller.exe");
+    }
+
+    #[test]
+    fn the_release_window_is_cut_on_a_character_boundary() {
+        // the 4096-byte window after the tag link ends inside a three-byte character
+        let filler: String = "杂".repeat(1400);
+        let html = format!(
+            r#"<a href="/AlkaidLab/foundation-sunshine-release/-/releases/tag/v2026.1001.112543.%E6%9D%82%E9%B1%BC">latest</a>{filler}<a href="/AlkaidLab/foundation-sunshine-release/-/releases/download/v2026.1001.112543.%E6%9D%82%E9%B1%BC/Sunshine.v2026.1001.WindowsInstaller.exe">download</a>"#
+        );
+        let (_, is_prerelease, assets) = parse_cnb_download_links(&html).unwrap();
+        assert!(!is_prerelease);
+        assert_eq!(assets.len(), 1);
+        // every offset of the window end, so one of them falls inside a character whatever the prefix length is
+        for pad in 0..4 {
+            let html = format!("{}{html}", " ".repeat(pad));
+            assert!(parse_cnb_download_links(&html).is_ok(), "pad {pad}");
+        }
     }
 
     #[test]

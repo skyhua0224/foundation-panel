@@ -95,6 +95,8 @@ fn configure_async_runtime() {
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(worker_threads)
             .thread_name("sunshine-gui-worker")
+            // 2 MiB is tokio's default: the TLS and HTTP calls of the agent run deep, and two stack overflows of the first release came from worker threads
+            .thread_stack_size(8 * 1024 * 1024)
             .enable_all()
             .build()
             .expect("failed to create the Sunshine GUI async runtime")

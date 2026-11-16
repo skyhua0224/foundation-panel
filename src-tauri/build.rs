@@ -146,6 +146,10 @@ fn write_capability(commands: &[String]) {
 
 /// Generates Tauri permissions and resources with constants from the shared compatibility contract.
 fn main() {
+    // The main thread runs the window procedures and the WebView2 callbacks: 8 MiB instead of the 1 MiB default of the linker (two stack overflows of the first release).
+    if std::env::var("CARGO_CFG_TARGET_ENV").as_deref() == Ok("msvc") {
+        println!("cargo:rustc-link-arg-bins=/STACK:8388608");
+    }
     println!("cargo:rerun-if-changed=component-compatibility.json");
     let compatibility: serde_json::Value = serde_json::from_str(
         &fs::read_to_string("component-compatibility.json")

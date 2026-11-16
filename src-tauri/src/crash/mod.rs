@@ -12,6 +12,7 @@
 //! waits on anything the panel needs to start.
 
 mod meta;
+mod recover;
 mod redact;
 mod upload;
 #[cfg(windows)]
@@ -179,7 +180,8 @@ pub(crate) fn install(version: &str, config_dir: PathBuf) {
     }));
     #[cfg(windows)]
     win::install();
-    let _ = std::thread::Builder::new().name("crash-upload".into()).spawn(uploader);
+    // 8 MiB: the first upload (TLS through SSPI, multipart bodies, a runtime of its own) overflowed the 2 MiB default twice on one machine, 20 seconds after the start
+    let _ = std::thread::Builder::new().name("crash-upload".into()).stack_size(8 * 1024 * 1024).spawn(uploader);
     run_test_switch();
 }
 
