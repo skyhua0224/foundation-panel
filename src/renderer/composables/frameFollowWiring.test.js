@@ -10,8 +10,8 @@ const entry = fs.readFileSync(new URL('../sunshine-frame.js', import.meta.url), 
 const vite = fs.readFileSync(new URL('../../../vite.config.js', import.meta.url), 'utf8')
 
 test('the panel supplies Foundation Sunshine settings data before the frame draws', () => {
-  assert.ok(vite.includes('find: /^@settings-data\\/(.*)$/'), 'vite aliases the generated settings data')
-  assert.match(entry, /import ['"]@settings-data\/index\.js['"]/, 'the frame entry supplies the data before mounting')
+  assert.ok(vite.includes('find: /^@settings-data$/'), 'vite aliases the generated settings data')
+  assert.match(entry, /import ['"]@settings-data['"]/, 'the frame entry supplies the data before mounting')
   assert.match(frame, /parseSettingsHash\(path\.slice\(at\), getSearchIndex\(\)\)/, 'same-page hash moves use the supplied index')
 })
 
