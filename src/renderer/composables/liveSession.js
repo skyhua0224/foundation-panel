@@ -37,6 +37,27 @@ export const PIPELINE_SEGMENTS = Object.freeze(['capture_to_convert', 'convert',
 /** The pipeline stages that have samples, in pipeline order. */
 export const pipelineSegments = (session) => PIPELINE_SEGMENTS.map((key) => ({ key, stats: session?.pipeline?.[key] ?? {} })).filter((s) => s.stats.samples)
 
+// The overview (the 帧时间占用 tile's frame-budget split) reads the stages as flat fields of the session it is given; each is the average of the stage in
+// milliseconds, absent while the host has no samples for it (a host that does not report the stage leaves the field out).
+export const PIPELINE_FIELDS = Object.freeze({
+  capture_to_convert: 'pipeCaptureToConvertMs',
+  convert: 'pipeConvertMs',
+  encode_queue: 'pipeEncodeQueueMs',
+  encode: 'pipeEncodeMs',
+  packet_to_broadcast: 'pipePacketToBroadcastMs',
+  total: 'pipeTotalMs',
+})
+/** The fields above for one perf session (/api/perf/current): `{ pipeConvertMs: 0.8, ... }`, only the stages that have samples and a finite average. */
+export function pipelineAverages(session) {
+  const out = {}
+  for (const [key, field] of Object.entries(PIPELINE_FIELDS)) {
+    const stats = session?.pipeline?.[key]
+    const avg = stats?.samples > 0 ? Number(stats.avg_ms) : NaN
+    if (Number.isFinite(avg) && avg >= 0) out[field] = avg
+  }
+  return out
+}
+
 export const formatMs = (v) => (v == null ? '--' : `${Number(v).toFixed(2)} ms`)
 export const formatNumber = (v) => (v == null ? '--' : Number(v).toFixed(1))
 export const formatPercent = (v) => (v == null ? '--' : `${Math.round(v)}%`)
