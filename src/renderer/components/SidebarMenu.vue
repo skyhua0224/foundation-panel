@@ -200,7 +200,7 @@ import { recordUpdateCheck } from '../composables/useUpdateCheckTime.js'
 import { useHostReach } from '../composables/useHostReach.js'
 import { ROW_OF_ROUTE, railItems, pageItems, barItems, barCurrent } from '../composables/panelNav.js'
 import { rtssInstalled, readRtssInstall } from '../composables/rtssInstall.js'
-import { rowKeywords, parseSettingsHash, SEARCH_INDEX } from 'foundation-ui/settings/index.js'
+import { rowKeywords, parseSettingsHash, getSearchIndex } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { useDualSenseStatus } from '../composables/useDualSenseStatus.js'
 import { useDualSenseText } from '../composables/useDualSenseText.js'
@@ -334,7 +334,7 @@ const restorePlace = (place) => {
 // shown (composables/frameFollow.js decides; it is a jump, so Back returns to the page the link was on). Only while the frame IS what is displayed: behind a page of the panel it may load whatever it likes.
 const followFrame = (path) => {
   if (!isWebPage.value) return
-  const move = framedMove(path, { route: router.currentRoute.value, params: nav.detail.value?.params }, { routeForWebPath, routeOfPlace, parseHash: (hash) => parseSettingsHash(hash, SEARCH_INDEX), configRoute: ROUTES.WEB_CONFIG })
+  const move = framedMove(path, { route: router.currentRoute.value, params: nav.detail.value?.params }, { routeForWebPath, routeOfPlace, parseHash: (hash) => parseSettingsHash(hash, getSearchIndex()), configRoute: ROUTES.WEB_CONFIG })
   if (move) jumps.jump(() => router.navigate(move.route, move.params))
 }
 // the back stack mirrors into the window's history (as in the Web UI): the back arrow of a pushed page, Esc, the mouse's back button and the browser's agree; without it the arrow only went back in the history and the page stayed
