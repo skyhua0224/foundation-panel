@@ -17,7 +17,7 @@ env:
   CARGO_TERM_COLOR: always
   SCCACHE_GHA_ENABLED: 'true'
   RUSTC_WRAPPER: sccache
-  FOUNDATION_SUNSHINE_DIR: ${{ github.workspace }}/../foundation-sunshine
+  SETTINGS_DATA_DIR: ${{ github.workspace }}/../foundation-sunshine/src_assets/common/assets/web/config/settingsData
 
 concurrency:
   group: gui-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -65,13 +65,15 @@ jobs:
           npm ci --prefix "$GITHUB_WORKSPACE/../ds5-ui-m3e"
 
       # The shared settings UI is data-free. Reuse Foundation Sunshine's generated index and
-      # labels at build time; vite.config.js resolves them through FOUNDATION_SUNSHINE_DIR.
+      # labels at build time; vite.config.js resolves them through SETTINGS_DATA_DIR.
       - name: Fetch Foundation Sunshine settings data
         shell: bash
         run: |
           dir="$GITHUB_WORKSPACE/../foundation-sunshine"
           git clone --depth 1 --filter=blob:none --sparse https://github.com/AlkaidLab/foundation-sunshine "$dir"
           git -C "$dir" sparse-checkout set src_assets/common/assets/web/config/settingsData
+          # a build without the data would draw label keys: stop here instead
+          test -f "$SETTINGS_DATA_DIR/index.js"
 
       - name: Install npm dependencies
         run: npm ci

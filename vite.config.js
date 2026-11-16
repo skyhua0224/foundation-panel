@@ -1,7 +1,7 @@
+import { existsSync } from 'node:fs'
 import { resolve, join } from 'path'
 import vuePlugin from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
-import { existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname } from 'node:path'
 
@@ -10,16 +10,11 @@ const __dirname = dirname(__filename)
 
 const rendererSrcPath = join(__dirname, 'src', 'renderer')
 const foundationUi = process.env.FOUNDATION_UI_DIR || join(__dirname, '..', 'ds5-ui-m3e')
-const foundationSunshineCandidates = [
-  process.env.FOUNDATION_SUNSHINE_DIR,
-  join(__dirname, '..', 'foundation-sunshine'),
-  join(__dirname, '..', 'Sunshine-Foundation'),
-].filter(Boolean)
-const foundationSunshine = foundationSunshineCandidates.find((dir) => existsSync(join(dir, 'src_assets', 'common', 'assets', 'web', 'config', 'settingsData', 'index.js')))
-if (!foundationSunshine) {
-  throw new Error('Foundation Sunshine settings data was not found; set FOUNDATION_SUNSHINE_DIR to a checkout containing src_assets/common/assets/web/config/settingsData')
-}
-const settingsData = join(foundationSunshine, 'src_assets', 'common', 'assets', 'web', 'config', 'settingsData')
+// The settings data (the search index of the settings and the label tables) belongs to the product this panel is built into, Foundation Sunshine (GPL-3.0): it is
+// read at build time from that checkout (src_assets/common/assets/web/config/settingsData, one level up and over from this repository when it is the submodule, or
+// SETTINGS_DATA_DIR) and is not part of this repository. Without it the panel builds with an empty set and shows the label keys.
+const settingsDataDir = process.env.SETTINGS_DATA_DIR || join(__dirname, '..', 'assets', 'web', 'config', 'settingsData')
+const settingsData = existsSync(join(settingsDataDir, 'index.js')) ? join(settingsDataDir, 'index.js') : join(rendererSrcPath, 'composables', 'settingsDataEmpty.js')
 
 /**
  * https://vitejs.dev/config
@@ -69,7 +64,7 @@ export default defineConfig(() => ({
       // every call to the host goes through this import: the timed one (src/renderer/tauri-core-timed.js) gives the package back with a timed invoke
       { find: /^@tauri-apps\/api\/core$/, replacement: join(rendererSrcPath, 'tauri-core-timed.js') },
       { find: '@', replacement: rendererSrcPath },
-      { find: /^@settings-data\/(.*)$/, replacement: join(settingsData, '$1') },
+      { find: /^@settings-data$/, replacement: settingsData },
       { find: /^foundation-ui\/vue$/, replacement: join(foundationUi, 'src/vue/index.js') },
       { find: /^foundation-ui\/all\.css$/, replacement: join(foundationUi, 'src/css/all.css') },
       { find: /^foundation-ui\/(.*)$/, replacement: join(foundationUi, 'src/$1') },

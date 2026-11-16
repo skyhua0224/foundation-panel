@@ -9,7 +9,7 @@ and applies to the original code and to this one.
 Third-party components keep their own licences:
 
 - Tauri, Vue, Vite and the other packages listed in `package.json` and `src-tauri/Cargo.toml`.
-- foundation-ui, the Material 3 Expressive component package used by the renderer.
+- foundation-ui, the Material 3 Expressive component package used by the renderer: MPL-2.0, source at https://github.com/AlkaidLab/foundation-ui (the licence text is `LICENSE` there). Its files stay under MPL-2.0; the rest of this repository stays under the licence above.
 - Foundation Sunshine's generated settings index and labels, supplied at build time under the licence
   carried by those source files.
 - Material Symbols and the Material colour utilities, under their own terms.

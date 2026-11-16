@@ -8,18 +8,11 @@ import { zh } from '../desktop/i18n/zh.js'
 const { ROUTES, PAGES, RAILS, HUB_OF, routeForWebPath, routeOfPlace, webPathOf, useRouter } = await import('./useRouter.js')
 const { pageItems, barCurrent, BAR_GROUP_OF, railItems } = await import('./panelNav.js')
 const { framedMove } = await import('./frameFollow.js')
-const { parseSettingsHash, getSearchIndex, provideSettingsData } = await import('foundation-ui/settings/index.js')
+const { parseSettingsHash } = await import('foundation-ui/settings/index.js')
+// the index is the product's (the panel carries none); the routes need only a setting or two of it, made up here
+const SEARCH_INDEX = [{ id: 'bind_address', title: 'config.bind_address', path: ['tabs.network'], icon: 'lan', route: 'config', params: { tab: 'network', focus: 'bind_address' } }]
 
-// the settings data is the product's supply (provider.js carries none of it): a minimal index so a
-// bare-key address resolves the way the shell does once the host's data has been provided
-provideSettingsData({
-  searchIndex: [
-    { id: 'bind_address', title: 'config.bind_address', path: ['tabs.network', 'tabs.advanced'], icon: 'lan', route: 'config', params: { tab: 'network', focus: 'bind_address' } },
-  ],
-  labels: { en: {} },
-})
-
-const deps = { routeForWebPath, routeOfPlace, parseHash: (hash) => parseSettingsHash(hash, getSearchIndex()), configRoute: ROUTES.WEB_CONFIG }
+const deps = { routeForWebPath, routeOfPlace, parseHash: (hash) => parseSettingsHash(hash, SEARCH_INDEX), configRoute: ROUTES.WEB_CONFIG }
 const ALIASED = new Set([ROUTES.CONTROLLERS, ROUTES.COMPONENTS, ROUTES.WEB_TROUBLESHOOTING])
 
 test('every page leads to a rail item (or is a first-level page with none lit) and the rail has a destination on the phone bar', () => {

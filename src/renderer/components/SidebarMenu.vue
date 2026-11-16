@@ -1,7 +1,7 @@
 <template>
   <div class="m-app m-app--scroll panel-shell">
     <!-- slim caption bar over the whole window: draggable, the window controls at the end; the pages start below it -->
-    <MCaption bem="panel-caption" data-tauri-drag-region @pointerdown="onTouchWindowDragStart">
+    <MCaption bem="panel-caption" data-tauri-drag-region="deep" @pointerdown="onTouchWindowDragStart">
       <template v-if="backButton" #back><MCaptionBack :page="backPage" :locale="locale" @back="jumps.back()" /></template>
       <template #version><MCaptionVersion :version="currentVersion" :build="buildInfo" :os="osName()" :locale="locale" :update="notice.version" @copied="onVersionCopied" @open-update="openUpdates" /></template>
       <template #brand><MBrand class="panel-caption__brand" :size="20" data-tauri-drag-region /></template>
@@ -146,6 +146,7 @@ import { developerOverlays, developerTexts, DEFAULT_FLAGS } from 'foundation-ui/
 import { SOURCE_KEY, afterCheck, afterOpened, noticeView, readNotice, writeNotice } from 'foundation-ui/update'
 import { createPanelTelemetry } from '../composables/panelTelemetry.js'
 import { panelVersion } from '../composables/panelVersion.js'
+import { SEARCH_INDEX } from '@settings-data'
 import { labelOf, settingsHash } from 'foundation-ui/settings/index.js'
 import PanelHome from './PanelHome.vue'
 import PanelBusyLayer from './PanelBusyLayer.vue'
@@ -200,7 +201,7 @@ import { recordUpdateCheck } from '../composables/useUpdateCheckTime.js'
 import { useHostReach } from '../composables/useHostReach.js'
 import { ROW_OF_ROUTE, railItems, pageItems, barItems, barCurrent } from '../composables/panelNav.js'
 import { rtssInstalled, readRtssInstall } from '../composables/rtssInstall.js'
-import { rowKeywords, parseSettingsHash, getSearchIndex } from 'foundation-ui/settings/index.js'
+import { rowKeywords, parseSettingsHash } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { useDualSenseStatus } from '../composables/useDualSenseStatus.js'
 import { useDualSenseText } from '../composables/useDualSenseText.js'
@@ -334,7 +335,7 @@ const restorePlace = (place) => {
 // shown (composables/frameFollow.js decides; it is a jump, so Back returns to the page the link was on). Only while the frame IS what is displayed: behind a page of the panel it may load whatever it likes.
 const followFrame = (path) => {
   if (!isWebPage.value) return
-  const move = framedMove(path, { route: router.currentRoute.value, params: nav.detail.value?.params }, { routeForWebPath, routeOfPlace, parseHash: (hash) => parseSettingsHash(hash, getSearchIndex()), configRoute: ROUTES.WEB_CONFIG })
+  const move = framedMove(path, { route: router.currentRoute.value, params: nav.detail.value?.params }, { routeForWebPath, routeOfPlace, parseHash: (hash) => parseSettingsHash(hash, SEARCH_INDEX), configRoute: ROUTES.WEB_CONFIG })
   if (move) jumps.jump(() => router.navigate(move.route, move.params))
 }
 // the back stack mirrors into the window's history (as in the Web UI): the back arrow of a pushed page, Esc, the mouse's back button and the browser's agree; without it the arrow only went back in the history and the page stayed
