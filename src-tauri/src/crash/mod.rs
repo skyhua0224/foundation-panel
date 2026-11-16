@@ -11,6 +11,8 @@
 //! the host's install id (`<config>/telemetry/install_id`); at most 20 stay, none is kept once error reports are turned off, and nothing here
 //! waits on anything the panel needs to start.
 
+mod logpack;
+mod logscrub;
 mod meta;
 mod recover;
 mod redact;
@@ -158,7 +160,8 @@ fn uploader() {
                     runtime.block_on(upload::upload_pending_once(&state.pending, &meta::endpoint(&conf), &id));
                 }
             }
-            next_upload = Instant::now() + Duration::from_secs(30 * 60);
+            // the regular period, or what the service asked for (Retry-After) or the backoff after a failure
+            next_upload = Instant::now() + upload::next_wait(Duration::from_secs(30 * 60));
         }
         std::thread::sleep(Duration::from_secs(30));
     }

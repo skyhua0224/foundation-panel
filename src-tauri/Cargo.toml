@@ -34,6 +34,8 @@ tower-http = { version = "0.6.8", features = ["cors"] }
 wmi = "0.18"
 quick-xml = { version = "0.37", features = ["serialize"] }
 regex = "1.11.3"
+fancy-regex = "0.14"
+flate2 = "1.1"
 base64 = "0.22.1"
 rcgen = "0.13"
 chrono = { version = "0.4.43", features = ["serde"] }
