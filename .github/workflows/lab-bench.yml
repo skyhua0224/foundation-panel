@@ -5,6 +5,7 @@ on:
 jobs:
   bench:
     runs-on: windows-latest
+    timeout-minutes: 40
     permissions:
       actions: read
       contents: read
