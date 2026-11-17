@@ -25,7 +25,7 @@ async function trial(v, idx, warm) {
 }
 for (const v of cfg.variants) await trial(v, -1, true)
 for (let i = 0; i < cfg.trials; i++) {
-  const order = i % 2 ? [...cfg.variants].reverse() : cfg.variants
+  const order = [...cfg.variants].sort(() => Math.random() - 0.5)
   for (const v of order) await trial(v, i, false)
 }
 writeFileSync("bench-result/raw.json", JSON.stringify(results, null, 2))
