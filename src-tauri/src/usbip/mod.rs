@@ -211,6 +211,12 @@ mod tests {
         assert!(status.installed);
         assert!(status.version_valid);
         assert!(status.ready, "{}", status.detail);
+        println!("USB/IP installed status: {status:?}");
+        if std::env::var("USBIP_EXPECT_EXTERNAL").as_deref() == Ok("1") {
+            assert!(status.externally_managed);
+            let error = device::cleanup_broken_transport().await.unwrap_err();
+            assert!(error.starts_with("USBIP-CLEAN-005:"), "{error}");
+        }
     }
 
     #[cfg(target_os = "windows")]

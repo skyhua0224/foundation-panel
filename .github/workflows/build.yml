@@ -134,6 +134,14 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc usbip:: -- --nocapture
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
+      - name: Save read-only transport test binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: usbip-debug-probe
+          path: src-tauri/target/x86_64-pc-windows-msvc/debug/deps/sunshine_gui-*.exe
+          if-no-files-found: error
+          retention-days: 7
+
       - name: Build native tool plugins
         shell: pwsh
         run: ./scripts/build-native-plugins.ps1 -Configuration Release -Target x86_64-pc-windows-msvc
