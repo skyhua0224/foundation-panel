@@ -1,0 +1,152 @@
+{
+  "schema": 1,
+  "exe_bytes": 31464960,
+  "exe_sha256": "51a4550524ad33a528fd4696107fef5544ac707031a589f5b88f2418827ffefe",
+  "pdb_sha256": "3604657e1027f02d26a07e2cca00298b19eeb07446a70e596980de09482c8f8d",
+  "pdb_guid_age_match": true,
+  "sections": [
+    {
+      "index": 1,
+      "name": ".text",
+      "virtual_bytes": 17313472,
+      "rva": 4096,
+      "raw_bytes": 17313792,
+      "offset": 1024
+    },
+    {
+      "index": 2,
+      "name": ".rdata",
+      "virtual_bytes": 12996372,
+      "rva": 17317888,
+      "raw_bytes": 12996608,
+      "offset": 17314816
+    },
+    {
+      "index": 3,
+      "name": ".data",
+      "virtual_bytes": 28136,
+      "rva": 30314496,
+      "raw_bytes": 16384,
+      "offset": 30311424
+    },
+    {
+      "index": 4,
+      "name": ".pdata",
+      "virtual_bytes": 968388,
+      "rva": 30343168,
+      "raw_bytes": 968704,
+      "offset": 30327808
+    },
+    {
+      "index": 5,
+      "name": ".rsrc",
+      "virtual_bytes": 109704,
+      "rva": 31313920,
+      "raw_bytes": 110080,
+      "offset": 31296512
+    },
+    {
+      "index": 6,
+      "name": ".reloc",
+      "virtual_bytes": 57908,
+      "rva": 31424512,
+      "raw_bytes": 58368,
+      "offset": 31406592
+    }
+  ],
+  "attribution_method": "Non-overlapping PDB source-line ranges after LTO; folded/mixed and missing ranges kept separate. This is source attribution, not pre-LTO crate object sizes.",
+  "text_attributed_fraction": 0.017051230394458144,
+  "text_by_crate": [
+    {
+      "crate": "[no line table]",
+      "bytes": 16978528
+    },
+    {
+      "crate": "core",
+      "bytes": 136317
+    },
+    {
+      "crate": "std",
+      "bytes": 121330
+    },
+    {
+      "crate": "[other source]",
+      "bytes": 38921
+    },
+    {
+      "crate": "alloc",
+      "bytes": 34358
+    },
+    {
+      "crate": "std_detect",
+      "bytes": 1729
+    },
+    {
+      "crate": "compiler-builtins",
+      "bytes": 1234
+    },
+    {
+      "crate": "[folded/mixed]",
+      "bytes": 807
+    },
+    {
+      "crate": "panic_unwind",
+      "bytes": 248
+    }
+  ],
+  "rdata_brotli_by_category": {
+    "script-or-other": {
+      "count": 76,
+      "packed_bytes": 2163869,
+      "raw_bytes": 8841172
+    },
+    "image-png": {
+      "count": 48,
+      "packed_bytes": 1511812,
+      "raw_bytes": 1517104
+    },
+    "svg-or-xml": {
+      "count": 7,
+      "packed_bytes": 3909,
+      "raw_bytes": 10338
+    },
+    "image-jpeg": {
+      "count": 6,
+      "packed_bytes": 48256,
+      "raw_bytes": 49464
+    },
+    "image-webp": {
+      "count": 15,
+      "packed_bytes": 1375318,
+      "raw_bytes": 1375250
+    },
+    "font-woff2": {
+      "count": 9,
+      "packed_bytes": 190933,
+      "raw_bytes": 190932
+    },
+    "html": {
+      "count": 9,
+      "packed_bytes": 8087,
+      "raw_bytes": 29177
+    },
+    "image-ico": {
+      "count": 1,
+      "packed_bytes": 442668,
+      "raw_bytes": 442663
+    },
+    "css-or-text": {
+      "count": 1,
+      "packed_bytes": 125724,
+      "raw_bytes": 875645
+    }
+  },
+  "rdata_brotli_bytes": 5870576,
+  "rdata_other_bytes": 7126032,
+  "runtime_function_count": 80699,
+  "unique_unwind_addresses": 73998,
+  "rdata_unwind_referenced_contribution_count": 11604,
+  "rdata_unwind_referenced_contribution_bytes": 4365300,
+  "xz_preset": "xz -9e -T1",
+  "xz_bytes": 11781464
+}
