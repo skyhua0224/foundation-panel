@@ -42,3 +42,10 @@ Windows 已安装的应用中替换或修复；当前面板不替用户卸载它
 或签名。Windows Rust/winreg 保留既有有界命令与哈希校验，避免 shell 拼接；UI 用
 既有 Vue 状态。没有更换协议、驱动或数据热路径，无运行时性能和跨实现互通测量。
 其他系统没有变更的 Backend，未构建或运行；真实设备、资源授权、租户隔离未核实。
+
+兼容性只读实测：Windows 验证环境上，原外部 0.9.8.1 工具与驱动通过既有的
+`installed_transport_reports_ready`、`discovers_a_device_from_a_standard_usbip_exporter`、
+`unreachable_exporter_fails_cleanly` 三个用例，3 通过、0 失败。标准 exporter 是回环
+测试夹具，使用官方 USB/IP 文档的 OP_REQ_DEVLIST / OP_REP_DEVLIST、版本 0x0111
+（usbip-policy-wire-20261117，2026-11-17 读取）；不是实物设备挂载或串流验收。
+前后注册表、驱动、服务、35 个文件仍一致。未扩大兼容版本或真实硬件声明。
