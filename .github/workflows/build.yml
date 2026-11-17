@@ -135,10 +135,10 @@ jobs:
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
       - name: Save read-only transport test binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: usbip-debug-probe
-          path: src-tauri/target/x86_64-pc-windows-msvc/debug/deps/sunshine_gui-*.exe
+          path: src-tauri/target/x86_64-pc-windows-msvc/debug/**/sunshine_gui-*.exe
           if-no-files-found: error
           retention-days: 7
 
