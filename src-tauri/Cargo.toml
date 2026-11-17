@@ -17,7 +17,7 @@ edition = "2024"
 [profile.release]
 # file and line tables in the PDB (not in the exe), so archived symbols resolve crash frames, also inlined ones under fat LTO
 debug = "line-tables-only"
-opt-level = "s"
+opt-level = "z"
 lto = "fat"
 codegen-units = 1
 
