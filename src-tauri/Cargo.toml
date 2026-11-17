@@ -135,12 +135,13 @@ webview2-com = "0.39"
 # Match the WebView2 bindings used by wry 0.57 and their Interface trait.
 wv2-windows-core = { package = "windows-core", version = "0.62" }
 winreg = "0.55"
-# Keep every existing decoder, the PNG/BMP/JPEG/ICO writers and Rayon.
-# The default `avif` feature adds an AV1 encoder; the panel never writes AVIF,
-# and AVIF decoding would require the separate `avif-native` feature already
-# absent here. Sources: panel-image-features, panel-image-avif (feature flags),
+# Decoders for the formats the application meets: PNG (clipboard, updater
+# sheet, DPI cover), BMP, JPEG, ICO (tray icons), plus GIF and WebP so a custom
+# tray image or a pasted web image still decodes. The default AVIF encoder and
+# the EXR, TIFF, HDR, DDS, farbfeld, PNM, QOI and TGA codecs are left out: nothing
+# in the panel reads or writes them. Rayon stays, so the image scheduling is the
+# same. Sources: panel-image-features, panel-image-avif (feature flags),
 # panel-cargo-features (feature unification).
 image = { version = "0.25.9", default-features = false, features = [
-    "bmp", "dds", "exr", "ff", "gif", "hdr", "ico", "jpeg", "png",
-    "pnm", "qoi", "tga", "tiff", "webp", "rayon",
+    "bmp", "gif", "ico", "jpeg", "png", "webp", "rayon",
 ] }
