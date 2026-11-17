@@ -33,6 +33,9 @@ jobs:
       - name: Bench
         shell: pwsh
         run: node lab/bench.mjs
+      - name: Crash capture check
+        shell: pwsh
+        run: ./lab/crash.ps1
       - uses: actions/upload-artifact@v4
         if: always()
         with:

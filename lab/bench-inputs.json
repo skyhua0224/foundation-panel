@@ -1,1 +1,1 @@
-{"trials": 20, "observeMs": 3500, "variants": [{"name":"base","run":44058888330},{"name":"new","run":44058914115},{"name":"z","run":44058894865}]}
+{"trials": 30, "observeMs": 3000, "variants": [{"name":"base","run":44058888330},{"name":"new","run":44058914115},{"name":"base2","run":44058888330},{"name":"z","run":44058894865}]}
