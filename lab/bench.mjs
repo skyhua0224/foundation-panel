@@ -14,8 +14,8 @@ async function trial(v, idx, warm) {
   try {
     const m = JSON.parse(r.stdout.trim().split("\n").pop())
     const [head, series] = m.result.split("|")
-    const [visible, first, settled, frames, pid] = head.split(",").map(Number)
-    row = { visible, firstChange: first, settled, frames, series }
+    const [visible, first, settled, content, frames, pid] = head.split(",").map(Number)
+    row = { visible, firstChange: first, content, frames }
   } catch (e) { console.log("measure failed", v.name, idx, r.stdout?.slice(0, 600), r.stderr?.slice(0, 600)); cleanup(); await sleep(2000); return }
   cleanup()
   await sleep(1500)
@@ -34,7 +34,7 @@ const stat = (a) => ({ n: a.length, p50: pct(a, 0.5), p95: pct(a, 0.95), mean: a
 const summ = {}
 for (const [name, rows] of Object.entries(results)) {
   const ok = (k) => rows.map((r) => r[k]).filter((x) => x > 0)
-  summ[name] = { visible: stat(ok("visible")), firstChange: stat(ok("firstChange")), settled: stat(ok("settled")) }
+  summ[name] = { visible: stat(ok("visible")), firstChange: stat(ok("firstChange")), content: stat(ok("content")) }
 }
 console.log(JSON.stringify(summ, null, 2))
 writeFileSync("bench-result/summary.json", JSON.stringify(summ, null, 2))

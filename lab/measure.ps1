@@ -40,7 +40,7 @@ public static class Probe {
     var psi = new ProcessStartInfo(exe); psi.UseShellExecute = false; psi.WorkingDirectory = System.IO.Path.GetDirectoryName(exe);
     psi.Environment["SUNSHINE_GUI_TEST_OFFSCREEN"] = "1"; psi.Environment["SUNSHINE_GUI_ALLOW_PARALLEL_INSTANCE"] = "1"; psi.Environment["WEBVIEW2_USER_DATA_FOLDER"] = profile;
     var sw = Stopwatch.StartNew(); var p = Process.Start(psi);
-    double tVisible = -1, tFirst = -1, tSettled = -1; int frames = 0; int[] first = null, prev = null; var series = new List<string>();
+    double tVisible = -1, tFirst = -1, tSettled = -1, tContent = -1; int frames = 0; int[] first = null, prev = null; var series = new List<string>();
     while (sw.ElapsedMilliseconds < observeMs) {
       if (p.HasExited) break;
       RECT r; var h = Find((uint)p.Id, title, out r);
@@ -50,14 +50,14 @@ public static class Probe {
       var s = Grab(r, 6); double t = sw.Elapsed.TotalMilliseconds; frames++;
       if (first == null) first = s;
       else {
-        if (tFirst < 0 && Diff(first, s) > 0.01) tFirst = t;
+        double df = Diff(first, s); if (tFirst < 0 && df > 0.01) tFirst = t; if (tContent < 0 && df > 0.5) tContent = t;
         if (prev != null && Diff(prev, s) > 0.0005) tSettled = t;
       }
       if (frames % 5 == 0) series.Add(((int)t) + ":" + Diff(first, s).ToString("F3"));
       prev = s;
     }
     int pid = p.Id; try { p.Kill(); } catch {}
-    return tVisible.ToString("F1") + "," + tFirst.ToString("F1") + "," + tSettled.ToString("F1") + "," + frames + "," + pid + "|" + string.Join(" ", series);
+    return tVisible.ToString("F1") + "," + tFirst.ToString("F1") + "," + tSettled.ToString("F1") + "," + tContent.ToString("F1") + "," + frames + "," + pid + "|" + string.Join(" ", series);
   }
 }
 "@
