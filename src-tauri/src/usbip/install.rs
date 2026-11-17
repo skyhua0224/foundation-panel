@@ -73,6 +73,12 @@ pub(crate) async fn ensure_pinned_usbip(
         InstallDisposition::Install => {}
     }
 
+    run_host_package("install").await
+}
+
+/// Host-supplied lifecycle helper owns the global mutex through hub verification.
+#[cfg(target_os = "windows")]
+pub(super) async fn run_host_package(action: &str) -> Result<InstallResult, String> {
     // Use the host's immutable signed payload and its root-hub transaction.
     // No runtime installer or vendor setup executable is downloaded by the panel.
     let script = crate::sunshine::install_dir()
@@ -83,9 +89,11 @@ pub(crate) async fn ensure_pinned_usbip(
             "USBIP-SETUP-002: update the host to install the bundled USB/IP component".into(),
         );
     }
-    super::manager::verify_slim_payload(
-        &crate::sunshine::install_dir().join("scripts").join("usbip"),
-    )?;
+    if action == "install" {
+        super::manager::verify_slim_payload(
+            &crate::sunshine::install_dir().join("scripts").join("usbip"),
+        )?;
+    }
     let powershell = std::path::PathBuf::from(
         std::env::var_os("SystemRoot")
             .ok_or("USBIP-SETUP-002: Windows directory is unavailable")?,
@@ -95,7 +103,7 @@ pub(crate) async fn ensure_pinned_usbip(
     command
         .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
         .arg(&script)
-        .args(["-Action", "install"])
+        .args(["-Action", action])
         // panel-usbip-tokio-20261117, kill_on_drop: closing the UI must not
         // interrupt the child guard between driver mutation and hub recovery.
         .kill_on_drop(false)
@@ -110,8 +118,12 @@ pub(crate) async fn ensure_pinned_usbip(
         .map_err(|_| "USBIP-SETUP-010: USB/IP setup timed out".to_string())?
         .map_err(|error| format!("USBIP-SETUP-010: USB/IP setup failed: {error}"))?;
     let result = classify_installer_exit_code(status.code())?;
-    super::manager::find_installation()?;
-    super::manager::verify_driver_compatibility()?;
+    if action == "install" {
+        super::manager::find_installation()?;
+        super::manager::verify_driver_compatibility()?;
+    } else if !super::usbip_uninstall_entries()?.is_empty() {
+        return Err("USBIP-CLEAN-001: USB/IP registration remains after guarded cleanup".into());
+    }
     Ok(result)
 }
 

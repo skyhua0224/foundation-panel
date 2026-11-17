@@ -275,11 +275,28 @@ pub(super) async fn cleanup_broken_transport() -> Result<(), String> {
             "USBIP-CLEAN-001: finish the active Sunshine stream before cleaning up the transport"
                 .to_string()
         })?;
+    let helper = crate::sunshine::install_dir()
+        .join("scripts")
+        .join("usbip-package.ps1");
+    if helper.is_file() {
+        // The same helper serializes install/uninstall and completes the hub
+        // guard on cancellation. Never start a native sweep beside that child.
+        super::install::run_host_package("uninstall").await?;
+        return Ok(());
+    }
+    let slim = super::usbip_uninstall_entries()?
+        .iter()
+        .any(|entry| entry.slim);
     let mut uninstall_error = None;
     if !super::usbip_uninstall_entries()?.is_empty() {
         if let Err(error) = run_registered_uninstaller().await {
             uninstall_error = Some(error);
         }
+    }
+    if slim {
+        // A standalone slim package's registered helper performs the entire
+        // cleanup. On timeout it still owns the lifecycle mutex.
+        return uninstall_error.map_or(Ok(()), Err);
     }
     remove_vhci_devnodes().await?;
     remove_orphaned_driver_service("usbip2_ude", "usbip2_ude.sys")?;
