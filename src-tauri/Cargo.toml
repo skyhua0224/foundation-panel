@@ -18,7 +18,7 @@ edition = "2024"
 # file and line tables in the PDB (not in the exe), so archived symbols resolve crash frames, also inlined ones under fat LTO
 debug = "line-tables-only"
 opt-level = "s"
-lto = "fat"
+lto = "thin"
 codegen-units = 1
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -145,3 +145,72 @@ winreg = "0.55"
 image = { version = "0.25.9", default-features = false, features = [
     "bmp", "gif", "ico", "jpeg", "png", "webp", "rayon",
 ] }
+
+[profile.release.package."*"]
+opt-level = "z"
+
+[profile.release.package.image]
+opt-level = "s"
+
+[profile.release.package.image-webp]
+opt-level = "s"
+
+[profile.release.package.zune-jpeg]
+opt-level = "s"
+
+[profile.release.package.zune-core]
+opt-level = "s"
+
+[profile.release.package.zune-inflate]
+opt-level = "s"
+
+[profile.release.package.png]
+opt-level = "s"
+
+[profile.release.package.fdeflate]
+opt-level = "s"
+
+[profile.release.package.miniz_oxide]
+opt-level = "s"
+
+[profile.release.package.flate2]
+opt-level = "s"
+
+[profile.release.package.gif]
+opt-level = "s"
+
+[profile.release.package.weezl]
+opt-level = "s"
+
+[profile.release.package.bytemuck]
+opt-level = "s"
+
+[profile.release.package.byteorder-lite]
+opt-level = "s"
+
+[profile.release.package.simd-adler32]
+opt-level = "s"
+
+[profile.release.package.crc32fast]
+opt-level = "s"
+
+[profile.release.package.zlib-rs]
+opt-level = "s"
+
+[profile.release.package.rayon]
+opt-level = "s"
+
+[profile.release.package.rayon-core]
+opt-level = "s"
+
+[profile.release.package.crossbeam-deque]
+opt-level = "s"
+
+[profile.release.package.crossbeam-epoch]
+opt-level = "s"
+
+[profile.release.package.crossbeam-utils]
+opt-level = "s"
+
+[profile.release.package.either]
+opt-level = "s"
