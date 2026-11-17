@@ -145,3 +145,6 @@ winreg = "0.55"
 image = { version = "0.25.9", default-features = false, features = [
     "bmp", "gif", "ico", "jpeg", "png", "webp", "rayon",
 ] }
+
+[profile.release.package."*"]
+opt-level = "z"
