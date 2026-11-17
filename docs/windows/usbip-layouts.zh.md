@@ -16,3 +16,8 @@ usbip-slim-ms-powershell-20261117 的 Windows 签名语义。读取日期 2026-1
 新旧安装、卸载与真实设备结果以 Windows CI 和独立设备验收为准；Linux 单元测试
 只覆盖版本策略和退出码。macOS、Linux、Android、iOS、HarmonyOS 未增加 Backend；
 吞吐、延迟、资源授权和跨租户隔离没有本卡测量或验收，不宣称已核实。
+
+固定库版本：winreg 0.55.0、Tokio 1.52.3、serde_json 1.0.149，依据分别见
+`panel-usbip-winreg-20261117`、`panel-usbip-tokio-20261117`、`panel-usbip-serde-json-20261117`。
+新布局的安装和卸载子进程在界面关闭或调用超时后继续完成 guard 事务，避免中断驱动变更后的恢复；
+进程间互斥量仍由子进程持有。取消中的真实 OS 行为未核实，不把策略测试作为设备验收。

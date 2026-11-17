@@ -162,6 +162,7 @@ fn consistent_version(
 
 /// An explicit receipt identifies the slim layout independently of localized ARP text.
 /// usbip-slim-ms-reg-uninstall-20261117: InstallLocation / DisplayVersion.
+// panel-usbip-winreg-20261117: typed registry values, no shell parsing.
 fn slim_registration(key: &str, layout: &str) -> Result<bool, String> {
     if !key.eq_ignore_ascii_case("AlkaidLabUSBip") {
         return Ok(false);
@@ -178,6 +179,7 @@ pub(super) fn verify_slim_payload(root: &std::path::Path) -> Result<(), String> 
     verify_transport_file(&receipt, env!("SUNSHINE_USBIP_PAYLOAD_SHA256"))?;
     let bytes = std::fs::read(&receipt)
         .map_err(|error| format!("USBIP-EXEC-006: cannot read USB/IP receipt: {error}"))?;
+    // panel-usbip-serde-json-20261117, from_slice: parse the hash-pinned UTF-8 receipt.
     let manifest: serde_json::Value = serde_json::from_slice(&bytes)
         .map_err(|error| format!("USBIP-EXEC-006: invalid USB/IP receipt: {error}"))?;
     let files = manifest["files"]

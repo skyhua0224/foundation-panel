@@ -96,7 +96,9 @@ pub(crate) async fn ensure_pinned_usbip(
         .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
         .arg(&script)
         .args(["-Action", "install"])
-        .kill_on_drop(true)
+        // panel-usbip-tokio-20261117, kill_on_drop: closing the UI must not
+        // interrupt the child guard between driver mutation and hub recovery.
+        .kill_on_drop(false)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);

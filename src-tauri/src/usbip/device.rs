@@ -277,7 +277,7 @@ pub(super) async fn cleanup_broken_transport() -> Result<(), String> {
         })?;
     let mut uninstall_error = None;
     if !super::usbip_uninstall_entries()?.is_empty() {
-        if let Err(error) = run_inno_uninstaller().await {
+        if let Err(error) = run_registered_uninstaller().await {
             uninstall_error = Some(error);
         }
     }
@@ -288,7 +288,7 @@ pub(super) async fn cleanup_broken_transport() -> Result<(), String> {
 }
 
 #[cfg(target_os = "windows")]
-async fn run_inno_uninstaller() -> Result<(), String> {
+async fn run_registered_uninstaller() -> Result<(), String> {
     use std::process::Stdio;
 
     let (uninstall_string, slim) = find_usbip_uninstall_string()?.ok_or_else(|| {
@@ -305,7 +305,9 @@ async fn run_inno_uninstaller() -> Result<(), String> {
         command.args(INNO_UNINSTALL_FLAGS.split_whitespace());
     }
     command
-        .kill_on_drop(true)
+        // The slim helper must complete its guard transaction after UI cancellation.
+        // panel-usbip-tokio-20261117, Command::kill_on_drop.
+        .kill_on_drop(!slim)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
