@@ -28,7 +28,7 @@ usbip-slim-ms-powershell-20261117 的 Windows 签名语义。读取日期 2026-1
 自有 receipt 必须匹配布局、来源哈希和同版本；旧包只在同版本、无 GUI/SDK、同一标准
 安装目录、主机保留固定哈希原安装器时才允许接管。普通成功 journal 不能证明来源。
 规则来源 usbip-policy-reg-20261117（DisplayVersion/InstallLocation）、
-usbip-policy-winreg-20261117（get_value、只读 registry view）、usbip-policy-files-20261117。
+usbip-policy-winreg-20261117（get_value、只读 registry view）、usbip-policy-rust-path-20261117（try_exists）。
 
 唯一兼容版本仍为 0.9.8.1，继续验证 CLI 与注册 UDE 驱动固定哈希，再执行有界 port
 探测。发行版本不同于驱动文件版本，不把“版本较新”视为 ABI 兼容。完整上游版的

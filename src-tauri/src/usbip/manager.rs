@@ -236,8 +236,8 @@ pub(crate) fn externally_managed() -> bool {
     inspect().unwrap_or(true)
 }
 
-// usbip-policy-winreg-20261117, get_value; usbip-policy-files-20261117,
-// presence and read failures. usbip-policy-rust-path-20261117, try_exists:
+// usbip-policy-winreg-20261117, get_value;
+// usbip-policy-rust-path-20261117, try_exists:
 // propagate permission errors instead of classifying an unreadable layout as absent.
 #[cfg(target_os = "windows")]
 fn inspect_ownership(
