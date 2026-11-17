@@ -30,15 +30,8 @@ jobs:
         run: |
           Get-ItemProperty HKLM:SOFTWAREWOW6432NodeMicrosoftEdgeUpdateClients{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5} -ErrorAction SilentlyContinue | Select-Object pv | Format-List | Out-String | Write-Host
           [Environment]::OSVersion | Out-String | Write-Host
-      - name: Bench direct
+      - name: Bench
         shell: pwsh
-        env:
-          BENCH_MODE: direct
-        run: node lab/bench.mjs
-      - name: Bench runas
-        shell: pwsh
-        env:
-          BENCH_MODE: runas
         run: node lab/bench.mjs
       - uses: actions/upload-artifact@v4
         if: always()
