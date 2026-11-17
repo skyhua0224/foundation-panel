@@ -32,7 +32,9 @@ tokio = { version = "1", features = ["test-util"] }
 tauri = { version = "~2.12.4", features = ["test"] }
 
 [dependencies]
-tauri = { version = "~2.12.4", features = [ "tray-icon", "native-tls-vendored", "devtools" ] }
+# ci-size-experiment-20261118: Tauri's default "compression" feature (brotli over the embedded front end) is left out, so the
+# front end sits in the executable as plain files that the installer's solid LZMA stream can match against the host Web UI copy.
+tauri = { version = "~2.12.4", default-features = false, features = [ "wry", "common-controls-v6", "dynamic-acl", "tray-icon", "native-tls-vendored", "devtools" ] }
 tauri-plugin-dialog = "2.8.3"
 tauri-plugin-notification = "2.7.0"
 tauri-plugin-fs = "2.7.1"
