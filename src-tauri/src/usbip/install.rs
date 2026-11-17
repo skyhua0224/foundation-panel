@@ -57,14 +57,7 @@ pub(crate) async fn ensure_no_active_session() -> Result<(), String> {
 pub(crate) async fn ensure_pinned_usbip(
     _staging_root: &std::path::Path,
 ) -> Result<InstallResult, String> {
-    use super::{
-        INSTALLER_DOWNLOAD_TIMEOUT, InstallDisposition, MAX_INSTALLER_BYTES, USBIP_SHA256,
-        USBIP_URL, USBIP_VERSION,
-    };
-    use crate::github_download::{
-        DEFAULT_IDLE_TIMEOUT, DEFAULT_RESPONSE_TIMEOUT, DownloadRequest,
-        download_to_file_with_fallbacks,
-    };
+    use super::InstallDisposition;
 
     match super::install_disposition(super::installed_usbip_version()?.as_deref())? {
         InstallDisposition::Ready => {
@@ -90,6 +83,9 @@ pub(crate) async fn ensure_pinned_usbip(
             "USBIP-SETUP-002: update the host to install the bundled USB/IP component".into(),
         );
     }
+    super::manager::verify_slim_payload(
+        &crate::sunshine::install_dir().join("scripts").join("usbip"),
+    )?;
     let powershell = std::path::PathBuf::from(
         std::env::var_os("SystemRoot")
             .ok_or("USBIP-SETUP-002: Windows directory is unavailable")?,
