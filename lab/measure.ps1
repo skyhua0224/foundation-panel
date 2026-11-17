@@ -1,5 +1,5 @@
 param([string]$Exe, [int]$Port, [string]$Profile, [string]$Mode = "direct", [int]$ObserveMs = 7000)
-Add-Type -ReferencedAssemblies System.Drawing.Common, System.Runtime.InteropServices, System.Collections, System.Diagnostics.Process, System.ComponentModel.Primitives, System.Drawing.Primitives -TypeDefinition @"
+Add-Type -ReferencedAssemblies System.Drawing.Common, System.Collections.Specialized, System.Collections, System.Runtime.InteropServices, System.Collections, System.Diagnostics.Process, System.ComponentModel.Primitives, System.Drawing.Primitives -TypeDefinition @"
 using System; using System.Text; using System.Collections.Generic; using System.Diagnostics; using System.Drawing; using System.Drawing.Imaging; using System.Runtime.InteropServices; using System.Threading;
 public static class Probe {
   delegate bool EnumProc(IntPtr h, IntPtr l);
@@ -27,8 +27,8 @@ public static class Probe {
   // returns "tVisible,tFirstChange,tSettled,frames,pid" in ms from process start
   public static string Run(string exe, string title, int observeMs, string profile, int port) {
     var psi = new ProcessStartInfo(exe); psi.UseShellExecute = false; psi.WorkingDirectory = System.IO.Path.GetDirectoryName(exe);
-    psi.EnvironmentVariables["SUNSHINE_GUI_TEST_OFFSCREEN"] = "1"; psi.EnvironmentVariables["SUNSHINE_GUI_ALLOW_PARALLEL_INSTANCE"] = "1";
-    psi.EnvironmentVariables["WEBVIEW2_USER_DATA_FOLDER"] = profile;
+    psi.Environment["SUNSHINE_GUI_TEST_OFFSCREEN"] = "1"; psi.Environment["SUNSHINE_GUI_ALLOW_PARALLEL_INSTANCE"] = "1";
+    psi.Environment["WEBVIEW2_USER_DATA_FOLDER"] = profile;
     var sw = Stopwatch.StartNew(); var p = Process.Start(psi);
     double tVisible = -1, tFirst = -1, tSettled = -1; int frames = 0; int[] first = null, prev = null; var series = new List<string>();
     while (sw.ElapsedMilliseconds < observeMs) {
