@@ -1,5 +1,6 @@
 import { ref, computed, watch } from 'vue'
 import { LOCALE_SYSTEM, choiceOf, readLocalePref, resolveSystemLocale, watchSystemLanguage, writeLocalePref } from 'foundation-ui/locale/localePref.js'
+import { withUsbipOwnership } from './usbipOwnership.js'
 import { zh } from './zh.js'
 import { en } from './en.js'
 import { DESKTOP_LOCALES, LOCALE_NAMES, documentLang, mergeLocale, normalizeDesktopLocale } from './merge.js'
@@ -28,7 +29,7 @@ const merged = new Map()
 const messagesFor = (locale) => {
   const code = normalizeDesktopLocale(locale)
   if (merged.has(code)) return merged.get(code)
-  const table = mergeLocale(en, zh, code, bundles[code])
+  const table = withUsbipOwnership(mergeLocale(en, zh, code, bundles[code]), code)
   merged.set(code, table)
   return table
 }
