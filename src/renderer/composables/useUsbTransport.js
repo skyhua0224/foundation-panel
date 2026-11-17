@@ -13,6 +13,7 @@ export function useUsbTransport() {
   const status = reactive({
     supported: true,
     installed: false,
+    externally_managed: false,
     ready: false,
     version: '',
     version_valid: false,
@@ -42,6 +43,7 @@ export function useUsbTransport() {
     if (!statusLoaded.value) return t.value.deviceHub.usb.checkingTransport
     if (statusProbeFailed.value) return t.value.deviceHub.usb.statusUnavailable
     if (!status.supported) return t.value.deviceHub.usb.transportUnsupported
+    if (status.externally_managed) return t.value.deviceHub.usb.externallyManaged
     if (status.ready) return t.value.deviceHub.usb.transportReady
     if (!status.installed) return t.value.deviceHub.usb.transportMissing
     return t.value.deviceHub.usb.transportNeedsRepair
@@ -103,7 +105,7 @@ export function useUsbTransport() {
   }
 
   const installTransport = sharedOperation.wrap(async () => {
-    if (transportBusy.value) return
+    if (transportBusy.value || status.externally_managed) return
     installing.value = true
     try {
       await ElMessageBox.confirm(
@@ -137,7 +139,7 @@ export function useUsbTransport() {
   })
 
   const cleanupResidual = sharedOperation.wrap(async () => {
-    if (transportBusy.value) return
+    if (transportBusy.value || status.externally_managed) return
     const removing = !needsCleanup.value
     cleaning.value = true
     try {

@@ -1,6 +1,6 @@
 /** Requires explicit shared cleanup for residual devices, unsupported versions or ABI conflicts. */
 export function usbipTransportNeedsCleanup(status = {}) {
-  return Boolean(
+  return !status.externally_managed && Boolean(
     status.vhci_residual
     // error_code 是后端下发的结构化码（Rust status::detail_error_code），
     // 不得回退到解析 detail 文本。

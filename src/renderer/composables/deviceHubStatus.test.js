@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  usbipTransportNeedsCleanup,
   MICROPHONE_BACKENDS,
   canTestMicrophone,
   microphoneBufferedMs,
@@ -140,3 +141,11 @@ test('VB-CABLE: a failed job is told by what a person can do about it', () => {
   assert.equal(vbCableErrorKind('VB_ENABLE_FAILED'), 'failed')
   assert.equal(vbCableErrorKind(''), '')
 })
+
+for (const version_valid of [true, false]) {
+  test(`external USB/IP is preserved with version_valid=${version_valid}`, () => {
+    const status = { installed: true, externally_managed: true, version_valid, vhci_residual: true, error_code: 'USBIP-EXEC-006' }
+    assert.equal(usbipTransportNeedsCleanup(status), false)
+    assert.equal(usbipTransportNeedsCleanup({ ...status, externally_managed: false }), true)
+  })
+}

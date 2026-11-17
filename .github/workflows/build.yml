@@ -121,6 +121,19 @@ jobs:
       - name: Test renderer logic
         run: npm run test:renderer
 
+      - name: USB-IP ownership registry and layout fixtures (Debug)
+        shell: powershell
+        env:
+          RUSTC_WRAPPER: ''
+        run: |
+          $contract = Get-Content -Raw src-tauri/component-compatibility.json | ConvertFrom-Json
+          $file = Join-Path $env:RUNNER_TEMP 'usbip-legacy-fixture.exe'
+          Invoke-WebRequest -UseBasicParsing $contract.usbip.installer_url -OutFile $file
+          if ((Get-FileHash -Algorithm SHA256 $file).Hash -ne $contract.usbip.installer_sha256) { throw 'Legacy fixture hash mismatch' }
+          $env:USBIP_LEGACY_FIXTURE_INSTALLER = $file
+          cargo test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc usbip:: -- --nocapture
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
       - name: Build native tool plugins
         shell: pwsh
         run: ./scripts/build-native-plugins.ps1 -Configuration Release -Target x86_64-pc-windows-msvc

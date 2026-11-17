@@ -63,6 +63,7 @@ pub struct UsbipStatus {
     pub error_code: String,
     pub attached_devices: Vec<UsbipAttachedDevice>,
     pub detail: String,
+    pub externally_managed: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

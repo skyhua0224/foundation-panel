@@ -269,6 +269,9 @@ fn find_usbip_uninstall_string() -> Result<Option<(String, bool)>, String> {
 /// the next install — but it is still reported so the user can retry.
 #[cfg(target_os = "windows")]
 pub(super) async fn cleanup_broken_transport() -> Result<(), String> {
+    if super::manager::externally_managed() {
+        return Err("USBIP-CLEAN-005: externally managed USB/IP is preserved; use Windows Installed apps if you choose to replace it".into());
+    }
     super::install::ensure_no_active_session()
         .await
         .map_err(|_| {

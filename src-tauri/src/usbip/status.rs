@@ -30,6 +30,7 @@ pub(super) fn detail_error_code(detail: &str) -> String {
 pub async fn usbip_get_status() -> Result<UsbipStatus, String> {
     #[cfg(not(target_os = "windows"))]
     return Ok(UsbipStatus {
+        externally_managed: false,
         supported: false,
         installed: false,
         ready: false,
@@ -47,14 +48,17 @@ pub async fn usbip_get_status() -> Result<UsbipStatus, String> {
         // Fail closed: if the residual state cannot be determined, do not
         // report a clean transport. Propagating the error surfaces the probe
         // as unavailable, hiding install and attach actions.
+        let externally_managed = super::manager::externally_managed();
         let interfaces = super::device::enumerate_vhci_interfaces()?;
         let nodes = super::device::enumerate_transport_nodes()?;
         let installation = match super::manager::find_installation() {
             Ok(installation) => installation,
             Err(detail) => {
                 let registered_version = super::installed_usbip_version();
-                let partially_installed = !matches!(registered_version, Ok(None));
+                let partially_installed =
+                    externally_managed || !matches!(registered_version, Ok(None));
                 return Ok(UsbipStatus {
+                    externally_managed,
                     supported: true,
                     installed: partially_installed,
                     ready: false,
@@ -79,9 +83,10 @@ pub async fn usbip_get_status() -> Result<UsbipStatus, String> {
         let vhci_residual = super::device::transport_not_ready(&interfaces, &nodes);
         if !version_valid {
             let detail = format!(
-                "USBIP-SETUP-003: the tested USB/IP {REQUIRED_VERSION} tools and driver are required"
+                "USBIP-SETUP-003: externally managed USB/IP is incompatible; choose whether to replace it in Windows Installed apps; only {REQUIRED_VERSION} is supported"
             );
             return Ok(UsbipStatus {
+                externally_managed,
                 supported: true,
                 installed: true,
                 ready: false,
@@ -96,6 +101,7 @@ pub async fn usbip_get_status() -> Result<UsbipStatus, String> {
         }
         match super::exec::list_attached().await {
             Ok(attached_devices) => Ok(UsbipStatus {
+                externally_managed,
                 supported: true,
                 installed: true,
                 // Residual instances break every usbip.exe operation; reflect
@@ -110,6 +116,7 @@ pub async fn usbip_get_status() -> Result<UsbipStatus, String> {
                 detail: String::new(),
             }),
             Err(detail) => Ok(UsbipStatus {
+                externally_managed,
                 supported: true,
                 installed: true,
                 ready: false,
@@ -131,11 +138,20 @@ mod tests {
 
     #[test]
     fn extracts_only_well_shaped_codes() {
-        assert_eq!(detail_error_code("USBIP-EXEC-006: the shared transport"), "USBIP-EXEC-006");
-        assert_eq!(detail_error_code("USBIP-SETUP-001: not installed"), "USBIP-SETUP-001");
+        assert_eq!(
+            detail_error_code("USBIP-EXEC-006: the shared transport"),
+            "USBIP-EXEC-006"
+        );
+        assert_eq!(
+            detail_error_code("USBIP-SETUP-001: not installed"),
+            "USBIP-SETUP-001"
+        );
         assert_eq!(detail_error_code("USBIP-EXEC-006"), "USBIP-EXEC-006");
         // 非码前缀的 detail 必须得到空串，前端不得据此推断语义
-        assert_eq!(detail_error_code("USB/IP passthrough is only supported"), "");
+        assert_eq!(
+            detail_error_code("USB/IP passthrough is only supported"),
+            ""
+        );
         assert_eq!(detail_error_code("usbip-exec-006: lowercase"), "");
         assert_eq!(detail_error_code("USBIP-EXEC-6: short number"), "");
         assert_eq!(detail_error_code(""), "");
