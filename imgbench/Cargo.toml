@@ -1,0 +1,13 @@
+[package]
+name = "imgbench"
+version = "0.0.0"
+edition = "2024"
+
+[dependencies]
+image = { version = "0.25.9", default-features = false, features = ["bmp", "gif", "ico", "jpeg", "png", "webp", "rayon"] }
+
+[profile.release]
+debug = "line-tables-only"
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
