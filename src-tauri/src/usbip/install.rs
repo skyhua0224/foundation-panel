@@ -44,8 +44,10 @@ pub(crate) async fn ensure_no_active_session() -> Result<(), String> {
     if sessions.is_empty() {
         Ok(())
     } else {
-        Err("USBIP-SETUP-006: finish the active Sunshine stream before changing the transport"
-            .to_string())
+        Err(
+            "USBIP-SETUP-006: finish the active Sunshine stream before changing the transport"
+                .to_string(),
+        )
     }
 }
 
@@ -53,7 +55,7 @@ pub(crate) async fn ensure_no_active_session() -> Result<(), String> {
 /// An existing incompatible installation needs the shared cleanup first.
 #[cfg(target_os = "windows")]
 pub(crate) async fn ensure_pinned_usbip(
-    staging_root: &std::path::Path,
+    _staging_root: &std::path::Path,
 ) -> Result<InstallResult, String> {
     use super::{
         INSTALLER_DOWNLOAD_TIMEOUT, InstallDisposition, MAX_INSTALLER_BYTES, USBIP_SHA256,
@@ -78,68 +80,40 @@ pub(crate) async fn ensure_pinned_usbip(
         InstallDisposition::Install => {}
     }
 
-    let installer = tempfile::Builder::new()
-        .prefix("usbip-installer-")
-        .suffix(".exe")
-        .tempfile_in(staging_root)
-        .map_err(|error| {
-            format!("USBIP-SETUP-010: unable to stage the USB/IP installer: {error}")
-        })?
-        .into_temp_path();
-    let installer_path = installer.to_path_buf();
-
-    download_to_file_with_fallbacks(
-        DownloadRequest {
-            url: USBIP_URL,
-            destination: &installer_path,
-            expected_size: None,
-            expected_sha256: None,
-            max_size: Some(MAX_INSTALLER_BYTES),
-            user_agent: "foundation-sunshine-control-panel",
-            connect_timeout: std::time::Duration::from_secs(10),
-            response_timeout: DEFAULT_RESPONSE_TIMEOUT,
-            idle_timeout: DEFAULT_IDLE_TIMEOUT,
-            overall_timeout: Some(INSTALLER_DOWNLOAD_TIMEOUT),
-        },
-        |_| {},
-    )
-    .await
-    .map_err(|error| format!("USBIP-SETUP-010: download failed: {error}"))?;
-
-    let actual = crate::native_components::install::sha256_file(&installer_path, MAX_INSTALLER_BYTES)
-        .map_err(|error| format!("USBIP-SETUP-010: cannot hash the USB/IP installer: {error}"))?;
-    if actual != USBIP_SHA256 {
-        return Err(format!(
-            "USBIP-SETUP-010: expected USB/IP SHA-256 {USBIP_SHA256}, got {actual}"
-        ));
+    // Use the host's immutable signed payload and its root-hub transaction.
+    // No runtime installer or vendor setup executable is downloaded by the panel.
+    let script = crate::sunshine::install_dir()
+        .join("scripts")
+        .join("usbip-package.ps1");
+    if !script.is_file() {
+        return Err(
+            "USBIP-SETUP-002: update the host to install the bundled USB/IP component".into(),
+        );
     }
-
-    let mut command = tokio::process::Command::new(&installer_path);
+    let powershell = std::path::PathBuf::from(
+        std::env::var_os("SystemRoot")
+            .ok_or("USBIP-SETUP-002: Windows directory is unavailable")?,
+    )
+    .join(r"System32\WindowsPowerShell\v1.0\powershell.exe");
+    let mut command = tokio::process::Command::new(powershell);
     command
-        .args([
-            "/VERYSILENT",
-            "/SUPPRESSMSGBOXES",
-            "/NORESTART",
-            "/RESTARTEXITCODE=3010",
-            "/SP-",
-        ])
+        .args(["-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
+        .arg(&script)
+        .args(["-Action", "install"])
         .kill_on_drop(true)
         .stdout(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
     let mut child = command
         .spawn()
-        .map_err(|error| format!("USBIP-SETUP-010: the USB/IP installer did not start: {error}"))?;
+        .map_err(|error| format!("USBIP-SETUP-010: USB/IP setup did not start: {error}"))?;
     let status = tokio::time::timeout(std::time::Duration::from_secs(600), child.wait())
         .await
-        .map_err(|_| "USBIP-SETUP-010: the USB/IP installer timed out".to_string())?
-        .map_err(|error| format!("USBIP-SETUP-010: the USB/IP installer failed: {error}"))?;
+        .map_err(|_| "USBIP-SETUP-010: USB/IP setup timed out".to_string())?
+        .map_err(|error| format!("USBIP-SETUP-010: USB/IP setup failed: {error}"))?;
     let result = classify_installer_exit_code(status.code())?;
-    if super::installed_usbip_version()?.as_deref() != Some(USBIP_VERSION) {
-        return Err(format!(
-            "USBIP-SETUP-010: the installer finished but version {USBIP_VERSION} is not registered"
-        ));
-    }
+    super::manager::find_installation()?;
+    super::manager::verify_driver_compatibility()?;
     Ok(result)
 }
 
@@ -149,7 +123,10 @@ mod tests {
 
     #[test]
     fn installer_exit_codes_map_to_ready_or_reboot() {
-        assert_eq!(classify_installer_exit_code(Some(0)), Ok(InstallResult::Ready));
+        assert_eq!(
+            classify_installer_exit_code(Some(0)),
+            Ok(InstallResult::Ready)
+        );
         assert_eq!(
             classify_installer_exit_code(Some(3010)),
             Ok(InstallResult::RebootRecommended)

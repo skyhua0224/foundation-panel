@@ -160,10 +160,51 @@ fn consistent_version(
     Ok(found)
 }
 
+/// An explicit receipt identifies the slim layout independently of localized ARP text.
+/// usbip-slim-ms-reg-uninstall-20261117: InstallLocation / DisplayVersion.
+fn slim_registration(key: &str, layout: &str) -> Result<bool, String> {
+    if !key.eq_ignore_ascii_case("AlkaidLabUSBip") {
+        return Ok(false);
+    }
+    if layout != "usbip-slim-v1" {
+        return Err("USBIP-SETUP-008: unsupported USB/IP installation layout".into());
+    }
+    Ok(true)
+}
+
+#[cfg(target_os = "windows")]
+pub(super) fn verify_slim_payload(root: &std::path::Path) -> Result<(), String> {
+    let receipt = root.join("payload.json");
+    verify_transport_file(&receipt, env!("SUNSHINE_USBIP_PAYLOAD_SHA256"))?;
+    let bytes = std::fs::read(&receipt)
+        .map_err(|error| format!("USBIP-EXEC-006: cannot read USB/IP receipt: {error}"))?;
+    let manifest: serde_json::Value = serde_json::from_slice(&bytes)
+        .map_err(|error| format!("USBIP-EXEC-006: invalid USB/IP receipt: {error}"))?;
+    let files = manifest["files"]
+        .as_object()
+        .ok_or("USBIP-EXEC-006: missing USB/IP file inventory")?;
+    for (name, record) in files {
+        // The receipt is hash-pinned above; retain this path boundary check as
+        // a separate invariant before using a receipt member as a file path.
+        if name
+            .split('/')
+            .any(|part| part.is_empty() || part == ".." || part.contains([':', '\\']))
+        {
+            return Err("USBIP-EXEC-006: invalid USB/IP receipt member".into());
+        }
+        let digest = record["sha256"]
+            .as_str()
+            .ok_or("USBIP-EXEC-006: missing USB/IP member hash")?;
+        verify_transport_file(&root.join(name), digest)?;
+    }
+    Ok(())
+}
+
 #[cfg(target_os = "windows")]
 pub(crate) struct UninstallEntry {
     pub(crate) key: winreg::RegKey,
     pub(crate) display_name: String,
+    pub(crate) slim: bool,
 }
 
 #[cfg(target_os = "windows")]
@@ -200,8 +241,16 @@ pub(crate) fn uninstall_entries() -> Result<Vec<UninstallEntry>, String> {
             let display_name = key
                 .get_value::<String, _>("DisplayName")
                 .unwrap_or_default();
-            if version_from_display_name(&display_name).is_some() {
-                entries.push(UninstallEntry { key, display_name });
+            let layout = key
+                .get_value::<String, _>("InstallLayout")
+                .unwrap_or_default();
+            let slim = slim_registration(&name, &layout)?;
+            if slim || version_from_display_name(&display_name).is_some() {
+                entries.push(UninstallEntry {
+                    key,
+                    display_name,
+                    slim,
+                });
             }
         }
     }
@@ -269,6 +318,9 @@ pub(super) fn find_installation() -> Result<Installation, String> {
                     "USBIP-SETUP-002: the installed USB/IP executable path is unsafe".to_string(),
                 );
             }
+            if entry.slim {
+                verify_slim_payload(&root)?;
+            }
             if supported_version_installed(Some(&version)) {
                 verify_transport_file(&executable, env!("SUNSHINE_USBIP_TOOL_SHA256"))?;
             }
@@ -303,6 +355,15 @@ mod tests {
         );
         std::fs::remove_file(&file).unwrap();
         assert!(verify_transport_file(&file, expected).is_err());
+    }
+
+    #[test]
+    fn slim_receipt_is_recognized_without_a_vendor_display_name() {
+        assert!(slim_registration("AlkaidLabUSBip", "usbip-slim-v1").unwrap());
+        assert!(slim_registration("alkaidlabusbip", "usbip-slim-v1").unwrap());
+        assert!(!slim_registration("other", "usbip-slim-v1").unwrap());
+        assert!(slim_registration("AlkaidLabUSBip", "").is_err());
+        assert!(slim_registration("AlkaidLabUSBip", "future").is_err());
     }
 
     #[test]

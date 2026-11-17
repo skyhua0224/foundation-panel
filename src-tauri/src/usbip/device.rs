@@ -211,9 +211,9 @@ fn read_transport_nodes(enumerator: &str) -> Result<Vec<TransportNode>, String> 
 /// what Inno Setup and Windows itself assume when parsing the same string.
 #[cfg(target_os = "windows")]
 fn split_executable_command(command: &str) -> Option<(String, Vec<String>)> {
-    use windows::core::PCWSTR;
-    use windows::Win32::Foundation::{LocalFree, HLOCAL};
+    use windows::Win32::Foundation::{HLOCAL, LocalFree};
     use windows::Win32::UI::Shell::CommandLineToArgvW;
+    use windows::core::PCWSTR;
 
     let command = command.trim();
     if command.is_empty() {
@@ -222,9 +222,8 @@ fn split_executable_command(command: &str) -> Option<(String, Vec<String>)> {
     let mut wide: Vec<u16> = command.encode_utf16().collect();
     wide.push(0);
     let mut argument_count = 0;
-    let arguments_ptr = unsafe {
-        CommandLineToArgvW(PCWSTR::from_raw(wide.as_ptr()), &mut argument_count)
-    };
+    let arguments_ptr =
+        unsafe { CommandLineToArgvW(PCWSTR::from_raw(wide.as_ptr()), &mut argument_count) };
     if arguments_ptr.is_null() || argument_count <= 0 {
         return None;
     }
@@ -248,7 +247,7 @@ fn split_executable_command(command: &str) -> Option<(String, Vec<String>)> {
 }
 
 #[cfg(target_os = "windows")]
-fn find_usbip_uninstall_string() -> Result<Option<String>, String> {
+fn find_usbip_uninstall_string() -> Result<Option<(String, bool)>, String> {
     Ok(super::usbip_uninstall_entries()?
         .into_iter()
         .find_map(|entry| {
@@ -258,6 +257,7 @@ fn find_usbip_uninstall_string() -> Result<Option<String>, String> {
                 .ok()
                 .map(|value| value.trim().to_string())
                 .filter(|value| !value.is_empty())
+                .map(|value| (value, entry.slim))
         }))
 }
 
@@ -291,16 +291,20 @@ pub(super) async fn cleanup_broken_transport() -> Result<(), String> {
 async fn run_inno_uninstaller() -> Result<(), String> {
     use std::process::Stdio;
 
-    let uninstall_string = find_usbip_uninstall_string()?.ok_or_else(|| {
+    let (uninstall_string, slim) = find_usbip_uninstall_string()?.ok_or_else(|| {
         "USBIP-CLEAN-001: the USB/IP uninstaller registration is missing".to_string()
     })?;
     let (executable, arguments) = split_executable_command(&uninstall_string).ok_or_else(|| {
         "USBIP-CLEAN-001: the USB/IP uninstaller registration is invalid".to_string()
     })?;
     let mut command = tokio::process::Command::new(&executable);
+    command.args(arguments);
+    // PowerShell's registered slim command already includes -Action uninstall.
+    // Inno flags are valid only for the legacy upstream uninstaller.
+    if !slim {
+        command.args(INNO_UNINSTALL_FLAGS.split_whitespace());
+    }
     command
-        .args(arguments)
-        .args(INNO_UNINSTALL_FLAGS.split_whitespace())
         .kill_on_drop(true)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -316,7 +320,7 @@ async fn run_inno_uninstaller() -> Result<(), String> {
     match finished {
         // Inno uninstallers exit 0 on success; any non-zero code means the
         // user cancelled or a fatal error occurred.
-        Ok(Ok(status)) if status.success() => {}
+        Ok(Ok(status)) if status.success() || (slim && status.code() == Some(3010)) => {}
         Ok(Ok(status)) => {
             return Err(format!(
                 "USBIP-CLEAN-001: the USB/IP uninstaller exited with {status}"

@@ -6,6 +6,12 @@
     "installer_url": "https://github.com/vadimgrn/usbip-win2/releases/download/v.0.9.8.1/USBip-0.9.8.1-x64.exe",
     "installer_sha256": "38cad6d4432b52d5bb9409d9ad03b72fdffc4ada4cd3a48fbeca1a2752a8518a",
     "tool_sha256": "817da219fa153b4b37c3bc1aa8fcc63f33e046188c57cc3dd2c60a6ef0883c56",
-    "driver_sha256": "abd4fc43dce40e027e4acc884cbfe92433e026206f6565c5ee5284a39441169a"
+    "driver_sha256": "abd4fc43dce40e027e4acc884cbfe92433e026206f6565c5ee5284a39441169a",
+    "installation_layouts": [
+      "upstream-inno",
+      "usbip-slim-v1"
+    ],
+    "slim_registration": "AlkaidLabUSBip",
+    "slim_payload_sha256": "549aac7e3cb5fd387fbd1b4574dd6fc541cda2879c75039cdea476cf0d6a61d9"
   }
 }

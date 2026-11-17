@@ -162,6 +162,7 @@ fn main() {
         ("USBIP_URL", &compatibility["usbip"]["installer_url"]),
         ("USBIP_SHA256", &compatibility["usbip"]["installer_sha256"]),
         ("USBIP_TOOL_SHA256", &compatibility["usbip"]["tool_sha256"]),
+        ("USBIP_PAYLOAD_SHA256", &compatibility["usbip"]["slim_payload_sha256"]),
         (
             "USBIP_DRIVER_SHA256",
             &compatibility["usbip"]["driver_sha256"],
