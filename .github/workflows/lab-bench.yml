@@ -1,0 +1,39 @@
+name: lab startup bench
+on:
+  push:
+    branches: [lab/bench]
+jobs:
+  bench:
+    runs-on: windows-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v7.1.0
+        with:
+          node-version: 24.21.0
+      - name: Download executables
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $cfg = Get-Content lab/bench-inputs.json | ConvertFrom-Json
+          foreach ($v in $cfg.variants) {
+            gh run download $v.run -R ${{ github.repository }} -n sunshine-gui-windows-x64 -D "bench/$($v.name)"
+            Get-ChildItem "bench/$($v.name)" | Select-Object Name,Length | Format-Table | Out-String | Write-Host
+            if (Test-Path "bench/$($v.name)/sunshine-gui-windows-x64.zip") { Expand-Archive "bench/$($v.name)/sunshine-gui-windows-x64.zip" "bench/$($v.name)/app" -Force }
+          }
+      - name: WebView2 runtime
+        shell: pwsh
+        run: |
+          Get-ItemProperty HKLM:SOFTWAREWOW6432NodeMicrosoftEdgeUpdateClients{F3017226-FE2A-4295-8BDF-00C3A9A7E4C5} -ErrorAction SilentlyContinue | Select-Object pv | Format-List | Out-String | Write-Host
+          [Environment]::OSVersion | Out-String | Write-Host
+      - name: Bench
+        shell: pwsh
+        run: node lab/bench.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: bench-result
+          path: bench-result/*
