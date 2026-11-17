@@ -42,7 +42,7 @@ const profiles = Object.fromEntries(cfg.variants.map((v) => [v.name, resolve(`be
 let port = 9500
 async function trial(v, idx, warm) {
   port++
-  const r = spawnSync("pwsh", ["-NoProfile", "-File", "lab/measure.ps1", "-Exe", exeOf(v.name), "-Port", String(port), "-Profile", profiles[v.name]], { encoding: "utf8", timeout: 90000 })
+  const r = spawnSync("pwsh", ["-NoProfile", "-File", "lab/measure.ps1", "-Exe", exeOf(v.name), "-Port", String(port), "-Profile", profiles[v.name], "-Mode", process.env.BENCH_MODE || "direct", "-ObserveMs", "10000"], { encoding: "utf8", timeout: 90000 })
   let m
   try { m = JSON.parse(r.stdout.trim().split("\n").pop()) } catch { console.log("measure failed", r.stdout, r.stderr); return }
   await sleep(1500)
@@ -52,7 +52,7 @@ async function trial(v, idx, warm) {
   if (warm) return
   const row = { windowMs: m.windowMs, exited: m.exited, pages }
   results[v.name].push(row)
-  console.log(v.name, idx, JSON.stringify(row))
+  console.log(v.name, idx, JSON.stringify(m), JSON.stringify(pages))
 }
 for (const v of cfg.variants) await trial(v, -1, true)
 for (let i = 0; i < cfg.trials; i++) {
