@@ -24,3 +24,11 @@ test('the smart plan reads the startup problems of the whole host log, as the We
   assert.match(home, /problems: startupProblems\(\(parseErrorLog\(state\.logText, Infinity\)\?\.rows \|\| \[\]\)\.filter\(\(r\) => r\.level === 'Fatal'\)\.map\(\(r\) => r\.text\), String\(locale\.value\)\)\.length/)
   assert.match(home, /startupProblems, parseErrorLog,/)
 })
+
+// the overview of the control panel and of the Web UI of one host are one overview: the layout is on the host, the client icons are one function (foundation-ui)
+test('the overview keeps its layout on the host and draws the clients with the one icon function', () => {
+  assert.match(home, /const layoutStore = createHostLayoutStore\(\{ request: \(path, init\) => hostFetch\(base, path, init\) \}\)/)
+  assert.match(home, /:layout-store="layoutStore"/)
+  assert.equal((home.match(/icon: deviceIconFor\(c\.name, c\.os\)/g) || []).length, 2, 'the model and the catalogue read the same icon')
+  assert.ok(!/icon: 'devices'/.test(home), 'no constant icon for every client')
+})

@@ -1,7 +1,7 @@
 <script setup>
 import { setVisibleInterval, clearVisibleInterval } from '../composables/pageVisibility.js'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { firstImage, micIsReady, padIsReady, startupProblems, parseErrorLog, MDriverGuardNotice, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, coverKnown, heroArtReady, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, useNotify, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
+import { createHostLayoutStore, deviceIconFor, firstImage, micIsReady, padIsReady, startupProblems, parseErrorLog, MDriverGuardNotice, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, coverKnown, heroArtReady, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, useNotify, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
 import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, useSessionClock, useSystemInfo, reachProblemOf, registeredComponentStatus, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf, recentKeys, rememberRecent, isLoopbackHost, createQueuedCalls, createSerialCalls } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
@@ -86,7 +86,7 @@ const model = computed(() => {
     codecModes: state.config && state.config.hevc_mode !== undefined ? { hevc: state.config.hevc_mode, av1: state.config.av1_mode } : null,
     pads: { text: [modeLabel.value, dsLabel.value].filter(Boolean).join(' · ') || '–', word: dsLabel.value || modeLabel.value, ready: padIsReady(props.runtime.ds?.state) },
     mic: micText.value ? { text: micText.value, ready: micIsReady({ state: props.runtime.mic?.state }) } : null,
-    clients: state.clients ? state.clients.map((c) => ({ ...c, icon: 'devices' })) : null,
+    clients: state.clients ? state.clients.map((c) => ({ ...c, icon: deviceIconFor(c.name, c.os) })) : null,
     apps: state.apps ? state.apps.map((a) => ({ id: a.name, name: a.name, cover: coverOf(a) })) : null,
     logs: state.errorLog, recent: state.recent, busy: busy.value,
     usb: props.runtime.usb?.attached_devices ? props.runtime.usb.attached_devices.length : null,
@@ -130,6 +130,8 @@ const vddAdapter = createHttpVddAdapter({
 const vddStore = createVddStore(vddAdapter, { autosave: true })
 onMounted(async () => { try { await vddAdapter.load() } catch { /* the card then shows the defaults */ } vddStore.refresh() })
 const sysJson = async (path) => { const r = await hostFetch(base, path); if (!r.ok) throw Object.assign(new Error(`HTTP ${r.status}`), { status: r.status }); return r.json() }
+// the overview layout is kept on the host, so the Web UI of the same host draws the same cards, order and sizes (foundation-ui hostLayout.js)
+const layoutStore = createHostLayoutStore({ request: (path, init) => hostFetch(base, path, init) })
 const nics = useSystemInfo({ fetchJson: sysJson })
 // the system information is kept between visits too (the network and system tiles, the Wi-Fi and slow-link signals of the smart plan come from it): a visit starts from it and the read replaces it in place
 if (seen.nics) nics.info.value = seen.nics
@@ -151,7 +153,7 @@ const catalogueInput = computed(() => {
     history: { samples: history.samples, sessions: history.sessions, days: history.days, last: () => history.last() },
     sys: model.value.info.some((i) => i.id === 'memory') && state.memory ? { memTotal: state.memory.system_total_memory, memAvail: state.memory.system_available_memory } : null,
     recent: recentKeys.value, canRuntime: canRuntime.value, ds5Keys: ds5Keys.value,
-    config: state.config, audio: audioDevicesChannel.data.value?.render || null, logText: state.logText, logs: state.errorLog, clients: state.clients ? state.clients.map((c) => ({ ...c, icon: 'devices' })) : null,
+    config: state.config, audio: audioDevicesChannel.data.value?.render || null, logText: state.logText, logs: state.errorLog, clients: state.clients ? state.clients.map((c) => ({ ...c, icon: deviceIconFor(c.name, c.os) })) : null,
     apps: state.apps ? state.apps.map((a) => ({ id: a.name, name: a.name, cover: coverOf(a) })) : null,
     codecModes: state.config && state.config.hevc_mode !== undefined ? { hevc: state.config.hevc_mode, av1: state.config.av1_mode } : null,
     pads: { text: [modeLabel.value, dsLabel.value].filter(Boolean).join(' · ') || '–' }, usb: props.runtime.usb?.attached_devices ? props.runtime.usb.attached_devices.length : null,
@@ -313,7 +315,7 @@ const supportSections = computed(() => [
     </template>
     <MDriverGuardNotice :guard="driverGuard" :locale="String(locale)" :open="openExternalUrl" @dismiss="dismissDriver" @retry="retryProbe" />
     <MAnnouncementStrip v-if="announcements.top.value" :item="announcements.top.value" :total="announcements.unread.value" :texts="announceTexts" @dismiss="announcements.dismiss" @open-url="openExternalUrl" @open-list="announceOpen = true" />
-    <MHomeDash v-model:edit="edit" :cards="cards" :details="allDetails" :ctx="dashCtx" storage-key="panel-home" :texts="dashTexts" :config="state.config" :locale="locale" @action="onAction" />
+    <MHomeDash v-model:edit="edit" :cards="cards" :details="allDetails" :ctx="dashCtx" storage-key="panel-home" :texts="dashTexts" :config="state.config" :locale="locale" :layout-store="layoutStore" @action="onAction" />
     <MAnnouncementSheet v-model="announceOpen" :items="announcements.list.value" :title="homeTexts(locale).annTitle" :texts="announceTexts" :close-label="h.done" @dismiss="announcements.dismiss" @open-url="openExternalUrl" />
     <MSupportSheet v-model="sponsorOpen" :title="h.sponsor" :sections="supportSections" :close-label="h.done" @open="(it) => openExternalUrl(it.url)" />
     <MDialog v-model="confirmRestart" :title="h.restartTitle" icon="restart_alt" tone="info">
