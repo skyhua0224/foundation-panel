@@ -224,7 +224,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: usbip-debug-probe
-          path: .panel-deps/target/x86_64-pc-windows-msvc/ci-test/deps/sunshine_gui-*.exe
+          path: .panel-deps/target/x86_64-pc-windows-msvc/ci-test/**/sunshine_gui-*.exe
           if-no-files-found: error
           retention-days: 7
 
