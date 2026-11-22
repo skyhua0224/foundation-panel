@@ -45,7 +45,7 @@
     "@tauri-apps/plugin-dialog": "^2.8.3",
     "@tauri-apps/plugin-fs": "^2.7.1",
     "dompurify": "^3.4.16",
-    "foundation-ui": "https://codeload.github.com/AlkaidLab/foundation-ui/tar.gz/eb88def32ef25d78db04c7261fc175b88688bf04",
+    "foundation-ui": "https://codeload.github.com/skyhua0224/foundation-ui/tar.gz/3e34475e63171f1e29035cd65c3d78fde82649be",
     "markdown-it": "^14.3.2",
     "pixi.js": "^8.19.0",
     "qrcode": "^1.5.4",
