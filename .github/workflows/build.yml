@@ -198,6 +198,21 @@ jobs:
           name: panel-renderer-dist
           path: dist
 
+      # One build, then the two filters run against the same executables. A second cargo test
+      # invocation recompiles the workspace crate (the build script rewrites its generated
+      # capability files), which cost 1 min 42 s in the 2026-11-22 cold run.
+      - name: Build the test binary once
+        shell: powershell
+        run: |
+          cargo test --locked --profile ci-test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --no-run --message-format=json > "$env:RUNNER_TEMP\test-targets.json"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $executables = Get-Content "$env:RUNNER_TEMP\test-targets.json" | ForEach-Object {
+            try { $_ | ConvertFrom-Json } catch { }
+          } | Where-Object { $_.reason -eq 'compiler-artifact' -and $_.executable } |
+            Select-Object -ExpandProperty executable -Unique
+          if (-not $executables) { throw 'cargo test --no-run produced no test executable' }
+          $executables | Set-Content "$env:RUNNER_TEMP\test-executables.txt"
+
       - name: USB-IP ownership registry and layout fixtures (ci-test)
         shell: powershell
         run: |
@@ -206,19 +221,33 @@ jobs:
           Invoke-WebRequest -UseBasicParsing $contract.usbip.installer_url -OutFile $file
           if ((Get-FileHash -Algorithm SHA256 $file).Hash -ne $contract.usbip.installer_sha256) { throw 'Legacy fixture hash mismatch' }
           $env:USBIP_LEGACY_FIXTURE_INSTALLER = $file
-          cargo test --locked --profile ci-test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc usbip:: -- --nocapture
-          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Push-Location src-tauri
+          try {
+            Get-Content "$env:RUNNER_TEMP\test-executables.txt" | ForEach-Object {
+              & $_ usbip:: --nocapture
+              if ($LASTEXITCODE) { throw "test executable failed: $_" }
+            }
+          } finally { Pop-Location }
 
       # Environment-dependent on hosted runners (system code page, timing, catalog signatures); they run on the release hosts.
       - name: Test Tauri backend
-        run: >-
-          cargo test --locked --profile ci-test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --
-          --skip usbip::
-          --skip host_version::tests::gbk_console_output_is_decoded_and_is_never_a_version
-          --skip text_encoding::tests::decodes_console_gbk
-          --skip sunshine::tray_protocol_tests::tray_status_times_out_when_core_never_sends_headers
-          --skip sunshine::tray_protocol_tests::tray_status_times_out_when_core_stalls_the_body
-          --skip tray::events::tests::event_stream_handshake_times_out_after_tcp_connect
+        shell: powershell
+        run: |
+          $skips = @(
+            '--skip', 'usbip::',
+            '--skip', 'host_version::tests::gbk_console_output_is_decoded_and_is_never_a_version',
+            '--skip', 'text_encoding::tests::decodes_console_gbk',
+            '--skip', 'sunshine::tray_protocol_tests::tray_status_times_out_when_core_never_sends_headers',
+            '--skip', 'sunshine::tray_protocol_tests::tray_status_times_out_when_core_stalls_the_body',
+            '--skip', 'tray::events::tests::event_stream_handshake_times_out_after_tcp_connect'
+          )
+          Push-Location src-tauri
+          try {
+            Get-Content "$env:RUNNER_TEMP\test-executables.txt" | ForEach-Object {
+              & $_ @skips
+              if ($LASTEXITCODE) { throw "test executable failed: $_" }
+            }
+          } finally { Pop-Location }
 
       - name: Save read-only transport test binary
         uses: actions/upload-artifact@v7
