@@ -101,7 +101,7 @@ jobs:
         run: npm run build:renderer
 
       - name: Save the npm cache
-        if: github.ref == 'refs/heads/main' && steps.npm-cache.outputs.cache-hit != 'true'
+        if: steps.npm-cache.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ~/.npm
@@ -139,7 +139,7 @@ jobs:
           tags: foundation-panel-dev:ci
           load: true
           cache-from: type=gha,scope=panel-dev-image
-          cache-to: ${{ github.ref == 'refs/heads/main' && 'type=gha,mode=max,scope=panel-dev-image' || '' }}
+          cache-to: type=gha,mode=max,scope=panel-dev-image
 
       - name: Build, check and test with the shared entry points
         run: |
@@ -183,7 +183,7 @@ jobs:
         with:
           prefix-key: panel-ci-v2
           workspaces: src-tauri -> ../.panel-deps/target
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: true
 
       - name: Select locked tools
         uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db  # v3.6.3
@@ -252,7 +252,7 @@ jobs:
         with:
           prefix-key: panel-ci-v2
           workspaces: src-tauri -> ../.panel-deps/config-target
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: true
 
       - name: Select locked tools
         uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db  # v3.6.3
@@ -294,7 +294,7 @@ jobs:
         with:
           prefix-key: panel-ci-v2
           workspaces: native-plugins -> ../.panel-deps/plugin-target
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: true
 
       - name: Select locked tools
         uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db  # v3.6.3
@@ -337,7 +337,7 @@ jobs:
         with:
           prefix-key: panel-ci-v2
           workspaces: src-tauri -> ../.panel-deps/target
-          save-if: ${{ github.ref == 'refs/heads/main' }}
+          save-if: true
 
       - name: Select locked tools
         uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db  # v3.6.3
