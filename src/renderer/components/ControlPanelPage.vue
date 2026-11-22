@@ -59,9 +59,13 @@
       </MSection>
     </template>
     <template v-else>
+      <!-- the four things a person comes to 帮助与关于 for, first; the update state is on its tile, and 关于 says it on its second line -->
+      <MSection>
+        <MHelpTiles :locale="locale" :update="update" @check="emit('check-update')" @open-update="emit('open-update')" @doctor="emit('open-doctor')" @downloads="emit('webui-navigate', '/downloads')" />
+      </MSection>
       <MSection>
         <MGroup>
-          <MItem action icon="info" :title="aboutText.title" :text="'Foundation Sunshine ' + currentVersion" @click="emit('open-about')" />
+          <MItem action icon="info" :title="aboutText.title" :text="aboutSub" @click="emit('open-about')" />
           <MItem action icon="rocket_launch" :title="guide.guide" :text="guide.helpRow" @click="emit('open-guide')" />
           <MItem action icon="tv" :title="t.sidebar.openBigScreen" :text="t.sidebar.openBigScreenHelp" data-help-row="bigScreen" @click="openDesktop" />
           <MItem action icon="lightbulb" :title="coach.rerun" @click="startCoach" />
@@ -71,10 +75,7 @@
       </MSection>
       <MSection>
         <MGroup>
-          <MItem action icon="download" :title="t.sidebar.clientDownloads" @click="emit('webui-navigate', '/downloads')" />
           <MItem action icon="keyboard" :title="t.toolbar.shortcutGuide" @click="shortcutsOpen = true" />
-          <MItem action icon="health_and_safety" :title="doctorTexts(locale).start" @click="emit('open-doctor')" />
-          <MFeedbackRow :locale="locale" />
           <MItem action icon="bug_report" :title="t.m3e.system.troubleshooting" @click="emit('webui-navigate', '/troubleshooting')" />
           <MItem action icon="public" :title="t.sidebar.officialWebsite" @click="actions.openUrl('https://www.alkaidlab.com/')"><template #trail><MIcon name="open_in_new" /></template></MItem>
           <MItem action icon="favorite" :title="t.m3e.home.sponsor" @click="sponsorOpen = true" />
@@ -88,7 +89,8 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSourceList, MChoiceItem, MSeg, MChip, MButton, MIcon, MFieldItem, MBanner, MSupportSheet, useNotify, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard, doctorTexts, MFeedbackRow } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSourceList, MChoiceItem, MSeg, MChip, MButton, MIcon, MFieldItem, MBanner, MSupportSheet, useNotify, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard, MHelpTiles } from 'foundation-ui/vue'
+import { helpTileTexts, aboutLine } from 'foundation-ui/help-tiles'
 import { SPONSORS } from '../config/sponsors.js'
 import ShortcutsSheet from './m3e/ShortcutsSheet.vue'
 import { usePanelPart } from '../composables/panelParts.js'
@@ -116,8 +118,10 @@ const props = defineProps({
   clipboardSyncState: { type: String, default: 'unknown' },
   isAdmin: Boolean,
   actions: { type: Object, required: true },
+  /** the state of the update check for the tile of 软件更新 and the second line of 关于: { state, installed, next, checkedAt } (SidebarMenu) */
+  update: { type: Object, default: () => ({ state: 'idle' }) },
 })
-const emit = defineEmits(['theme-change', 'locale-change', 'channel-change', 'webui-navigate', 'open-guide', 'open-remote', 'open-about', 'open-doctor'])
+const emit = defineEmits(['theme-change', 'locale-change', 'channel-change', 'webui-navigate', 'open-guide', 'open-remote', 'open-about', 'open-doctor', 'check-update', 'open-update'])
 const { t } = useI18n()
 const notify = useNotify()
 const openDesktop = () => openBigScreenWithNotice((m) => notify.snack(m), t.value.sidebar.openBigScreenFailed)
@@ -127,6 +131,7 @@ const remote = computed(() => remoteTexts(props.locale))
 const coach = computed(() => coachTexts(props.locale))
 const startCoach = () => window.dispatchEvent(new CustomEvent('foundation-coach-start'))
 const aboutText = computed(() => aboutTexts(props.locale))
+const aboutSub = computed(() => aboutLine(props.currentVersion || props.update.installed, props.update, helpTileTexts(props.locale)))
 // the get started card of the overview comes back from here
 const startText = computed(() => homeTexts(props.locale))
 const startCard = useGuideCard('panel-home', () => [])
