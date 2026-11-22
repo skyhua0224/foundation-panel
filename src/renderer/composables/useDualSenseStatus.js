@@ -1,5 +1,6 @@
 import { onActivated, onDeactivated, onMounted, onUnmounted, ref } from 'vue'
 import { dualsenseStatusChannel, STATUS_POLL_INTERVAL_MS } from './deviceStatusStore.js'
+import { setVisibleInterval, clearVisibleInterval } from './pageVisibility.js'
 
 /**
  * Status of the native DualSense path (host + USB/IP transport). Read only: it
@@ -24,10 +25,12 @@ export function useDualSenseStatus() {
 
   const start = () => {
     if (timer || disposed || !active) return
-    timer = window.setInterval(() => refresh(), STATUS_POLL_INTERVAL_MS)
+    // A poll reads the live state (a controller connecting), so it asks the host again (force); the cached answer
+    // of the channel serves everything else. It rests while the page is hidden and reads once when it is shown.
+    timer = setVisibleInterval(() => refresh({ force: true }), STATUS_POLL_INTERVAL_MS, { resume: true })
   }
   const stop = () => {
-    if (timer) window.clearInterval(timer)
+    if (timer) clearVisibleInterval(timer)
     timer = undefined
   }
 

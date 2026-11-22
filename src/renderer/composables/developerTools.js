@@ -25,6 +25,21 @@ export function resetOnboarding(local, session) {
 export const resetOverview = (storage) => remove(storage, keysOf(storage).filter((k) => k.startsWith(OVERVIEW_PREFIX)))
 export const resetStorage = (storage, keep = KEEP_ON_RESET) => remove(storage, keysOf(storage).filter((k) => !keep.includes(k)))
 
+/** base64 -> bytes (for a native side that still answers the capture as text). */
+const bytesOfBase64 = (text) => {
+  const raw = atob(String(text || ''))
+  const out = new Uint8Array(raw.length)
+  for (let i = 0; i < raw.length; i += 1) out[i] = raw.charCodeAt(i)
+  return out
+}
+/** The window capture as the native side answers it: the PNG itself (a binary IPC answer arrives as an ArrayBuffer), or text in base64. */
+export const bytesOfCapture = (answer) => {
+  if (typeof answer === 'string') return bytesOfBase64(answer)
+  if (answer instanceof Uint8Array) return answer
+  if (answer instanceof ArrayBuffer) return new Uint8Array(answer)
+  return Array.isArray(answer) ? Uint8Array.from(answer) : new Uint8Array(0)
+}
+
 /** One entry of the panel log as the line the file has (the page parses these lines). */
 export function logLine(entry) {
   const where = entry.file ? ` [${entry.file}${entry.line ? `:${entry.line}` : ''}]` : ''
@@ -40,16 +55,50 @@ export const displayText = (win = globalThis) => {
   return `${Math.round((win.screen?.width || 0) * ratio)}x${Math.round((win.screen?.height || 0) * ratio)} @${Math.round(ratio * 100)}%`
 }
 
+/** `promise`, or `fallback` when it takes longer than `ms`. The promise is left running: a late answer still lands in whatever keeps it (`remembered`). */
+export function within(promise, ms, fallback) {
+  let timer
+  const late = new Promise((resolve) => { timer = setTimeout(() => resolve(fallback), ms) })
+  return Promise.race([Promise.resolve(promise).catch(() => fallback), late]).finally(() => clearTimeout(timer))
+}
+
+/** Probes answered once and kept for `ttl` ms (Infinity: the session). A probe that failed is not kept, so the next question asks again. */
+export function remembered(now = Date.now) {
+  const kept = new Map()
+  return (key, ttl, read) => {
+    const hit = kept.get(key)
+    if (hit && now() - hit.at < ttl) return hit.promise
+    const entry = { at: now(), promise: Promise.resolve().then(read) }
+    kept.set(key, entry)
+    entry.promise.catch(() => { if (kept.get(key) === entry) kept.delete(key) })
+    return entry.promise
+  }
+}
+/** How long the environment waits for each probe before it goes without that line (ms). The slow ones run on and are kept when they arrive. */
+export const ENV_WAIT = Object.freeze({ system: 5000, host: 1500, components: 4000, channel: 2000 })
+const MINUTE = 60_000
+
 export function createDeveloperTools({ invoke, settings, locale = 'zh-CN', version = '', hostVersion = null, base = null, kit = null, errorContext = null, simulateHost = null,
-  local = globalThis.localStorage, session = globalThis.sessionStorage, reload = () => globalThis.location?.reload(), save = null, win = globalThis } = {}) {
+  local = globalThis.localStorage, session = globalThis.sessionStorage, reload = () => globalThis.location?.reload(), save = null, win = globalThis, wait = {} } = {}) {
   const call = (name, args) => invoke(name, args)
+  const waits = { ...ENV_WAIT, ...wait }
+  const keep = remembered()
   const apiBase = async () => String((await base?.()) || '').replace(/\/$/, '')
   const saveSettings = async (patch) => settings.save({ ...settings.get(), ...patch })
   const tools = {
+    // What the report and the developer page show about this computer. The system, the GPUs and the WebView do not change while the panel runs: asked once. The host and the components change (an update, a driver
+    // installed): kept for a minute. Nothing here may hold a window open: a probe that is slow is left out of this answer and kept when it arrives (the host version never blocks).
     environment: async () => {
-      const [info, gpus, dev, host, components] = await Promise.all([call('get_system_info').catch(() => ({})), call('get_gpus').catch(() => []), call('dev_environment').catch(() => ({})), Promise.resolve(hostVersion?.()).catch(() => null), call('get_component_inventory').catch(() => [])])
+      const [info, gpus, dev, host, components, channel] = await Promise.all([
+        within(keep('system', Infinity, () => call('get_system_info')), waits.system, {}),
+        within(keep('gpus', Infinity, () => call('get_gpus')), waits.system, []),
+        within(keep('webview', Infinity, () => call('dev_environment')), waits.system, {}),
+        within(keep('host', MINUTE, async () => { const v = await hostVersion?.(); if (!v) throw new Error('no host version'); return v }), waits.host, null),
+        within(keep('components', MINUTE, () => call('get_component_inventory')), waits.components, []),
+        within(tools.update.channel.get(), waits.channel, ''),
+      ])
       return {
-        product: 'Foundation Sunshine panel', version: version || info.app_version || '', channel: (await tools.update.channel.get().catch(() => '')) || '',
+        product: 'Foundation Sunshine panel', version: version || info.app_version || '', channel: channel || '',
         builds: [{ name: 'panel', sha: info.app_version || version || '' }], components: Array.isArray(components) ? components : [], host: host || '', os: info.os_version || '', arch: info.arch || dev.target || '', gpu: Array.isArray(gpus) ? gpus.join(', ') : '',
         webview: dev.webview || '', display: displayText(win), locale,
       }

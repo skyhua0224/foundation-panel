@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "nr-switch",
+  "description": "Allow the bundled quality controls to switch DLSS NR for the host.",
+  "windows": ["main", "nr_overlay"],
+  "local": true,
+  "permissions": ["allow-set-global-nr-enabled"]
+}

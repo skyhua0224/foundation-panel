@@ -1,13 +1,17 @@
 import { ref } from 'vue'
-import { ElMessage, ElNotification, ElMessageBox } from './notifyMessage.js'
+import { ElMessage, ElNotification, ElMessageBox, UPDATE_CHECK_MESSAGE } from './notifyMessage.js'
 import { openExternalUrl, tools, controllerMeta, sunshine } from '@/tauri-adapter.js'
 import { latencyClockTexts } from 'foundation-ui/vue'
 import { pickStreamMonitor, centredOn } from './streamMonitor.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { formatMessage } from '../shared/format-message.js'
+import { isCurrentVersionUnknown, isPrereleaseUnavailable, updateCheckFailureText } from './updateCheckError.js'
+import { clipboardSyncState, clipboardSyncWorks } from './clipboardStatusView.js'
+import { setVisibleInterval, clearVisibleInterval } from './pageVisibility.js'
 
 // Module-scoped reactive flag so all sidebar instances share state.
 const clipboardSyncEnabled = ref(false)
+const clipboardSyncStateWord = ref('unknown')
 let clipboardSyncInitialised = false
 let clipboardSyncPollTimer = null
 // The gamepad test tool downloads or writes files on disk: while that runs nothing else may interrupt it (a restart would corrupt the write). The flag covers
@@ -205,18 +209,18 @@ export function useTools() {
       })
 
       // 显示提示
-      ElMessage.info(t.value.toolActions.requestingAdmin)
+      ElMessage.info({ message: t.value.toolActions.requestingAdmin, id: 'admin-restart' })
 
       // 调用 Tauri 命令
       const { invoke } = await import('@tauri-apps/api/core')
       await invoke('restart_as_admin')
 
       // 如果到这里说明成功请求了重启
-      ElMessage.success(t.value.toolActions.restartingAsAdmin)
+      ElMessage.success({ message: t.value.toolActions.restartingAsAdmin, id: 'admin-restart' })
     } catch (error) {
       if (error !== 'cancel') {
         console.error('重启失败:', error)
-        ElMessage.error(t.value.toolActions.restartFailed)
+        ElMessage.error({ message: t.value.toolActions.restartFailed, id: 'admin-restart' })
       }
     }
   }
@@ -225,10 +229,14 @@ export function useTools() {
    * 检查更新，返回 UpdateInfo（包含 is_latest 标记）由调用方处理展示
    */
   const checkForUpdates = async (channel = null) => {
+    let progress = null
+    let failed = false
     try {
       const { invoke } = await import('@tauri-apps/api/core')
 
-      ElMessage.info(t.value.toolActions.checkingUpdates)
+      // one message for the whole check: the sentence stays until the answer comes (a slow check outlasts the usual 5 s), a failure replaces it where it stands
+      // (same id), an answer closes it because the dialog of the answer takes over
+      progress = ElMessage({ message: t.value.toolActions.checkingUpdates, id: UPDATE_CHECK_MESSAGE, duration: 0 })
 
       const hasExplicitChannel = channel === 'stable' || channel === 'prerelease'
       const result = hasExplicitChannel
@@ -241,8 +249,13 @@ export function useTools() {
       return null
     } catch (error) {
       console.error('检查更新失败:', error)
-      ElMessage.error(t.value.toolActions.checkUpdatesFailed)
+      failed = true
+      const text = updateCheckFailureText(error, t.value.toolActions)
+      if (isPrereleaseUnavailable(error) || isCurrentVersionUnknown(error)) ElMessage.warning({ message: text, id: UPDATE_CHECK_MESSAGE })
+      else ElMessage.error({ message: text, id: UPDATE_CHECK_MESSAGE })
       return null
+    } finally {
+      if (!failed) await progress?.close()
     }
   }
 
@@ -441,7 +454,9 @@ export function useTools() {
     try {
       const { invoke } = await import('@tauri-apps/api/core')
       const status = await invoke('clipboard_sync_status')
-      clipboardSyncEnabled.value = status?.transport_state === 'connected' && status?.service_allowed !== false
+      // working = the agent is connected, the host hears it and the host's own setting says on; a setting nobody could read is not "on"
+      clipboardSyncEnabled.value = clipboardSyncWorks(status)
+      clipboardSyncStateWord.value = clipboardSyncState(status)
       return status
     } catch (err) {
       console.warn('[clipboard] status query failed:', err)
@@ -460,6 +475,10 @@ export function useTools() {
       ElMessage.warning(msg.agentInactive)
     } else if (status.service_allowed === false) {
       ElMessage.warning(msg.serviceDisabled)
+    } else if (status.transport_state === 'degraded') {
+      ElMessage.warning(msg.degraded)
+    } else if (status.transport_state === 'connected' && status.service_allowed !== true) {
+      ElMessage.warning(msg.capabilityUnknown)
     } else if (status.transport_state === 'connected') {
       ElMessage.success(msg.active)
     } else if (status.transport_state === 'connecting') {
@@ -477,11 +496,11 @@ export function useTools() {
     if (clipboardSyncInitialised) return
     clipboardSyncInitialised = true
     await refreshClipboardSyncStatus()
-    clipboardSyncPollTimer = window.setInterval(refreshClipboardSyncStatus, 5000)
+    clipboardSyncPollTimer = setVisibleInterval(refreshClipboardSyncStatus, 5000, { resume: true })
     window.addEventListener(
       'beforeunload',
       () => {
-        if (clipboardSyncPollTimer) window.clearInterval(clipboardSyncPollTimer)
+        if (clipboardSyncPollTimer) clearVisibleInterval(clipboardSyncPollTimer)
         clipboardSyncPollTimer = null
       },
       { once: true },
@@ -499,6 +518,7 @@ export function useTools() {
     showClipboardSyncStatus,
     initClipboardSyncStatus,
     clipboardSyncEnabled,
+    clipboardSyncStateWord,
     controllerBusy,
     controllerBusyText,
   }

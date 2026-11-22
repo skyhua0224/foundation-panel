@@ -12,6 +12,8 @@ const idle = () => ({
   downloaded: 0,
   total: 0,
   source: '',
+  // why the download is not from Mirror酱 although it is the chosen source ('' when it is or was not chosen)
+  fallbackReason: '',
   filename: '',
   path: '',
   errorCode: '',
@@ -34,7 +36,10 @@ export function createUpdateDownload({ invoke, listen }) {
   const visible = computed(() => state.active || !!state.path)
   const ready = computed(() => !state.active && !!state.path)
 
-  const apply = (payload) => Object.assign(state, downloadView(payload))
+  const apply = (payload) => {
+    Object.assign(state, downloadView(payload))
+    if (typeof payload?.fallbackReason === 'string') state.fallbackReason = payload.fallbackReason
+  }
 
   /** Read the transfer that may already be running after a webview reload. */
   const refresh = async () => {
@@ -51,13 +56,14 @@ export function createUpdateDownload({ invoke, listen }) {
         path: status.path || state.path,
         errorCode: active ? '' : state.errorCode,
         errorDetail: active ? '' : (status.error || state.errorDetail),
+        fallbackReason: status.fallback_reason || '',
       })
     } catch {
       // no backend (browser preview): the sheet still works for its own start
     }
   }
 
-  const start = async ({ url, fallbackUrl, filename, expectedSize, expectedSha256, assetType }) => {
+  const start = async ({ url, fallbackUrl, filename, expectedSize, expectedSha256, assetType, targetVersion }) => {
     if (running) return { busy: true, ok: false }
     Object.assign(state, idle(), { active: true, opened: false, filename })
     const task = (async () => {
@@ -71,12 +77,14 @@ export function createUpdateDownload({ invoke, listen }) {
           expectedSize: expectedSize || null,
           expectedSha256: expectedSha256 || null,
           assetType: assetType || null,
+          targetVersion: targetVersion || null,
         })
         if (result?.success) {
           state.path = result.file_path || ''
           state.active = false
           state.downloadPhase = 'complete'
           state.progress = 1
+          state.fallbackReason = result.fallback_reason || ''
           state.errorCode = ''
           state.errorDetail = ''
           return { ok: true, path: state.path, cached: !!result.cached }

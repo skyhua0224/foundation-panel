@@ -157,3 +157,54 @@ mod tests {
         assert_eq!((v["requested"].as_u64(), v["applied"].as_u64(), v["max"].as_u64()), (Some(250), Some(200), Some(200)));
     }
 }
+
+/// How long a change of the monitor's scale must stay quiet before the window is given its size back (ms): a display that flips between two scales (a virtual display that follows the client's
+/// resolution) is laid out once, for the last scale.
+pub const KEEP_DIP_DEBOUNCE_MS: u32 = 1500;
+
+/// A size in pixels as DIPs (device independent pixels, 96 dpi) at a monitor DPI.
+pub fn dip_of_pixels(pixels: i32, dpi: u32) -> f64 {
+    f64::from(pixels.max(0)) * 96.0 / f64::from(dpi.max(1))
+}
+
+/// The size in pixels a window of `dip` DIPs has at `dpi`, never larger than the work area of its monitor (`work`, pixels) and never under 1 pixel.
+pub fn pixels_keeping_dip(dip: (f64, f64), dpi: u32, work: (i32, i32)) -> (i32, i32) {
+    let scale = f64::from(dpi.max(1)) / 96.0;
+    let fit = |dips: f64, room: i32| ((dips * scale).round() as i32).clamp(1, room.max(1));
+    (fit(dip.0, work.0), fit(dip.1, work.1))
+}
+
+/// The top-left corner that keeps a window of `size` pixels inside the work area `[left, top, right, bottom]`, as near to where it is (`at`) as it can.
+pub fn corner_inside(at: (i32, i32), size: (i32, i32), work: (i32, i32, i32, i32)) -> (i32, i32) {
+    let x = at.0.min(work.2 - size.0).max(work.0);
+    let y = at.1.min(work.3 - size.1).max(work.1);
+    (x, y)
+}
+
+#[cfg(test)]
+mod keep_dip_tests {
+    use super::*;
+
+    #[test]
+    fn a_size_in_dips_survives_a_change_of_scale() {
+        // 1100 x 570 DIPs at 175 % is 1925 x 998 pixels; the same DIPs at 300 % are 3300 x 1710
+        assert_eq!(pixels_keeping_dip((1100.0, 570.0), 168, (3840, 2160)), (1925, 998));
+        assert_eq!(pixels_keeping_dip((1100.0, 570.0), 288, (3840, 2160)), (3300, 1710));
+        assert!((dip_of_pixels(1956, 168) - 1117.7).abs() < 0.1);
+        assert!((dip_of_pixels(1956, 288) - 652.0).abs() < 0.1);
+    }
+
+    #[test]
+    fn the_work_area_is_the_limit() {
+        assert_eq!(pixels_keeping_dip((1100.0, 570.0), 288, (2560, 1400)), (2560, 1400));
+        assert_eq!(pixels_keeping_dip((0.0, 0.0), 96, (1920, 1080)), (1, 1));
+        assert_eq!(pixels_keeping_dip((800.0, 600.0), 96, (0, 0)), (1, 1), "a work area that is not known does not make a window of 0 pixels");
+    }
+
+    #[test]
+    fn the_corner_keeps_the_window_inside() {
+        assert_eq!(corner_inside((100, 50), (800, 600), (0, 0, 1920, 1080)), (100, 50));
+        assert_eq!(corner_inside((1500, 700), (800, 600), (0, 0, 1920, 1080)), (1120, 480));
+        assert_eq!(corner_inside((-50, -20), (800, 600), (0, 0, 1920, 1080)), (0, 0));
+    }
+}

@@ -62,3 +62,68 @@ test('a frame of another origin does not beat, and a rejected beat is not an unh
   assert.ok(top.calls.length >= 2, 'the window itself still beats')
   assert.equal(rejections.length, 0)
 })
+
+// A page whose engine reports its own visibility (a window covered by other windows) next to the panel's.
+function engineLoaded(initialEngineHidden) {
+  const state = { engineHidden: initialEngineHidden }
+  const styles = []
+  const listeners = []
+  const events = []
+  const head = {
+    appendChild(style) { styles.push(style); style.parentNode = this },
+    removeChild(style) { styles.splice(styles.indexOf(style), 1); style.parentNode = null },
+  }
+  const document = {
+    head, documentElement: head,
+    createElement: () => ({ parentNode: null }),
+    addEventListener: (type, fn) => type === 'visibilitychange' && listeners.push(fn),
+    dispatchEvent: (event) => { events.push(event.type); listeners.slice().forEach((fn) => fn(event)) },
+  }
+  class Document {}
+  Object.defineProperty(Document.prototype, 'visibilityState', { get() { return state.engineHidden ? 'hidden' : 'visible' }, configurable: true })
+  Object.setPrototypeOf(document, Document.prototype)
+  const window = { __TAURI_INTERNALS__: undefined }
+  window.top = window
+  vm.runInNewContext(source.replaceAll('__LIFECYCLE_GENERATION__', '1'), {
+    window, document, Document, Event: class { constructor(type) { this.type = type } },
+    console: { log() {} }, setInterval: () => 0,
+  })
+  // the engine tells its listeners (the page's and the script's own) when its state changes
+  const engineChanges = (hidden) => { state.engineHidden = hidden; listeners.slice().forEach((fn) => fn({ type: 'visibilitychange' })) }
+  return { window, document, styles, events, engineChanges }
+}
+
+test('a covered window is hidden for the page and its animations pause, shown again when uncovered', () => {
+  const view = engineLoaded(false)
+  assert.equal(view.document.hidden, false)
+  view.engineChanges(true)
+  assert.equal(view.document.hidden, true)
+  assert.equal(view.document.visibilityState, 'hidden')
+  assert.equal(view.styles.length, 1, 'the animations pause for a covered window too')
+  view.engineChanges(false)
+  assert.equal(view.document.hidden, false)
+  assert.equal(view.styles.length, 0)
+})
+
+test('the panel and the engine are two sources of one state', () => {
+  const view = engineLoaded(false)
+  view.window.__setWebviewVisibility(false)
+  assert.equal(view.styles.length, 1)
+  // the engine also reports hidden: still hidden, still one pause style
+  view.engineChanges(true)
+  assert.equal(view.styles.length, 1)
+  // the panel shows the window but the engine still says covered: still hidden
+  view.window.__setWebviewVisibility(true)
+  assert.equal(view.document.hidden, true)
+  assert.equal(view.styles.length, 1)
+  view.engineChanges(false)
+  assert.equal(view.document.hidden, false)
+  assert.equal(view.styles.length, 0)
+})
+
+test('a frame that starts covered pauses at once on its first engine event and not before', () => {
+  const view = engineLoaded(true)
+  assert.equal(view.document.hidden, true)
+  view.engineChanges(true)
+  assert.equal(view.styles.length, 1)
+})

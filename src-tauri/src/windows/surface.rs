@@ -14,7 +14,7 @@ const FIRST_RUN: (u8, u8, u8) = (0x13, 0x13, 0x18);
 static LAST_STORED: Mutex<Option<(u8, u8, u8)>> = Mutex::new(None);
 
 fn path() -> Option<PathBuf> {
-    dirs::data_local_dir().map(|dir| dir.join("Sunshine GUI").join("panel-surface"))
+    crate::test_isolation::data_local_dir().map(|dir| dir.join("Sunshine GUI").join("panel-surface"))
 }
 
 fn parse(text: &str) -> Option<(u8, u8, u8)> {

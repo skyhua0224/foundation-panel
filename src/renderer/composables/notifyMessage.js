@@ -1,10 +1,14 @@
 // The Element Plus message and notification calls of the earlier windows, answered by the one snackbar of the window (foundation-ui notify): a result that
 // passes shows at the bottom, never as a banner over the caption bar. Same call shapes, so a caller only changes its import. The store is loaded when the first
 // message is shown, so a module that only imports this (a test, a worker) does not load the UI framework.
-// `duration: 0` keeps a message until its handle is closed (the old call did that). A notification that waits for the person (duration 0 with an action) is a
+// `duration: 0` keeps a message until its handle is closed (the old call did that). `id` names a message: a later call with the same id replaces it where it stands
+// (a progress sentence that becomes its result changes its text and restarts its time; it does not leave and enter again as a second message would), and the handle of
+// either call closes it. Without an id every call is a message of its own. A notification that waits for the person (duration 0 with an action) is a
 // standing state, not a passing result: it goes to the status notices of the caption bar (the bell), where the person can dismiss it and it never occupies the
 // one snackbar of the queue, so every other notice keeps appearing while it waits. A dismissed one stays away until what it reports changes (its revision).
 let serial = 0
+// the one message of a manual update check: its sentence, then its failure
+export const UPDATE_CHECK_MESSAGE = 'update-check'
 const textOf = (options) => (typeof options === 'string' ? options : [options?.title, options?.message].filter(Boolean).join(' · '))
 const loadNotify = () => import('foundation-ui/notify').then(({ useNotify }) => useNotify()).catch(() => null)
 const timeoutOf = (tone, options) => (options?.duration === 0 ? 0 : tone === 'error' || tone === 'warning' ? 8000 : 5000)
@@ -30,7 +34,7 @@ const showStanding = (tone, options) => {
 const show = (tone) => (options) => {
   if (waitsForThePerson(options)) return showStanding(tone, options)
   const text = textOf(options)
-  const id = `message-${++serial}`
+  const id = (typeof options === 'object' && options?.id) || `message-${++serial}`
   const action = typeof options?.onClick === 'function' && options.actionText ? { action: options.actionText, onAction: options.onClick } : {}
   const ready = text ? loadNotify().then((notify) => { notify?.snack(text, { id, timeout: timeoutOf(tone, options), ...action }); return notify }).catch(() => null) : Promise.resolve(null)
   return { close: () => ready.then((notify) => notify?.dismissSnack(id)) }

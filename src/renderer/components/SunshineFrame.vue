@@ -38,6 +38,7 @@ import { isWebuiNavigationPath } from '../composables/webuiNavigation.js'
 import { BLANK, framePageGo, routeChanged, webuiNavigated } from '../composables/frameRoute.js'
 import { webPathOf, routeForWebPath } from '../composables/useRouter.js'
 import { createReportLimiter, normalizeFrameReport } from '../composables/frameReport.js'
+import { SEARCH_INDEX } from '@settings-data'
 import { parseSettingsHash } from 'foundation-ui/settings/index.js'
 
 invoke('main_panel_loading').catch(() => {})
@@ -205,7 +206,7 @@ const settingsPlaceMessage = (path) => {
   const at = path.indexOf('#')
   if (at < 0 || path.slice(0, at) !== '/config' || !sunshineUrl.value || sunshineUrl.value === 'about:blank') return false
   if (currentPath.value.split(/[?#]/, 1)[0].replace(/\.html$/, '') !== '/config') return false
-  const place = parseSettingsHash(path.slice(at))
+  const place = parseSettingsHash(path.slice(at), SEARCH_INDEX)
   const frame = sunshineIframe.value?.contentWindow
   if (!place || !frame) return false
   // a frame that is not on an http(s) address has the origin 'null', and postMessage(message, 'null') throws: nothing is sent to it

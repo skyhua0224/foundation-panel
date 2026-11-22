@@ -1,11 +1,25 @@
 /** Requires explicit shared cleanup for residual devices, unsupported versions or ABI conflicts. */
 export function usbipTransportNeedsCleanup(status = {}) {
-  return Boolean(
+  return !status.externally_managed && Boolean(
     status.vhci_residual
     // error_code 是后端下发的结构化码（Rust status::detail_error_code），
     // 不得回退到解析 detail 文本。
     || (status.installed && (!status.version_valid || status.error_code === 'USBIP-EXEC-006')),
   )
+}
+
+/**
+ * A live controller with others of the same driver beside it (Rust `residual_kind`): removing the extra ones is enough, nothing
+ * is reinstalled. This also holds for an installation the person manages themselves: only the duplicate controller goes and one
+ * stays live, which is what makes their own installation work.
+ */
+export function usbipResidualIsStale(status = {}) {
+  return Boolean(status.vhci_residual) && status.residual_kind === 'stale'
+}
+
+/** The external full usbip-win2 that the host's helper says may be replaced (it decides; the panel keeps no ownership rules). */
+export function usbipCanReplaceLegacy(status = {}) {
+  return Boolean(status.externally_managed && status.replaceable)
 }
 
 export const MICROPHONE_BACKENDS = Object.freeze(['auto', 'vb_cable', 'usbip_experimental', 'disabled'])
@@ -19,32 +33,8 @@ export function vbCableState(devices) {
   return VB_CABLE_STATES.includes(state) ? state : 'unknown'
 }
 
-/** Not installed, or installed but not usable for another reason: the download is offered. */
-export const vbCableNeedsInstall = (state) => VB_CABLE_STATES.includes(state) && state !== 'ready' && state !== 'disabled'
-
 /** Installed, its device disabled in the Device Manager: the way out is to enable it there, not to download it again. */
 export const vbCableNeedsEnable = (state) => state === 'disabled'
-
-/** The job of the host that installs or enables VB-CABLE, as GET /api/audio/devices reports it (`vb_cable.job`). */
-export function vbCableJob(devices) {
-  const job = devices?.vb_cable?.job || {}
-  const step = ['downloading', 'verifying', 'installing', 'enabling'].includes(job.step) ? job.step : ''
-  return { running: job.running === true, step: job.running === true ? step || 'downloading' : step, failed: job.step === 'failed', errorCode: typeof job.error_code === 'string' ? job.error_code : '' }
-}
-
-/** What a failed job tells the person: the download or the pack, the signature, the missing administrator rights, or "still unavailable". */
-export function vbCableErrorKind(code) {
-  switch (code) {
-    case 'VB_DOWNLOAD_FAILED': case 'VB_EXTRACT_FAILED': case 'VB_SETUP_MISSING': return 'download'
-    case 'VB_SIGNATURE_INVALID': case 'VB_SIGNER_UNEXPECTED': return 'signature'
-    case 'VB_NEEDS_ADMIN': return 'admin'
-    case '': return ''
-    default: return 'failed'
-  }
-}
-
-/** The official page of VB-CABLE (the driver pack is downloaded from there). */
-export const VB_CABLE_PAGE = 'https://vb-audio.com/Cable/'
 
 /** Backends that need the usbip-win2 host component. */
 const needsUsbip = (backend) => backend === 'usbip_experimental' || backend === 'auto'

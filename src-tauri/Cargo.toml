@@ -3,9 +3,36 @@ name = "sunshine-gui"
 version = "0.0.0-dev"
 description = "A GUI for sunshine"
 authors = ["qiin2333"]
-license = ""
+license = "MIT"
 repository = "https://github.com/qiin2333/sunshine"
 edition = "2024"
+
+# The release profile follows the Cargo profile reference: size optimisation,
+# whole-program LTO and one codegen unit. Keep panic handling at Cargo's
+# default for this application. No `strip`: on the MSVC target it makes rustc
+# pass /DEBUG:NONE to the linker, so no PDB is written and the crash reports
+# (module + offset frames) could not be decoded. The PDB is a separate file
+# and does not add to the size of the executable; CI archives it.
+# Sources: panel-cargo-profiles
+[profile.release]
+# file and line tables in the PDB (not in the exe), so archived symbols resolve crash frames, also inlined ones under fat LTO
+debug = "line-tables-only"
+opt-level = "s"
+lto = "fat"
+codegen-units = 1
+
+# CI tests only. The shipped binary above keeps size optimisation and whole-program LTO; tests
+# do not need either (the 2026-11-22 run spent 11 min 34 s compiling and 11 s running 768 tests).
+# Inheriting release keeps debug assertions and the test behaviour of the old release-profile
+# runs; opt-level 1 keeps the timing-sensitive tests close to release speed while debug info and
+# incremental artefacts are not built. Sources: panel-cargo-profiles, panel-cargo-test-profile.
+[profile.ci-test]
+inherits = "release"
+opt-level = 1
+debug = 0
+incremental = false
+codegen-units = 16
+lto = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -34,6 +61,8 @@ tower-http = { version = "0.6.8", features = ["cors"] }
 wmi = "0.18"
 quick-xml = { version = "0.37", features = ["serialize"] }
 regex = "1.11.3"
+fancy-regex = "0.14"
+flate2 = "1.1"
 base64 = "0.22.1"
 rcgen = "0.13"
 chrono = { version = "0.4.43", features = ["serde"] }
@@ -85,7 +114,9 @@ windows = { version = "0.62.2", features = [
     "Win32_System_Ole",
     # Required by windows-rs for ShellExecuteExW/SHELLEXECUTEINFOW.
     "Win32_System_Registry",
+    "Win32_System_RemoteDesktop",
     "Win32_Security",
+    "Win32_Security_Authorization",
     # Credential Manager：CDK 的安全存储（CredWriteW/CredReadW/CredDeleteW）。
     "Win32_Security_Credentials",
     "Win32_Graphics_Dwm",
@@ -100,6 +131,7 @@ windows = { version = "0.62.2", features = [
     "Win32_UI_HiDpi",
     "Win32_UI_WindowsAndMessaging",
     "UI_ViewManagement",
+    "Devices_Enumeration",
     "Win32_System_Memory",
     "Win32_System_SystemInformation",
     "Win32_Networking_WinHttp",
@@ -118,5 +150,14 @@ windows = { version = "0.62.2", features = [
 webview2-com = "0.39"
 # Match the WebView2 bindings used by wry 0.57 and their Interface trait.
 wv2-windows-core = { package = "windows-core", version = "0.62" }
+windows-collections = "0.3"
 winreg = "0.55"
-image = "0.25.9"
+# Decoders for the formats the application meets: PNG (clipboard, updater
+# sheet, DPI cover), BMP, JPEG, ICO (tray icons), plus GIF and WebP so a custom
+# tray image or a pasted web image still decodes. The default AVIF encoder and
+# the EXR, TIFF, HDR, DDS, farbfeld, PNM, QOI and TGA codecs are left out: nothing
+# in the panel reads or writes them. Sources: panel-image-features, panel-image-avif (feature flags),
+# panel-cargo-features (feature unification).
+image = { version = "0.25.9", default-features = false, features = [
+    "bmp", "gif", "ico", "jpeg", "png", "webp", "rayon",
+] }

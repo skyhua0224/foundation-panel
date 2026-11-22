@@ -34,9 +34,9 @@
         <MGroup v-if="nr.list.length > 1">
           <MChoiceItem icon="cast_connected" :title="nrText.choose" :model-value="nr.selected ?? ''" :options="nr.list.map((p) => ({ value: p.id, label: `${nrText.stream} #${p.id} · ${nrOutputLabel(p)}` }))" :cancel-label="l.cancel" @update:model-value="(v) => selectNr(Number(v))" />
         </MGroup>
-        <NrSessionControls v-if="nrPipeline" :pipeline="nrPipeline" :online="nr.online" @changed="pollNr" @error="nrError = $event" />
+        <NrSessionControls v-if="nrPipeline" :pipeline="nrPipeline" :online="nr.online" :global-enabled="nr.enabled" @changed="pollNr" @error="nrError = $event" />
         <MGroup v-else>
-          <MItem icon="wand_stars" title="DLSS NR" :value="nrOverlayText.states[nrOverlayState(null, nr.online)]">
+          <MItem icon="wand_stars" title="DLSS NR" :value="nrStatusLabel(nrOverlayText, nrOverlayState(null, nr.online, nr.hasStreams, nr.list.length), nr.enabled)">
             <template #trail><MButton variant="text" size="sm" @click="nr.online ? emit('open-quality') : pollNr()">{{ nr.online ? l.nrOpen : l.refresh }}</MButton></template>
           </MItem>
         </MGroup>
@@ -88,15 +88,17 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { setVisibleInterval, clearVisibleInterval } from '../../composables/pageVisibility.js'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { MPage, MGroup, MSection, MItem, MSliderItem, MChoiceItem, MValueItem, MChipSet, MStat, MSparkline, MBanner, MButton, MIconButton, MFooter, MEmpty, MDialog, MPageLoading, useNotify } from 'foundation-ui/vue'
 import { invoke } from '@tauri-apps/api/core'
 import { sunshine } from '../../tauri-adapter.js'
 import NrSessionControls from '../NrSessionControls.vue'
+import { useLiveNrSessions } from '../../composables/useLiveNrSessions.js'
 import { useDlssNrReady } from '../../composables/useDlssNrReady.js'
 import { enhancementControlsText, enhancementError } from '../../composables/enhancementControls.js'
-import { nrOverlayText as overlayTexts } from '../../composables/nrOverlayMessages.js'
-import { nrOutputLabel, nrOverlayState, nrPipelines } from '../../composables/nrOverlayState.js'
+import { nrOverlayText as overlayTexts, nrStatusLabel } from '../../composables/nrOverlayMessages.js'
+import { nrOutputLabel, nrOverlayState } from '../../composables/nrOverlayState.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 import { bitrateChipMarks, bitrateFromProgress, bitrateSliderProgress, bitrateSliderSpan } from 'foundation-ui/settings/index.js'
 import { BITRATE, BITRATE_PRESETS, DEFAULT_BITRATE, formatBitrate, validBitrate, liveSessions, perfSessionOf, budgetUsage, perfStatus, pipelineSegments, formatMs, formatNumber, formatPercent, formatInteger, formatUptime } from '../../composables/liveSession.js'
@@ -175,23 +177,8 @@ async function loadPerf() {
 const nrText = computed(() => enhancementControlsText(locale.value)), nrOverlayText = computed(() => overlayTexts(locale.value))
 // only for an installed and usable DLSS NR: otherwise nothing of it on this page (the install is on 画质增强)
 const nrReady = useDlssNrReady()
-const nr = reactive({ list: [], selected: null, online: true })
-const nrError = ref('')
-const nrPipeline = computed(() => nr.list.find((p) => p.id === nr.selected) || null)
-async function selectNr(id) {
-  try { await invoke('nr_overlay_select_session', { id }); nr.selected = id; nrError.value = '' } catch (e) { nrError.value = String(e) }
-}
-let targetRead = false
-async function pollNr() {
-  if (!nrReady.value) return
-  try {
-    if (!targetRead) { targetRead = true; try { const s = await invoke('nr_overlay_settings'); if (s?.target != null) nr.selected = s.target } catch { /* no saved target */ } }
-    nr.list = nrPipelines((await invoke('nr_live_status'))?.pipelines)
-    nr.online = true
-    if (nr.selected !== null && !nr.list.some((p) => p.id === nr.selected)) nr.selected = null
-    if (nr.selected === null && nr.list.length === 1) await selectNr(nr.list[0].id)
-  } catch { nr.online = false; nr.list = [] }
-}
+const { nr, nrError, selectNr, pollNr, dispose: disposeNr } = useLiveNrSessions(nrReady, invoke)
+const nrPipeline = computed(() => nr.list.find(p => p.id === nr.selected) || null)
 
 const confirmStop = ref(false), stopping = ref(false)
 async function stopAll() {
@@ -208,8 +195,8 @@ async function refresh(manual = false) {
   try { await Promise.all([loadSessions(), loadPerf(), pollNr()]); readAt.value = Date.now() } finally { inFlight = false; refreshing.value = false; loaded.value = true }
 }
 let timer = null
-onMounted(() => { refresh(); timer = setInterval(refresh, 2000) })
-onUnmounted(() => clearInterval(timer))
+onMounted(() => { refresh(); timer = setVisibleInterval(refresh, 2000, { resume: true }) })
+onUnmounted(() => { disposeNr(); clearVisibleInterval(timer) })
 </script>
 
 <style>

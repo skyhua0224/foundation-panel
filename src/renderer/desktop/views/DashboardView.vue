@@ -62,7 +62,7 @@
     </div>
 
     <!-- 内存监控 -->
-    <h2 class="section-title fade-in"><MIcon name="monitoring" />{{ t.dashboard.memoryMonitor }}</h2>
+    <h2 class="section-title fade-in"><MIcon name="monitor_heart" />{{ t.dashboard.memoryMonitor }}</h2>
 
     <div class="desktop-card memory-monitor-card fade-in">
       <div class="memory-overview">

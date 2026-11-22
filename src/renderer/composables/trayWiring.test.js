@@ -16,11 +16,11 @@ const mainRs = read('src-tauri/src/main.rs')
 const trayRs = read('src-tauri/src/tray.rs')
 
 const menuIds = [...menuRs.matchAll(/(?:MenuItem|CheckMenuItem)::with_id\(\s*app,\s*"([a-z_0-9]+)"/g)].map((m) => m[1])
-const rustIds = [...inputRs.slice(inputRs.indexOf('ITEM_IDS: [&str; 43]')).matchAll(/"([a-z_0-9]+)"/g)].map((m) => m[1]).slice(0, 43)
+const rustIds = [...inputRs.slice(inputRs.indexOf('ITEM_IDS: [&str; 46]')).matchAll(/"([a-z_0-9]+)"/g)].map((m) => m[1]).slice(0, 46)
 
-test('the 43 item ids are the same in menu.rs, the popup\'s list in Rust, the handler arms and the menus\' model', () => {
-  assert.equal(rustIds.length, 43)
-  // menu.rs builds 42 items itself (tray_status is built there too: 43 with it); the containers are submenus
+test('the 46 item ids are the same in menu.rs, the popup\'s list in Rust, the handler arms and the menus\' model', () => {
+  assert.equal(rustIds.length, 46)
+  // The containers are submenus; the item IDs themselves must match.
   assert.deepEqual([...new Set(menuIds)].sort(), [...rustIds].sort())
   assert.deepEqual([...TRAY_ITEM_IDS].sort(), [...rustIds].sort())
   for (const id of rustIds.filter((x) => x !== 'tray_status')) assert.ok(actionsRs.includes(`"${id}" =>`), `no handler arm for ${id}`)

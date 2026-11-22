@@ -1,13 +1,13 @@
 <template>
-  <section class="live-controls" :aria-busy="busy || pending" @pointerdown.capture="beginEdit" @keydown.capture="beginEdit" @focusout="cancelEdit">
-    <div class="live-control-row">
+  <section class="live-controls" :aria-busy="busy || pending" @pointerdown.capture="pressEdit" @keydown.capture="pressEdit" @focusout="(event) => { if (focusLeaves(event.currentTarget, event.relatedTarget)) cancelEdit() }">
+    <div v-if="showGlobal" class="live-control-row">
       <MSwitchItem
-        :model-value="!!pipeline.nr_requested_enabled"
+        :model-value="globalEnabled === true"
         icon="wand_stars"
         :title="text.liveTitle"
-        :text="text.liveHint"
-        :disabled="!canChange"
-        @update:model-value="(enabled) => send({ enabled }, pipeline.id)"
+        :text="text.nrPermissionHint"
+        :disabled="!online || globalEnabled == null || busy"
+        @update:model-value="setGlobal"
       >
         <template #extra><MLoading v-if="busy || pending" size="18px" /></template>
       </MSwitchItem>
@@ -38,6 +38,9 @@
     <p v-if="pending" class="quality-note" role="status">
       {{ overlayText.states[state] }}
     </p>
+    <p v-if="state === 'degraded'" class="quality-warning" role="status">
+      {{ degradedReason.main }}<br v-if="degradedReason.detail">{{ degradedReason.detail }}
+    </p>
     <p
       v-if="pipeline.nr_settings_failure_reason"
       class="quality-warning"
@@ -54,12 +57,14 @@ import { MLoading, MSliderItem, MSwitchItem, MSeg, MItem, MGroup, MSection, MBut
 import { invoke } from '@tauri-apps/api/core'
 import { useI18n } from '../desktop/i18n/index.js'
 import { enhancementControlsText } from '../composables/enhancementControls.js'
-import { nrOverlayText } from '../composables/nrOverlayMessages.js'
+import { nrDegradedReason, nrOverlayText } from '../composables/nrOverlayMessages.js'
 import { nrOverlayState } from '../composables/nrOverlayState.js'
-import { nrSessionRequest, nrResetRequest } from '../composables/nrSessionControls.js'
+import { nrSessionRequest, nrResetRequest, focusLeaves, startsSliderEdit } from '../composables/nrSessionControls.js'
 const props = defineProps({
   pipeline: { type: Object, required: true },
-  online: Boolean
+  online: Boolean,
+  globalEnabled: { type: Boolean, default: null },
+  showGlobal: { type: Boolean, default: true },
 })
 const emit = defineEmits(['changed', 'error'])
 const { locale } = useI18n()
@@ -76,6 +81,7 @@ const state = computed(() => nrOverlayState(props.pipeline, props.online))
 const pending = computed(() =>
   ['warming_up', 'stopping', 'scaling'].includes(state.value)
 )
+const degradedReason = computed(() => nrDegradedReason(props.pipeline, overlayText.value))
 const canChange = computed(
   () =>
     props.online &&
@@ -96,6 +102,7 @@ watch(
   },
   { immediate: true }
 )
+const pressEdit = (event) => { if (startsSliderEdit(event)) beginEdit() }
 function beginEdit() {
   if (canChange.value && editTarget.value === null)
     editTarget.value = props.pipeline.id
@@ -117,7 +124,16 @@ async function commit(kind) {
 }
 const reset = () => run(() => nrResetRequest(props.pipeline, props.pipeline.id, props.online))
 const send = (patch, target) => run(() => nrSessionRequest(props.pipeline, target, patch, props.online))
-// every change is remembered for the next streams, as the overlay does (nr_live_remember); the app's own settings come first
+async function setGlobal(enabled) {
+  if (busy.value) return
+  busy.value = true
+  try {
+    const savedEnabled = await invoke('set_global_nr_enabled', { enabled })
+    emit('changed', savedEnabled)
+  }
+  catch (e) { emit('error', String(e)) }
+  finally { busy.value = false }
+}
 async function run(build) {
   if (busy.value) return
   try {

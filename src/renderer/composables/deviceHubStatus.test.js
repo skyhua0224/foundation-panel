@@ -1,6 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  usbipCanReplaceLegacy,
+  usbipResidualIsStale,
+  usbipTransportNeedsCleanup,
   MICROPHONE_BACKENDS,
   canTestMicrophone,
   microphoneBufferedMs,
@@ -11,12 +14,8 @@ import {
   microphoneInputFresh,
   microphoneInputLevel,
   microphoneTestIsLive,
-  VB_CABLE_PAGE,
   VB_CABLE_STATES,
-  vbCableErrorKind,
-  vbCableJob,
   vbCableNeedsEnable,
-  vbCableNeedsInstall,
   vbCableState,
 } from './deviceHubStatus.js'
 
@@ -108,35 +107,39 @@ test('VB-CABLE: the state of the host answer, `unknown` before it and for a stat
   assert.equal(vbCableState({ vb_cable: { state: 'something-new' } }), 'unknown')
 })
 
-test('VB-CABLE: the download is offered when it is not installed or not usable, never before the host has answered', () => {
-  assert.equal(vbCableNeedsInstall('ready'), false)
-  assert.equal(vbCableNeedsInstall('unknown'), false)
-  for (const state of ['partial', 'unavailable', 'missing']) assert.equal(vbCableNeedsInstall(state), true, state)
-  assert.match(VB_CABLE_PAGE, /^https:\/\/vb-audio\.com\//)
-})
-
 test('VB-CABLE: installed but disabled offers the Device Manager, not a download', () => {
   assert.equal(vbCableNeedsEnable('disabled'), true)
-  assert.equal(vbCableNeedsInstall('disabled'), false)
   for (const state of ['ready', 'partial', 'unavailable', 'missing', 'unknown']) assert.equal(vbCableNeedsEnable(state), false, state)
   assert.equal(vbCableState({ vb_cable: { state: 'disabled', installed: true } }), 'disabled')
 })
 
-test('VB-CABLE: the job of the host is read as it is reported, an older host has none', () => {
-  assert.deepEqual(vbCableJob(null), { running: false, step: '', failed: false, errorCode: '' })
-  assert.deepEqual(vbCableJob({ vb_cable: { state: 'missing' } }), { running: false, step: '', failed: false, errorCode: '' })
-  assert.deepEqual(vbCableJob({ vb_cable: { job: { action: 'install', step: 'verifying', running: true } } }), { running: true, step: 'verifying', failed: false, errorCode: '' })
-  assert.equal(vbCableJob({ vb_cable: { job: { step: 'something-new', running: true } } }).step, 'downloading')
-  const failed = vbCableJob({ vb_cable: { job: { action: 'enable', step: 'failed', running: false, error_code: 'VB_NEEDS_ADMIN' } } })
-  assert.equal(failed.failed, true)
-  assert.equal(failed.errorCode, 'VB_NEEDS_ADMIN')
+for (const version_valid of [true, false]) {
+  test(`external USB/IP is preserved with version_valid=${version_valid}`, () => {
+    const status = { installed: true, externally_managed: true, version_valid, vhci_residual: true, error_code: 'USBIP-EXEC-006' }
+    assert.equal(usbipTransportNeedsCleanup(status), false)
+    assert.equal(usbipTransportNeedsCleanup({ ...status, externally_managed: false }), true)
+  })
+}
+
+test('a working controller with older ones beside it is stale, anything else needs the full cleanup', () => {
+  const base = { installed: true, version_valid: true, vhci_residual: true }
+  assert.equal(usbipResidualIsStale({ ...base, residual_kind: 'stale' }), true)
+  assert.equal(usbipResidualIsStale({ ...base, residual_kind: 'broken' }), false)
+  assert.equal(usbipResidualIsStale({ ...base, residual_kind: '' }), false)
+  assert.equal(usbipResidualIsStale({ ...base, vhci_residual: false, residual_kind: 'stale' }), false)
+  // an installation the person manages is not uninstalled, but its duplicate controller may go (one stays live)
+  assert.equal(usbipResidualIsStale({ ...base, externally_managed: true, residual_kind: 'stale' }), true)
+  assert.equal(usbipTransportNeedsCleanup({ ...base, externally_managed: true, residual_kind: 'stale' }), false)
+  assert.equal(usbipResidualIsStale(), false)
+  // the stale state still counts as needing a cleanup for the summary that only asks "is there a problem"
+  assert.equal(usbipTransportNeedsCleanup({ ...base, residual_kind: 'stale' }), true)
 })
 
-test('VB-CABLE: a failed job is told by what a person can do about it', () => {
-  assert.equal(vbCableErrorKind('VB_DOWNLOAD_FAILED'), 'download')
-  assert.equal(vbCableErrorKind('VB_SIGNATURE_INVALID'), 'signature')
-  assert.equal(vbCableErrorKind('VB_SIGNER_UNEXPECTED'), 'signature')
-  assert.equal(vbCableErrorKind('VB_NEEDS_ADMIN'), 'admin')
-  assert.equal(vbCableErrorKind('VB_ENABLE_FAILED'), 'failed')
-  assert.equal(vbCableErrorKind(''), '')
+test('the replacement of an external USB/IP is offered only when the host says it may be replaced', () => {
+  assert.equal(usbipCanReplaceLegacy({ externally_managed: true, replaceable: true }), true)
+  assert.equal(usbipCanReplaceLegacy({ externally_managed: true, replaceable: false }), false)
+  assert.equal(usbipCanReplaceLegacy({ externally_managed: true }), false)
+  // the host's own package is never offered for replacement
+  assert.equal(usbipCanReplaceLegacy({ externally_managed: false, replaceable: true }), false)
+  assert.equal(usbipCanReplaceLegacy(), false)
 })

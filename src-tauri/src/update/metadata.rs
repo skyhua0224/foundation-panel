@@ -63,6 +63,9 @@ pub(crate) struct ReleaseCandidate {
 pub(crate) struct ReleaseCatalog {
     pub(crate) latest: Option<ReleaseCandidate>,
     pub(crate) pre_latest: Option<ReleaseCandidate>,
+    /// Why the prerelease side of the catalog is missing when a source that could have had it failed (an empty release-metadata
+    /// prerelease channel whose GitHub fallback answered 403 or did not answer): an empty `pre_latest` then means "unknown", not "none".
+    pub(crate) prerelease_unavailable: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -484,6 +487,7 @@ fn parse_metadata(body: &[u8]) -> Result<ReleaseCatalog, String> {
     Ok(ReleaseCatalog {
         latest: Some(latest),
         pre_latest,
+        prerelease_unavailable: None,
     })
 }
 
@@ -691,16 +695,23 @@ async fn fetch_github_catalog(channel: UpdateChannel) -> Result<ReleaseCatalog, 
     let (latest_result, list_result) = match (latest_future, list_future) {
         (Some(latest), Some(list)) => {
             let (latest, list) = tokio::join!(latest, list);
-            (latest.ok().and_then(candidate_from_github), list.ok())
+            (latest.ok().and_then(candidate_from_github), Some(list))
         }
         (Some(latest), None) => (latest.await.ok().and_then(candidate_from_github), None),
-        (None, Some(list)) => (None, list.await.ok()),
+        (None, Some(list)) => (None, Some(list.await)),
         (None, None) => (None, None),
     };
 
+    // The reason is kept: a release list that did not arrive (403 rate limit, no network) is "prerelease unknown", not "no prerelease".
+    let (list_result, list_error) = match list_result {
+        Some(Ok(releases)) => (Some(releases), None),
+        Some(Err(error)) => (None, Some(error)),
+        None => (None, None),
+    };
     let mut catalog = ReleaseCatalog {
         latest: latest_result,
         pre_latest: None,
+        prerelease_unavailable: list_error.clone(),
     };
     if let Some(releases) = list_result {
         for candidate in releases.into_iter().filter_map(candidate_from_github) {
@@ -725,7 +736,10 @@ async fn fetch_github_catalog(channel: UpdateChannel) -> Result<ReleaseCatalog, 
         return Err("GitHub 没有可用的稳定 Release".to_string());
     }
     if matches!(channel, UpdateChannel::PrereleaseOnly) && catalog.pre_latest.is_none() {
-        return Err("GitHub 没有可用的 prerelease Release".to_string());
+        return Err(match list_error {
+            Some(error) => format!("无法取得 GitHub 的 prerelease 信息: {error}"),
+            None => "GitHub 没有可用的 prerelease Release".to_string(),
+        });
     }
     if matches!(channel, UpdateChannel::StableAndPrerelease)
         && catalog.latest.is_none()
@@ -750,7 +764,12 @@ fn parse_cnb_download_links(html: &str) -> Result<(String, bool, Vec<(String, St
         .as_str()
         .to_string();
     let tag = decode_segment(&encoded_tag)?;
-    let release_window = &html[tag_match.start()..html.len().min(tag_match.end() + 4096)];
+    // 4096 bytes after the tag link; the cut must fall on a character boundary (the page is Chinese: a cut inside a character panicked the update check)
+    let mut window_end = html.len().min(tag_match.end() + 4096);
+    while !html.is_char_boundary(window_end) {
+        window_end -= 1;
+    }
+    let release_window = &html[tag_match.start()..window_end];
     let prerelease_re = Regex::new(r#"(?is)>\s*(?:pre-release|prerelease|预发布)\s*<"#)
         .map_err(|error| error.to_string())?;
     let is_prerelease = prerelease_re.is_match(release_window);
@@ -923,6 +942,7 @@ async fn fetch_cnb_catalog() -> Result<ReleaseCatalog, String> {
     Ok(ReleaseCatalog {
         latest: (!is_prerelease).then_some(candidate.clone()),
         pre_latest: is_prerelease.then_some(candidate),
+        prerelease_unavailable: None,
     })
 }
 
@@ -942,7 +962,8 @@ async fn ensure_channel_candidates(
         match fetch_github_catalog(UpdateChannel::PrereleaseOnly).await {
             Ok(github_catalog) => catalog.pre_latest = github_catalog.pre_latest,
             Err(error) if matches!(channel, UpdateChannel::PrereleaseOnly) => return Err(error),
-            Err(_) => {}
+            // one request, no retry: the anonymous GitHub limit is 60 an hour per address
+            Err(error) => catalog.prerelease_unavailable = Some(error),
         }
     }
 
@@ -973,6 +994,51 @@ pub(crate) async fn resolve_catalog(channel: UpdateChannel) -> Result<ReleaseCat
     }
 
     fetch_github_catalog(channel).await
+}
+
+/// What the person has to be told when a check finds nothing newer, beyond "up to date".
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum UpToDateNote {
+    /// The prerelease information could not be fetched (the release-metadata prerelease channel was empty and the GitHub
+    /// fallback failed): nothing newer was found, but a prerelease may exist.
+    PrereleaseUnavailable,
+    /// The installed version is a prerelease and no newer version exists.
+    InstalledPrereleaseNoNewer,
+}
+
+impl UpToDateNote {
+    /// The word the panel renders as a sentence (UpdateInfo.latest_note).
+    pub(crate) fn code(self) -> &'static str {
+        match self {
+            UpToDateNote::PrereleaseUnavailable => "prerelease_unavailable",
+            UpToDateNote::InstalledPrereleaseNoNewer => "installed_prerelease_no_newer",
+        }
+    }
+}
+
+/// The installed version is a prerelease when the catalog lists exactly that version as one.
+fn installed_is_prerelease(current_version: &str, catalog: &ReleaseCatalog) -> bool {
+    [&catalog.latest, &catalog.pre_latest]
+        .into_iter()
+        .flatten()
+        .any(|candidate| candidate.prerelease
+                && crate::version_compare::version_key(current_version).is_some_and(|installed| {
+                    crate::version_compare::version_key(&candidate.version) == Some(installed)
+                }))
+}
+
+/// The note for a check that found nothing newer. An unreachable prerelease side comes first: "up to date" would be a claim the
+/// check could not make.
+pub(crate) fn up_to_date_note(
+    current_version: &str,
+    catalog: &ReleaseCatalog,
+    channel: UpdateChannel,
+) -> Option<UpToDateNote> {
+    let sees_prereleases = !matches!(channel, UpdateChannel::StableOnly);
+    if sees_prereleases && catalog.prerelease_unavailable.is_some() {
+        return Some(UpToDateNote::PrereleaseUnavailable);
+    }
+    installed_is_prerelease(current_version, catalog).then_some(UpToDateNote::InstalledPrereleaseNoNewer)
 }
 
 pub(crate) fn select_candidate(
@@ -1095,6 +1161,23 @@ mod tests {
     }
 
     #[test]
+    fn the_release_window_is_cut_on_a_character_boundary() {
+        // the 4096-byte window after the tag link ends inside a three-byte character
+        let filler: String = "杂".repeat(1400);
+        let html = format!(
+            r#"<a href="/AlkaidLab/foundation-sunshine-release/-/releases/tag/v2026.1001.112543.%E6%9D%82%E9%B1%BC">latest</a>{filler}<a href="/AlkaidLab/foundation-sunshine-release/-/releases/download/v2026.1001.112543.%E6%9D%82%E9%B1%BC/Sunshine.v2026.1001.WindowsInstaller.exe">download</a>"#
+        );
+        let (_, is_prerelease, assets) = parse_cnb_download_links(&html).unwrap();
+        assert!(!is_prerelease);
+        assert_eq!(assets.len(), 1);
+        // every offset of the window end, so one of them falls inside a character whatever the prefix length is
+        for pad in 0..4 {
+            let html = format!("{}{html}", " ".repeat(pad));
+            assert!(parse_cnb_download_links(&html).is_ok(), "pad {pad}");
+        }
+    }
+
+    #[test]
     fn parses_cnb_prerelease_label_in_latest_release_card() {
         let html = r#"
           <a href="/AlkaidLab/foundation-sunshine-release/-/releases/tag/v2026.1001.112543.%E6%9D%82%E9%B1%BC">latest</a>
@@ -1161,5 +1244,81 @@ mod tests {
             compare_candidates(&release, &candidate("manual-latest")),
             Ordering::Greater
         );
+    }
+
+    fn release(version: &str, prerelease: bool) -> ReleaseCandidate {
+        ReleaseCandidate {
+            version: version.to_string(),
+            prerelease,
+            github_release_id: None,
+            published_at: None,
+            release_notes: String::new(),
+            release_page: String::new(),
+            assets: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn an_unreachable_prerelease_side_is_never_called_up_to_date() {
+        // the release-metadata prerelease channel was empty and the GitHub fallback answered 403
+        let catalog = ReleaseCatalog {
+            latest: Some(release("v2026.1112.25657.杂鱼", false)),
+            pre_latest: None,
+            prerelease_unavailable: Some("HTTP 状态码 403".to_string()),
+        };
+        for channel in [UpdateChannel::StableAndPrerelease, UpdateChannel::PrereleaseOnly] {
+            assert_eq!(
+                up_to_date_note("2026.1112.025657", &catalog, channel),
+                Some(UpToDateNote::PrereleaseUnavailable)
+            );
+        }
+        // a person on the stable channel never asked for prereleases: the failed side does not matter
+        assert_eq!(up_to_date_note("2026.1112.025657", &catalog, UpdateChannel::StableOnly), None);
+    }
+
+    #[test]
+    fn a_reachable_empty_prerelease_side_is_a_plain_up_to_date() {
+        let catalog = ReleaseCatalog {
+            latest: Some(release("v2026.1112.25657.杂鱼", false)),
+            pre_latest: None,
+            prerelease_unavailable: None,
+        };
+        assert_eq!(up_to_date_note("2026.1112.025657", &catalog, UpdateChannel::StableAndPrerelease), None);
+    }
+
+    #[test]
+    fn an_installed_prerelease_with_nothing_newer_is_said_plainly() {
+        let catalog = ReleaseCatalog {
+            latest: Some(release("v2026.1101.10000.杂鱼", false)),
+            pre_latest: Some(release("v2026.1112.25657.杂鱼", true)),
+            prerelease_unavailable: None,
+        };
+        // padded or not, with or without the suffix: the same version
+        for installed in ["2026.1112.025657", "v2026.1112.25657.杂鱼"] {
+            assert_eq!(
+                up_to_date_note(installed, &catalog, UpdateChannel::StableAndPrerelease),
+                Some(UpToDateNote::InstalledPrereleaseNoNewer),
+                "{installed}"
+            );
+        }
+        // a stable install is not a prerelease
+        assert_eq!(up_to_date_note("2026.1101.010000", &catalog, UpdateChannel::StableAndPrerelease), None);
+        // an unreadable installed version is not guessed to be one
+        assert_eq!(up_to_date_note("Unknown", &catalog, UpdateChannel::StableAndPrerelease), None);
+    }
+
+    #[test]
+    fn the_unreachable_side_outranks_the_prerelease_note_and_notes_have_stable_codes() {
+        let catalog = ReleaseCatalog {
+            latest: None,
+            pre_latest: Some(release("v2026.1112.25657.杂鱼", true)),
+            prerelease_unavailable: Some("请求超时".to_string()),
+        };
+        assert_eq!(
+            up_to_date_note("2026.1112.025657", &catalog, UpdateChannel::StableAndPrerelease),
+            Some(UpToDateNote::PrereleaseUnavailable)
+        );
+        assert_eq!(UpToDateNote::PrereleaseUnavailable.code(), "prerelease_unavailable");
+        assert_eq!(UpToDateNote::InstalledPrereleaseNoNewer.code(), "installed_prerelease_no_newer");
     }
 }

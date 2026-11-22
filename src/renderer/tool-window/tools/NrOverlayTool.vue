@@ -18,11 +18,11 @@
           </select>
           <div class="switch-row">
             <span>{{ text.enhancement }}</span>
-            <button class="switch" role="switch" :aria-checked="effectActive" :aria-label="text.enhancement" :class="{ on: effectActive }" :disabled="!canToggle" @click="toggle"><span /></button>
+            <button class="switch" role="switch" :aria-checked="globalEnabled" :aria-label="text.enhancement" :class="{ on: globalEnabled }" :disabled="!online || !nrInstalled || busy" @click="toggle"><span /></button>
           </div>
-          <div class="live-state" aria-live="polite"><span class="dot" :class="state" />{{ text.states[state] }}</div>
+          <div class="live-state" aria-live="polite"><span class="dot" :class="state" />{{ nrStatusLabel(text, state, globalEnabled) }}</div>
           <p v-if="state === 'blocked'" class="notice">{{ pipeline?.backend !== 'none' ? text.hdrBusy : text.unsupported }}</p>
-          <p v-else-if="state === 'degraded'" class="notice">{{ text.fallback }}<br><small>{{ pipeline?.nr_reason }}</small></p>
+          <p v-else-if="state === 'degraded'" class="notice">{{ degradedReason.main }}<small v-if="degradedReason.detail"><br>{{ degradedReason.detail }}</small></p>
           <p v-else-if="['warming_up', 'stopping', 'scaling'].includes(state)" class="notice">{{ text.wait }}</p>
           <p v-if="error" class="notice error">{{ error }} <button @click="refresh">{{ text.retry }}</button></p>
           <div v-if="supportsControls" class="scale-control">
@@ -91,7 +91,7 @@ import { listen } from '@tauri-apps/api/event'
 import { currentMonitor, getCurrentWindow } from '@tauri-apps/api/window'
 import { useI18n } from '../../desktop/i18n/index.js'
 import { nrShortcutLabel, enhancementControlsText, enhancementError } from '../../composables/enhancementControls.js'
-import { nrOverlayText } from '../../composables/nrOverlayMessages.js'
+import { nrDegradedReason, nrOverlayText, nrStatusLabel } from '../../composables/nrOverlayMessages.js'
 import { nrOverlayState, overlayOpacity, nrProcessingSize, nrPipelines, nrOutputLabel } from '../../composables/nrOverlayState.js'
 
 import { useTouchWindowDrag } from '../../composables/useTouchWindowDrag.js'
@@ -117,7 +117,8 @@ function applyPreferences(status) {
   if (status.target !== null && status.target !== undefined && status.target !== selectedId.value) { selectedId.value = status.target }
 }
 const surface = ref(null)
-const pipelines = ref([])
+const pipelines = ref([]), hasStreams = ref(false)
+let switchRevision = 0
 const selectedId = ref(null)
 const online = ref(false)
 const busy = ref(false)
@@ -137,7 +138,8 @@ watch(selectedId, id => {
   })
 })
 const pipeline = computed(() => pipelines.value.find(item => item.id === selectedId.value))
-const state = computed(() => nrOverlayState(pipeline.value, online.value))
+const state = computed(() => nrOverlayState(pipeline.value, online.value, hasStreams.value, pipelines.value.length))
+const degradedReason = computed(() => nrDegradedReason(pipeline.value, text.value))
 const compactLabel = computed(() => state.value === 'active' ? `NR · ${pipeline.value?.nr_scale_percent ?? 100}%` : text.value.states[state.value])
 const settled = ref(false)
 let settleTimer
@@ -146,7 +148,7 @@ watch(state, (next, previous) => {
   settled.value = ['active', 'disabled'].includes(next) && ['warming_up', 'stopping', 'scaling'].includes(previous)
   if (settled.value) settleTimer = setTimeout(() => { settled.value = false }, 1200)
 })
-const effectActive = computed(() => online.value && pipeline.value?.nr_state === 'active')
+const globalEnabled = ref(false), nrInstalled = ref(false)
 const canToggle = computed(() => online.value && pipeline.value?.nr_toggle_supported && !busy.value && !['warming_up', 'stopping', 'scaling'].includes(state.value))
 const supportsControls = computed(() => pipeline.value?.nr_live_controls_version >= 2)
 const draftScale = ref(100), draftIntensity = ref(100), draftSkin = ref(0)
@@ -183,15 +185,19 @@ async function setOption(patch) {
 }
 async function resetDefaults() {
   if (!canToggle.value) return
-  await sendRequest(false, { scalePercent: 100, intensity: 1, style: 0, skinStructureStrength: 0, autoMask: false, uiCorrection: false, motionQuality: 0 })
+  await sendRequest(pipeline.value.nr_requested_enabled, { scalePercent: 100, intensity: 1, style: 0, skinStructureStrength: 0, autoMask: false, uiCorrection: false, motionQuality: 0 })
 }
 let disposed = false, refreshing = false, timer, observer, unlisten = []
 async function refresh() {
   if (refreshing || disposed) return
   refreshing = true
   try {
+    const revision = switchRevision
     const result = await invoke('nr_live_status')
     if (disposed) return
+    hasStreams.value = result?.has_streams === true
+    if (!busy.value && revision === switchRevision) globalEnabled.value = result?.nr_enabled === true
+    nrInstalled.value = result?.nr_installed === true
     const next = nrPipelines(result?.pipelines)
     if (selectedId.value !== null && !next.some(item => item.id === selectedId.value)) {
       selectedId.value = null
@@ -207,8 +213,14 @@ async function refresh() {
 }
 async function poll() { await refresh(); if (!disposed) timer = setTimeout(poll, 500) }
 async function toggle() {
-  if (!canToggle.value) return
-  await sendRequest(!pipeline.value.nr_requested_enabled)
+  if (!online.value || busy.value || !nrInstalled.value) return
+  busy.value = true
+  ++switchRevision
+  actionError.value = ''
+  errorCode.value = ''
+  try { globalEnabled.value = await invoke('set_global_nr_enabled', { enabled: !globalEnabled.value }) }
+  catch (e) { actionError.value = String(e) }
+  finally { ++switchRevision; busy.value = false }
 }
 async function sendRequest(enabled, patch = {}) {
   const id = pipeline.value.id
@@ -250,7 +262,6 @@ onMounted(async () => {
   for (const [name, handler] of [
     ['nr-settings-changed', e => applyPreferences(e.payload)],
     ['nr-action-error', e => { actionError.value = enhancementError(enhancementControlsText(locale.value), e.payload) }],
-    ['nr-save-error', e => { if (e.payload === selectedId.value) { saveState.value = ''; actionError.value = text.value.saveFailed } }],
   ]) {
     try { const stop = await listen(name, handler); if (disposed) stop(); else unlisten.push(stop) } catch {}
   }

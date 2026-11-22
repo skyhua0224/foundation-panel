@@ -75,7 +75,7 @@ pub(super) async fn run_usbip(_arguments: Vec<String>) -> Result<std::process::O
     Err("USBIP-SETUP-004: USB/IP passthrough is only supported on Windows".to_string())
 }
 
-async fn read_bounded_output<R>(mut reader: R, limit: usize) -> Result<Vec<u8>, String>
+pub(super) async fn read_bounded_output<R>(mut reader: R, limit: usize) -> Result<Vec<u8>, String>
 where
     R: tokio::io::AsyncRead + Unpin,
 {

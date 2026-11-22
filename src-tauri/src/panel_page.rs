@@ -3,7 +3,7 @@
 //! renderer to take it, and the renderer also takes it once its listeners are registered (SunshineFrame on mount). Taking empties the slot, so a
 //! request is delivered exactly once whichever of the two comes first; a newer request replaces one that was not taken yet.
 use std::sync::Mutex;
-use tauri::{Emitter, Runtime, WebviewWindow};
+use tauri::{AppHandle, Emitter, Manager, Runtime};
 
 pub(crate) struct PendingPage(Mutex<Option<String>>);
 impl PendingPage {
@@ -19,11 +19,13 @@ impl PendingPage {
 }
 static PENDING: PendingPage = PendingPage::new();
 
-/// Ask the main window for a page (renderer composables/panelParts.js PANEL_PAGES); call after the window was shown or created.
-pub fn open_page<R: Runtime>(window: &WebviewWindow<R>, page: &str) {
+/// Queue a page for the renderer and ping the main window if it is already present.
+pub fn open_page<R: Runtime>(app: &AppHandle<R>, page: &str) {
     PENDING.put(page);
     log::info!("panel page requested: {page}");
-    let _ = window.emit("panel-page-pending", ());
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.emit("panel-page-pending", ());
+    }
 }
 
 /// The renderer takes the waiting page (none when it was taken already).

@@ -3,7 +3,7 @@ import '../../../src-tauri/inject-traces.js'  // no trace of a browser: drag gho
 // name, stage, notice and hero) and the end; this draws MLaunchSplash from it. A page that loads after the first frame asks for the current one.
 import { createApp, defineComponent, h, nextTick, onBeforeUnmount, onMounted, ref } from 'vue'
 import 'foundation-ui/all.css'
-import { MLaunchSplash } from 'foundation-ui/vue'
+import MLaunchSplash from 'foundation-ui/vue/MLaunchSplash.vue'  // the one component, not the package's index: the page loads in the tray state
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 

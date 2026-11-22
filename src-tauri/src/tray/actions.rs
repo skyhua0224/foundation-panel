@@ -9,14 +9,25 @@ const BILIBILI_URL: &str = "https://space.bilibili.com/3690974838524514";
 const STAR_URL: &str = "https://github.com/AlkaidLab/foundation-sunshine";
 
 fn site_url(locale: &str) -> &'static str {
-    if locale == "zh" {
+    if locale.to_ascii_lowercase().starts_with("zh") {
         "https://www.alkaidlab.cn/"
     } else {
         "https://www.alkaidlab.com/"
     }
 }
 
+fn sponsor_site_url(locale: &str) -> &'static str {
+    if locale.to_ascii_lowercase().starts_with("zh") {
+        "https://www.alkaidlab.cn/#sponsors"
+    } else {
+        "https://www.alkaidlab.com/en/#sponsors"
+    }
+}
+
 pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id: &str) {
+    if crate::test_isolation::active() && menu_id != "open_main_panel" {
+        return;
+    }
     let s = get_tray_strings();
     match menu_id {
         "open_main_panel" => open_main_panel_from_tray(app, "menu"),
@@ -90,6 +101,8 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
             info!("ℹ️ 托盘菜单：显示关于对话框");
             let _ = windows::open_about_window(app);
         }
+        // 反馈问题…: the main panel opens the one feedback panel (the same panel every other entry opens)
+        "feedback" => open_main_panel_and_emit(app, "feedback", "open-feedback", serde_json::json!({})),
         "shutdown" => shutdown_sunshine(app),
         "lang_zh" => switch_tray_locale(app, "zh"),
         "lang_en" => switch_tray_locale(app, "en"),
@@ -108,6 +121,8 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
         "sponsor_qiin" => utils::open_url_in_browser("https://www.ifdian.net/a/qiin2333"),
         "sponsor_yundi339" => utils::open_url_in_browser("https://www.ifdian.net/a/Yundi339"),
         "sponsor_skyhua" => utils::open_url_in_browser("https://ifdian.net/a/skyhua"),
+        "sponsor_wechat" => utils::open_url_in_browser(sponsor_site_url(&get_current_locale())),
+        "sponsor_github" => utils::open_url_in_browser("https://github.com/sponsors/qiin2333"),
         "restart" => restart_sunshine(app),
         // the native menu's stepped stand-ins for the menus' bitrate and scale sliders (menu.rs)
         _ if popup_input::native_slider_event(app, menu_id) => {}
@@ -117,8 +132,18 @@ pub fn handle_tray_menu_event<R: Runtime + 'static>(app: &AppHandle<R>, menu_id:
 
 /// Open the main panel and tell it to show the connect dialog on a tab (`pair` or `install`); the panel gets the event when it is ready, also when it had to be created first.
 fn open_connect_dialog<R: Runtime>(app: &AppHandle<R>, tab: &str) {
-    open_main_panel_from_tray(app, "connect");
-    emit_to_main_when_ready(app, "open-connect", serde_json::json!({ "tab": tab }));
+    open_main_panel_and_emit(app, "connect", "open-connect", serde_json::json!({ "tab": tab }));
+}
+
+/// Opens the main panel and sends it an event. While the old main window is still closing, both wait for it to be gone: the event would otherwise go to the closing window (or be dropped) and the new panel would never get it.
+fn open_main_panel_and_emit<R: Runtime>(app: &AppHandle<R>, source: &str, event: &'static str, payload: serde_json::Value) {
+    if windows::closing::is_closing("main") {
+        let source = source.to_owned();
+        windows::closing::after_closed(app, "main", move |app| open_main_panel_and_emit(&app, &source, event, payload));
+        return;
+    }
+    open_main_panel_from_tray(app, source);
+    emit_to_main_when_ready(app, event, payload);
 }
 
 /// 打开 VDD 设置
@@ -423,6 +448,7 @@ fn shutdown_sunshine<R: Runtime>(app: &AppHandle<R>) {
             tauri::async_runtime::spawn(async move {
                 match sunshine::post_tray_action("shutdown", None).await {
                     Ok(response) if response.status => {
+                        crate::exit_state::begin("tray quit");
                         shutdown_handle.exit(crate::gui_agent_exit::GUI_AGENT_DELIBERATE_QUIT_EXIT_CODE)
                     }
                     Ok(response) => {
@@ -496,17 +522,8 @@ fn open_main_window_view<R: Runtime + 'static>(
         windows::closing::after_closed(app, "main", move |app| open_main_window_view(&app, event, description));
         return;
     }
-    if app.get_webview_window("main").is_none()
-        && let Err(e) = windows::create_main_window(app)
-    {
-        error!("Failed to create main window for {}: {}", description, e);
-        return;
-    }
-
-    if let Some(window) = app.get_webview_window("main") {
-        windows::show_and_activate_window(&window);
-        emit_to_main_when_ready(app, event, serde_json::Value::Null);
-    }
+    open_main_panel_from_tray(app, description);
+    emit_to_main_when_ready(app, event, serde_json::Value::Null);
 }
 
 /// 更新 Sunshine 用户模式状态
@@ -585,17 +602,8 @@ fn toggle_toolbar<R: Runtime>(app: &AppHandle<R>) {
 /// 检查更新（托盘菜单触发，`manual = true`）
 fn check_for_updates<R: Runtime>(app: &AppHandle<R>) {
     info!("🔄 托盘菜单：检查更新");
-    if app.get_webview_window("main").is_none()
-        && let Err(e) = windows::create_main_window(app)
-    {
-        error!("Failed to create main window for update check: {}", e);
-        return;
-    }
+    open_main_panel_from_tray(app, "update check");
     let app_handle = app.clone();
-
-    if let Some(window) = app.get_webview_window("main") {
-        windows::show_and_activate_window(&window);
-    }
 
     let include_prerelease = update::get_include_prerelease(app);
     tauri::async_runtime::spawn(async move {
@@ -631,6 +639,17 @@ fn check_for_updates<R: Runtime>(app: &AppHandle<R>) {
     });
 }
 
+#[cfg(target_os = "windows")]
+fn describe_auto_start_error(error: &str, strings: &TrayStrings) -> String {
+    if error.starts_with("SVC-UAC-001:") {
+        strings.auto_start_uac_canceled.to_string()
+    } else if error.starts_with("SVC-UAC-003:") {
+        strings.auto_start_untrusted_dir.to_string()
+    } else {
+        strings.auto_start_failed.replace("{error}", error)
+    }
+}
+
 /// The tray's start-up item. With SunshineService it sets the service start
 /// type through the same back end as 系统 › Sunshine 服务; turning it off
 /// (Manual) first asks for confirmation that the host will not be reachable
@@ -639,11 +658,16 @@ fn check_for_updates<R: Runtime>(app: &AppHandle<R>) {
 fn toggle_auto_start<R: Runtime + 'static>(app: &AppHandle<R>) {
     let enabled = !desktop_settings::is_combined_auto_start_enabled();
     refresh_menu(app);
-    let needs_confirmation = !enabled
-        && matches!(
-            desktop_settings::startup_owner(),
-            Ok(desktop_settings::StartupOwner::Service(_))
-        );
+    let owner = match desktop_settings::startup_owner() {
+        Ok(owner) => owner,
+        Err(error) => {
+            error!("Failed to inspect start-up owner: {}", error);
+            emit_message(app, "error", &describe_auto_start_error(&error, get_tray_strings()));
+            refresh_menu(app);
+            return;
+        }
+    };
+    let needs_confirmation = !enabled && matches!(owner, desktop_settings::StartupOwner::Service(_));
     if needs_confirmation {
         use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
         let strings = get_tray_strings();
@@ -682,11 +706,8 @@ fn apply_auto_start<R: Runtime + 'static>(app: &AppHandle<R>, enabled: bool, ack
                 Ok(()) => info!("Start-up changed from the tray: {}", enabled),
                 Err(error) => {
                     error!("Failed to update start-up: {}", error);
-                    emit_message(
-                        &menu_handle,
-                        "error",
-                        &format!("Failed to update auto-start: {error}"),
-                    );
+                    let message = describe_auto_start_error(&error, get_tray_strings());
+                    emit_message(&menu_handle, "error", &message);
                 }
             }
             refresh_menu(&menu_handle);
@@ -723,5 +744,62 @@ pub fn cleanup_prevent_sleep() {
             Ok(()) => info!("✅ 已清理防止睡眠状态"),
             Err(e) => error!("❌ 清理防止睡眠状态失败: {}", e),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    const SRC: &str = include_str!("actions.rs");
+
+    #[test]
+    fn sponsor_site_follows_the_current_language() {
+        assert_eq!(super::sponsor_site_url("zh-CN"), "https://www.alkaidlab.cn/#sponsors");
+        assert_eq!(super::sponsor_site_url("zh-TW"), "https://www.alkaidlab.cn/#sponsors");
+        assert_eq!(super::sponsor_site_url("en"), "https://www.alkaidlab.com/en/#sponsors");
+    }
+
+    /// The body of a function of this file (from its signature to the next top-level item).
+    fn body_of<'a>(name: &str) -> &'a str {
+        let at = SRC.find(&format!("fn {name}<")).unwrap_or_else(|| panic!("fn {name} not found"));
+        let rest = &SRC[at..];
+        let end = rest[3..].find("\nfn ").or_else(|| rest[3..].find("\n/// ")).map_or(rest.len(), |e| e + 3);
+        &rest[..end]
+    }
+
+    #[test]
+    fn an_event_for_the_main_panel_waits_for_the_closing_window_before_it_is_sent() {
+        let body = body_of("open_main_panel_and_emit");
+        let closing = body.find("is_closing(\"main\")").expect("the helper looks at the closing window");
+        let wait = body.find("after_closed(").expect("it waits for the old window to be gone");
+        let emit = body.rfind("emit_to_main_when_ready(").expect("and then sends the event");
+        assert!(closing < wait && wait < emit, "check, wait, then send: an event sent first would go to the window that is closing");
+        assert!(body.contains("move |app| open_main_panel_and_emit(&app"), "the waiting closure runs the whole open-and-send again, not only the open");
+    }
+
+    #[test]
+    fn the_feedback_and_connect_entries_use_the_helper_and_never_send_the_event_themselves() {
+        let feedback = SRC.find("\"feedback\" =>").expect("the feedback arm");
+        let arm = &SRC[feedback..SRC[feedback..].find("\n        \"shutdown\"").map_or(SRC.len(), |e| feedback + e)];
+        assert!(arm.contains("open_main_panel_and_emit(app, \"feedback\", \"open-feedback\""), "{arm}");
+        assert!(!arm.contains("emit_to_main_when_ready"));
+        let connect = body_of("open_connect_dialog");
+        assert!(connect.contains("open_main_panel_and_emit(app, \"connect\", \"open-connect\""));
+        assert!(!connect.contains("emit_to_main_when_ready"));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn auto_start_errors_translate_uac_and_untrusted_directory_causes() {
+        use crate::tray::{EN_STRINGS, ZH_STRINGS};
+        assert_eq!(
+            super::describe_auto_start_error("SVC-UAC-001: canceled", &ZH_STRINGS),
+            ZH_STRINGS.auto_start_uac_canceled
+        );
+        assert_eq!(
+            super::describe_auto_start_error("SVC-UAC-003: writable dir", &ZH_STRINGS),
+            ZH_STRINGS.auto_start_untrusted_dir
+        );
+        let other = super::describe_auto_start_error("SVC-SCM-002: denied", &EN_STRINGS);
+        assert!(other.contains("SVC-SCM-002: denied"), "{other}");
     }
 }

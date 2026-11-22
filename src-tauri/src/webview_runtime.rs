@@ -69,6 +69,12 @@ fn version_is_installed(value: &str) -> bool {
 
 #[cfg(target_os = "windows")]
 fn runtime_is_available() -> bool {
+    installed_version().is_some()
+}
+
+/// The version of the installed WebView2 Runtime (the `pv` value the Evergreen runtime registers), when there is one.
+#[cfg(target_os = "windows")]
+pub(crate) fn installed_version() -> Option<String> {
     use winreg::RegKey;
     use winreg::enums::{HKEY_CURRENT_USER, HKEY_LOCAL_MACHINE};
 
@@ -85,17 +91,13 @@ fn runtime_is_available() -> bool {
         ),
     ];
 
-    paths.iter().any(|path| {
-        machine
-            .open_subkey(path)
-            .ok()
-            .and_then(|key| key.get_value::<String, _>("pv").ok())
-            .is_some_and(|version| version_is_installed(&version))
-            || user
-                .open_subkey(path)
+    paths.iter().find_map(|path| {
+        [&machine, &user].into_iter().find_map(|root| {
+            root.open_subkey(path)
                 .ok()
                 .and_then(|key| key.get_value::<String, _>("pv").ok())
-                .is_some_and(|version| version_is_installed(&version))
+                .filter(|version| version_is_installed(version))
+        })
     })
 }
 
@@ -242,6 +244,87 @@ fn show_missing_runtime_dialog() {
     }
 }
 
+/// The words of the dialog that tells the person the window cannot be shown (title, instruction, content, "open the log folder", "close").
+pub(crate) fn window_failed_text(language: &str) -> [&'static str; 5] {
+    match language {
+        "zh" => [
+            "控制面板窗口无法显示",
+            "控制面板的窗口反复崩溃，已停止自动重试",
+            "已重新加载页面，并改用软件渲染，窗口仍然崩溃。请把日志文件 panel.log、Windows 版本（Win+R 输入 winver）和显卡型号发给我们。",
+            "打开日志文件夹",
+            "关闭",
+        ],
+        "zh_TW" => [
+            "控制面板視窗無法顯示",
+            "控制面板的視窗反覆當機，已停止自動重試",
+            "已重新載入頁面，並改用軟體轉譯，視窗仍然當機。請把記錄檔 panel.log、Windows 版本（Win+R 輸入 winver）和顯示卡型號傳給我們。",
+            "開啟記錄檔資料夾",
+            "關閉",
+        ],
+        "ja" => [
+            "コントロールパネルのウィンドウを表示できません",
+            "ウィンドウが繰り返しクラッシュしたため、自動再試行を止めました",
+            "ページを再読み込みし、ソフトウェアレンダリングに切り替えても改善しませんでした。ログファイル panel.log、Windows のバージョン（Win+R で winver）、GPU の型番をお送りください。",
+            "ログフォルダーを開く",
+            "閉じる",
+        ],
+        _ => [
+            "The control panel window cannot be shown",
+            "The control panel window keeps crashing; automatic retries have stopped",
+            "The page was reloaded and software rendering was tried, and the window still crashes. Please send us the log file panel.log, your Windows version (Win+R, winver) and your graphics card model.",
+            "Open the log folder",
+            "Close",
+        ],
+    }
+}
+
+/// Tells the person that the window cannot be shown, from another thread (the window's own thread is the one in trouble).
+#[cfg(target_os = "windows")]
+pub(crate) fn show_window_failed_dialog() {
+    let _ = std::thread::Builder::new()
+        .name("window-failed-dialog".into())
+        .spawn(|| {
+            use windows::Win32::Globalization::GetUserDefaultUILanguage;
+            use windows::Win32::UI::Controls::{
+                TASKDIALOG_BUTTON, TASKDIALOGCONFIG, TDF_ALLOW_DIALOG_CANCELLATION, TaskDialogIndirect,
+            };
+            use windows::core::PCWSTR;
+
+            const LOGS_BUTTON: i32 = 1001;
+            const CLOSE_BUTTON: i32 = 1002;
+            fn wide(value: &str) -> Vec<u16> {
+                value.encode_utf16().chain(std::iter::once(0)).collect()
+            }
+
+            let [title, instruction, content, logs, close] =
+                window_failed_text(webview2_dialog_language(unsafe { GetUserDefaultUILanguage() }));
+            let (title, instruction, content) = (wide(title), wide(instruction), wide(content));
+            let (logs, close) = (wide(logs), wide(close));
+            let buttons = [
+                TASKDIALOG_BUTTON { nButtonID: LOGS_BUTTON, pszButtonText: PCWSTR(logs.as_ptr()) },
+                TASKDIALOG_BUTTON { nButtonID: CLOSE_BUTTON, pszButtonText: PCWSTR(close.as_ptr()) },
+            ];
+            let config = TASKDIALOGCONFIG {
+                cbSize: std::mem::size_of::<TASKDIALOGCONFIG>() as u32,
+                dwFlags: TDF_ALLOW_DIALOG_CANCELLATION,
+                pszWindowTitle: PCWSTR(title.as_ptr()),
+                pszMainInstruction: PCWSTR(instruction.as_ptr()),
+                pszContent: PCWSTR(content.as_ptr()),
+                cButtons: buttons.len() as u32,
+                pButtons: buttons.as_ptr(),
+                nDefaultButton: LOGS_BUTTON,
+                ..Default::default()
+            };
+            let mut selected = 0;
+            let _ = unsafe { TaskDialogIndirect(&config, Some(&mut selected), None, None) };
+            if selected == LOGS_BUTTON {
+                if let Some(directory) = crate::logger::panel_log_path().parent() {
+                    let _ = std::process::Command::new("explorer.exe").arg(directory).spawn();
+                }
+            }
+        });
+}
+
 #[cfg(test)]
 mod tests {
     #[cfg(target_os = "windows")]
@@ -254,6 +337,15 @@ mod tests {
         assert!(!version_is_installed(""));
         assert!(!version_is_installed("not-a-version"));
         assert!(version_is_installed("128.0.2739.42"));
+    }
+
+    #[test]
+    fn the_window_failed_dialog_has_every_line_in_every_language() {
+        for language in ["zh", "zh_TW", "ja", "en", "anything else"] {
+            let text = super::window_failed_text(language);
+            assert!(text.iter().all(|line| !line.is_empty()), "{language}");
+        }
+        assert!(super::window_failed_text("en")[2].contains("panel.log"));
     }
 
     #[test]

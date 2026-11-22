@@ -24,7 +24,7 @@ export function useInputDrivers(t) {
         }).catch(() => { probeFailed.vigem = true }),
         mouse.loadVmouseStatus(),
       ])
-      probeFailed.vmouse = !mouse.vmouseStatusKnown.value
+      probeFailed.vmouse = mouse.vmouseSupported.value && !mouse.vmouseStatusKnown.value
     } finally {
       initialized.value = true
       refreshing.value = false

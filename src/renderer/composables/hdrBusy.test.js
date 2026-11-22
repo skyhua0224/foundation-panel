@@ -16,7 +16,7 @@ test('a busy host is asked again with a backoff, reads and writes, before any er
 
 test('the page says 「正在保存…」 and tries once more; it does not drop the save', () => {
   const manager = read('./useEnhancementManager.js')
-  assert.match(manager, /includes\('hdr_save_busy'\)\) \{\s*ElMessage\.info\(text\.value\.saveBusy \|\| '正在保存…'\)\s*await new Promise\(\(resolve\) => setTimeout\(resolve, 1500\)\)\s*result = await api\.setEnabled\(enabled\)/)
+  assert.match(manager, /includes\('hdr_save_busy'\)\) \{\s*ElMessage\.info\(\{ message: text\.value\.saveBusy \|\| '正在保存…', id: 'enhancement-save' \}\)\s*await new Promise\(\(resolve\) => setTimeout\(resolve, 1500\)\)\s*result = await api\.setEnabled\(enabled\)/)
   const controls = read('./enhancementControls.js')
   assert.match(controls, /hdr_save_busy: '正在保存…'/); assert.match(controls, /hdr_save_busy: 'Saving…'/)
 })

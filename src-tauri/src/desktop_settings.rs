@@ -52,6 +52,8 @@ pub struct DesktopSettings {
     pub log_level: String,
     pub toolbar_shortcut_enabled: bool,
     pub text_context_enabled: bool,
+    /// A change of the monitor's scale gives the window its size in DIPs back (a virtual display that follows the client's resolution changes the scale; the window kept its pixels and shrank in DIPs). Off by default.
+    pub keep_window_size_on_dpi_change: bool,
 }
 
 impl Default for DesktopSettings {
@@ -68,6 +70,7 @@ impl Default for DesktopSettings {
             log_level: "info".to_string(),
             toolbar_shortcut_enabled: true,
             text_context_enabled: true,
+            keep_window_size_on_dpi_change: false,
         }
     }
 }
@@ -94,7 +97,7 @@ pub struct ToolbarShortcutStatus {
 }
 
 fn settings_dir() -> Result<PathBuf, String> {
-    dirs::config_dir()
+    crate::test_isolation::config_dir()
         .map(|dir| dir.join("Sunshine GUI"))
         .ok_or_else(|| "Cannot resolve user config directory".to_string())
 }
@@ -149,26 +152,63 @@ fn startup_command(start_minimized: bool) -> Result<String, String> {
 }
 
 #[cfg(target_os = "windows")]
+fn write_run_entry(
+    root: &winreg::RegKey,
+    subkey_path: &str,
+    value_name: &str,
+    command: Option<&str>,
+) -> Result<(), String> {
+    use winreg::enums::*;
+
+    match command {
+        Some(cmd) => {
+            let (run_key, _) = root
+                .create_subkey_with_flags(subkey_path, KEY_SET_VALUE)
+                .map_err(|e| e.to_string())?;
+            run_key
+                .set_value(value_name, &cmd)
+                .map_err(|e| e.to_string())?;
+        }
+        None => {
+            match root.open_subkey_with_flags(subkey_path, KEY_SET_VALUE) {
+                Ok(run_key) => match run_key.delete_value(value_name) {
+                    Ok(()) => {}
+                    Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(e) => return Err(e.to_string()),
+                },
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e.to_string()),
+            }
+        }
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "windows")]
 fn apply_auto_start(settings: &DesktopSettings) -> Result<(), String> {
     use winreg::RegKey;
     use winreg::enums::*;
 
-    let managed_service_mode = managed_service_start_mode()?;
+    let managed_service_mode = if settings.auto_start {
+        managed_service_start_mode()?
+    } else {
+        None
+    };
     let register_gui = should_register_gui_auto_start(settings.auto_start, managed_service_mode);
     let hkcu = RegKey::predef(HKEY_CURRENT_USER);
-    let (run_key, _) = hkcu
-        .create_subkey(r"Software\Microsoft\Windows\CurrentVersion\Run")
-        .map_err(|e| e.to_string())?;
-    if register_gui {
-        let command = startup_command(settings.start_minimized)?;
-        run_key
-            .set_value(RUN_VALUE_NAME, &command)
-            .map_err(|e| e.to_string())?;
+    let command = if register_gui {
+        Some(startup_command(settings.start_minimized)?)
     } else {
-        let _ = run_key.delete_value(RUN_VALUE_NAME);
-        if settings.auto_start && managed_service_mode.is_some() {
-            log::debug!("Sunshine service owns GUI agent startup; removed legacy Run entry");
-        }
+        None
+    };
+    write_run_entry(
+        &hkcu,
+        r"Software\Microsoft\Windows\CurrentVersion\Run",
+        RUN_VALUE_NAME,
+        command.as_deref(),
+    )?;
+    if !register_gui && settings.auto_start && managed_service_mode.is_some() {
+        log::debug!("Sunshine service owns GUI agent startup; removed legacy Run entry");
     }
     Ok(())
 }
@@ -326,14 +366,20 @@ pub async fn save_desktop_settings(
     app: AppHandle,
     mut settings: DesktopSettings,
 ) -> Result<DesktopSettingsResponse, String> {
-    {
+    let previous = {
         let _settings_guard = lock_desktop_settings();
+        let previous = load_desktop_settings_from_disk();
         // 桌宠快捷键只由桌宠设置页的独立命令修改，避免普通设置页保存旧快照时覆盖它。
-        settings.toolbar_shortcut_enabled = load_desktop_settings_from_disk().toolbar_shortcut_enabled;
+        settings.toolbar_shortcut_enabled = previous.toolbar_shortcut_enabled;
         normalize(&mut settings);
         save_desktop_settings_to_disk(&settings)?;
+        previous
+    };
+    if let Err(error) = apply_auto_start(&settings) {
+        let _settings_guard = lock_desktop_settings();
+        let _ = save_desktop_settings_to_disk(&previous);
+        return Err(error);
     }
-    apply_auto_start(&settings)?;
     #[cfg(target_os = "windows")]
     crate::text_context::set_enabled(settings.text_context_enabled);
     crate::tray::refresh_menu(&app);
@@ -389,6 +435,19 @@ pub fn set_toolbar_shortcut_enabled(
     }
 
     Ok(toolbar_shortcut_status(&app, enabled))
+}
+
+/// 恢复 Panel 默认偏好: the pet shortcut goes back to its default too (the ordinary save keeps the stored value, so an old page cannot overwrite it). It is saved first and registered after: a
+/// conflict at the registration is not a failure of the reset, the settings page tries it again when it is opened (`load_toolbar_shortcut_status`).
+pub fn reset_toolbar_shortcut(app: &AppHandle) -> Result<(), String> {
+    let _settings_guard = lock_desktop_settings();
+    let mut settings = load_desktop_settings_from_disk();
+    settings.toolbar_shortcut_enabled = DesktopSettings::default().toolbar_shortcut_enabled;
+    save_desktop_settings_to_disk(&settings)?;
+    if let Err(error) = crate::app::sync_toolbar_shortcut(app, settings.toolbar_shortcut_enabled) {
+        log::warn!("Failed to register the toolbar shortcut after the reset: {error}");
+    }
+    Ok(())
 }
 
 pub fn apply_startup_settings(app: &AppHandle, settings: &DesktopSettings) {
@@ -577,5 +636,23 @@ mod tests {
             true,
             Some(StartType::Auto)
         ));
+        assert!(!should_register_gui_auto_start(
+            false,
+            Some(StartType::Auto)
+        ));
+    }
+
+    #[test]
+    fn removing_run_entry_succeeds_even_when_key_or_value_is_absent() {
+        use winreg::{RegKey, enums::HKEY_CURRENT_USER};
+
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let id = uuid::Uuid::new_v4().to_string();
+        let path = format!(r"Software\SunshineGuiAutoStartTests\{id}");
+        assert!(write_run_entry(&hkcu, &path, RUN_VALUE_NAME, None).is_ok());
+        assert!(write_run_entry(&hkcu, &path, RUN_VALUE_NAME, Some(r#""C:\App\panel.exe" --hidden"#)).is_ok());
+        assert!(write_run_entry(&hkcu, &path, RUN_VALUE_NAME, None).is_ok());
+        assert!(write_run_entry(&hkcu, &path, RUN_VALUE_NAME, None).is_ok());
+        let _ = hkcu.delete_subkey_all(r"Software\SunshineGuiAutoStartTests");
     }
 }

@@ -19,7 +19,7 @@
       <!-- the same rows as the Web UI and the phone: the bitrate is one row with the shared control (value, steps, slider, chips) -->
       <MSection>
         <MGroup>
-          <MItem class="dsk-bitrate" icon="monitoring" :title="t.stream.bitrateLimit" :text="applies('max_bitrate')" stack>
+          <MItem class="dsk-bitrate" icon="monitor_heart" :title="t.stream.bitrateLimit" :text="applies('max_bitrate')" stack>
             <template #trail>
               <MIconButton icon="remove" :label="`${t.stream.bitrateLimit} −`" @click="nudgeBitrate(-NUDGE_MBPS)" />
               <span class="m-slider-value dsk-bitrate__value">{{ bitrateDisplay }}</span>
@@ -72,7 +72,7 @@
       </MSection>
 
       <!-- what a sofa does not need often: display and resolution, the virtual display, the virtual mouse driver -->
-      <PanelLinkSection :links="['displayModes', 'vdd', 'vmouse']" />
+      <PanelLinkSection :links="streamPanelLinks" />
     </template>
   </DeskPage>
 </template>
@@ -85,6 +85,7 @@ import DeskPage from '../components/DeskPage.vue'
 import PanelLinkSection from '../components/PanelLinkSection.vue'
 import SettingsNotice from '../components/settings/SettingsNotice.vue'
 import SettingsToggleRow from '../components/settings/SettingsToggleRow.vue'
+import { loadVmouseSupport, vmouseSupported } from '../../composables/useVmouse.js'
 import { useI18n } from '../i18n/index.js'
 
 const { t, locale } = useI18n()
@@ -102,6 +103,7 @@ const hostPlatform = ref('')
 const liveSessions = ref([])
 const audioBusy = ref(false)
 const currentSession = computed(() => liveSessions.value.find((s) => s?.state === 'RUNNING') || null)
+const streamPanelLinks = computed(() => ['displayModes', 'vdd', ...(vmouseSupported.value ? ['vmouse'] : [])])
 
 // max_bitrate: the host's own default is 0 (自动, the client decides) and a config file that never wrote the key does not send it, so 0 is what shows then
 const configData = ref({ hevc_mode: 2, av1_mode: 0, max_bitrate: '0', hdr_prep: 'automatic' })
@@ -268,7 +270,7 @@ async function saveDesktopLaunchMode() {
 }
 
 onMounted(async () => {
-  await initTauri()
+  await Promise.all([initTauri(), loadVmouseSupport()])
   await loadSettings()
   await refreshRuntimeSessions()
   runtimeTimer = setInterval(refreshRuntimeSessions, 3000)

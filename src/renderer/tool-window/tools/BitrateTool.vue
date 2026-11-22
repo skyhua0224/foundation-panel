@@ -16,7 +16,7 @@
     <template v-else-if="selectedClient">
       <div class="m-tool__hero" role="status">
         <b class="m-tool__big">{{ formatBitrate(bitrateValue) }}</b>
-        <MChip v-if="currentBitrate" tone="info" icon="monitoring">{{ t.bitrateTool.currentBitrate }} {{ formatBitrate(currentBitrate) }}</MChip>
+        <MChip v-if="currentBitrate" tone="info" icon="monitor_heart">{{ t.bitrateTool.currentBitrate }} {{ formatBitrate(currentBitrate) }}</MChip>
       </div>
       <MGroup>
         <MSliderItem v-model="bitrateProgress" icon="speed" :title="t.bitrateTool.targetBitrate" :min="bitrateSpan.min" :max="bitrateSpan.max" :step="1" :decimals="0" :marks="bitrateMarks" size="m" icon-start="signal_cellular_alt_2_bar" icon-end="signal_cellular_alt" :readout-text="formatBitrate(bitrateValue)" :disabled="applying" />

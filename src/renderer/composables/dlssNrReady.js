@@ -5,6 +5,13 @@ import { computed, ref } from 'vue'
 // them too, so they never flash in and out. The status is read once per panel and shared; the pages that read it anyway (画质增强, its manager) hand
 // their answers in, so an install there shows the controls here without another call.
 
+// A full component read hashes the runtime. Refresh it when the host reports a
+// change that affects the install button, including the end of another stream's use.
+export function nrComponentChanged(status, live) {
+  return !status || status.installed !== live.nr_installed ||
+    status.in_use !== live.component_in_use || status.maintenance !== live.component_maintenance
+}
+
 /** Whether a component status makes the live controls usable. */
 export const dlssNrUsable = (status) => !!(status && status.installed && status.host_supported && status.adapter_present)
 

@@ -33,7 +33,7 @@
       :class="{ active: menuVisible }"
       @pointerdown="onDragStart"
       @click.stop="onIconClick"
-      @contextmenu.prevent="toggleMenu"
+      @contextmenu.prevent="onIconContextMenu"
     >
       <!-- PixiJS Canvas 容器 -->
       <canvas ref="pixiCanvas" class="icon-canvas"></canvas>
@@ -789,6 +789,7 @@ const captionOf = (id) => t.value.toolbar.captions?.[id] || ''
 // a long press on the pet opens the menu, as a right click does with a mouse
 let longPressTimer = null
 let longPressFired = false
+let suppressTouchClickUntil = 0
 const clearLongPress = () => { if (longPressTimer !== null) { clearTimeout(longPressTimer); longPressTimer = null } }
 
 const toggleMenu = () => {
@@ -1583,6 +1584,7 @@ const onDragStart = (e) => {
 
   const generation = ++dragGeneration
   const pointerId = e.pointerId
+  if (e.pointerType !== 'touch') suppressTouchClickUntil = 0
   e.preventDefault()
   isDragging = true
   hasMoved = false
@@ -1727,12 +1729,12 @@ const onDragMove = (e) => {
   }
 
   hasMoved = true
+  clearLongPress()
   e.preventDefault()
   queueTouchPosition()
 }
 
 const onDragEnd = async (e) => {
-  clearLongPress()
   if (
     dragPointerId === null ||
     e.pointerId !== dragPointerId ||
@@ -1740,10 +1742,17 @@ const onDragEnd = async (e) => {
   ) {
     return
   }
+  clearLongPress()
 
   const generation = dragGeneration
   const pointerId = dragPointerId
   const wasDragged = isDragging && hasMoved
+  const touchTap = e.type === 'pointerup' && dragPointerType === 'touch' &&
+    !wasDragged && !longPressFired && dragPointerTarget?.classList.contains('toolbar-icon')
+  if (dragPointerType === 'touch') {
+    suppressTouchClickUntil = Date.now() + 700
+    longPressFired = false
+  }
   // A sample received during setPosition belongs to the previous viewport
   // coordinate frame and cannot be safely reapplied after that call completes.
   const canRefreshFinalTouchPosition =
@@ -1804,11 +1813,24 @@ const onDragEnd = async (e) => {
   }
 
   finishDrag(generation, pointerId, wasDragged)
+  if (touchTap) toggleMenu()
 }
 
-const onIconClick = () => {
+const isTouchGeneratedEvent = (event) => (
+  event?.pointerType === 'touch' || event?.sourceCapabilities?.firesTouchEvents === true ||
+  (!event?.pointerType && Date.now() < suppressTouchClickUntil)
+)
+
+const onIconClick = (event) => {
+  if (isTouchGeneratedEvent(event)) return
   if (longPressFired) { longPressFired = false; return }
   if (!hasMoved) toggleMenu()
+}
+
+const onIconContextMenu = (event) => {
+  // WebView may send a context menu for the same touch long press.
+  if (dragPointerType === 'touch' || event.pointerType === 'touch' || event.sourceCapabilities?.firesTouchEvents === true) return
+  toggleMenu()
 }
 
 // 窗口鼠标命中测试：菜单关闭时窗口本身已经缩小到桌宠尺寸，不需要穿透。
@@ -1827,19 +1849,25 @@ let cursorIgnoreDesired = false
 let cursorIgnoreApplied = false
 let cursorIgnoreUpdate = null
 let activeToolbarWindowExpanded = null
+let toolbarModeGeneration = 0
+let toolbarModeQueue = Promise.resolve()
 let lastHitCursorX = Number.NaN
 let lastHitCursorY = Number.NaN
 let cursorMotionObserved = false
 let unlistenMenuOutsideClose = null
 let hitTestTimer = null
 let hitTestEnabled = false
+let hitTestGeneration = 0
 const HIT_TEST_ACTIVE_INTERVAL_MS = 80
-const HIT_TEST_IDLE_INTERVAL_MS = 250
+const HIT_TEST_IDLE_INTERVAL_MS = 80
 const CURSOR_MOTION_THRESHOLD_PX = 1
+// On a touch-capable host the mouse cursor cannot predict the finger's first
+// contact. Keep the brief speech window hittable so touch cannot pass through.
+const touchInputAvailable = navigator.maxTouchPoints > 0
 
 const flushCursorIgnore = async () => {
   let failed = false
-  while (hitTestEnabled && cursorIgnoreApplied !== cursorIgnoreDesired) {
+  while (cursorIgnoreApplied !== cursorIgnoreDesired) {
     const target = cursorIgnoreDesired
     try {
       await appWindow.setIgnoreCursorEvents(target)
@@ -1853,7 +1881,7 @@ const flushCursorIgnore = async () => {
   cursorIgnoreUpdate = null
 
   // 目标可能在最后一次 IPC 完成时发生变化。
-  if (!failed && hitTestEnabled && cursorIgnoreApplied !== cursorIgnoreDesired) {
+  if (!failed && cursorIgnoreApplied !== cursorIgnoreDesired) {
     cursorIgnoreUpdate = flushCursorIgnore()
   }
 }
@@ -1865,7 +1893,7 @@ const setCursorIgnore = (ignore) => {
   }
 }
 
-const hitTestTick = async () => {
+const hitTestTick = async (generation) => {
   // 拖拽会话结束前维持非穿透，避免打断原生拖拽或触摸收尾。
   if (menuVisible.value) {
     setCursorIgnore(false)
@@ -1881,6 +1909,7 @@ const hitTestTick = async () => {
       appWindow.outerSize(),
       cursorPosition(),
     ])
+    if (!hitTestEnabled || generation !== hitTestGeneration) return
     if (menuVisible.value) {
       setCursorIgnore(false)
       return
@@ -1935,13 +1964,14 @@ const hitTestTick = async () => {
 const initBubbleClickThrough = () => {
   // 先保持可命中，等确认鼠标移动后再进入按光标穿透的模式。
   hitTestEnabled = true
+  const generation = ++hitTestGeneration
   setCursorIgnore(false)
   const scheduleNextHitTest = (delay) => {
     if (!hitTestEnabled) return
     hitTestTimer = setTimeout(async () => {
       if (!hitTestEnabled) return
-      await hitTestTick()
-      if (!hitTestEnabled) return
+      await hitTestTick(generation)
+      if (!hitTestEnabled || generation !== hitTestGeneration) return
       const active = dragPointerId !== null || menuVisible.value || !cursorIgnoreApplied
       scheduleNextHitTest(active ? HIT_TEST_ACTIVE_INTERVAL_MS : HIT_TEST_IDLE_INTERVAL_MS)
     }, delay)
@@ -1951,6 +1981,7 @@ const initBubbleClickThrough = () => {
 
 const stopCursorHitTest = () => {
   hitTestEnabled = false
+  hitTestGeneration += 1
   if (hitTestTimer !== null) {
     clearTimeout(hitTestTimer)
     hitTestTimer = null
@@ -1958,28 +1989,26 @@ const stopCursorHitTest = () => {
   setCursorIgnore(false)
 }
 
-const applyToolbarWindowMode = async () => {
+const applyToolbarWindowMode = () => {
+  const generation = ++toolbarModeGeneration
   const expanded = menuVisible.value || speechVisible.value
-  if (activeToolbarWindowExpanded === expanded) {
-    stopCursorHitTest()
-    if (expanded && !menuVisible.value) {
-      initBubbleClickThrough()
-    }
-    return
-  }
-
-  activeToolbarWindowExpanded = expanded
   stopCursorHitTest()
-  try {
-    await invoke('set_toolbar_window_expanded', { expanded })
-  } catch (error) {
-    activeToolbarWindowExpanded = null
-    console.warn('[桌宠HitTest] set_toolbar_window_expanded 失败', expanded, error)
-    return
-  }
-  if (expanded && !menuVisible.value) {
-    initBubbleClickThrough()
-  }
+  toolbarModeQueue = toolbarModeQueue.then(async () => {
+    if (componentDisposed || generation !== toolbarModeGeneration) return
+    if (activeToolbarWindowExpanded !== expanded) {
+      try {
+        await invoke('set_toolbar_window_expanded', { expanded })
+        activeToolbarWindowExpanded = expanded
+      } catch (error) {
+        activeToolbarWindowExpanded = null
+        console.warn('[桌宠HitTest] set_toolbar_window_expanded 失败', expanded, error)
+        return
+      }
+    }
+    if (componentDisposed || generation !== toolbarModeGeneration) return
+    if (expanded && !menuVisible.value && !touchInputAvailable) initBubbleClickThrough()
+  })
+  return toolbarModeQueue
 }
 
 watch(speechVisible, () => {
@@ -2033,6 +2062,7 @@ onUnmounted(() => {
   visionAbortController?.abort('disposed')
   visionAbortController = null
   dragDisposed = true
+  clearLongPress()
   clearDragState()
   if (unlistenDragScaleChanged) {
     unlistenDragScaleChanged()
@@ -2089,7 +2119,6 @@ onUnmounted(() => {
 
 @halo-default: drop-shadow(0 0 2px rgba(255, 182, 193, 0.1)) drop-shadow(0 0 4px rgba(221, 160, 221, 0.05));
 @halo-hover: drop-shadow(0 0 3px rgba(255, 182, 193, 0.16)) drop-shadow(0 0 5px rgba(221, 160, 221, 0.07));
-@halo-active: drop-shadow(0 0 3px rgba(123, 80, 87, 0.2)) drop-shadow(0 0 6px rgba(221, 160, 221, 0.08));
 
 @transition-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
 
@@ -2157,7 +2186,7 @@ onUnmounted(() => {
   transform: translateX(-50%);
   white-space: nowrap;
   pointer-events: none;
-  font: 600 11px/14px system-ui, 'Microsoft YaHei UI', sans-serif;
+  font: 400 11px/14px system-ui, 'Microsoft YaHei UI', sans-serif;
   color: #fff;
   text-shadow: 0 1px 3px rgba(60, 20, 90, 0.85), 0 0 2px rgba(60, 20, 90, 0.9);
 
@@ -2255,7 +2284,6 @@ onUnmounted(() => {
   padding: 0;
   margin: 0;
   border-radius: 50%;
-  animation: float 4s ease-in-out infinite;
   filter: @halo-default;
   transition: all 0.4s @transition-bounce;
   position: relative;
@@ -2266,14 +2294,9 @@ onUnmounted(() => {
   -webkit-font-smoothing: antialiased;
 
   &:hover {
-    animation: pulse 2.4s ease-in-out infinite;
     filter: @halo-hover;
   }
 
-  &.active {
-    transform: scale(1.12) translateZ(0);
-    filter: @halo-active;
-  }
 }
 
 .icon-image,
@@ -2287,6 +2310,10 @@ onUnmounted(() => {
 .icon-image {
   object-fit: contain;
   .gpu-accelerate();
+}
+
+.icon-canvas {
+  animation: float 5s ease-in-out infinite;
 }
 
 .speech-bubble {
@@ -2368,26 +2395,10 @@ onUnmounted(() => {
 @keyframes float {
   0%,
   100% {
-    transform: translate3d(0, 0, 0) scale(1);
+    transform: translate3d(0, 0, 0) scale(0.95);
   }
   50% {
-    transform: translate3d(0, -7px, 0) scale(1);
-  }
-}
-
-@keyframes pulse {
-  0%,
-  100% {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  25% {
-    transform: translate3d(0, -5px, 0) scale(1.05);
-  }
-  50% {
-    transform: translate3d(0, -10px, 0) scale(1.1);
-  }
-  75% {
-    transform: translate3d(0, -5px, 0) scale(1.05);
+    transform: translate3d(0, -1.5px, 0) scale(0.95);
   }
 }
 
@@ -2425,8 +2436,8 @@ onUnmounted(() => {
 }
 
 .bubble-wrapper:nth-child(n) .bubble-item.danger { background: var(--pet-error-container); }
-.bubble-caption { color: var(--pet-on-surface); text-shadow: 0 1px 3px color-mix(in srgb, var(--md-sys-color-shadow, #000) 70%, transparent); }
+.bubble-caption { color: var(--pet-on-surface); text-shadow: 0 1px 2px color-mix(in srgb, var(--md-sys-color-shadow, #000) 30%, transparent); }
 .bubble-caption.danger { color: var(--pet-on-error-container); }
-.speech-bubble { color: var(--pet-on-surface); background: var(--pet-surface); border: 1px solid var(--md-sys-color-outline-variant, rgba(255,255,255,.18)); box-shadow: 0 8px 28px color-mix(in srgb, var(--md-sys-color-shadow, #000) 30%, transparent); }
+.speech-bubble { color: var(--pet-on-surface); background: var(--pet-surface); border: 1px solid var(--md-sys-color-outline-variant, rgba(255,255,255,.18)); }
 .speech-bubble::after { border-top-color: var(--pet-surface); }
 </style>

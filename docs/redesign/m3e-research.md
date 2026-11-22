@@ -77,7 +77,7 @@ control panel (Vue 3 under Tauri's WebView2, with Element Plus) and the Web UI (
   `@material/material-color-utilities`, and for building `@material-symbols/svg-400`, `@fontsource-variable/roboto-flex`,
   `vite`, `@vitejs/plugin-vue`. The consumers resolve the package by an alias to the sibling checkout (`FOUNDATION_UI_DIR`);
   declaring it as a `file:` dependency and regenerating the lock files is the remaining packaging step.
-- **Licence.** The package is GPL-3.0-only like its consumers. Every dependency is Apache-2.0, MIT or OFL 1.1, which are
+- **Licence.** The package is MPL-2.0 (`LICENSE` in the foundation-ui repository); MPL-2.0 section 3.3 lets this repository distribute it together with its own code. Every dependency is Apache-2.0, MIT or OFL 1.1, which are
   compatible; the font and the icon files keep their own licence notices in the package.
 
 ## 5. What could not be confirmed

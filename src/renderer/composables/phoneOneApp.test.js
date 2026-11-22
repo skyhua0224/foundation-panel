@@ -12,8 +12,8 @@ const layout = fs.readFileSync(new URL('../../../node_modules/foundation-ui/src/
 
 test('a phone has no list pages of the rails: the nav is told which hub stands for which rail, and the window size', () => {
   assert.match(router, /export const HUB_OF = \{ stream: ROUTES\.STREAM_HUB, config: ROUTES\.SETTINGS_HUB, input: ROUTES\.SETTINGS_HUB, audio: ROUTES\.SETTINGS_HUB, display: ROUTES\.SETTINGS_HUB, system: ROUTES\.SETTINGS_HUB, appearance: ROUTES\.SETTINGS_HUB, developer: ROUTES\.DEV_HUB \}/)
-  assert.match(router, /createNav\(\{ routes, home: ROUTES\.HOME, compact: isPhone, hubOf: HUB_OF \}\)/)
-  assert.match(router, /export const isPhone = \(\) => typeof window !== 'undefined' && window\.innerWidth < PHONE_MAX/)
+  assert.match(router, /createNav\(\{ routes, home: ROUTES\.HOME, compact: isPhone, hubOf: HUB_OF(, initial: restoredStack\(globalThis\.__PANEL_RESTORE__, routes\))? \}\)/)
+  assert.match(router, /export const isPhone = \(\) => typeof window !== 'undefined' && isCompactNav\(window\.innerWidth, window\.innerHeight\)/)
   assert.match(router, /PHONE_MAX = 600/)
 })
 test('the stream hub is a page of the stream rail declared after its pages, so 客户端 stays the first page of the wide rail', () => {
@@ -28,13 +28,14 @@ test('串流 is the same page as 设置: MPage, one group of MItem rows, no acti
   assert.match(shell, /<StreamHubPage v-else-if="entry\.id === ROUTES\.STREAM_HUB"/)
   assert.match(shell, /if \(!isPhone\(\)\) emit\('webui-navigate', webPathOf\(ROUTES\.WEB_CLIENTS\)\)/)
 })
-test('the shell converts the stack when the window crosses 600 px, and starts wide', () => {
+test('the shell converts the stack when the window crosses 600 px wide or 480 px tall, and starts wide', () => {
   assert.match(shell, /const now = isPhone\(\); if \(now !== wasPhone\) \{ wasPhone = now; if \(now\) nav\.narrow\(\); else nav\.widen\(\) \}/)
   assert.match(shell, /onMounted\(\(\) => \{ nav\.widen\(\); nav\.attach\(\) \}\)/)
 })
-test('the caption bar of a phone is the Web UI\'s: icon buttons of one size, no empty slot for the bell, the brand gives way; the sizes are shared in m3e', () => {
-  assert.match(layout, /\.m-caption \.m-icon-btn, \.m-caption \.m-caption-connect \{ width: 44px; height: 44px;/)
+test('the caption bar of a phone is the Web UI\'s: one design in m3e (data-phone from the shell\'s own rule, one size and gap for every button), the window buttons are the panel\'s alone', () => {
+  assert.match(layout, /\.m-caption \{ --m-cap-btn: 44px; --m-cap-gap: 4px; \}/)
   assert.match(layout, /\.m-caption \.m-statusbell--rest \{ display: none; \}/)
-  assert.match(layout, /\.m-caption \.m-caption-connect \{ background: transparent;/)
-  assert.match(shell, /\.panel-caption \{ grid-template-columns: minmax\(0, 1fr\) auto auto; \} \.panel-caption__brand \{ min-width: 0; overflow: hidden;/)
+  assert.match(layout, /\.m-caption\.m-caption:is\(\[data-phone\][^{]*\) \.m-brand \{ min-width: 0; overflow: hidden;/)
+  assert.ok(!/@media\s*\(max-width:\s*599\.98px\)\s*\{[^{}]*panel-caption/.test(shell), 'no width media query of the panel decides the bar of a phone')
+  assert.match(shell, /panel-caption__controls/)
 })

@@ -22,6 +22,17 @@
     @go="goPlace"
   >
     <template #tools>
+      <MSection :title="clipTexts.title" data-panel-section="clipboard-sync">
+        <MGroup>
+          <MItem icon="content_paste" :title="clipFirst.title" :value="clipFirst.text">
+            <template #trail>
+              <MChip :tone="clipView.tone">{{ clipView.label }}</MChip>
+              <MButton variant="tonal" icon="refresh" :loading="clipLoading" @click="refreshClipboard">{{ clipTexts.refresh }}</MButton>
+            </template>
+          </MItem>
+          <MItem v-for="row in clipView.rows.slice(1)" :key="row.id" :title="row.title" :value="row.text" />
+        </MGroup>
+      </MSection>
       <MSection :title="logText.title">
         <MGroup>
           <MButton variant="tonal" icon="refresh" :loading="refreshing" @click="refreshLogs">{{ logText.refresh }}</MButton>
@@ -42,9 +53,11 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { setVisibleInterval, clearVisibleInterval } from '../../composables/pageVisibility.js'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
-import { MDiagnostics, MDialog, MButton, diagnosticsTexts, guideTexts, coachTexts, remoteTexts, MGroup, MSection, useDialogs, useNotify } from 'foundation-ui/vue'
+import { MDiagnostics, MDialog, MButton, MChip, MItem, diagnosticsTexts, guideTexts, coachTexts, remoteTexts, MGroup, MSection, useDialogs, useNotify } from 'foundation-ui/vue'
+import { clipboardBundleFacts, clipboardStatusView } from '../../composables/clipboardStatusView.js'
 import { useDiagnostics } from '../../composables/useDiagnostics.js'
 import { exportPanelLogs } from '../../composables/panelLogExport.js'
 import { useLogDiagnosis } from '../../composables/useLogDiagnosis.js'
@@ -54,7 +67,7 @@ import { saveThroughDialog } from '../../shared/saveDialog.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 
 // 诊断与日志. The same page as the Web UI. What only this window can read (the panel log, the device status) is passed as facts.
-const emit = defineEmits(['back', 'go', 'webui-navigate', 'open-guide', 'open-remote'])
+const emit = defineEmits(['back', 'go', 'webui-navigate', 'open-guide', 'open-remote', 'open-reset'])
 const { t, locale } = useI18n()
 const logText = computed(() => t.value.logConsole)
 const refreshing = ref(false)
@@ -62,7 +75,27 @@ const say = (text) => useNotify().snack(text)
 const texts = computed(() => diagnosticsTexts(locale.value))
 
 const data = (r) => (r?.success ? r.data : null)
+// the clipboard sync agent: its status as the page shows it, and as the diagnostics bundle carries it (words, counts and times; never the text of an error)
+const clipTexts = computed(() => t.value.clipboardSync.diag)
+const clipStatus = ref(null)
+const clipLoading = ref(false)
+const clipView = computed(() => clipboardStatusView(clipStatus.value, clipTexts.value))
+// the first row carries the chip and the refresh button: the local agent's state; with no answer yet it only says what the section is
+const clipFirst = computed(() => clipView.value.rows[0] || { title: clipTexts.value.agent, text: '' })
+// a slow answer must not overwrite a newer one: each call takes a number and only the latest call may write
+let clipSeq = 0
+async function refreshClipboard() {
+  const mine = ++clipSeq
+  clipLoading.value = true
+  let next = null
+  try { next = await invoke('clipboard_sync_status') } catch { next = null }
+  if (mine !== clipSeq) return
+  clipStatus.value = next
+  clipLoading.value = false
+}
+let clipTimer = 0
 const devices = async () => {
+  const clipboard = clipboardBundleFacts(await invoke('clipboard_sync_status').catch(() => null))
   const [usb, ds, mic, vigem] = await Promise.all([usbipStatusChannel, dualsenseStatusChannel, micStatusChannel, vigemStatusChannel].map((c) => c.fetch({ force: false }).catch(() => null)))
   const pick = (o, keys) => (o ? Object.fromEntries(keys.filter((k) => o[k] !== undefined).map((k) => [k, o[k]])) : null)
   return {
@@ -70,6 +103,7 @@ const devices = async () => {
     dualsense: pick(data(ds), ['state', 'host']),
     microphone: pick(data(mic), ['configured_backend', 'active_backend', 'component_available', 'state']),
     vigem: pick(data(vigem), ['installed', 'version']),
+    clipboard,
   }
 }
 const diag = useDiagnostics({ devices })
@@ -136,6 +170,7 @@ async function downloadLogs() {
 const commands = computed(() => ({
   restart,
   resetDisplay: diag.platform.value === 'windows' ? resetDisplay : undefined,
+  resetSettings: () => emit('open-reset'),
   ai: () => ai.open(),
   diagnose: () => ai.diagnose(diag.text.value),
   downloadLogs,
@@ -184,5 +219,6 @@ async function clearLogs() {
 async function exportLogs(format) {
   await exportPanelLogs({ invoke, format, texts: logText.value, alert: useDialogs().alert })
 }
-onMounted(() => { diag.loadFacts(); diag.start() })
+onMounted(() => { diag.loadFacts(); diag.start(); void refreshClipboard(); clipTimer = setVisibleInterval(refreshClipboard, 5000, { resume: true }) })
+onBeforeUnmount(() => { clearVisibleInterval(clipTimer) })
 </script>

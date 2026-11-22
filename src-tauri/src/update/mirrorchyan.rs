@@ -198,6 +198,74 @@ pub(crate) fn download_url_of(answer: &Answer) -> Option<String> {
     Some(url.to_string())
 }
 
+/// Why the update was not taken from Mirror酱 although the person chose it: what the panel tells them ("Mirror酱 暂未同步此版本，已改用 CNB 下载") and the word
+/// the anonymous usage statistics carry (`update_source_miss`).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum Miss {
+    /// Mirror酱 answered, but its newest version is not the version to install (its sync runs on a timer and lags behind a release).
+    VersionLag,
+    /// The CDK was refused: expired, invalid, banned, wrong type.
+    CdkInvalid,
+    /// The CDK has no downloads left.
+    Quota,
+    /// No answer, an unreadable answer, a server error, or the download from Mirror酱 failed.
+    Network,
+    /// The source is Mirror酱 but no CDK is stored: the free channel has no download address.
+    NoCdk,
+}
+
+impl Miss {
+    pub(crate) fn word(self) -> &'static str {
+        match self {
+            Miss::VersionLag => "version_lag",
+            Miss::CdkInvalid => "cdk_invalid",
+            Miss::Quota => "quota",
+            Miss::Network => "network",
+            Miss::NoCdk => "no_cdk",
+        }
+    }
+}
+
+/// `data.version_name` of an answer.
+pub(crate) fn version_of(answer: &Answer) -> Option<&str> {
+    answer.body.as_ref()?.pointer("/data/version_name")?.as_str()
+}
+
+/// Whether Mirror酱's version is the one to install. An unknown target (the caller did not say) is not held against Mirror酱; a version that cannot be read on
+/// either side is compared as text.
+fn same_version(mirror: &str, target: &str) -> bool {
+    match (crate::version_compare::version_key(mirror), crate::version_compare::version_key(target)) {
+        (Some(a), Some(b)) => a == b,
+        _ => mirror.trim().trim_start_matches(['v', 'V']) == target.trim().trim_start_matches(['v', 'V']),
+    }
+}
+
+/// Why this answer cannot be used for the download of `target_version`; `None` when it can (code 0, an address of the allowed host, the same version).
+pub(crate) fn miss_of(answer: &Answer, target_version: Option<&str>) -> Option<Miss> {
+    let Some(code) = code_of(answer) else {
+        return Some(Miss::Network);
+    };
+    match code {
+        0 => {
+            let lagging = match (version_of(answer), target_version.filter(|v| !v.trim().is_empty())) {
+                (Some(mirror), Some(target)) => !same_version(mirror, target),
+                _ => false,
+            };
+            if lagging {
+                Some(Miss::VersionLag)
+            } else if download_url_of(answer).is_none() {
+                // code 0 without an address of the allowed host: nothing to download from
+                Some(Miss::Network)
+            } else {
+                None
+            }
+        }
+        7003 => Some(Miss::Quota),
+        7001 | 7002 | 7004 | 7005 | 8009 => Some(Miss::CdkInvalid),
+        _ => Some(Miss::Network),
+    }
+}
+
 /// 下载地址的白名单校验：HTTPS、无端口/凭据/fragment，主机仅限官方文档示例的
 /// mirrorchyan.com（含 www）。`data.url` 带时效令牌，通过与否都不写日志。
 pub(crate) fn validate_download_url(url: &str) -> Result<(), String> {
@@ -437,5 +505,47 @@ mod tests {
         let summary = log_summary(&answer);
         assert_eq!(summary, "status=200, code=0");
         assert!(!summary.contains("SECRETCDK"));
+    }
+
+    fn ok_answer(version: &str, url: Option<&str>) -> Answer {
+        let mut data = json!({ "version_name": version });
+        if let Some(url) = url {
+            data["url"] = json!(url);
+        }
+        answer(200, json!({ "code": 0, "msg": "success", "data": data }))
+    }
+
+    #[test]
+    fn a_lagging_mirror_is_a_version_miss_and_a_matching_one_is_a_hit() {
+        let url = "https://mirrorchyan.com/dl/abc";
+        // Mirror酱 still has the older build while the release to install is newer
+        assert_eq!(miss_of(&ok_answer("v2026.1116.22909", Some(url)), Some("v2026.1116.43312")), Some(Miss::VersionLag));
+        assert_eq!(miss_of(&ok_answer("v2026.1116.22909", None), Some("v2026.1116.43312")), Some(Miss::VersionLag));
+        // the same release, written with or without the prefix or the padding
+        assert_eq!(miss_of(&ok_answer("v2026.1116.43312", Some(url)), Some("2026.1116.043312")), None);
+        // no target given: Mirror酱 is not held to a version
+        assert_eq!(miss_of(&ok_answer("v2026.1116.22909", Some(url)), None), None);
+        // code 0 but no usable address
+        assert_eq!(miss_of(&ok_answer("v2026.1116.43312", None), Some("v2026.1116.43312")), Some(Miss::Network));
+        assert_eq!(miss_of(&ok_answer("v2026.1116.43312", Some("https://example.com/x")), Some("v2026.1116.43312")), Some(Miss::Network));
+    }
+
+    #[test]
+    fn error_codes_map_to_the_reasons_of_the_statistics() {
+        let coded = |code: i64| answer(200, json!({ "code": code, "msg": "x" }));
+        for code in [7001, 7002, 7004, 7005, 8009] {
+            assert_eq!(miss_of(&coded(code), Some("v1")), Some(Miss::CdkInvalid), "{code}");
+        }
+        assert_eq!(miss_of(&coded(7003), Some("v1")), Some(Miss::Quota));
+        for code in [1001, 8001, 1, -1] {
+            assert_eq!(miss_of(&coded(code), Some("v1")), Some(Miss::Network), "{code}");
+        }
+        assert_eq!(miss_of(&Answer::no_answer(), Some("v1")), Some(Miss::Network));
+    }
+
+    #[test]
+    fn the_miss_words_are_the_ones_of_the_data_contract() {
+        let words: Vec<&str> = [Miss::VersionLag, Miss::CdkInvalid, Miss::Quota, Miss::Network, Miss::NoCdk].iter().map(|m| m.word()).collect();
+        assert_eq!(words, ["version_lag", "cdk_invalid", "quota", "network", "no_cdk"]);
     }
 }

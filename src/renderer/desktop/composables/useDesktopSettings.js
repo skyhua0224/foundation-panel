@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { isTauriRuntime, tauriInvoke } from './useTauri'
+import { isTauriRuntime, tauriInvoke } from './useTauri.js'
 
 export const DESKTOP_SETTINGS_KEY = 'sunshine-desktop-settings'
 export const DESKTOP_SETTINGS_UPDATED = 'desktop-settings-updated'
@@ -14,6 +14,8 @@ export const defaultDesktopSettings = {
   devMode: false,
   logLevel: 'info',
   textContextEnabled: true,
+  // a change of the monitor's scale gives the window its size in DIPs back (src-tauri windows/lifecycle/display.rs); no switch on a page yet: set in the settings file
+  keepWindowSizeOnDpiChange: false,
 }
 
 export const desktopSettings = ref({ ...defaultDesktopSettings })
@@ -68,15 +70,14 @@ export async function saveDesktopSettings(nextSettings) {
     return { settings: desktopSettings.value, status: desktopSettingsStatus.value }
   }
 
+  const previous = { ...desktopSettings.value }
   let response = null
   try {
     response = await tauriInvoke('save_desktop_settings', { settings: normalized })
     desktopSettings.value = normalize(response.settings)
     desktopSettingsStatus.value = response.status || null
   } catch (e) {
-    desktopSettings.value = normalized
-    persistLocal(desktopSettings.value)
-    window.dispatchEvent(new CustomEvent(DESKTOP_SETTINGS_UPDATED, { detail: desktopSettings.value }))
+    desktopSettings.value = previous
     throw e
   }
   persistLocal(desktopSettings.value)

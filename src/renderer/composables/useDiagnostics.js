@@ -4,6 +4,7 @@ import { appendTail, createLogByteDecoder, decodeLogBytes, findSessions, parseLo
 import { sunshine } from '../tauri-adapter.js'
 import { combineDiagnosticsRecords } from './diagnosticsRecords.js'
 import { SAVE_CANCELLED, saveThroughDialog } from '../shared/saveDialog.js'
+import { setVisibleInterval, clearVisibleInterval } from './pageVisibility.js'
 
 // The data of the diagnostics page of the control panel: the host log and configuration through the local proxy, and what only the panel
 // can read (system, graphics cards, monitors, device status). Reading only: `save` writes a file the person chose in the system dialog.
@@ -79,8 +80,8 @@ export function useDiagnostics({ update, devices = async () => ({}) } = {}) {
     gpus.value = (await safe(() => invoke('get_gpus'), [])) || []
     clientNames.value = ((await safe(() => getJson('/api/clients/list'), null))?.named_certs || []).map((c) => c?.name).filter(Boolean)
   }
-  const start = () => { stop(); void refresh(); void pollLive(); timer = setInterval(() => { void refresh(); void pollLive() }, 5000) }
-  const stop = () => { clearInterval(timer); timer = 0 }
+  const start = () => { stop(); void refresh(); void pollLive(); timer = setVisibleInterval(() => { void refresh(); void pollLive() }, 5000, { resume: true }) }
+  const stop = () => { clearVisibleInterval(timer); timer = 0 }
   watch(live, (on) => (on ? start() : stop()))
   onBeforeUnmount(stop)
 

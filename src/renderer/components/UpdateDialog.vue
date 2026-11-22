@@ -29,15 +29,21 @@
     @retry="handleRetry"
     @open-release="handleOpenBrowser()"
     @open-changelog="handleOpenBrowser"
-  />
+  >
+    <template v-if="latestNote || fallbackNote" #notice>
+      <MBanner v-if="latestNote" tone="info" icon="info">{{ latestNote }}</MBanner>
+      <MBanner v-if="fallbackNote" tone="info" icon="swap_horiz">{{ fallbackNote }}</MBanner>
+    </template>
+  </MUpdateSheet>
 </template>
 
 <script setup>
 import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
-import { MUpdateSheet, sheetFromPanelInfo } from 'foundation-ui/vue'
+import { MBanner, MUpdateSheet, sheetFromPanelInfo } from 'foundation-ui/vue'
 import { channelOfVersion, fetchReleaseMetadata, orderedDownloadUrls } from 'foundation-ui/update'
 import { useUpdateSource } from '../composables/useUpdateSource.js'
+import { mirrorFallbackText } from '../composables/mirrorFallback.js'
 import { useUpdateDownload } from '../composables/updateDownload.js'
 import { useI18n } from '../desktop/i18n/index.js'
 
@@ -80,7 +86,11 @@ const mirrorHost = ref('')
 let installProgressUnlisten = null
 let installWaitTimer = null
 
+// the download did not come from Mirror酱 although it is the chosen source: one sentence with the reason and the source that took over
+const fallbackNote = computed(() => mirrorFallbackText(updateDownload.state.fallbackReason, updateDownload.state.source, t.value.updateDialog.mirrorFallback))
 const isLatest = computed(() => !!props.updateInfo?.is_latest)
+// "up to date" plus what else is true: the installed version is a prerelease and nothing newer exists
+const latestNote = computed(() => (isLatest.value && props.updateInfo?.latest_note === 'installed_prerelease_no_newer' ? t.value.updateDialog.latestNoteInstalledPrerelease : ''))
 
 // Notes, driver notice, release page and installer facts of the update the host reported.
 const sheet = computed(() => sheetFromPanelInfo(props.updateInfo, { current: props.currentVersion }))
@@ -173,6 +183,7 @@ const checkCachedInstaller = async () => {
       expectedSize: props.updateInfo.download_size || null,
       expectedSha256: props.updateInfo.download_sha256 || null,
       assetType: props.updateInfo.download_type || null,
+      targetVersion: props.updateInfo.version || null,
     })
     if (
       cached &&

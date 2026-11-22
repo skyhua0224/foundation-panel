@@ -102,6 +102,42 @@ test('the environment is gathered from the commands that exist and survives one 
   assert.equal(env.version, '2026.1104.1'); assert.equal(env.gpu, 'RTX 4080'); assert.equal(env.webview, '156.0'); assert.equal(env.display, '3840x2160 @200%'); assert.equal(env.host, 'Sunshine 1'); assert.equal(env.channel, '')
 })
 
+test('the environment is asked once for what does not change, and a slow probe never holds it: left out now, kept when it arrives', async () => {
+  const asked = {}
+  let releaseComponents
+  const slowComponents = new Promise((resolve) => { releaseComponents = resolve })
+  const invoke = async (cmd) => {
+    asked[cmd] = (asked[cmd] || 0) + 1
+    if (cmd === 'get_system_info') return { app_version: '1', os_version: 'Windows 11', arch: 'x86_64' }
+    if (cmd === 'get_gpus') return ['RTX 4080']
+    if (cmd === 'dev_environment') return { webview: '156.0', target: 'x86_64' }
+    if (cmd === 'get_include_prerelease_preference') return false
+    if (cmd === 'get_component_inventory') return slowComponents
+    throw new Error(cmd)
+  }
+  let hostCalls = 0
+  const tools = createDeveloperTools({ invoke, settings: { get: () => ({}), save: async () => {} }, hostVersion: () => { hostCalls += 1; return new Promise(() => {}) }, wait: { host: 20, components: 20 }, win: { devicePixelRatio: 1, screen: { width: 10, height: 10 } } })
+  const started = Date.now()
+  const first = await tools.environment()
+  assert.ok(Date.now() - started < 1000, 'the environment is back after the short waits, not after the slow probes')
+  assert.equal(first.gpu, 'RTX 4080'); assert.equal(first.host, ''); assert.deepEqual(first.components, []); assert.equal(first.channel, 'stable')
+  releaseComponents([{ id: 'host', installed: true }])
+  await new Promise((resolve) => setTimeout(resolve, 5))
+  const second = await tools.environment()
+  assert.deepEqual(second.components, [{ id: 'host', installed: true }], 'the late answer is there on the next question')
+  assert.equal(asked.get_system_info, 1); assert.equal(asked.get_gpus, 1); assert.equal(asked.dev_environment, 1)
+  assert.equal(asked.get_component_inventory, 1, 'the slow probe is not started a second time while its answer is kept')
+  assert.equal(hostCalls, 1, 'a probe that is still running is not started again; it is asked afresh only after the minute it is kept for')
+})
+
+test('a probe that failed is asked again on the next question', async () => {
+  let n = 0
+  const invoke = async (cmd) => { if (cmd === 'get_gpus') { n += 1; if (n === 1) throw new Error('wmi'); return ['GPU'] } return cmd === 'get_system_info' || cmd === 'dev_environment' ? {} : cmd === 'get_component_inventory' ? [] : false }
+  const tools = createDeveloperTools({ invoke, settings: { get: () => ({}), save: async () => {} } })
+  assert.equal((await tools.environment()).gpu, '')
+  assert.equal((await tools.environment()).gpu, 'GPU')
+})
+
 // the wiring is read from the sources (the router and the shell need the bundler)
 const read = (p) => fs.readFileSync(new URL(p, import.meta.url), 'utf8')
 test('the developer pages are the rail 开发者 (only in developer mode), 开发者选项 is one of them, 系统 and 关于 keep their entries', () => {

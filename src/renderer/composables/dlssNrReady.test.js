@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
-import { createDlssNrReady, dlssNrUsable, qualityParts } from './dlssNrReady.js'
+import { createDlssNrReady, dlssNrUsable, nrComponentChanged, qualityParts } from './dlssNrReady.js'
 
 const usable = { installed: true, host_supported: true, adapter_present: true }
 
@@ -73,4 +73,12 @@ test('the page puts the overlay switch, the shortcut keys and the live NR parts 
   assert.match(tag(/<MButton[^>]*@click="setVisibility\(true\)"[^>]*>/), /parts\.liveControls/)
   const live = readFileSync(new URL('../components/m3e/LiveSessionPage.vue', import.meta.url), 'utf8')
   assert.match(live, /<MSection v-if="nrReady" :title="t\.m3e\.display\.quality">/)
+})
+
+test('ending component use or maintenance refreshes a missing component without a reinstall', () => {
+  const live = { nr_installed: false, component_in_use: false, component_maintenance: false }
+  const idle = { installed: false, in_use: false, maintenance: false }
+  assert.equal(nrComponentChanged({ ...idle, in_use: true }, live), true)
+  assert.equal(nrComponentChanged({ ...idle, maintenance: true }, live), true)
+  assert.equal(nrComponentChanged(idle, live), false)
 })

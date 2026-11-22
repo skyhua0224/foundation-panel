@@ -6,11 +6,17 @@
 
 mod commands;
 mod config;
+#[cfg(target_os = "windows")]
+mod devnode;
+mod diagnostics;
 mod device;
 mod elevated;
 mod exec;
 mod install;
+mod journal;
 mod manager;
+mod memo;
+mod nodes;
 mod signature;
 mod status;
 
@@ -58,11 +64,31 @@ pub struct UsbipStatus {
     pub version_valid: bool,
     pub reboot_recommended: bool,
     pub vhci_residual: bool,
+    /// What the leftover is: "" (none), "stale" (a working controller with older ones beside it; removing those is
+    /// enough) or "broken" (clean the transport and install it again).
+    pub residual_kind: String,
+    /// A cleanup was accepted by Windows and finishes at the next restart; the restart has not happened yet.
+    pub cleanup_pending_restart: bool,
+    /// Windows has restarted since a cleanup waited for it and the leftover is still there: continue the cleanup.
+    pub cleanup_resume: bool,
+    /// Which operation to continue: "cleanup" (the whole cleanup) or "stale" (the repair that keeps the live controller).
+    pub cleanup_resume_op: String,
+    /// The last cleanup's error line as the helper answered it (codes and all), kept for the diagnostics.
+    pub last_cleanup_error: String,
+    /// The last install/replace error line with the underlying classification and code, kept for the diagnostics.
+    pub last_install_error: String,
+    /// An install failed because Windows has a pending restart; retry after the restart.
+    pub install_pending_restart: bool,
+    /// Windows has restarted since an install waited for a pending reboot: retry the install once.
+    pub install_resume: bool,
     /// 结构化错误码（"USBIP-SETUP-003" 等），取自 detail 的码前缀；
     /// 前端按码判断语义，不得解析 detail 文本。
     pub error_code: String,
     pub attached_devices: Vec<UsbipAttachedDevice>,
     pub detail: String,
+    pub externally_managed: bool,
+    /// An external installation the person may ask to replace with the host's own package (host `status`).
+    pub replaceable: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -70,6 +96,10 @@ pub struct UsbipStatus {
 enum ElevatedRequest {
     Install,
     Cleanup,
+    /// Remove the older controllers beside the working one; the live controller stays.
+    RemoveStale,
+    /// The person confirmed replacing an external USB/IP installation with the host's package.
+    ReplaceLegacy,
     Attach {
         remote: String,
         tcp_port: u16,
@@ -90,6 +120,10 @@ impl ElevatedRequest {
             // The silent uninstaller plus the devnode sweep stay well below a
             // single Inno install, but leave headroom for slow driver teardown.
             Self::Cleanup => std::time::Duration::from_secs(15 * 60),
+            // Each node is asked for a few seconds over the polling budget of a cleanup, without an uninstaller.
+            Self::RemoveStale => std::time::Duration::from_secs(5 * 60),
+            // The host's helper allows its uninstall and install ten minutes in total; leave the same headroom.
+            Self::ReplaceLegacy => std::time::Duration::from_secs(15 * 60),
             Self::Attach { .. } | Self::Detach { .. } => {
                 COMMAND_TIMEOUT + std::time::Duration::from_secs(5)
             }
@@ -195,6 +229,28 @@ mod tests {
     }
 
     #[test]
+    fn replace_request_has_its_own_allowlisted_operation() {
+        let encoded = serde_json::to_string(&ElevatedRequest::ReplaceLegacy).unwrap();
+        assert_eq!(encoded, r#"{"operation":"replace_legacy"}"#);
+        assert!(matches!(
+            serde_json::from_str::<ElevatedRequest>(&encoded),
+            Ok(ElevatedRequest::ReplaceLegacy)
+        ));
+        // Cleanup of an external installation stays refused; the replacement is a different, confirmed operation.
+        assert!(serde_json::from_str::<ElevatedRequest>(r#"{"operation":"replace"}"#).is_err());
+    }
+
+    #[test]
+    fn stale_removal_is_its_own_allowlisted_operation() {
+        let encoded = serde_json::to_string(&ElevatedRequest::RemoveStale).unwrap();
+        assert_eq!(encoded, r#"{"operation":"remove_stale"}"#);
+        assert!(matches!(
+            serde_json::from_str::<ElevatedRequest>(&encoded),
+            Ok(ElevatedRequest::RemoveStale)
+        ));
+    }
+
+    #[test]
     fn validates_usbip_win2_tcp_port_range() {
         assert_eq!(validate_tcp_port(None).unwrap(), DEFAULT_TCP_PORT);
         assert!(validate_tcp_port(Some(1023)).is_err());
@@ -210,6 +266,90 @@ mod tests {
         assert!(status.installed);
         assert!(status.version_valid);
         assert!(status.ready, "{}", status.detail);
+        println!("USB/IP installed status: {status:?}");
+        if std::env::var("USBIP_EXPECT_EXTERNAL").as_deref() == Ok("1") {
+            assert!(status.externally_managed);
+            let error = device::cleanup_broken_transport().await.unwrap_err();
+            assert!(error.starts_with("USBIP-CLEAN-005:"), "{error}");
+        }
+    }
+
+    /// The 0.9.7.7 leftover: run in an elevated session after the old uninstaller left a host-controller node behind.
+    #[cfg(target_os = "windows")]
+    #[tokio::test]
+    #[ignore = "changes the machine: removes usbip-win2 host-controller devnodes; needs an elevated session"]
+    async fn sweep_removes_every_leftover_controller() {
+        let interfaces = device::enumerate_vhci_interfaces().unwrap();
+        let before = device::enumerate_transport_nodes().unwrap();
+        println!("before: interfaces={interfaces:?} nodes={before:?}");
+        assert!(
+            !before.is_empty() || !interfaces.is_empty(),
+            "the test needs a leftover controller to remove: install and uninstall 0.9.7.7 first"
+        );
+        let finish = device::sweep_devnodes(false).await;
+        let after = device::enumerate_transport_nodes().unwrap();
+        println!("sweep: {finish:?}; after: nodes={after:?}");
+        let finish = finish.expect("the sweep must not fail");
+        if finish == device::Finish::Done {
+            assert!(after.is_empty(), "nothing may be left: {after:?}");
+        } else {
+            assert!(after.iter().all(|node| node.present), "{after:?}");
+        }
+    }
+
+    /// A working install with an older controller beside it (both may be live): one controller stays, the rest go.
+    #[cfg(target_os = "windows")]
+    #[tokio::test]
+    #[ignore = "changes the machine: removes usbip-win2 host-controller devnodes; needs an elevated session"]
+    async fn removing_the_stale_controller_keeps_one_live_controller() {
+        let interfaces = device::enumerate_vhci_interfaces().unwrap();
+        assert!(!interfaces.is_empty(), "needs a live controller: {interfaces:?}");
+        let before = device::enumerate_transport_nodes().unwrap();
+        println!("before: interfaces={interfaces:?} nodes={before:?} kind={:?}", device::residual_kind(&interfaces, &before));
+        assert_eq!(
+            device::residual_kind(&interfaces, &before),
+            device::Residual::Stale,
+            "the test needs a live controller with an older one beside it"
+        );
+        let finish = device::remove_stale_nodes().await.expect("the repair must not fail");
+        let interfaces_after = device::enumerate_vhci_interfaces().unwrap();
+        let after = device::enumerate_transport_nodes().unwrap();
+        println!("repair: {finish:?}; interfaces={interfaces_after:?} nodes={after:?}");
+        assert_eq!(interfaces_after.len(), 1, "exactly one live controller must stay");
+        assert!(!device::transport_not_ready(&interfaces_after, &after));
+    }
+
+    /// Writes the diagnostics file for real and checks that every section is there (read only; shows the file in Explorer).
+    #[cfg(target_os = "windows")]
+    #[tokio::test]
+    #[ignore = "reads the local USB/IP state and writes the diagnostics file"]
+    async fn exports_the_diagnostics_file_with_every_section() {
+        let path = diagnostics::export().await.expect("the export must work");
+        let text = std::fs::read_to_string(&path).unwrap();
+        println!("{path} ({} bytes)", text.len());
+        println!("{text}");
+        for section in [
+            "== Windows",
+            "== Panel status",
+            "== Last cleanup",
+            "== Last install",
+            "== Host-controller devices",
+            "== Driver services",
+            "== Registered installations",
+            "== Driver packages",
+            "== Device installation log",
+        ] {
+            assert!(text.contains(section), "missing {section}");
+        }
+    }
+
+    /// What the panel reports for the machine as it is (read only).
+    #[cfg(target_os = "windows")]
+    #[tokio::test]
+    #[ignore = "reads the local USB/IP state"]
+    async fn prints_the_status_the_panel_would_show() {
+        let status = usbip_get_status().await.unwrap();
+        println!("{}", serde_json::to_string_pretty(&status).unwrap());
     }
 
     #[cfg(target_os = "windows")]

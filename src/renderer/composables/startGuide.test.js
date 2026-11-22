@@ -36,7 +36,8 @@ test('--start-guide is the fresh flow at its first step, whatever was saved', ()
   writeProgress(storage, key, { step: 'remote', finished: false, visited: ['intro', 'remote'], version: '9.0.0', mode: 'fresh' })
   const kept = guideOnLaunch({ fromStart: false, entry: { mode: 'upgrade', skip: ['account'] } })
   assert.deepEqual(kept, { mode: 'upgrade', skip: ['account'] })
-  assert.equal(startIndex(buildGuideSteps({ mode: 'fresh' }), readProgress(storage, key)), buildGuideSteps({ mode: 'fresh' }).findIndex((step) => step.id === 'remote'))
+  // a position of the old flow (the remote access step) continues at the first step of the new flow still to do: the client install
+  assert.equal(startIndex(buildGuideSteps({ mode: 'fresh' }), readProgress(storage, key)), buildGuideSteps({ mode: 'fresh' }).findIndex((step) => step.id === 'install'))
   assert.equal(saved.step, null)
 })
 

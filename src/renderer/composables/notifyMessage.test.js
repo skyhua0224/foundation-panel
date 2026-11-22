@@ -92,3 +92,33 @@ test('a dismissed standing notice stays away until what it reports changes', asy
   assert.equal(useNotify().state.systems['tool-update-2'].revision, '3.0')
   useNotify().clearSystem('tool-update-2')
 })
+
+test('a message with an id is replaced where it stands by the next call with that id, and its handle closes it', async () => {
+  const progress = ElMessage({ message: '正在检查更新...', id: 'update-check', duration: 0 })
+  await settled()
+  assert.equal(snacks().length, 1)
+  assert.equal(snacks()[0].id, 'update-check')
+  assert.equal(snacks()[0].timeout, 0)
+  ElMessage.error({ message: '检查更新失败', id: 'update-check' })
+  await settled()
+  assert.equal(snacks().length, 1, 'one message, not a second one waiting behind the first')
+  assert.equal(snacks()[0].id, 'update-check')
+  assert.equal(snacks()[0].message, '检查更新失败')
+  assert.equal(snacks()[0].timeout, 8000)
+  await progress.close()
+  assert.equal(snacks().length, 0)
+  // without an id every call is a message of its own
+  ElMessage.info('甲'); ElMessage.info('乙')
+  await settled()
+  assert.equal(snacks().length, 2)
+  for (const s of [...snacks()]) useNotify().dismissSnack(s.id)
+})
+
+// The snackbar of the window must not start a second entrance when its enter class goes (the base .m-snackbar rule carries m-dialog-in): foundation-ui keeps the animation on the enter class only.
+test('the installed foundation-ui snackbar has no animation of its own, so a check for updates shows one entrance only', async () => {
+  const { readFileSync } = await import('node:fs')
+  const { fileURLToPath } = await import('node:url')
+  const css = readFileSync(fileURLToPath(new URL('../css/notify.css', import.meta.resolve('foundation-ui/notify'))), 'utf8')
+  assert.match(css, /\.m-snackbar\[popover\] \{ animation: none; \}/)
+  assert.match(css, /\.m-snackbar\[popover\]\.m-snack-enter-active \{ animation: m-snack-in /)
+})

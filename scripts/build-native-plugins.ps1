@@ -11,6 +11,7 @@ $WorkspaceManifest = Join-Path $ProjectRoot 'native-plugins\Cargo.toml'
 $Profile = if ($Configuration -eq 'Release') { 'release' } else { 'debug' }
 $CargoArguments = @(
     'build',
+    '--locked',
     '--manifest-path', $WorkspaceManifest,
     '-p', 'alkaidlab-plugin-stylus'
 )
@@ -27,7 +28,8 @@ if ($LASTEXITCODE -ne 0) {
     throw 'Native tool plugin build failed'
 }
 
-$PluginTargetRoot = Join-Path $ProjectRoot 'native-plugins\target'
+# dev-env-cargo-env: CARGO_TARGET_DIR; dev-env-cargo-build: --locked.
+$PluginTargetRoot = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $ProjectRoot 'native-plugins\target' }
 $PluginSource = if ($Target) {
     Join-Path $PluginTargetRoot "$Target\$Profile\alkaidlab_plugin_stylus.dll"
 } else {
@@ -37,7 +39,7 @@ if (-not (Test-Path -LiteralPath $PluginSource)) {
     throw "Native tool plugin output was not found: $PluginSource"
 }
 
-$GuiTargetRoot = Join-Path $ProjectRoot 'src-tauri\target'
+$GuiTargetRoot = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $ProjectRoot 'src-tauri\target' }
 $GuiOutput = if ($Target) {
     Join-Path $GuiTargetRoot "$Target\$Profile"
 } else {

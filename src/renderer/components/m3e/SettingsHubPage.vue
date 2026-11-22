@@ -1,6 +1,7 @@
 <script setup>
 import { computed, nextTick, onMounted } from 'vue'
 import { MPage, MGroup, MItem, MSection } from 'foundation-ui/vue'
+import '@settings-data'
 import { labelOf } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../../desktop/i18n/index.js'
 import { pageItems, railItems } from '../../composables/panelNav.js'

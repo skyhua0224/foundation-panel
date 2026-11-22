@@ -3,6 +3,7 @@
 </template>
 
 <script setup>
+import { setVisibleInterval, clearVisibleInterval } from '../../composables/pageVisibility.js'
 import { onBeforeUnmount, onMounted, ref } from 'vue'
 import { MServiceStatus, useNotify } from 'foundation-ui/vue'
 import { serviceTexts } from 'foundation-ui/service'
@@ -32,6 +33,6 @@ const setStartType = (type, acknowledged) => change('start-type', () => sunshine
 
 // the state can change outside the page (the tray, services.msc, a crash): read it again every few seconds while the page is open
 let timer = 0
-onMounted(() => { refresh(); timer = setInterval(() => { if (!busy.value) refresh(true) }, 5000) })
-onBeforeUnmount(() => clearInterval(timer))
+onMounted(() => { refresh(); timer = setVisibleInterval(() => { if (!busy.value) refresh(true) }, 5000, { resume: true }) })
+onBeforeUnmount(() => clearVisibleInterval(timer))
 </script>

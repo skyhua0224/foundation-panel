@@ -14,6 +14,21 @@ test('the panel registers openUrl for the report and sign-in sheets, and it is t
   assert.match(src, /import \{[^}]*openExternalUrl[^}]*\} from '\.\.\/tauri-adapter\.js'/)
 })
 
+test('the panel tells the feedback sheet that its host takes a screenshot, and the capture it gives is the native window capture', () => {
+  const src = readFileSync(new URL('./developerReport.js', import.meta.url), 'utf8')
+  assert.match(src, /registerDevReport\(\{[\s\S]*shots: true/)
+  assert.match(src, /capture: async \(\) => bytesOfCapture\(await invoke\('dev_capture_window'\)\)/)
+})
+
+test('the capture arrives as the PNG bytes of a binary answer; text in base64 still works', async () => {
+  const { bytesOfCapture } = await import('./developerTools.js')
+  const png = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10])
+  assert.deepEqual([...bytesOfCapture(png.buffer.slice(0))], [...png])
+  assert.deepEqual([...bytesOfCapture(png)], [...png])
+  assert.deepEqual([...bytesOfCapture(Buffer.from(png).toString('base64'))], [...png])
+  assert.equal(bytesOfCapture(null).length, 0)
+})
+
 test('the device page goes to the native opener and its answer is the sheet\'s: true opened, false could not', async () => {
   assert.equal(await openExternalUrl('https://github.com/login/device'), true)
   assert.deepEqual(calls.at(-1), ['open_external_url', { url: 'https://github.com/login/device' }])

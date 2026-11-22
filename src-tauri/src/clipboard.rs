@@ -58,6 +58,7 @@ use serde::Serialize;
 use tauri::async_runtime::JoinHandle;
 use tokio::sync::Notify;
 
+use crate::clipboard_health as health;
 use crate::sunshine::{create_https_client, create_sse_https_client, get_sunshine_url};
 
 const WIRE_VERSION: u8 = 1;
@@ -284,10 +285,29 @@ pub struct ClipboardStatus {
     pub last_connected_at_ms: Option<i64>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_error: Option<String>,
+    /// The class of the last failure, as a fixed word ("none" while there is none).
+    pub last_error_class: &'static str,
+    /// What the host said in its last answer to the heartbeat: whether it counts this agent as alive, and how many streams it has.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host_gui_alive: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub host_session_count: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_heartbeat_ok_ms: Option<i64>,
+    /// The class of the heartbeat's last failure ("none" when its last call worked).
+    pub heartbeat_error: &'static str,
+    /// Why the status could not ask the host about its setting ("none" when it could). With this word set, `service_allowed` is unknown, not "allowed".
+    pub capability_error: &'static str,
 }
 
 fn set_transport_state(state: u8, error: Option<String>) {
-    TRANSPORT_STATE.store(state, Ordering::Release);
+    let previous = TRANSPORT_STATE.swap(state, Ordering::AcqRel);
+    if previous == TRANSPORT_CONNECTED && state != TRANSPORT_CONNECTED {
+        health::left_connected();
+    }
+    if state == TRANSPORT_CONNECTED && previous != TRANSPORT_CONNECTED {
+        health::connected();
+    }
     *LAST_TRANSPORT_ERROR
         .lock()
         .unwrap_or_else(|e| e.into_inner()) = error;
@@ -609,6 +629,12 @@ fn next_token() -> u32 {
 }
 
 async fn post_item(body: Vec<u8>) -> Result<(), String> {
+    let result = post_item_inner(body).await;
+    health::post(result.is_ok());
+    result
+}
+
+async fn post_item_inner(body: Vec<u8>) -> Result<(), String> {
     let url = get_sunshine_url().await?;
     let client = create_https_client()?;
     let resp = client
@@ -637,9 +663,19 @@ pub async fn post_file_offer_payload(payload: Vec<u8>) -> Result<(), String> {
     post_item(body).await
 }
 
-async fn post_capability_once() -> Result<(), String> {
-    let url = get_sunshine_url().await?;
-    let client = create_https_client()?;
+/// What the host answers to the capability call (the heartbeat and the status read both make it).
+struct CapabilityAnswer {
+    clipboard_sync: Option<bool>,
+    gui_alive: Option<bool>,
+    session_count: Option<u64>,
+}
+
+/// One capability call. An error carries the class of the failure (fixed words) and the text for the local log.
+async fn capability_call() -> Result<CapabilityAnswer, (health::ErrClass, String)> {
+    let url = get_sunshine_url()
+        .await
+        .map_err(|e| (health::classify_text(&e), e))?;
+    let client = create_https_client().map_err(|e| (health::classify_text(&e), e))?;
     let resp = client
         .post(format!(
             "{}/api/v1/clipboard/capability",
@@ -647,16 +683,47 @@ async fn post_capability_once() -> Result<(), String> {
         ))
         .send()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| (health::classify_reqwest(&e), e.to_string()))?;
     if !resp.status().is_success() {
-        return Err(format!("status {}", resp.status()));
+        let class = health::classify_status(resp.status().as_u16());
+        return Err((class, format!("status {}", resp.status())));
     }
-    Ok(())
+    let json: serde_json::Value = resp
+        .json()
+        .await
+        .map_err(|e| (health::ErrClass::Other, e.to_string()))?;
+    Ok(CapabilityAnswer {
+        clipboard_sync: json.get("clipboard_sync").and_then(|v| v.as_bool()),
+        gui_alive: json.get("gui_alive").and_then(|v| v.as_bool()),
+        session_count: json.get("session_count").and_then(|v| v.as_u64()),
+    })
+}
+
+async fn post_capability_once() -> Result<(), String> {
+    match capability_call().await {
+        Ok(answer) => {
+            health::heartbeat_ok(answer.gui_alive, answer.session_count);
+            Ok(())
+        }
+        Err((class, text)) => {
+            // a failure the classes do not name is still "the heartbeat failed"
+            health::heartbeat_failed(if class == health::ErrClass::Other { health::ErrClass::Heartbeat } else { class });
+            Err(text)
+        }
+    }
 }
 
 /// POST /api/v1/clipboard/blob with raw bytes + X-Clipboard-Mime header.
 /// Returns the assigned blob id on success.
 async fn upload_blob(bytes: Vec<u8>, mime: &str) -> Result<String, String> {
+    let result = upload_blob_inner(bytes, mime).await;
+    if result.is_err() {
+        health::post(false);
+    }
+    result
+}
+
+async fn upload_blob_inner(bytes: Vec<u8>, mime: &str) -> Result<String, String> {
     let url = get_sunshine_url().await?;
     let client = create_https_client()?;
     let resp = client
@@ -796,6 +863,7 @@ async fn apply_inbound_ref(frame: Frame, echo: Arc<Mutex<EchoState>>) {
         Ok(t) => t,
         Err(e) => {
             warn!("inbound REF: fetch_blob({}) failed: {e}", meta.id);
+            health::apply(false);
             return;
         }
     };
@@ -908,6 +976,7 @@ fn apply_compound(text: &[u8], png: &[u8], echo: &Arc<Mutex<EchoState>>) {
             Ok(rgba) => match crate::win_clipboard::write_compound(text_str, &rgba, png) {
                 Ok(()) => {
                     st.current = Some(ClipboardIdentity::new(Some(text), Some(png), pixel_hash));
+                    health::apply(true);
                     debug!(
                         "applied compound clipboard (text {}B + PNG {}B)",
                         text.len(),
@@ -926,8 +995,11 @@ fn apply_compound(text: &[u8], png: &[u8], echo: &Arc<Mutex<EchoState>>) {
         if let Ok(ctx) = ClipboardContext::new() {
             if ctx.set_image(img).is_ok() {
                 st.current = Some(ClipboardIdentity::new(None, Some(png), pixel_hash));
+                health::apply(true);
+                return;
             }
         }
+        health::apply(false);
         return;
     }
 
@@ -939,9 +1011,9 @@ fn apply_compound(text: &[u8], png: &[u8], echo: &Arc<Mutex<EchoState>>) {
             if ctx.set_text(text_str.to_string()).is_ok() {
                 st.current = Some(ClipboardIdentity::new(Some(text), None, None));
             }
-            if ctx.set_image(img).is_ok() {
+            health::apply(ctx.set_image(img).map(|()| {
                 st.current = Some(ClipboardIdentity::new(None, Some(png), pixel_hash));
-            }
+            }).is_ok());
         }
         debug!(
             "applied compound clipboard via sequential fallback (text {}B + PNG {}B)",
@@ -970,6 +1042,7 @@ fn apply_inbound_inline(frame: Frame, echo: &Arc<Mutex<EchoState>>) {
         Ok(c) => c,
         Err(e) => {
             warn!("inbound: ClipboardContext::new failed: {e}");
+            health::apply(false);
             return;
         }
     };
@@ -986,8 +1059,10 @@ fn apply_inbound_inline(frame: Frame, echo: &Arc<Mutex<EchoState>>) {
             };
             if let Err(e) = ctx.set_text(text) {
                 warn!("inbound set_text failed: {e}");
+                health::apply(false);
             } else {
                 st.current = Some(identity);
+                health::apply(true);
             }
         }
         Kind::Png => {
@@ -1015,8 +1090,10 @@ fn apply_inbound_inline(frame: Frame, echo: &Arc<Mutex<EchoState>>) {
                 ClipboardIdentity::new(None, Some(&frame.payload), hash_image_pixels(&img));
             if let Err(e) = ctx.set_image(img) {
                 warn!("inbound set_image failed: {e}");
+                health::apply(false);
             } else {
                 st.current = Some(identity);
+                health::apply(true);
             }
         }
         Kind::Ref => {
@@ -1051,6 +1128,7 @@ async fn sse_pump(stop: Arc<Notify>, echo: Arc<Mutex<EchoState>>) {
             Ok(u) => u,
             Err(e) => {
                 warn!("clipboard SSE: get_sunshine_url: {e}");
+                health::note_error(health::classify_text(&e));
                 set_transport_state(TRANSPORT_DISCONNECTED, Some(e));
                 if wait_or_stop(&stop, SSE_RECONNECT_BACKOFF).await {
                     return;
@@ -1064,6 +1142,7 @@ async fn sse_pump(stop: Arc<Notify>, echo: Arc<Mutex<EchoState>>) {
             Ok(c) => c,
             Err(e) => {
                 warn!("clipboard SSE: client: {e}");
+                health::note_error(health::classify_text(&e));
                 set_transport_state(TRANSPORT_DISCONNECTED, Some(e));
                 if wait_or_stop(&stop, SSE_RECONNECT_BACKOFF).await {
                     return;
@@ -1080,7 +1159,9 @@ async fn sse_pump(stop: Arc<Notify>, echo: Arc<Mutex<EchoState>>) {
         {
             Ok(r) => r,
             Err(e) => {
-                debug!("clipboard SSE connect failed: {e}");
+                // a failure to connect is the first thing to look at when the clipboard does not work: warning level, so the exported log keeps it
+                warn!("clipboard SSE connect failed: {e}");
+                health::note_error(health::classify_reqwest(&e));
                 set_transport_state(TRANSPORT_DISCONNECTED, Some(e.to_string()));
                 if wait_or_stop(&stop, SSE_RECONNECT_BACKOFF).await {
                     return;
@@ -1092,6 +1173,7 @@ async fn sse_pump(stop: Arc<Notify>, echo: Arc<Mutex<EchoState>>) {
             // the host has published a credential and does not accept it yet (it was just started or reinstalled): it is not ready after all. Ask again at once, not after the backoff.
             debug!("clipboard SSE: the host does not accept its credential yet");
             crate::proxy_server::host_not_ready();
+            health::note_error(health::ErrClass::Http401);
             set_transport_state(TRANSPORT_DISCONNECTED, Some("service returned 401".to_string()));
             if wait_or_stop(&stop, std::time::Duration::from_millis(400)).await {
                 return;
@@ -1101,6 +1183,7 @@ async fn sse_pump(stop: Arc<Notify>, echo: Arc<Mutex<EchoState>>) {
         if !resp.status().is_success() {
             let error = format!("service returned {}", resp.status());
             warn!("clipboard SSE bad status: {}", resp.status());
+            health::note_error(health::classify_status(resp.status().as_u16()));
             set_transport_state(TRANSPORT_DISCONNECTED, Some(error));
             if wait_or_stop(&stop, SSE_RECONNECT_BACKOFF).await {
                 return;
@@ -1128,11 +1211,13 @@ async fn sse_pump(stop: Arc<Notify>, echo: Arc<Mutex<EchoState>>) {
                     }
                     Some(Err(e)) => {
                         debug!("clipboard SSE read error: {e}");
+                        health::note_error(health::classify_reqwest(&e));
                         set_transport_state(TRANSPORT_DISCONNECTED, Some(e.to_string()));
                         break;
                     }
                     None => {
                         debug!("clipboard SSE stream ended");
+                        health::note_error(health::ErrClass::StreamEnded);
                         set_transport_state(
                             TRANSPORT_DISCONNECTED,
                             Some("event stream ended".to_string()),
@@ -1183,7 +1268,8 @@ fn parse_sse_event(raw: &[u8]) -> Option<Frame> {
 async fn heartbeat_pump(stop: Arc<Notify>) {
     loop {
         if let Err(e) = post_capability_once().await {
-            debug!("clipboard heartbeat failed: {e}");
+            // warning level, once per failure: the exported log must show that the host stopped hearing the agent
+            warn!("clipboard heartbeat failed: {e}");
         }
         if wait_or_stop(&stop, HEARTBEAT_INTERVAL).await {
             return;
@@ -1297,6 +1383,12 @@ fn supervise_once() {
         );
         respawn_watcher(now);
         return;
+    }
+
+    // a run that goes on for days sends its statistics record once a day (the end of the run sends the last one)
+    if health::due(now) {
+        health::mark_sent();
+        tauri::async_runtime::spawn(send_health_event());
     }
 
     // Watcher heartbeat: one INFO line every 5 minutes proving the watcher
@@ -1500,6 +1592,7 @@ pub fn start() -> Result<(), String> {
     if st.enabled {
         return Ok(());
     }
+    health::run_started();
     set_transport_state(TRANSPORT_CONNECTING, None);
 
     let stop = Arc::new(Notify::new());
@@ -1563,38 +1656,48 @@ pub fn stop() {
     if let Some(t) = sup {
         t.abort();
     }
+    send_health_at_stop();
     set_transport_state(TRANSPORT_STOPPED, None);
     info!("clipboard sync agent stopped");
 }
 
-fn agent_active() -> bool {
-    lock_agent().enabled
+/// The statistics record of the run (clipboard_health), through the host: its own sender owns the identity and the two choices, so a choice that is off sends nothing.
+async fn send_health_event() {
+    health::mark_sent();
+    if !health::worth_sending() {
+        return;
+    }
+    let body = serde_json::json!({
+        "product": "panel",
+        "version": env!("CARGO_PKG_VERSION"),
+        "events": [health::health_event()],
+    });
+    let Ok(url) = get_sunshine_url().await else { return };
+    let Ok(client) = create_https_client() else { return };
+    let _ = client
+        .post(format!("{}/api/telemetry/events", url.trim_end_matches('/')))
+        .json(&body)
+        .send()
+        .await;
 }
 
-async fn query_service_allowed() -> Option<bool> {
-    // Service exposes the effective gate at /api/v1/clipboard/capability.
-    // Keep transport errors distinct from a deliberate service-side disable.
-    let url = match get_sunshine_url().await {
-        Ok(u) => u,
-        Err(_) => return None,
-    };
-    let client = match create_https_client() {
-        Ok(c) => c,
-        Err(_) => return None,
-    };
-    let endpoint = format!("{}/api/v1/clipboard/capability", url.trim_end_matches('/'));
-    let resp = match client.post(&endpoint).send().await {
-        Ok(r) => r,
-        Err(_) => return None,
-    };
-    if !resp.status().is_success() {
-        return None;
+/// The last record of a run, at its end: it waits at most 2 s, on a thread of its own (the caller may be inside a runtime).
+fn send_health_at_stop() {
+    if !health::worth_sending() {
+        return;
     }
-    let json: serde_json::Value = match resp.json().await {
-        Ok(v) => v,
-        Err(_) => return None,
-    };
-    json.get("clipboard_sync").and_then(|v| v.as_bool())
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+    std::thread::spawn(move || {
+        tauri::async_runtime::block_on(async {
+            let _ = tokio::time::timeout(Duration::from_secs(2), send_health_event()).await;
+        });
+        let _ = done_tx.send(());
+    });
+    let _ = done_rx.recv_timeout(Duration::from_millis(2500));
+}
+
+fn agent_active() -> bool {
+    lock_agent().enabled
 }
 
 /// Start the agent in the background at app launch. The agent is harmless
@@ -1602,6 +1705,7 @@ async fn query_service_allowed() -> Option<bool> {
 /// rejected and outbound posts will 4xx, so we just keep retrying quietly.
 pub fn auto_start() {
     if let Err(e) = start() {
+        health::note_error(health::ErrClass::Other);
         set_transport_state(TRANSPORT_DISCONNECTED, Some(e.clone()));
         warn!("clipboard auto-start failed: {e}");
     }
@@ -1611,17 +1715,36 @@ pub fn auto_start() {
 
 #[tauri::command]
 pub async fn clipboard_sync_status() -> ClipboardStatus {
-    let transport_state = TRANSPORT_STATE.load(Ordering::Acquire);
+    // the host's own answer: its setting, whether it has an agent subscribed right now, and a failure to ask is a word, not "allowed"
+    let (service_allowed, host_alive_now, session_count, capability_error) = match capability_call().await {
+        Ok(answer) => (answer.clipboard_sync, answer.gui_alive, answer.session_count, "none"),
+        Err((class, _)) => (None, None, None, class.word()),
+    };
+    // read after the call: it can take seconds, and the state, the time and the heartbeat facts may have moved meanwhile
+    let now = health::now_ms();
+    let stream_state = transport_state_name(TRANSPORT_STATE.load(Ordering::Acquire));
     let last_connected_at_ms = LAST_CONNECTED_AT_MS.load(Ordering::Acquire);
+    let facts = health::status_facts();
+    let mut transport_state = health::effective_state(stream_state, last_connected_at_ms, facts.last_heartbeat_ok_ms.unwrap_or(0), now);
+    // the stream is open on this side but the host says it has no subscriber: it does not count the agent, whatever this side thinks
+    if transport_state == "connected" && host_alive_now == Some(false) {
+        transport_state = "degraded";
+    }
     ClipboardStatus {
         agent_active: agent_active(),
-        service_allowed: query_service_allowed().await,
-        transport_state: transport_state_name(transport_state),
+        service_allowed,
+        transport_state,
         last_connected_at_ms: (last_connected_at_ms > 0).then_some(last_connected_at_ms),
         last_error: LAST_TRANSPORT_ERROR
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .clone(),
+        last_error_class: facts.last_error_class,
+        host_gui_alive: host_alive_now.or(facts.host_gui_alive),
+        host_session_count: session_count.or(facts.host_session_count),
+        last_heartbeat_ok_ms: facts.last_heartbeat_ok_ms,
+        heartbeat_error: facts.heartbeat_error,
+        capability_error,
     }
 }
 
@@ -1635,6 +1758,18 @@ mod status_tests {
         assert_eq!(transport_state_name(TRANSPORT_CONNECTING), "connecting");
         assert_eq!(transport_state_name(TRANSPORT_CONNECTED), "connected");
         assert_eq!(transport_state_name(TRANSPORT_DISCONNECTED), "disconnected");
+    }
+
+    #[test]
+    fn the_status_words_are_the_ones_the_page_knows() {
+        // the page branches on these exact words (useTools.js showClipboardSyncStatus)
+        let known = ["stopped", "connecting", "connected", "disconnected", "degraded"];
+        for state in [TRANSPORT_STOPPED, TRANSPORT_CONNECTING, TRANSPORT_CONNECTED, TRANSPORT_DISCONNECTED] {
+            let word = transport_state_name(state);
+            assert!(known.contains(&word));
+            let effective = health::effective_state(word, 1, 0, 1 + 10 * 60_000);
+            assert!(known.contains(&effective));
+        }
     }
 }
 

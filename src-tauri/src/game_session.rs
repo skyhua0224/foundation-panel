@@ -536,7 +536,7 @@ fn kill_process_tree(pid: u32) {
 // ===== Playtime stats =====
 
 fn stats_path() -> Result<PathBuf, String> {
-    dirs::config_dir()
+    crate::test_isolation::config_dir()
         .map(|dir| dir.join("Sunshine GUI").join(STATS_FILE))
         .ok_or_else(|| "Cannot resolve the user config directory".to_string())
 }

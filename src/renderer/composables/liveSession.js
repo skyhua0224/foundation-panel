@@ -37,6 +37,9 @@ export const PIPELINE_SEGMENTS = Object.freeze(['capture_to_convert', 'convert',
 /** The pipeline stages that have samples, in pipeline order. */
 export const pipelineSegments = (session) => PIPELINE_SEGMENTS.map((key) => ({ key, stats: session?.pipeline?.[key] ?? {} })).filter((s) => s.stats.samples)
 
+// The overview reads the stages and the extras of a perf session through foundation-ui (homePerfInputs.js), the same functions as the Web UI.
+export { PIPELINE_FIELDS, pipelineAverages, perfExtras } from 'foundation-ui/home/perf'
+
 export const formatMs = (v) => (v == null ? '--' : `${Number(v).toFixed(2)} ms`)
 export const formatNumber = (v) => (v == null ? '--' : Number(v).toFixed(1))
 export const formatPercent = (v) => (v == null ? '--' : `${Math.round(v)}%`)

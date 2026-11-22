@@ -224,7 +224,7 @@ pub fn just_closed_by_icon_press() -> bool {
 static CURRENT: Mutex<Option<TrayPrefs>> = Mutex::new(None);
 
 fn path() -> Option<std::path::PathBuf> {
-    dirs::config_dir().map(|dir| dir.join("Sunshine GUI").join(FILE))
+    crate::test_isolation::config_dir().map(|dir| dir.join("Sunshine GUI").join(FILE))
 }
 
 pub fn parse(text: &str) -> TrayPrefs {
@@ -288,6 +288,14 @@ mod tests {
         assert_eq!(old.density, "auto");
         assert_eq!(parse(r#"{"density":"touch"}"#).density, "touch");
         assert_eq!(TrayPrefs { density: "huge".into(), ..TrayPrefs::default() }.normalized().density, "auto");
+    }
+
+    #[test]
+    fn restoring_the_defaults_writes_the_defaults_as_they_are() {
+        // 恢复 Panel 默认偏好 saves `TrayPrefs::default()` through `save`, which normalises: the record on disk must be the default, with the layout left to the default (None)
+        let d = TrayPrefs::default();
+        assert_eq!(d.clone().normalized(), d);
+        assert!(d.tiles.is_none() && d.sliders.is_none());
     }
 
     #[test]

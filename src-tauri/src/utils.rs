@@ -163,6 +163,7 @@ pub async fn restart_as_admin(app_handle: tauri::AppHandle) -> Result<String, St
         .map_err(|error| format!("Failed to start elevated instance: {error}"))?;
 
         info!("Elevated GUI launch was accepted by Windows");
+        crate::exit_state::begin("elevated restart");
 
         tokio::spawn(async move {
             info!("Exiting current GUI instance");

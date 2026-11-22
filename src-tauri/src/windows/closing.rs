@@ -236,7 +236,7 @@ mod tests {
         assert!(shown.contains("closing::is_closing"), "show_and_activate_window must refuse a closing window");
         let uncloaked = code.split("fn uncloak_cold").nth(1).and_then(|rest| rest.split("\n}\n").next()).expect("uncloak_cold");
         assert!(uncloaked.contains("closing::is_closing"), "uncloak_cold must not focus a closing window");
-        for entry in ["pub fn activate_main_window", "pub fn open_desktop_window", "pub fn open_main_panel_page"] {
+        for entry in ["fn request_main_window", "pub fn open_desktop_window", "pub fn open_main_panel_page"] {
             let body = code.split(entry).nth(1).and_then(|rest| rest.split("\n}\n").next()).unwrap_or_else(|| panic!("{entry}"));
             assert!(body.contains("closing::after_closed"), "{entry} must wait for a closing window instead of showing it");
         }

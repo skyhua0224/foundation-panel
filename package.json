@@ -2,6 +2,7 @@
   "name": "sunshine-gui",
   "version": "0.0.0-dev",
   "description": "A GUI for sunshine",
+  "license": "MIT",
   "type": "module",
   "allowScripts": {
     "esbuild@0.28.1": true
@@ -44,10 +45,15 @@
     "@tauri-apps/plugin-dialog": "^2.8.3",
     "@tauri-apps/plugin-fs": "^2.7.1",
     "dompurify": "^3.4.16",
-    "foundation-ui": "file:../ds5-ui-m3e",
+    "foundation-ui": "https://codeload.github.com/AlkaidLab/foundation-ui/tar.gz/eb88def32ef25d78db04c7261fc175b88688bf04",
     "markdown-it": "^14.3.2",
     "pixi.js": "^8.19.0",
     "qrcode": "^1.5.4",
     "vue": "^3.5.38"
-  }
+  },
+  "engines": {
+    "node": "24.22.3",
+    "npm": "11.19.1"
+  },
+  "packageManager": "npm@11.19.1"
 }

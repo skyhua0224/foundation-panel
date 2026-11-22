@@ -8,7 +8,9 @@ import { zh } from '../desktop/i18n/zh.js'
 const { ROUTES, PAGES, RAILS, HUB_OF, routeForWebPath, routeOfPlace, webPathOf, useRouter } = await import('./useRouter.js')
 const { pageItems, barCurrent, BAR_GROUP_OF, railItems } = await import('./panelNav.js')
 const { framedMove } = await import('./frameFollow.js')
-const { parseSettingsHash, SEARCH_INDEX } = await import('foundation-ui/settings/index.js')
+const { parseSettingsHash } = await import('foundation-ui/settings/index.js')
+// the index is the product's (the panel carries none); the routes need only a setting or two of it, made up here
+const SEARCH_INDEX = [{ id: 'bind_address', title: 'config.bind_address', path: ['tabs.network'], icon: 'lan', route: 'config', params: { tab: 'network', focus: 'bind_address' } }]
 
 const deps = { routeForWebPath, routeOfPlace, parseHash: (hash) => parseSettingsHash(hash, SEARCH_INDEX), configRoute: ROUTES.WEB_CONFIG }
 const ALIASED = new Set([ROUTES.CONTROLLERS, ROUTES.COMPONENTS, ROUTES.WEB_TROUBLESHOOTING])

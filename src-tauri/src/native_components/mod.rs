@@ -207,6 +207,12 @@ pub async fn hdr_enhanced_select_backend(
     }
 }
 
+#[tauri::command]
+pub async fn set_global_nr_enabled(enabled: bool) -> Result<bool, String> {
+    let saved = providers::nvidia_dlssnr::save_component_enabled(enabled).await?;
+    Ok(saved.settings.nr_enabled)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

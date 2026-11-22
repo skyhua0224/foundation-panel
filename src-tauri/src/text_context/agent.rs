@@ -1,14 +1,11 @@
 //! Process-owned text agent. One transport serializes presence and observations.
 //! Window focus/visibility never participates in this lifecycle.
 
-use super::{Observation, ObservationQueue, agent_id, observer_loop, post_json};
+use super::{Observation, ObservationQueue, StopSignal, agent_id, observer_loop, post_json};
 use log::{debug, warn};
 use std::{
     future::Future,
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, Mutex},
     time::Duration,
 };
 use tauri::async_runtime::JoinHandle as Task;
@@ -127,7 +124,7 @@ impl Shared {
 
 struct Observer {
     generation: u64,
-    stop: Arc<AtomicBool>,
+    stop: Arc<StopSignal>,
 }
 
 struct ObserverLifetime(Arc<Shared>, u64);
@@ -141,7 +138,11 @@ impl Drop for ObserverLifetime {
 impl Observer {
     fn start(shared: &Arc<Shared>) -> Option<Self> {
         let generation = shared.begin();
-        let stop = Arc::new(AtomicBool::new(false));
+        let Some(stop) = StopSignal::new() else {
+            shared.finished(generation);
+            warn!("Failed to create text context observer stop event");
+            return None;
+        };
         let worker_stop = stop.clone();
         let worker_shared = shared.clone();
         match std::thread::Builder::new()
@@ -161,7 +162,7 @@ impl Observer {
 
     fn stop(self, shared: &Shared) {
         shared.finished(self.generation);
-        self.stop.store(true, Ordering::Release);
+        self.stop.request();
         // COM providers can block indefinitely. The detached worker releases
         // its own resources when it returns; generation checks reject late results.
     }
@@ -536,7 +537,7 @@ mod tests {
             starts.set(starts.get() + 1);
             Some(Observer {
                 generation: shared.begin(),
-                stop: Arc::new(AtomicBool::new(false)),
+                stop: StopSignal::new().unwrap(),
             })
         };
         agent.reconcile(start);
@@ -548,7 +549,7 @@ mod tests {
         drop(ObserverLifetime(shared.clone(), old)); // Failed initialization/early exit.
         agent.reconcile(start);
         assert_eq!(starts.get(), 2);
-        assert!(old_stop.load(Ordering::Acquire));
+        assert!(old_stop.is_requested());
         let new = agent.observer.as_ref().unwrap().generation;
         assert!(new > old);
         shared.ready(new, false, true);
@@ -560,7 +561,7 @@ mod tests {
         let new_stop = agent.observer.as_ref().unwrap().stop.clone();
         agent.reconcile(start);
         assert!(agent.observer.is_none());
-        assert!(new_stop.load(Ordering::Acquire));
+        assert!(new_stop.is_requested());
         assert_eq!(starts.get(), 2);
         shared.set_enabled(true);
         agent.reconcile(start);
@@ -623,13 +624,13 @@ mod tests {
     fn stopped_generation_cannot_reactivate_or_clear_a_new_observer() {
         let shared = Shared::new();
         let old = shared.begin();
-        let stop = Arc::new(AtomicBool::new(false));
+        let stop = StopSignal::new().unwrap();
         Observer {
             generation: old,
             stop: stop.clone(),
         }
         .stop(&shared);
-        assert!(stop.load(Ordering::Acquire));
+        assert!(stop.is_requested());
         let idle = shared.snapshot();
         assert!(!shared.ready(old, true, true)); // stopped before initialization completed
         shared.finished(old);

@@ -25,6 +25,7 @@ export function createGuideData(deps) {
     network: { port: 47989, activePort: 0, upnpActive: null, upnpSaved: null, loaded: false, endpoints: '' },
     webAccess: { scope: 'lan', bind: '', active: null, saved: null },
     reach: deps.reach ? deps.reach.view : { report: null, status: 'idle' },
+    channel: { value: 'stable' },
     clients: null,
     sessions: null,
     pair: { name: '' },
@@ -295,7 +296,20 @@ export function createGuideData(deps) {
     } catch (error) { return { ok: false, error: error?.message || '' } }
   }
 
+  /** The update channel the person has now (deps.channel.get() -> true for 测试版); an unreadable answer leaves the default. */
+  async function loadChannel() {
+    try { state.channel.value = (await deps.channel?.get?.()) ? 'prerelease' : 'stable' } catch { /* the default stays */ }
+  }
+  /** Saves the channel at once (deps.channel.set(include)); { ok } so the step can say it was not saved. */
+  async function setChannel(value) {
+    if (!deps.channel?.set) return { ok: false }
+    try { await deps.channel.set(value === 'prerelease'); state.channel.value = value === 'prerelease' ? 'prerelease' : 'stable'; return { ok: true } } catch { return { ok: false } }
+  }
+
   const callbacks = {
+    loadChannel,
+    setChannel,
+    funnel: (props) => deps.funnel?.(props),
     scanGames,
     restoreApps,
     addGames,

@@ -54,7 +54,7 @@ test('everything that contacts the host at the start waits for it through the sa
   assert.match(clip, /let _ = crate::proxy_server::host_ready\(std::time::Duration::from_secs\(30\)\)\.await;\s*let url = match get_sunshine_url\(\)/)
   assert.match(clip, /resp\.status\(\) == reqwest::StatusCode::UNAUTHORIZED[\s\S]{0,400}crate::proxy_server::host_not_ready\(\)/)
   // the tray state and its event stream
-  assert.match(src('tray/events.rs'), /let _ = crate::proxy_server::host_ready\(Duration::from_secs\(30\)\)\.await;\s*match sunshine::get_tray_state\(\)\.await/)
+  assert.match(src('tray/events.rs'), /let _ = crate::proxy_server::host_ready\(Duration::from_secs\(30\)\)\.await;\s*let supports_events = handle_state_result\(\s*sunshine::get_tray_state\(\)\.await/)
   // a loopback connect is accepted or refused at once: 500 ms made a starved host a failed call
   assert.match(src('sunshine.rs'), /\.connect_timeout\(std::time::Duration::from_millis\(3000\)\)\s*\.read_timeout\(std::time::Duration::from_secs\(10\)\)/)
 })

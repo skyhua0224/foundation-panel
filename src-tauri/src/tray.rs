@@ -224,21 +224,22 @@ pub(crate) fn emit_message<R: Runtime>(app: &AppHandle<R>, msg_type: &str, messa
         "type": msg_type,
         "message": message
     });
-    let mut has_visible_window = false;
+    let main_visible = app
+        .get_webview_window("main")
+        .is_some_and(|window| window.is_visible().unwrap_or(false));
 
     for label in ["main", "desktop"] {
         if let Some(window) = app.get_webview_window(label) {
-            has_visible_window |= window.is_visible().unwrap_or(false);
             let _ = window.emit("show-message", &payload);
         }
     }
 
-    if msg_type == "error" && !has_visible_window {
+    if msg_type == "error" && !main_visible {
         use tauri_plugin_dialog::{DialogExt, MessageDialogKind};
 
         app.dialog()
             .message(message)
-            .title("Sunshine Error")
+            .title(get_tray_strings().auto_start_error_title)
             .kind(MessageDialogKind::Error)
             .show(|_| {});
     }
@@ -261,6 +262,7 @@ struct TrayStrings {
     client_disconnected: &'static str,
     client_disconnected_detail: &'static str,
     client_disconnected_named: &'static str,
+    nr_active: &'static str,
     incoming_pairing: &'static str,
     pairing_instruction: &'static str,
     pairing_menu_instruction: &'static str,
@@ -302,6 +304,13 @@ struct TrayStrings {
     auto_start: &'static str,
     #[cfg(target_os = "windows")]
     auto_start_off_confirm: &'static str,
+    auto_start_error_title: &'static str,
+    #[cfg(target_os = "windows")]
+    auto_start_uac_canceled: &'static str,
+    #[cfg(target_os = "windows")]
+    auto_start_untrusted_dir: &'static str,
+    #[cfg(target_os = "windows")]
+    auto_start_failed: &'static str,
     #[cfg(target_os = "windows")]
     switch_mode_confirm: &'static str,
     #[cfg(any(debug_assertions, feature = "beta"))]
@@ -310,6 +319,7 @@ struct TrayStrings {
     debug_page: &'static str,
     check_update: &'static str,
     about: &'static str,
+    feedback: &'static str,
     shutdown: &'static str,
     shutdown_message: &'static str,
     language: &'static str,
@@ -350,6 +360,7 @@ const ZH_STRINGS: TrayStrings = TrayStrings {
     client_disconnected: "客户端已断开",
     client_disconnected_detail: "串流连接已结束。",
     client_disconnected_named: "「{name}」已从这台电脑断开。",
+    nr_active: "当前串流的 DLSS NR 画质增强已生效。",
     incoming_pairing: "Moonlight 配对请求",
     pairing_instruction: "点击此通知，输入 Moonlight 上显示的 4 位 PIN。",
     pairing_menu_instruction: "打开 Sunshine 托盘菜单中的“完成配对”，输入 Moonlight 上显示的 4 位 PIN。",
@@ -393,12 +404,20 @@ const ZH_STRINGS: TrayStrings = TrayStrings {
     switch_mode_confirm: "切换运行模式会先停止 Sunshine 再重新启动，正在进行的串流会断开，需要管理员授权。继续吗？",
     #[cfg(target_os = "windows")]
     auto_start_off_confirm: "关闭后 Sunshine 服务改为手动启动：这台电脑重启后，Sunshine 不会自动运行，远程设备将无法连接，直到有人在这台电脑上启动它。确定关闭吗？",
+    auto_start_error_title: "Sunshine",
+    #[cfg(target_os = "windows")]
+    auto_start_uac_canceled: "未能更改开机自启：已取消管理员授权。",
+    #[cfg(target_os = "windows")]
+    auto_start_untrusted_dir: "未能更改开机自启：当前安装目录可被普通用户写入，控制面板不会自动提权修改系统服务。请以管理员身份运行控制面板后重试，或更新/重新安装到受保护目录（如 Program Files）。",
+    #[cfg(target_os = "windows")]
+    auto_start_failed: "更改开机自启失败：{error}",
     #[cfg(any(debug_assertions, feature = "beta"))]
     web_stream: "Web 串流服务",
     #[cfg(debug_assertions)]
     debug_page: "调试页面",
     check_update: "检查更新",
     about: "关于 Sunshine",
+    feedback: "反馈问题…",
     shutdown: "退出 Sunshine",
     shutdown_message: "这将停止 Sunshine 服务、GUI 和托盘。确定要退出吗？",
     language: "语言",
@@ -438,6 +457,7 @@ const EN_STRINGS: TrayStrings = TrayStrings {
     client_disconnected: "Client disconnected",
     client_disconnected_detail: "The streaming connection has ended.",
     client_disconnected_named: "“{name}” disconnected from this computer.",
+    nr_active: "DLSS NR is enhancing the current stream.",
     incoming_pairing: "Moonlight pairing request",
     pairing_instruction: "Click this notification to enter the 4-digit PIN shown in Moonlight.",
     pairing_menu_instruction: "Open Complete Pairing from the Sunshine tray menu and enter the 4-digit PIN shown in Moonlight.",
@@ -481,12 +501,20 @@ const EN_STRINGS: TrayStrings = TrayStrings {
     switch_mode_confirm: "Switching the mode stops Sunshine and starts it again: live streams end, and it needs administrator approval. Continue?",
     #[cfg(target_os = "windows")]
     auto_start_off_confirm: "The Sunshine service will be set to Manual: after this PC restarts, Sunshine will not run and remote devices cannot connect until someone starts it on this PC. Turn it off?",
+    auto_start_error_title: "Sunshine",
+    #[cfg(target_os = "windows")]
+    auto_start_uac_canceled: "Could not change startup setting: administrator authorization was canceled.",
+    #[cfg(target_os = "windows")]
+    auto_start_untrusted_dir: "Could not change startup setting: this installation folder is writable without administrator rights, so the panel will not self-elevate. Run the panel as administrator and try again, or reinstall/update into a protected folder such as Program Files.",
+    #[cfg(target_os = "windows")]
+    auto_start_failed: "Failed to update startup setting: {error}",
     #[cfg(any(debug_assertions, feature = "beta"))]
     web_stream: "Web Streaming",
     #[cfg(debug_assertions)]
     debug_page: "Debug Page",
     check_update: "Check for Updates",
     about: "About Sunshine",
+    feedback: "Send feedback…",
     shutdown: "Exit Sunshine",
     shutdown_message: "This will stop the Sunshine service, GUI, and tray. Continue?",
     language: "Language",
@@ -526,6 +554,7 @@ const JA_STRINGS: TrayStrings = TrayStrings {
     client_disconnected: "クライアントが切断されました",
     client_disconnected_detail: "ストリーミング接続が終了しました。",
     client_disconnected_named: "「{name}」がこのコンピューターから切断されました。",
+    nr_active: "現在のストリームで DLSS NR が有効になりました。",
     incoming_pairing: "Moonlight ペアリング要求",
     pairing_instruction: "この通知をクリックし、Moonlight に表示された 4 桁の PIN を入力してください。",
     pairing_menu_instruction: "Sunshine のトレイメニューから「ペアリングを完了」を開き、Moonlight に表示された 4 桁の PIN を入力してください。",
@@ -569,12 +598,20 @@ const JA_STRINGS: TrayStrings = TrayStrings {
     switch_mode_confirm: "実行モードを切り替えると Sunshine をいったん停止して再起動します。配信中のストリームは切断され、管理者の承認が必要です。続けますか？",
     #[cfg(target_os = "windows")]
     auto_start_off_confirm: "Sunshine サービスを手動に変更します。この PC を再起動すると Sunshine は起動せず、この PC で誰かが起動するまでリモートデバイスから接続できません。オフにしますか？",
+    auto_start_error_title: "Sunshine",
+    #[cfg(target_os = "windows")]
+    auto_start_uac_canceled: "自動起動を変更できませんでした：管理者権限の承認がキャンセルされました。",
+    #[cfg(target_os = "windows")]
+    auto_start_untrusted_dir: "自動起動を変更できませんでした：現在のインストール先フォルダーは一般ユーザーが書き込み可能なため、自動的に昇格できません。コントロールパネルを管理者として実行して再試行するか、Program Files などの保護されたフォルダーへ再インストールしてください。",
+    #[cfg(target_os = "windows")]
+    auto_start_failed: "自動起動の変更に失敗しました：{error}",
     #[cfg(any(debug_assertions, feature = "beta"))]
     web_stream: "Web ストリーミング",
     #[cfg(debug_assertions)]
     debug_page: "デバッグページ",
     check_update: "更新を確認",
     about: "Sunshine について",
+    feedback: "フィードバックを送る…",
     shutdown: "Sunshine を終了",
     shutdown_message: "Sunshine サービス、GUI、トレイを停止します。続行しますか？",
     language: "言語",
@@ -662,11 +699,13 @@ mod power {
 
 /// 创建系统托盘
 pub fn create_system_tray<R: Runtime + 'static>(app: &AppHandle<R>) -> tauri::Result<()> {
-    #[cfg(target_os = "windows")]
-    init_sunshine_user_mode_state(app);
+    if !crate::test_isolation::active() {
+        #[cfg(target_os = "windows")]
+        init_sunshine_user_mode_state(app);
 
-    if let Err(error) = notifications::initialize(app) {
-        warn!("{}", error);
+        if let Err(error) = notifications::initialize(app) {
+            warn!("{}", error);
+        }
     }
 
     initialize_tray_locale();
@@ -785,20 +824,8 @@ fn open_desktop_gui_from_tray<R: Runtime>(app: &AppHandle<R>, source: &str) {
 }
 
 fn open_main_panel_from_tray<R: Runtime>(app: &AppHandle<R>, source: &str) {
-    // the old window is still being closed: the panel opens when it is gone
-    if windows::closing::is_closing("main") {
-        let source = source.to_owned();
-        windows::closing::after_closed(app, "main", move |app| open_main_panel_from_tray(&app, &source));
-        return;
-    }
-    if let Some(window) = app.get_webview_window("main") {
-        windows::show_and_activate_window(&window);
-        return;
-    }
-
-    if let Err(e) = windows::create_main_window(app) {
-        error!("Failed to open main panel from tray {}: {}", source, e);
-    }
+    debug!("Main panel requested from tray {source}");
+    windows::activate_main_window(app, None);
 }
 
 pub fn mark_main_panel_loading() {
@@ -1394,6 +1421,25 @@ pub(crate) fn refresh_menu_mode<R: Runtime>(app: &AppHandle<R>) {
 #[tauri::command]
 pub fn tray_prefs_get() -> crate::tray_prefs::TrayPrefs {
     crate::tray_prefs::current()
+}
+
+/// 恢复 Panel 默认偏好: the window's settings file, the pet shortcut, the tray icon's record and the developer overrides go back to their defaults (the page then clears what the window itself stores and loads again).
+#[tauri::command]
+pub async fn reset_panel_preferences(app: AppHandle) -> Result<(), String> {
+    // every part is tried, so that one that fails does not leave the others as they were; the page says that the reset is not complete
+    let mut failed: Vec<String> = Vec::new();
+    if let Err(error) = crate::dev_tools::dev_reset_desktop_settings(app.clone()).await {
+        failed.push(error);
+    }
+    if let Err(error) = crate::desktop_settings::reset_toolbar_shortcut(&app) {
+        failed.push(error);
+    }
+    if let Err(error) = crate::tray_prefs::save(crate::tray_prefs::TrayPrefs::default()) {
+        failed.push(error);
+    }
+    popup_input::reset_failures();
+    refresh_menu_mode(&app);
+    if failed.is_empty() { Ok(()) } else { Err(failed.join("; ")) }
 }
 
 #[tauri::command]

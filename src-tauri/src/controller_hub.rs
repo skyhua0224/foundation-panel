@@ -87,24 +87,6 @@ pub async fn get_audio_devices() -> Result<serde_json::Value, String> {
     read_device_api_response(response, "audio devices").await
 }
 
-/// Ask the host to install VB-CABLE ("install": download from VB-Audio, check the signature, silent setup) or to enable its
-/// disabled device ("enable": pnputil). The page has asked the person first; the host starts nothing without `confirm`.
-/// The progress is `vb_cable.job` of GET /api/audio/devices.
-#[tauri::command]
-pub async fn start_vb_cable_job(action: String) -> Result<serde_json::Value, String> {
-    if action != "install" && action != "enable" {
-        return Err(format!("Invalid VB-CABLE action: {action}"));
-    }
-    let endpoint = device_api_url(&format!("/api/audio/vb-cable/{action}")).await?;
-    let response = sunshine::create_https_client()?
-        .post(endpoint)
-        .json(&serde_json::json!({ "confirm": true }))
-        .send()
-        .await
-        .map_err(|error| format!("Unable to start the VB-CABLE job: {error}"))?;
-    read_device_api_response(response, "VB-CABLE job").await
-}
-
 #[tauri::command]
 pub async fn test_virtual_microphone() -> Result<MicrophoneTestResult, String> {
     let endpoint = device_api_url("/api/microphone/test").await?;

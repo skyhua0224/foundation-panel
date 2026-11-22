@@ -29,7 +29,7 @@ test('a host with an account answers the config, one without sends a page: the a
   const without = make({ '/api/config': () => new Response('<html>create account</html>', { status: 200 }) })
   await without.probeAccount()
   assert.equal(without.state.account.exists, false)
-  assert.deepEqual(buildGuideSteps({ skip: without.state.account.exists ? ['account'] : [] }).slice(0, 3).map((s) => s.id), ['intro', 'account', 'appearance'])
+  assert.deepEqual(buildGuideSteps({ skip: without.state.account.exists ? ['account'] : [] }).slice(0, 3).map((s) => s.id), ['intro', 'account', 'channel'])
 
   const down = make({})
   await down.probeAccount()
@@ -190,7 +190,7 @@ test('the Web UI access step reads the saved scope and bind address and saves on
   assert.equal(post.path, '/api/config')
   assert.deepEqual(post.body, { origin_web_ui_allowed: 'pc', bind_address: '192.0.2.5', port: '57989', locale: 'zh' })
   assert.equal(data.state.webAccess.scope, 'pc')
-  assert.ok(buildGuideSteps().some((s) => s.id === 'webaccess'))
+  assert.ok(buildGuideSteps().at(-1).optional.includes('webaccess'), 'the page is an optional one of the done page')
 })
 
 test('an upgrade: a host that is set up opens the guide once per new version of the panel', async () => {
@@ -342,4 +342,29 @@ test('the port check of the address step is the host 体检 (network group), in 
   assert.deepEqual(await make({}, {}).callbacks.checkPorts(), { ok: false, unsupported: true }, 'a host without the route (404) is unsupported, not failed')
   const down = createGuideData({ proxyUrl: async () => 'http://proxy', fetchImpl: async () => { throw new Error('away') }, vddStatus: async () => ({}), openUrl() {}, copy() {} })
   assert.deepEqual(await down.callbacks.checkPorts(), { ok: false, unsupported: false })
+})
+
+test('the update channel step reads the panel preference and saves a choice at once, answering { ok } so the step can say it was not saved', async () => {
+  const saved = []
+  const data = make({}, { channel: { get: async () => true, set: async (include) => { saved.push(include) } } })
+  assert.equal(data.state.channel.value, 'stable', 'the default until the preference is read')
+  await data.callbacks.loadChannel()
+  assert.equal(data.state.channel.value, 'prerelease')
+  assert.deepEqual(await data.callbacks.setChannel('stable'), { ok: true })
+  assert.deepEqual(saved, [false]); assert.equal(data.state.channel.value, 'stable')
+  assert.deepEqual(await data.callbacks.setChannel('prerelease'), { ok: true }); assert.deepEqual(saved, [false, true])
+  // a refusal leaves the shown choice and says so
+  const refused = make({}, { channel: { get: async () => false, set: async () => { throw new Error('native side down') } } })
+  assert.deepEqual(await refused.callbacks.setChannel('prerelease'), { ok: false }); assert.equal(refused.state.channel.value, 'stable')
+  // no native side (the Web page of the host): nothing is claimed
+  assert.deepEqual(await make({}).callbacks.setChannel('prerelease'), { ok: false })
+  await make({}).callbacks.loadChannel()
+})
+
+test('the funnel of the guide goes to the product, which hands it to its event sender', () => {
+  const sent = []
+  const data = make({}, { funnel: (props) => sent.push(props) })
+  data.callbacks.funnel({ phase: 'reached', step: 'intro' })
+  assert.deepEqual(sent, [{ phase: 'reached', step: 'intro' }])
+  assert.doesNotThrow(() => make({}).callbacks.funnel({ phase: 'reached', step: 'intro' }), 'a product without a sender is fine')
 })

@@ -1,7 +1,7 @@
 <template>
   <MSection>
     <MGroup>
-      <MSwitchItem :model-value="active" icon="monitoring" :title="t.rtssTool.monitoring" @update:model-value="toggleMonitoring" />
+      <MSwitchItem :model-value="active" icon="monitor_heart" :title="t.rtssTool.monitoring" @update:model-value="toggleMonitoring" />
       <MItem v-for="group in metricGroups" :key="group.id" stack :title="group.label">
         <template #control>
           <MChipSet multiple :model-value="config.metrics.filter((m) => group.metrics.some((g) => g.id === m))" :label="group.label" :options="group.metrics.map((m) => ({ value: m.id, label: m.label }))" @update:model-value="(ids) => setGroupMetrics(group, ids)" />

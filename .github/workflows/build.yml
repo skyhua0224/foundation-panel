@@ -1,8 +1,14 @@
 name: Build and Release
 
+# What a change can affect is decided by the `changes` job, not by `on.*.paths`: a workflow
+# skipped by a path filter leaves its checks pending, while a skipped job reports success and the
+# single `ci-gate` check still gives one required status. Pull requests run only the matching
+# subset; main, tags and manual runs run everything.
 on:
   pull_request:
   push:
+    branches:
+      - main
     tags:
       - 'v*'
   workflow_dispatch:
@@ -15,8 +21,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  SCCACHE_GHA_ENABLED: 'true'
-  RUSTC_WRAPPER: sccache
 
 concurrency:
   group: gui-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -26,10 +30,143 @@ permissions:
   contents: read
 
 jobs:
-  build-windows:
-    name: Build Windows (x64)
-    runs-on: windows-latest
+  # Classifies the files a run touches. A skipped job reports success, so the jobs below are
+  # routed from these outputs and `ci-gate` stays the one check to require
+  # (panel-github-workflow-syntax: paths filters leave checks pending).
+  changes:
+    name: Changes
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      rust: ${{ steps.classify.outputs.rust }}
+      renderer: ${{ steps.classify.outputs.renderer }}
+      code: ${{ steps.classify.outputs.code }}
+    steps:
+      - name: Checkout the CI scripts
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: scripts/ci
+          persist-credentials: false
 
+      - name: Test and run the classifier
+        id: classify
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          python3 scripts/ci/test_classify_changes.py
+          python3 scripts/ci/changed-files.py > files.txt
+          python3 scripts/ci/classify-changes.py --event "$EVENT" --output "$GITHUB_OUTPUT" < files.txt
+
+  # Tauri's build script reads a frontend dist during the Rust compile. Build it once on Linux
+  # and hand the files to the Windows jobs. This job stays small so the Rust jobs do not wait
+  # for the development image; the frontend build with the pinned settings data is the check
+  # below, and the release job builds its own production dist.
+  renderer-dist:
+    name: Renderer dist
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.22.3'
+
+      # The npm cache is saved only from main so pull requests cannot evict it through
+      # per-ref entries (panel-github-cache, panel-actions-cache).
+      - name: Restore the npm cache
+        id: npm-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.npm
+          key: panel-npm-v1-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: panel-npm-v1-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline
+
+      - name: Build the renderer
+        run: npm run build:renderer
+
+      - name: Save the npm cache
+        if: github.ref == 'refs/heads/main' && steps.npm-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.npm
+          key: panel-npm-v1-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      - name: Upload the renderer dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: panel-renderer-dist
+          path: dist
+          if-no-files-found: error
+          retention-days: 3
+
+  # The frontend check with the pinned tools: the locked image is restored from the GHA layer
+  # cache instead of being rebuilt from the Dockerfile every run (panel-docker-gha-cache,
+  # panel-build-push-action). This job does not gate the Windows Rust jobs.
+  renderer-tests:
+    name: Renderer tests (Dev Container)
+    needs: changes
+    if: needs.changes.outputs.renderer == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the development image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: .devcontainer/Dockerfile
+          platforms: linux/amd64
+          tags: foundation-panel-dev:ci
+          load: true
+          cache-from: type=gha,scope=panel-dev-image
+          cache-to: ${{ github.ref == 'refs/heads/main' && 'type=gha,mode=max,scope=panel-dev-image' || '' }}
+
+      - name: Build, check and test with the shared entry points
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/panel-cache/tmp"
+          docker run --platform=linux/amd64 --rm --init \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/workspaces/panel" \
+            --mount "type=bind,source=$RUNNER_TEMP/panel-cache,target=/workspaces/.cache" \
+            --workdir /workspaces/panel \
+            --env CARGO_BUILD_JOBS=2 \
+            --env CARGO_HOME=/workspaces/.cache/cargo \
+            foundation-panel-dev:ci \
+            sh -eu -c 'just setup && just doctor && just build && just test'
+
+  # The test binary is built once in the ci-test profile and both the whole suite and the USB-IP
+  # fixtures run from it. src-tauri's release profile (fat LTO, one codegen unit) is for the
+  # shipped binary only; a test run took 11 s while its fat-LTO compile took 11 min 34 s
+  # (panel-cargo-profiles, panel-cargo-test-profile). The dependency cache is panel-rust-cache;
+  # its 10 GB scope and branch rules are panel-github-cache.
+  windows-backend:
+    name: Windows Rust tests
+    needs: [changes, renderer-dist]
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 35
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/.panel-deps/target
     steps:
       # Several tests match source text with \n in their patterns: check the sources out with LF on Windows too.
       - name: Keep LF line endings
@@ -39,32 +176,207 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v7.1.0
+      # Dependency-only target cache (panel-rust-cache); pull requests restore main's entry,
+      # only main saves one (panel-github-cache).
+      - name: Restore Rust dependencies
+        uses: Swatinem/rust-cache@v2
         with:
-          node-version: 24.21.0
-          cache: npm
+          prefix-key: panel-ci-v2
+          workspaces: src-tauri -> ../.panel-deps/target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Select locked tools
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db  # v3.6.3
         with:
-          targets: x86_64-pc-windows-msvc
+          version: 2026.11.9
+      - name: Activate MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756  # v1.13.0
 
-      # Cache compiler outputs without restoring Cargo's target directory. This
-      # avoids the stale Tauri proc-macro fingerprints previously seen with a
-      # target-directory cache while still reusing unchanged dependency builds.
-      - name: Setup Rust compiler cache
-        uses: mozilla-actions/sccache-action@v0.0.11
+      - name: Download renderer dist
+        uses: actions/download-artifact@v4
+        with:
+          name: panel-renderer-dist
+          path: dist
 
-      # The panel imports foundation-ui from a sibling checkout named ds5-ui-m3e (package.json: "file:../ds5-ui-m3e").
-      - name: Fetch foundation-ui
-        shell: bash
+      # One build, then the two filters run against the same executables. A second cargo test
+      # invocation recompiles the workspace crate (the build script rewrites its generated
+      # capability files), which cost 1 min 42 s in the 2026-11-22 cold run.
+      - name: Build the test binary once
+        shell: powershell
         run: |
-          git clone --depth 1 https://github.com/AlkaidLab/foundation-ui "$GITHUB_WORKSPACE/../ds5-ui-m3e"
-          npm ci --prefix "$GITHUB_WORKSPACE/../ds5-ui-m3e"
+          cargo test --locked --profile ci-test --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --no-run --message-format=json > "$env:RUNNER_TEMP\test-targets.json"
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $executables = Get-Content "$env:RUNNER_TEMP\test-targets.json" | ForEach-Object {
+            try { $_ | ConvertFrom-Json } catch { }
+          } | Where-Object { $_.reason -eq 'compiler-artifact' -and $_.executable } |
+            Select-Object -ExpandProperty executable -Unique
+          if (-not $executables) { throw 'cargo test --no-run produced no test executable' }
+          $executables | Set-Content "$env:RUNNER_TEMP\test-executables.txt"
 
-      - name: Install npm dependencies
-        run: npm ci
+      - name: USB-IP ownership registry and layout fixtures (ci-test)
+        shell: powershell
+        run: |
+          $contract = Get-Content -Raw src-tauri/component-compatibility.json | ConvertFrom-Json
+          $file = Join-Path $env:RUNNER_TEMP 'usbip-legacy-fixture.exe'
+          Invoke-WebRequest -UseBasicParsing $contract.usbip.installer_url -OutFile $file
+          if ((Get-FileHash -Algorithm SHA256 $file).Hash -ne $contract.usbip.installer_sha256) { throw 'Legacy fixture hash mismatch' }
+          $env:USBIP_LEGACY_FIXTURE_INSTALLER = $file
+          Push-Location src-tauri
+          try {
+            Get-Content "$env:RUNNER_TEMP\test-executables.txt" | ForEach-Object {
+              & $_ usbip:: --nocapture
+              if ($LASTEXITCODE) { throw "test executable failed: $_" }
+            }
+          } finally { Pop-Location }
+
+      # Environment-dependent on hosted runners (system code page, timing, catalog signatures); they run on the release hosts.
+      - name: Test Tauri backend
+        shell: powershell
+        run: |
+          $skips = @(
+            '--skip', 'usbip::',
+            '--skip', 'host_version::tests::gbk_console_output_is_decoded_and_is_never_a_version',
+            '--skip', 'text_encoding::tests::decodes_console_gbk',
+            '--skip', 'sunshine::tray_protocol_tests::tray_status_times_out_when_core_never_sends_headers',
+            '--skip', 'sunshine::tray_protocol_tests::tray_status_times_out_when_core_stalls_the_body',
+            '--skip', 'tray::events::tests::event_stream_handshake_times_out_after_tcp_connect'
+          )
+          Push-Location src-tauri
+          try {
+            Get-Content "$env:RUNNER_TEMP\test-executables.txt" | ForEach-Object {
+              & $_ @skips
+              if ($LASTEXITCODE) { throw "test executable failed: $_" }
+            }
+          } finally { Pop-Location }
+
+      - name: Save read-only transport test binary
+        uses: actions/upload-artifact@v7
+        with:
+          name: usbip-debug-probe
+          path: .panel-deps/target/x86_64-pc-windows-msvc/ci-test/**/sunshine_gui-*.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  # The tests compile the test configuration, in which some functions exist that the release
+  # build does not have. Type-check the release and the debug bin configurations here, in
+  # parallel with the tests, instead of running a second full compile on the test runner.
+  windows-config:
+    name: Windows configuration checks
+    needs: [changes, renderer-dist]
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/.panel-deps/config-target
+    steps:
+      - name: Keep LF line endings
+        shell: bash
+        run: git config --global core.autocrlf false
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: panel-ci-v2
+          workspaces: src-tauri -> ../.panel-deps/config-target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Select locked tools
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db  # v3.6.3
+        with:
+          version: 2026.11.9
+      - name: Activate MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756  # v1.13.0
+
+      - name: Download renderer dist
+        uses: actions/download-artifact@v4
+        with:
+          name: panel-renderer-dist
+          path: dist
+
+      - name: Check the debug configuration compiles
+        run: cargo check --locked --bins --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc
+
+      - name: Check the release configuration compiles
+        run: cargo check --locked --manifest-path src-tauri/Cargo.toml --release --bins --target x86_64-pc-windows-msvc
+
+  windows-native-plugins:
+    name: Windows native plugins
+    needs: changes
+    if: needs.changes.outputs.rust == 'true'
+    runs-on: windows-latest
+    timeout-minutes: 25
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/.panel-deps/plugin-target
+    steps:
+      - name: Keep LF line endings
+        shell: bash
+        run: git config --global core.autocrlf false
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: panel-ci-v2
+          workspaces: native-plugins -> ../.panel-deps/plugin-target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Select locked tools
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db  # v3.6.3
+        with:
+          version: 2026.11.9
+      - name: Activate MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756  # v1.13.0
+
+      - name: Build native tool plugins
+        shell: pwsh
+        run: ./scripts/build-native-plugins.ps1 -Configuration Release -Target x86_64-pc-windows-msvc
+
+      - name: Test native tool plugin crates
+        run: cargo test --locked --profile ci-test --manifest-path native-plugins/Cargo.toml --target x86_64-pc-windows-msvc
+
+      - name: Check the debug plugin configuration compiles
+        run: cargo check --locked --workspace --manifest-path native-plugins/Cargo.toml --target x86_64-pc-windows-msvc
+
+  # Tags and a manual run that asks for a release keep the shipped configuration: fat LTO and
+  # one codegen unit in src-tauri's release profile. It runs beside the tests, so the critical
+  # path of a tag is the slower of the two.
+  windows-release:
+    name: Windows release build
+    needs: changes
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
+    runs-on: windows-latest
+    timeout-minutes: 60
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/.panel-deps/target
+    steps:
+      - name: Keep LF line endings
+        shell: bash
+        run: git config --global core.autocrlf false
+
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Restore Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: panel-ci-v2
+          workspaces: src-tauri -> ../.panel-deps/target
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Select locked tools
+        uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db  # v3.6.3
+        with:
+          version: 2026.11.9
+      - name: Activate MSVC developer environment
+        uses: ilammy/msvc-dev-cmd@0b201ec74fa43914dc39ae48a89fd1d8cb592756  # v1.13.0
+
+      - name: Setup with the contributor entry point
+        run: just setup
 
       - name: Inject version from tag
         shell: bash
@@ -81,7 +393,7 @@ jobs:
             const fs = require('fs');
             const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8'));
             pkg.version = '$VERSION';
-            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\n');
+            fs.writeFileSync('package.json', JSON.stringify(pkg, null, 2) + '\\n');
           "
 
           # src-tauri/tauri.conf.json
@@ -89,7 +401,7 @@ jobs:
             const fs = require('fs');
             const conf = JSON.parse(fs.readFileSync('src-tauri/tauri.conf.json', 'utf8'));
             conf.version = '$VERSION';
-            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2) + '\n');
+            fs.writeFileSync('src-tauri/tauri.conf.json', JSON.stringify(conf, null, 2) + '\\n');
           "
 
           # src-tauri/Cargo.toml (replace version in [package] section)
@@ -98,59 +410,42 @@ jobs:
           # Built-in native tool plugin
           sed -i '0,/^version = ".*"/s//version = "'"$VERSION"'"/' native-plugins/stylus/Cargo.toml
 
+          # The injected version is the workspace member's own entry in each Cargo.lock. Refresh only that entry
+          # (dependencies stay locked) so the --locked builds below accept it.
+          cargo update --workspace --manifest-path src-tauri/Cargo.toml
+          cargo update --workspace --manifest-path native-plugins/Cargo.toml
+
           echo "Version injected into GUI and native plugin manifests"
 
       - name: Build frontend
         run: npm run build:renderer
 
-      - name: Test renderer logic
-        run: npm run test:renderer
-
       - name: Build native tool plugins
         shell: pwsh
         run: ./scripts/build-native-plugins.ps1 -Configuration Release -Target x86_64-pc-windows-msvc
 
-      - name: Test native tool plugin crates
-        run: cargo test --release --manifest-path native-plugins/Cargo.toml --target x86_64-pc-windows-msvc
-
-      # Environment-dependent on hosted runners (system code page, timing, catalog signatures); they run on the release hosts.
-      - name: Test Tauri backend
-        run: >-
-          cargo test --release --manifest-path src-tauri/Cargo.toml --target x86_64-pc-windows-msvc --
-          --skip host_version::tests::gbk_console_output_is_decoded_and_is_never_a_version
-          --skip text_encoding::tests::decodes_console_gbk
-          --skip sunshine::tray_protocol_tests::tray_status_times_out_when_core_never_sends_headers
-          --skip sunshine::tray_protocol_tests::tray_status_times_out_when_core_stalls_the_body
-          --skip tray::events::tests::event_stream_handshake_times_out_after_tcp_connect
-          --skip usbip::signature::tests::a_signed_system_file_reads_as_signed
-          --skip usbip::signature::tests::an_unsigned_script_and_a_missing_file_are_not_called_signed
-
       - name: Build Tauri (release)
-        if: github.event_name != 'pull_request'
-        run: cargo build --manifest-path src-tauri/Cargo.toml --release --target x86_64-pc-windows-msvc
+        run: cargo build --locked --manifest-path src-tauri/Cargo.toml --release --target x86_64-pc-windows-msvc
 
       - name: Install NSIS
-        if: github.event_name != 'pull_request'
         shell: pwsh
         run: choco install nsis -y --no-progress
 
       - name: Build GUI component installer
-        if: github.event_name != 'pull_request'
         shell: pwsh
         run: ./scripts/build-gui-component-installer.ps1 -SkipBuild
 
       - name: Prepare artifacts
-        if: github.event_name != 'pull_request'
         shell: pwsh
         run: |
           $outDir = "artifacts"
           New-Item -ItemType Directory -Force -Path $outDir
 
-          $targetDir = "src-tauri/target/x86_64-pc-windows-msvc/release"
+          $targetDir = ".panel-deps/target/x86_64-pc-windows-msvc/release"
           Copy-Item "$targetDir/sunshine-gui.exe" "$outDir/"
           Copy-Item "$targetDir/alkaidlab-plugin-stylus.dll" "$outDir/"
 
-          # WebView2Loader.dll (if exists — Tauri 2 may embed it)
+          # WebView2Loader.dll (if exists - Tauri 2 may embed it)
           if (Test-Path "$targetDir/WebView2Loader.dll") {
             Copy-Item "$targetDir/WebView2Loader.dll" "$outDir/"
           }
@@ -172,23 +467,51 @@ jobs:
             Write-Host "$($_.Name): $([math]::Round($_.Length / 1MB, 2)) MB"
           }
 
+          # Executable size, raw and compressed, in bytes (to follow the package size from build to build)
+          $exe = Get-Item "$outDir/sunshine-gui.exe"
+          $packed = Join-Path $env:RUNNER_TEMP 'sunshine-gui.exe.zip'
+          Compress-Archive -Path $exe.FullName -DestinationPath $packed -CompressionLevel Optimal -Force
+          $line = "sunshine-gui.exe: $($exe.Length) bytes, $((Get-Item $packed).Length) bytes zipped"
+          Write-Host $line
+          "- $line" >> $env:GITHUB_STEP_SUMMARY
+
+          # The symbols for decoding crash reports stay outside the release package
+          $pdb = Get-ChildItem $targetDir -Filter '*.pdb' | Where-Object { $_.Name -like 'sunshine*gui*.pdb' } | Select-Object -First 1
+          if (-not $pdb) { throw "The release build wrote no PDB: crash reports could not be decoded" }
+          New-Item -ItemType Directory -Force -Path symbols | Out-Null
+          Copy-Item $pdb.FullName "symbols/"
+
       - name: Upload artifacts
-        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: sunshine-gui-windows-x64
           path: artifacts/*
           if-no-files-found: error
 
+      - name: Upload symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: sunshine-gui-symbols
+          path: symbols/*
+          retention-days: 90
+          if-no-files-found: error
+
   release:
     name: Create Release
-    needs: build-windows
+    needs: windows-release
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.create_release == 'true')
     permissions:
       contents: write
 
     steps:
+      # The release text lives in the repository: .github/release-notes/<tag>.md
+      - name: Checkout release notes
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/release-notes
+          sparse-checkout-cone-mode: false
+
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
@@ -204,12 +527,56 @@ jobs:
             echo "tag=v$(date +%Y.%m%d.%H%M%S)" >> "$GITHUB_OUTPUT"
           fi
 
+      # The notes file of the tag is the body of the release; a tag without one gets the generated notes.
+      - name: Find release notes
+        id: notes
+        run: |
+          file=".github/release-notes/${{ steps.version.outputs.tag }}.md"
+          if [ -s "$file" ]; then echo "path=$file" >> "$GITHUB_OUTPUT"; else echo "path=" >> "$GITHUB_OUTPUT"; fi
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Sunshine GUI ${{ steps.version.outputs.tag }}
-          generate_release_notes: true
+          body_path: ${{ steps.notes.outputs.path }}
+          generate_release_notes: ${{ steps.notes.outputs.path == '' }}
           files: artifacts/*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # The only check a branch protection rule needs. A job skipped by the change classifier
+  # reports success; any failed or cancelled job fails the gate.
+  ci-gate:
+    name: ci-gate
+    needs:
+      - changes
+      - renderer-dist
+      - renderer-tests
+      - windows-backend
+      - windows-config
+      - windows-native-plugins
+      - windows-release
+      - release
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check the job results
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+
+          needs = json.loads(os.environ["NEEDS"])
+          rows = [f"- {name}: {value['result']}" for name, value in needs.items()]
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("\n".join(rows) + "\n")
+          failed = [name for name, value in needs.items() if value["result"] in ("failure", "cancelled")]
+          if failed:
+              raise SystemExit("failed or cancelled: " + ", ".join(failed))
+          PY
+

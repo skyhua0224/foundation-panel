@@ -59,7 +59,7 @@
         <!-- 串流监控 -->
         <MSection :title="r.monitor">
           <MGroup>
-            <MSwitchItem :model-value="monitoring" icon="monitoring" :title="r.monitorOn" @update:model-value="(v) => (v ? startMonitoring() : stopMonitoring())" />
+            <MSwitchItem :model-value="monitoring" icon="monitor_heart" :title="r.monitorOn" @update:model-value="(v) => (v ? startMonitoring() : stopMonitoring())" />
             <MItem v-for="group in groups" :key="group.id" stack :title="group.label">
               <template #control><MChipSet :model-value="config.metrics" multiple :label="group.label" :options="group.metrics" @update:model-value="setMetrics" /></template>
             </MItem>

@@ -15,6 +15,25 @@ const OPTIONS = {
   autoMask: [3, (v) => typeof v === 'boolean'],
 }
 
+/**
+ * Whether a change of focus takes the focus out of the live controls (to nothing, or to an element outside them). The focus moving from one control of the section to another
+ * (a press on the track of the next slider moves it from the handle of the one before) is not leaving: it must not drop the edit that press began.
+ */
+export const focusLeaves = (section, next) => !(next && typeof section?.contains === 'function' && section.contains(next))
+
+export const SLIDER_KEYS = Object.freeze(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown'])
+
+/**
+ * Whether a press or a key begins editing a slider of the live controls: a press on a slider, or a key that changes the value on the handle of one. Tab, a press on a switch or a segmented
+ * control and the keys of other controls begin nothing: an edit that never commits would hold the draft against the values the host reports.
+ */
+export function startsSliderEdit(event) {
+  const target = event?.target
+  if (typeof target?.closest !== 'function') return false
+  if (event.type === 'keydown') return SLIDER_KEYS.includes(event.key) && !!target.closest('[role=slider]')
+  return !!target.closest('.m-slider')
+}
+
 // Validate the target again when committing an edit: a newly selected stream
 // must never receive a value drafted for the previous one.
 export function nrSessionRequest(pipeline, targetId, patch, online = true, { reset = false } = {}) {
@@ -54,10 +73,10 @@ export function nrSessionRequest(pipeline, targetId, patch, online = true, { res
   return request
 }
 
-/** The request of 恢复 NR 默认值: switch off and put every option back (the options of controls version 3 only where the host has them). */
+/** The request of 恢复 NR 默认值: restore the processing parameters (the options of controls version 3 only where the host has them). */
 export function nrResetRequest(pipeline, targetId, online = true) {
   const version = pipeline?.nr_live_controls_version ?? 0
-  const patch = { enabled: false, ...NR_DEFAULTS }
+  const patch = { ...NR_DEFAULTS }
   if (!(version >= 3)) { delete patch.style; delete patch.skinStructureStrength; delete patch.autoMask }
   return nrSessionRequest(pipeline, targetId, patch, online, { reset: true })
 }

@@ -422,6 +422,7 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
 
     let check_update = MenuItem::with_id(app, "check_update", s.check_update, true, None::<&str>)?;
     let about = MenuItem::with_id(app, "about", s.about, true, None::<&str>)?;
+    let feedback = MenuItem::with_id(app, "feedback", s.feedback, true, None::<&str>)?;
     let help_separator = PredefinedMenuItem::separator(app)?;
     let star_project = MenuItem::with_id(app, "star_project", s.star_project, true, None::<&str>)?;
     let visit_project_sunshine = MenuItem::with_id(
@@ -446,12 +447,14 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
     let sponsor_qiin = MenuItem::with_id(app, "sponsor_qiin", "qiin2333", true, None::<&str>)?;
     let sponsor_yundi339 = MenuItem::with_id(app, "sponsor_yundi339", "Yundi339", true, None::<&str>)?;
     let sponsor_skyhua = MenuItem::with_id(app, "sponsor_skyhua", "skyhua0224", true, None::<&str>)?;
+    let sponsor_wechat = MenuItem::with_id(app, "sponsor_wechat", "微信赞赏 / WeChat", true, None::<&str>)?;
+    let sponsor_github = MenuItem::with_id(app, "sponsor_github", "GitHub Sponsors", true, None::<&str>)?;
     let sponsor_submenu = Submenu::with_id_and_items(
         app,
         "sponsor",
         s.sponsor_menu,
         true,
-        &[&sponsor_qiin, &sponsor_yundi339, &sponsor_skyhua],
+        &[&sponsor_qiin, &sponsor_yundi339, &sponsor_skyhua, &sponsor_wechat, &sponsor_github],
     )?;
     let help_submenu = Submenu::with_id_and_items(
         app,
@@ -461,6 +464,7 @@ pub(super) fn build_tray_menu<R: Runtime>(app: &AppHandle<R>) -> tauri::Result<M
         &[
             &check_update,
             &about,
+            &feedback,
             &help_separator,
             &star_project,
             &visit_project_sunshine,

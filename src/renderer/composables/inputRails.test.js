@@ -94,7 +94,7 @@ test('the help page names the Web page of the logs with the name that page has (
 test('the tools people come for are rows of 系统: the latency clock, the test tools and the timer are two presses (the toolbox made them three)', () => {
   const nav = read('./panelNav.js')
   const system = nav.slice(nav.indexOf('    system: ['), nav.indexOf('  return pages[rail]'))
-  assert.deepEqual([...system.matchAll(/id: ROUTES\.(\w+),/g)].map((m) => m[1]), ['SUNSHINE_SERVICE', 'COMPONENT_STATUS', 'NETWORK_OVERVIEW', 'DIAGNOSTICS', 'DOCTOR', 'TOOLBOX', 'LATENCY_CLOCK', 'TEST_TOOLS', 'STREAM_TIMER', 'RTSS'])
+  assert.deepEqual([...system.matchAll(/id: ROUTES\.(\w+),/g)].map((m) => m[1]), ['SUNSHINE_SERVICE', 'COMPONENT_STATUS', 'NETWORK_OVERVIEW', 'DIAGNOSTICS', 'DOCTOR', 'RESET', 'TOOLBOX', 'LATENCY_CLOCK', 'TEST_TOOLS', 'STREAM_TIMER', 'RTSS'])
   assert.ok(nav.includes("[ROUTES.LATENCY_CLOCK]: 'latency-clock', [ROUTES.TEST_TOOLS]: 'test-tools', [ROUTES.STREAM_TIMER]: 'stream-timer'"))
 })
 

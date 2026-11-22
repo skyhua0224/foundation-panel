@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { webcrypto } from 'node:crypto'
-import { createSSRApp, ref } from 'vue'
+import { createRenderer, createSSRApp, ref } from 'vue'
 import { renderToString } from 'vue/server-renderer'
 import { mockIPC } from '@tauri-apps/api/mocks'
 import { rtxHdrMessages } from './rtxHdrMessages.js'
@@ -13,6 +13,27 @@ Object.defineProperty(globalThis, 'navigator', { value: { language: 'en' }, conf
 globalThis.window = { addEventListener() {}, crypto: webcrypto }
 mockIPC(() => undefined, { shouldMockEvents: true })
 const { useEnhancementManager } = await import('./useEnhancementManager.js')
+
+test('leaving the page discards an outstanding component status read', async () => {
+  const pending = Promise.withResolvers()
+  const statuses = []
+  const renderer = createRenderer({ createComment: () => ({}), insert() {}, remove() {} })
+  const app = renderer.createApp({
+    setup() {
+      useEnhancementManager({
+        api: { getStatus: () => pending.promise },
+        messages: ref(dlssNrText('en')),
+        onStatus: data => statuses.push(data.installed),
+      })
+      return () => null
+    },
+  })
+  app.mount({})
+  app.unmount()
+  pending.resolve({ success: true, data: { installed: false } })
+  await pending.promise
+  assert.deepEqual(statuses, [])
+})
 
 for (const text of [rtxHdrMessages.en, dlssNrText('zh')]) {
   test(`${text.runtime}: failed initial check stays unknown and a retry restores status`, async () => {

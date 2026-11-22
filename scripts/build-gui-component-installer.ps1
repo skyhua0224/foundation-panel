@@ -37,10 +37,12 @@ function Get-Sha256([string]$Path) {
 }
 
 function Resolve-GuiExe {
+    # dev-env-cargo-env: just package passes CARGO_TARGET_DIR, so the build writes there instead of src-tauri\target.
+    $TargetRoot = if ($env:CARGO_TARGET_DIR) { $env:CARGO_TARGET_DIR } else { Join-Path $TauriRoot 'target' }
     $paths = @(
-        (Join-Path $TauriRoot 'target\release\sunshine-gui.exe'),
-        (Join-Path $TauriRoot 'target\x86_64-pc-windows-msvc\release\sunshine-gui.exe'),
-        (Join-Path $TauriRoot 'target\x86_64-pc-windows-gnu\release\sunshine-gui.exe')
+        (Join-Path $TargetRoot 'release\sunshine-gui.exe'),
+        (Join-Path $TargetRoot 'x86_64-pc-windows-msvc\release\sunshine-gui.exe'),
+        (Join-Path $TargetRoot 'x86_64-pc-windows-gnu\release\sunshine-gui.exe')
     )
 
     $candidates = $paths |

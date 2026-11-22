@@ -1,6 +1,10 @@
-export function nrOverlayState(pipeline, online) {
+export function nrOverlayState(pipeline, online, hasStreams = false, pipelineCount = 0) {
   if (!online) return 'unavailable'
-  if (!pipeline) return 'idle'
+  if (!pipeline) {
+    if (pipelineCount > 1) return 'choose_stream'
+    return hasStreams ? 'no_pipeline' : 'idle'
+  }
+  if (pipeline.nr_app_allowed === false) return 'app_disabled'
   if (!pipeline.nr_toggle_supported) return 'blocked'
   if (pipeline.nr_requested_enabled) {
     if (pipeline.nr_state === 'active') {

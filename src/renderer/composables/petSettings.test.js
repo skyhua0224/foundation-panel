@@ -41,7 +41,7 @@ test('the desktop observation asks for consent and needs a configured assistant'
 // the pet's own menu: a right click or a long press opens it, and the entries to hide the pet and to open its settings are words, not guesses
 const pet = fs.readFileSync(new URL('../toolbar/ToolbarApp.vue', import.meta.url), 'utf8')
 test('the pet menu opens on a right click and on a long press, and says what its bubbles do', () => {
-  assert.match(pet, /@contextmenu\.prevent="toggleMenu"/)
+  assert.match(pet, /@contextmenu\.prevent="onIconContextMenu"/)
   assert.match(pet, /longPressTimer = setTimeout\(/)
   assert.match(pet, /<span class="bubble-caption"/)
   for (const t of [zh, en]) {

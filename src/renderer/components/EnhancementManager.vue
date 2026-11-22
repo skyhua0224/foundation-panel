@@ -21,7 +21,7 @@
       <MSwitchItem
         :model-value="status.enabled"
         icon="power_settings_new"
-        :title="controlsText.allowUse + (kind === 'nr' ? 'DLSS NR' : 'RTX HDR')"
+        :title="kind === 'nr' ? controlsText.liveTitle : controlsText.allowUse + 'RTX HDR'"
         :text="kind === 'nr' ? controlsText.nrPermissionHint : controlsText.hdrPermissionHint"
         :disabled="!statusKnown || !status.installed || (!status.enabled && status.state === 'repair_required') || status.maintenance || controlsBusy"
         @update:model-value="setEnabled"
@@ -62,7 +62,8 @@ const controlsText = computed(() => enhancementControlsText(locale.value))
 const hdrText = useRtxHdrI18n()
 const text = computed(() => ({
   ...(props.kind === 'nr' ? dlssNrText(locale.value) : hdrText.value),
-  saveSuccess: controlsText.value.permissionSaved
+  saveSuccess: controlsText.value.permissionSaved,
+  permissionSaveFailed: controlsText.value.permissionSaveFailed
 }))
 
 const {

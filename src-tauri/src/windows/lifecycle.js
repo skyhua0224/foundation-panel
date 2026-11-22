@@ -2,12 +2,26 @@
     let _hidden = false;
     let _pauseStyleEl = null;
 
+    // The page is hidden when the panel says so (hidden to the tray, minimized: `__setWebviewVisibility`) or when the
+    // engine says so (the window is covered by other windows). The engine's own answer is read before the property
+    // is replaced; a frame of another origin is told only by the engine.
+    let _engineHidden = function() { return false; };
+    try {
+        const descriptor = Object.getOwnPropertyDescriptor(Document.prototype, 'visibilityState');
+        if (descriptor && descriptor.get) {
+            _engineHidden = function() {
+                try { return descriptor.get.call(document) === 'hidden'; } catch (e) { return false; }
+            };
+        }
+    } catch (e) {}
+    const isHidden = function() { return _hidden || _engineHidden(); };
+
     Object.defineProperty(document, 'hidden', {
-        get: function() { return _hidden; },
+        get: function() { return isHidden(); },
         configurable: true,
     });
     Object.defineProperty(document, 'visibilityState', {
-        get: function() { return _hidden ? 'hidden' : 'visible'; },
+        get: function() { return isHidden() ? 'hidden' : 'visible'; },
         configurable: true,
     });
 
@@ -28,19 +42,32 @@
         }
     }
 
-    window.__setWebviewVisibility = function(visible) {
-        var wasHidden = _hidden;
-        _hidden = !visible;
-        if (wasHidden !== _hidden) {
-            console.log('[WebView Visibility] ' + (_hidden ? '进入休眠' : '恢复活跃'));
-            if (_hidden) {
-                pauseAnimations();
-            } else {
-                resumeAnimations();
-            }
-            document.dispatchEvent(new Event('visibilitychange'));
+    // What was applied last: the animations follow the combined state, not one of its two sources.
+    let _applied = false;
+    function apply() {
+        const now = isHidden();
+        if (now === _applied) return false;
+        _applied = now;
+        console.log('[WebView Visibility] ' + (now ? '进入休眠' : '恢复活跃'));
+        if (now) {
+            pauseAnimations();
+        } else {
+            resumeAnimations();
         }
+        return true;
+    }
+
+    window.__setWebviewVisibility = function(visible) {
+        _hidden = !visible;
+        // The page's own listeners get the event only when the combined state changed.
+        if (apply()) document.dispatchEvent(new Event('visibilitychange'));
     };
+
+    // The engine's own events (a covered window, a frame): the animations follow them; the page's listeners
+    // receive these events themselves and read the combined state.
+    if (typeof document.addEventListener === 'function') {
+        document.addEventListener('visibilitychange', apply);
+    }
 
     // WebView 心跳：每 10 秒向 Rust 后端发送心跳信号
     // 若渲染进程崩溃，心跳停止，后端检测到后可触发自动恢复

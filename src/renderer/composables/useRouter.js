@@ -1,7 +1,8 @@
 import { computed } from 'vue'
-import { createNav } from 'foundation-ui/vue'
+import { createNav, isCompactNav } from 'foundation-ui/vue'
 import { settingsHash, DEFAULT_PLACE, parentPlace } from 'foundation-ui/settings/index.js'
 import { useI18n } from '../desktop/i18n/index.js'
+import { restoredStack } from './restoredStack.js'
 
 /** Destinations of the control panel. A page is a detail entry of one back stack (see foundation-ui createNav). */
 export const ROUTES = {
@@ -47,6 +48,7 @@ export const ROUTES = {
   SUNSHINE_SERVICE: 'sunshine-service', // 系统 › Sunshine 服务: the SCM, process and API layers, the startup type, start, stop, restart
   DIAGNOSTICS: 'diagnostics',
   DOCTOR: 'doctor', // 体检: the host's health check
+  RESET: 'reset', // 恢复默认设置: the host's settings back to the defaults (and back), and the preferences of the panel
   NETWORK_OVERVIEW: 'network-overview', // 网络概览: adapters, public IPv4/IPv6, NAT type, CGNAT, UPnP and firewall (GET /api/network/overview)
   // Pages of the Web UI shown in the embedded frame
   WEB_CLIENTS: 'web-clients',
@@ -110,6 +112,7 @@ export const PAGES = {
   [ROUTES.TEST_TOOLS]: { rail: 'system', list: false, push: true },
   [ROUTES.DIAGNOSTICS]: { rail: 'system' },
   [ROUTES.DOCTOR]: { rail: 'system' },
+  [ROUTES.RESET]: { rail: 'system' },
   [ROUTES.NETWORK_OVERVIEW]: { rail: 'system' },
   [ROUTES.AI_ASSISTANT]: { rail: 'assistant', list: false }, // 米塔 AI: the chat takes the whole width, its settings are behind the gear of the chat header
   [ROUTES.WEB_TROUBLESHOOTING]: { rail: 'system' },
@@ -191,10 +194,17 @@ for (const [id, p] of Object.entries(PAGES)) routes[id] = { role: 'detail', rail
 // a phone has no list pages of the rails: 串流 is the stream hub, every other category is in the 设置 hub; Back from a page is that hub, whatever way the page was reached (as in the Web UI)
 export const HUB_OF = { stream: ROUTES.STREAM_HUB, config: ROUTES.SETTINGS_HUB, input: ROUTES.SETTINGS_HUB, audio: ROUTES.SETTINGS_HUB, display: ROUTES.SETTINGS_HUB, system: ROUTES.SETTINGS_HUB, appearance: ROUTES.SETTINGS_HUB, developer: ROUTES.DEV_HUB }
 export const PHONE_MAX = 600
-export const isPhone = () => typeof window !== 'undefined' && window.innerWidth < PHONE_MAX
+// the compact navigation of the shell: a narrow window (under PHONE_MAX) and a short one (a phone on its side, a small window) share the phone's flow: one pane, the hubs
+export const isPhone = () => typeof window !== 'undefined' && isCompactNav(window.innerWidth, window.innerHeight)
 
 let nav = null
-const shared = () => (nav ||= createNav({ routes, home: ROUTES.HOME, compact: isPhone, hubOf: HUB_OF }))
+const shared = () => {
+  if (nav) return nav
+  nav = createNav({ routes, home: ROUTES.HOME, compact: isPhone, hubOf: HUB_OF, initial: restoredStack(globalThis.__PANEL_RESTORE__, routes) })
+  // the page-state recorder asks for the stack when it keeps a snapshot of the window
+  globalThis.__panelNavState = () => nav.entries.value.map(({ id, params, root }) => ({ id, ...(params ? { params } : {}), ...(root ? { root: true } : {}) }))
+  return nav
+}
 
 /** Navigation of the panel: one back stack for the whole window. */
 export function useRouter() {

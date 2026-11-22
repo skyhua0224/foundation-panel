@@ -1,0 +1,17 @@
+{
+  "name": "Panel development",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "..",
+    "options": [
+      "--platform=linux/amd64"
+    ]
+  },
+  "workspaceFolder": "/workspaces/panel",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspaces/panel,type=bind",
+  "postCreateCommand": "just setup",
+  "remoteUser": "root",
+  "containerEnv": {
+    "CARGO_HOME": "/workspaces/.cache/cargo"
+  }
+}

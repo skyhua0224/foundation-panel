@@ -18,6 +18,7 @@ pub struct Settings {
     pub schema_version: u32,
     pub selected_backend: Option<String>,
     pub selected_nr_backend: Option<String>,
+    pub nr_enabled: bool,
     pub backends: BTreeMap<String, BackendSettings>,
 }
 
@@ -36,6 +37,8 @@ struct SettingsDocument {
     selected_backend: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     selected: Option<SelectedBackends>,
+    #[serde(default)]
+    nr_enabled: bool,
     backends: BTreeMap<String, BackendSettings>,
 }
 
@@ -43,11 +46,11 @@ impl TryFrom<SettingsDocument> for Settings {
     type Error = String;
 
     fn try_from(document: SettingsDocument) -> Result<Self, Self::Error> {
-        let (hdr, nr) = match document.schema_version {
-            1 if document.selected.is_none() => (document.selected_backend, None),
+        let (hdr, nr, nr_enabled) = match document.schema_version {
+            1 if document.selected.is_none() => (document.selected_backend, None, false),
             2 if document.selected_backend.is_none() => {
                 let selected = document.selected.ok_or("missing capability selections")?;
-                (selected.hdr, selected.nr)
+                (selected.hdr, selected.nr, document.nr_enabled)
             }
             _ => return Err("unsupported enhancement configuration schema".to_string()),
         };
@@ -64,6 +67,7 @@ impl TryFrom<SettingsDocument> for Settings {
             schema_version: document.schema_version,
             selected_backend: hdr,
             selected_nr_backend: nr,
+            nr_enabled,
             backends: document.backends,
         })
     }
@@ -75,7 +79,8 @@ impl Serialize for Settings {
             json!({"schema_version": 1, "selected_backend": self.selected_backend,
                 "backends": self.backends})
         } else {
-            json!({"schema_version": 2, "selected": {
+            json!({"schema_version": self.schema_version, "nr_enabled": self.nr_enabled,
+                "selected": {
                 "hdr": self.selected_backend, "nr": self.selected_nr_backend},
                 "backends": self.backends})
         };
@@ -400,7 +405,7 @@ mod tests {
         assert_eq!(saved["selected"]["nr"], original["selected"]["nr"]);
         assert_eq!(saved["backends"], original["backends"]);
         assert!(saved.get("selected_backend").is_none());
-        assert_eq!(saved.as_object().unwrap().len(), 3);
+        assert_eq!(saved.as_object().unwrap().len(), 4);
     }
 
     #[test]
@@ -412,5 +417,21 @@ mod tests {
         ] {
             assert!(decode_config(json!({"config":config}), Some(etag(2))).is_err());
         }
+    }
+
+    #[test]
+    fn schema2_carries_the_global_nr_switch() {
+        let original = json!({"schema_version":2,"nr_enabled":true,
+            "selected":{"hdr":null,"nr":"alkaidlab.nvidia_dlssnr"},
+            "backends":{"alkaidlab.nvidia_dlssnr":{"version":"310-8-0-0","runtime_sha256":"b".repeat(64)}}});
+        let config = decode_config(json!({"config":original}), Some(etag(2))).unwrap();
+        assert!(config.settings.nr_enabled);
+        assert_eq!(serde_json::to_value(config.settings).unwrap(), original);
+        // Documents written before the field read as off and gain it on the next save.
+        let legacy = json!({"schema_version":2,"selected":{"hdr":null,"nr":null},"backends":{}});
+        let config = decode_config(json!({"config":legacy}), Some(etag(2))).unwrap();
+        assert!(!config.settings.nr_enabled);
+        assert_eq!(serde_json::to_value(config.settings).unwrap(),
+            json!({"schema_version":2,"nr_enabled":false,"selected":{"hdr":null,"nr":null},"backends":{}}));
     }
 }

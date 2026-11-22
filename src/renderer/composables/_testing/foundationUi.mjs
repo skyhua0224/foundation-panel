@@ -1,12 +1,13 @@
-// Lets the Node test runner resolve the pure modules of the shared package the way the build does (a Vite alias).
+// Lets the Node test runner resolve the pure modules of the shared package the way the build does (the locked package).
 // Import this first and load the code under test with dynamic imports afterwards.
 import { register } from 'node:module'
-import { pathToFileURL } from 'node:url'
-import { resolve } from 'node:path'
+import { pathToFileURL, fileURLToPath } from 'node:url'
+import { resolve, dirname } from 'node:path'
 
-const root = process.env.FOUNDATION_UI_DIR || resolve(import.meta.dirname, '../../../../../ds5-ui-m3e')
-// the router only needs the back stack from the component index, which cannot load in Node
-const routerStub = 'data:text/javascript,' + encodeURIComponent(`export { createNav } from ${JSON.stringify(pathToFileURL(root + '/src/nav/backstack.js').href)}`)
+// dev-env-npm: resolve the same immutable package as the application build.
+const root = resolve(dirname(fileURLToPath(import.meta.resolve('foundation-ui'))), '..')
+// the router only needs the back stack and the compact-navigation rule from the component index, which cannot load in Node
+const routerStub = 'data:text/javascript,' + encodeURIComponent(`export { createNav } from ${JSON.stringify(pathToFileURL(root + '/src/nav/backstack.js').href)}\nexport { isCompactNav } from ${JSON.stringify(pathToFileURL(root + '/src/nav/scenes.js').href)}`)
 const i18nStub = 'data:text/javascript,' + encodeURIComponent('export const useI18n = () => ({ t: { value: {} } })')
 const hook = `
 const i18nStub = ${JSON.stringify(i18nStub)}

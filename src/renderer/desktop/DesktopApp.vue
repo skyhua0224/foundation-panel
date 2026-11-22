@@ -276,6 +276,8 @@ async function setupUpdateNotifications() {
     const { listen } = await import('@tauri-apps/api/event')
     updateUnlisten = await listen('update-available', (event) => {
       if (!desktopSettings.value.notifications || !desktopSettings.value.updateNotify) return
+      // the event also carries the answer "up to date" of a check the person asked for (is_latest): nothing to announce
+      if (event.payload?.is_latest) return
       const version = event.payload?.version || ''
       showDesktopNotification(
         settingsText('notificationTitle', 'Sunshine'),

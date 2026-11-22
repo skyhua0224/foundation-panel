@@ -74,7 +74,10 @@ export function createStatusChannel(fetcher, ttlMs) {
   return { fetch, invalidate, prime, data, error }
 }
 
-const STATUS_TTL_MS = 10_000
+// The probes behind dualsense / usbip are costly to start (the driver signature and the host helper's ownership answer run PowerShell on
+// the native side, which keeps them as long as the installation does not change): an answer is reused for five minutes. A
+// poll (useDualSenseStatus) and an action (invalidate / prime) refresh it earlier.
+const STATUS_TTL_MS = 300_000
 const POLL_INTERVAL_MS = 30_000
 
 export const STATUS_POLL_INTERVAL_MS = POLL_INTERVAL_MS

@@ -275,6 +275,37 @@ mod tests {
         assert_eq!(pixel[3], 123);
     }
 
+    /// The bundled icons keep their small frames as bitmaps and carry the large ones as PNG (same pixels, a fifth of the
+    /// bytes): every frame of every state must still decode, and the frame the tray draws is 32 px.
+    #[test]
+    fn every_frame_of_every_bundled_tray_icon_decodes() {
+        for name in ["sunshine.ico", "sunshine-playing.ico", "sunshine-pausing.ico", "sunshine-locked.ico"] {
+            let bytes = bundled_tray_icon_bytes(name);
+            let tray = decode_tray_icon(bytes).expect("the tray frame decodes");
+            assert_eq!(tray.dimensions(), (32, 32), "{name}");
+            let count = usize::from(u16::from_le_bytes([bytes[4], bytes[5]]));
+            assert_eq!(count, 7, "{name}");
+            for index in 0..count {
+                let entry = 6 + index * 16;
+                let width = ico_dimension(bytes[entry]);
+                let size = u32::from_le_bytes(bytes[entry + 8..entry + 12].try_into().unwrap()) as usize;
+                let offset = u32::from_le_bytes(bytes[entry + 12..entry + 16].try_into().unwrap()) as usize;
+                // a one-frame icon made of this frame
+                let mut single = bytes[..6].to_vec();
+                single[4] = 1;
+                single[5] = 0;
+                single.extend_from_slice(&bytes[entry..entry + 8]);
+                single.extend_from_slice(&(size as u32).to_le_bytes());
+                single.extend_from_slice(&22u32.to_le_bytes());
+                single.extend_from_slice(&bytes[offset..offset + size]);
+                let image = image::ImageReader::with_format(Cursor::new(single), image::ImageFormat::Ico)
+                    .decode()
+                    .unwrap_or_else(|error| panic!("{name} frame {width}: {error}"));
+                assert_eq!(u32::from(width), image.width(), "{name} frame {width}");
+            }
+        }
+    }
+
     #[test]
     fn invalid_custom_icon_falls_back_to_bundled_icon() {
         let image =

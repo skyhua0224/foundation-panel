@@ -50,3 +50,21 @@ test('the old component vocabulary is gone from the DualSense sentences', () => 
   const all = JSON.stringify([zh.dualSense, en.dualSense])
   assert.doesNotMatch(all, /Sidecar|HIDMaestro|VIIPER|修复组件|Repair component|本地组件包/i)
 })
+
+test('no DualSense sentence tells the person a setting is "not open yet": each says what is missing', () => {
+  const walk = (node) => (typeof node === 'string' ? [node] : node && typeof node === 'object' ? Object.values(node).flatMap(walk) : [])
+  for (const [name, dictionary] of [['zh', zh], ['en', en]]) {
+    for (const sentence of walk(dictionary.dualSense)) {
+      assert.doesNotMatch(sentence, /暂未开放|暫未開放|尚未提供|尚未接入|尚未实现|not available yet|not connected in this build yet|Not implemented by the host yet/i, `${name}: ${sentence}`)
+    }
+  }
+})
+
+test('the controller input report rate has its name and its 250 Hz confirm text from foundation-ui, the same as the host page', async () => {
+  const { localizedKeyLabel, localizedOptionLabel, inputRateNeedsConfirm, inputRateWarning, INPUT_RATE_KEY, INPUT_RATE_WARNING_SECONDS } = await import('foundation-ui/settings/index.js')
+  assert.equal(localizedKeyLabel({ key: INPUT_RATE_KEY, label: '' }, 'zh'), '手柄输入回报频率')
+  assert.equal(localizedOptionLabel('hz250', 'zh'), '250 Hz')
+  assert.equal(inputRateNeedsConfirm(INPUT_RATE_KEY, 'hz250', 'hz500'), true)
+  assert.equal(INPUT_RATE_WARNING_SECONDS, 5)
+  assert.match(inputRateWarning('zh', 'hz500').lines.join(''), /344 次点按全部读到/)
+})

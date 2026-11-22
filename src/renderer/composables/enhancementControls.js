@@ -53,14 +53,15 @@ const messages = {
     replaceFile: '更换组件文件',
     installSetup: '安装并配置',
     allowUse: '允许串流使用 ',
-    nrPermissionHint:
-      '这是功能许可开关，不代表当前画面已增强。默认行为在应用设置中选择，正在串流时可到“当前串流”即时开关。',
+    nrPermissionHint: '控制当前和后续串流的 DLSS NR。',
+    installNr: '安装组件',
     hdrPermissionHint:
       '允许应用使用 SDR 转 HDR 功能；是否启用由应用配置决定，下次连接时生效。',
     appDefaults: '应用默认设置',
     setupHelp: '安装需要什么？',
     usageNotes: '功能说明与注意事项',
     permissionSaved: '功能设置已保存。应用默认配置与当前串流效果分别管理。',
+    permissionSaveFailed: '功能设置未保存，请重试',
     needsInstall: '待安装',
     needsSetup: '需要配置',
     ready: '已就绪',
@@ -96,7 +97,7 @@ const messages = {
     record: '请按下组合键…',
     recordHint:
       '请按下含 Ctrl、Alt 或 Shift 的组合键。Esc 取消，30 秒后自动退出。',
-    keyHint: '浮层隐藏时仍可使用，仅作用于选定串流。',
+    keyHint: '浮层隐藏时也可切换全局 DLSS NR。',
     saved: '已保存',
     local: '本机设置 · 自动保存',
     preview: '浮层预览',
@@ -108,7 +109,7 @@ const messages = {
     noSession: '等待串流',
     disconnected: '主机未连接',
     refresh: '重试',
-    sessionHint: '实时调节只影响选定会话，不修改应用默认设置。',
+    sessionHint: '强度和处理比例应用于选定串流。',
     output: '输出格式',
     scale: '处理比例',
     enhancement: '画面增强',
@@ -141,8 +142,8 @@ const messages = {
     replaceFile: 'Replace component file',
     installSetup: 'Install & set up',
     allowUse: 'Allow streams to use ',
-    nrPermissionHint:
-      'Makes the feature available; it does not indicate an active effect. Set app defaults in application settings, or toggle the current stream live.',
+    nrPermissionHint: 'Control DLSS NR for current and future streams.',
+    installNr: 'Install component',
     hdrPermissionHint:
       'Allows apps to use SDR-to-HDR conversion. Per-app settings take effect on the next connection.',
     appDefaults: 'Application defaults',
@@ -150,6 +151,7 @@ const messages = {
     usageNotes: 'Usage notes',
     permissionSaved:
       'Feature setting saved. App defaults and live-stream effects are managed separately.',
+    permissionSaveFailed: 'Feature setting was not saved. Try again.',
     needsInstall: 'Not installed',
     needsSetup: 'Setup required',
     ready: 'Ready',
@@ -186,7 +188,7 @@ const messages = {
     record: 'Press a shortcut…',
     recordHint:
       'Use Ctrl, Alt or Shift. Esc cancels; capture expires after 30 seconds.',
-    keyHint: 'Works with the overlay hidden. Only affects the selected stream.',
+    keyHint: 'The NR shortcut switches DLSS NR globally, even with the overlay hidden.',
     saved: 'Saved',
     local: 'Local settings · Saved automatically',
     preview: 'Overlay preview',
@@ -199,7 +201,7 @@ const messages = {
     noSession: 'Waiting for a stream',
     disconnected: 'Host disconnected',
     refresh: 'Retry',
-    sessionHint: 'Changes affect the selected session only, not app defaults.',
+    sessionHint: 'Intensity and processing scale apply to the selected stream.',
     output: 'Output format',
     scale: 'Processing scale',
     enhancement: 'Enhancement',

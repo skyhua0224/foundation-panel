@@ -473,6 +473,17 @@ mod tests {
     }
 
     #[test]
+    fn a_report_left_behind_by_an_earlier_run_is_listed_and_nothing_else_is() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(list_pending(dir.path()).is_empty(), "an empty folder: the earlier run did not fail");
+        std::fs::write(dir.path().join("stray.dmp"), "d").unwrap();
+        std::fs::write(dir.path().join("note.txt"), "keep").unwrap();
+        assert!(list_pending(dir.path()).is_empty(), "a dump without a meta and other files are not a report");
+        std::fs::write(dir.path().join("1700000000-panel-panic-p0000001f.json"), "{}").unwrap();
+        assert_eq!(list_pending(dir.path()).len(), 1);
+    }
+
+    #[test]
     fn pending_keeps_the_newest_twenty_and_drops_strays() {
         let dir = tempfile::tempdir().unwrap();
         let base = SystemTime::now() - Duration::from_secs(3600);

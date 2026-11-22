@@ -104,7 +104,7 @@ impl LogCollector {
 /// Where the panel keeps its own log between runs. The viewer reads the
 /// in-memory entries; the file is the support copy and stays UTF-8.
 pub fn panel_log_path() -> PathBuf {
-    dirs::data_local_dir()
+    crate::test_isolation::data_local_dir()
         .unwrap_or_else(std::env::temp_dir)
         .join("Sunshine GUI")
         .join("logs")
@@ -238,9 +238,9 @@ pub fn init_logger() {
         .expect("Failed to initialize logger");
 }
 
-/// Return all collected logs.
+/// Return all collected logs. Async so that copying and serialising up to 10000 lines is a worker's job: the feedback sheet asks for them while it opens.
 #[tauri::command]
-pub fn get_all_logs() -> Vec<LogEntry> {
+pub async fn get_all_logs() -> Vec<LogEntry> {
     if let Some(collector) = LOG_COLLECTOR.get() {
         collector.get_logs()
     } else {

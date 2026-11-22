@@ -66,6 +66,7 @@ let keptStatus = null
 </script>
 
 <script setup>
+import { setVisibleInterval, clearVisibleInterval } from '../composables/pageVisibility.js'
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
 import { MPage, MGroup, MSection, MItem, MSwitchItem, MSliderItem, MChoiceItem, MValueItem, MFooter, MStatusPill, MProgress, MButton, MIconButton, MChip, useSubpage } from 'foundation-ui/vue'
@@ -160,9 +161,15 @@ watch([() => config.web_server.bind_address, httpsEnabled, certKeyPath, certPemP
 
 // ========== 方法 ==========
 
+// A read that was asked later is the newer one: an older answer that arrives after it (a page shown again reads at once) is dropped.
+let statusSeq = 0
+let appliedStatusSeq = 0
 async function refreshStatus() {
+  const seq = ++statusSeq
   try {
     const s = await moonlightWeb.getStatus()
+    if (seq < appliedStatusSeq) return
+    appliedStatusSeq = seq
     Object.assign(status, s)
     keptStatus = { ...status }
     known.value = true
@@ -202,12 +209,12 @@ async function loadConfig() {
 }
 
 function startPolling() {
-  pollTimer = setInterval(refreshStatus, 5000)
+  pollTimer = setVisibleInterval(refreshStatus, 5000, { resume: true })
 }
 
 function stopPolling() {
   if (pollTimer) {
-    clearInterval(pollTimer)
+    clearVisibleInterval(pollTimer)
     pollTimer = null
   }
 }

@@ -33,7 +33,7 @@ test('the pages are built of the shared components: MSection, MGroup, MItem; the
 
 test('串流 is one bitrate row (value, steps, slider, chips) from the shared bitrate module, then codec rows, HDR and launch as switch rows', () => {
   const view = read('views/StreamView.vue')
-  assert.match(view, /<MItem class="dsk-bitrate" icon="monitoring" :title="t\.stream\.bitrateLimit"[^>]*stack>/)
+  assert.match(view, /<MItem class="dsk-bitrate" icon="monitor_heart" :title="t\.stream\.bitrateLimit"[^>]*stack>/)
   // the order the pad walks: value row (steps), slider, chips
   assert.ok(view.indexOf('icon="remove"') < view.indexOf('<MSlider') && view.indexOf('<MSlider') < view.indexOf('<MSeg :model-value="bitrateKbps"'))
   assert.match(view, /<MSlider :model-value="bitrateSliderProgress\(bitrateKbps\)" :min="0" :max="SLIDER_MAX_PROGRESS" :step="1" unit=""/)

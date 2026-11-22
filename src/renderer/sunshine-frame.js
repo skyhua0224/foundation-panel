@@ -14,6 +14,7 @@ import './styles/m3e-compat.less'  // restyles the pages that still use their ow
 // 导入 Tauri polyfill
 import './tauri-polyfill.js'
 import { getDefaultLocale, setLocale } from '../i18n/index.js'
+import { i18nReady } from './desktop/i18n/index.js'
 import { configureDevBackend } from 'foundation-ui/vue'
 import { applyDevBackend } from './devBackendConfig.js'
 
@@ -24,11 +25,11 @@ setLocale(getDefaultLocale())
 applyDevBackend(configureDevBackend)
 
 const app = createApp(SunshineFrame)
-app.mount('#app')
+// the language of the window is read before the first view is drawn (a language other than English and Chinese is a file of its own)
 
 // The first view is in the DOM: the native side may show the window now (WebView2 paints over the window's surface colour; it need not wait for
 // the load event, which waits for every frame inside the page) and learns the theme's surface colour for its first frame
-queueMicrotask(() => {
+const afterFirstView = () => {
   invoke('panel_content_ready').catch(() => {})
   // the window may be cloaked until the first frame is painted: tell the host when it is
   try {
@@ -45,7 +46,8 @@ queueMicrotask(() => {
   configureInvokeTiming({ report })
   startSlowCallLog(report, window, invokePending)
   installFaultLog(report, window)
-})
+}
+i18nReady.then(() => { app.mount('#app'); queueMicrotask(afterFirstView) })
 
 // The page is being used: the native side takes no snapshot of it then (at most one report in 250 ms)
 function followPageActivity(invoke) {

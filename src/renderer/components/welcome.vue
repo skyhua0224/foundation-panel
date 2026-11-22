@@ -25,7 +25,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, inject, onMounted, ref, watch } from 'vue'
 import QRCode from 'qrcode'
 import { invoke } from '@tauri-apps/api/core'
 import { MGuideFlow, MLoading, MOnboardWindow, buildGuideSteps, clearProgress, guideDeviceId, guideEntry, readProgress, upgradeSkips, useTelemetryConsent } from 'foundation-ui/vue'
@@ -33,6 +33,7 @@ import { supportedLocales, setLocaleChoice as setWelcomeChoice, localeChoice, sy
 import { useI18n as useDesktopI18n } from '../desktop/i18n/index.js'
 import { telemetryApi } from '../composables/telemetryApi.js'
 import { openExternalUrl, sunshine } from '../tauri-adapter.js'
+import { channelChosen, saveUpdateChannel } from '../composables/updateChannel.js'
 import { GUIDE_DISMISSED_KEY, GUIDE_STORAGE_KEY, createGuideData } from '../composables/guideData.js'
 import { consumeStartGuide, guideOnLaunch } from '../composables/startGuide.js'
 import { panelVersion } from '../composables/panelVersion.js'
@@ -60,7 +61,12 @@ const data = createGuideData({
   openTools: () => emit('webui-navigate', '/#test-tools'),
   openDiagnostics: () => emit('open-doctor'),
   locale: () => locale.value,
+  // the update channel step: the same preference as 关于 (updateChannel.js)
+  channel: { get: () => invoke('get_include_prerelease_preference'), set: (include) => saveUpdateChannel(invoke, include) },
+  // the anonymous funnel of the guide (the panel's event sender, under the choice about usage statistics)
+  funnel: (props) => guideFunnel?.(props),
 })
+const guideFunnel = inject('guideFunnel', null)
 const { state, probeAccount, loadGuideHost } = data
 const hostProgress = ref(null) // what the host remembers of the guide, read once before the flow opens
 // the update method (the last step): the same source and CDK the 更新 page keeps; the CDK itself stays in the native side
@@ -123,7 +129,7 @@ onMounted(async () => {
   const pairedCount = Array.isArray(state.clients) ? state.clients.length : null
   const found = state.account.exists ? guideEntry({ progress: readProgress(null, GUIDE_STORAGE_KEY), version: version.value, setupCompleted: !!state.setup.completed, pairedCount, configExists: true, host: hostProgress.value, device: guideDeviceId() }) : null
   // the guide the host would not open by itself was asked for by hand (the help page): it starts at the first step, not where an old run was left
-  entry.value = found?.mode === 'upgrade' ? { mode: 'upgrade', skip: upgradeSkips({ accountExists: true, setupCompleted: !!state.setup.completed, pairedCount }) } : { mode: 'fresh', skip: [], restart: !found }
+  entry.value = found?.mode === 'upgrade' ? { mode: 'upgrade', skip: upgradeSkips({ accountExists: true, channelChosen: channelChosen() }) } : { mode: 'fresh', skip: [], restart: !found }
 })
 </script>
 

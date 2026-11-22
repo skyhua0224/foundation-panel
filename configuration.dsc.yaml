@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://aka.ms/configuration-dsc-schema/0.2
+# dev-env-vs-components: VCTools workload, latest v143, recommended SDK 26100.
+# dev-env-winget: WinGetPackage and VSComponents; dev-env-webview2: Evergreen Runtime.
+properties:
+  configurationVersion: 0.2.0
+  resources:
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      id: buildTools
+      directives:
+        description: Install the MSVC build tools
+        allowPrerelease: true
+        securityContext: elevated
+      settings:
+        id: Microsoft.VisualStudio.2022.BuildTools
+        source: winget
+    - resource: Microsoft.VisualStudio.DSC/VSComponents
+      dependsOn:
+        - buildTools
+      directives:
+        description: Install the C++ workload and SDK
+        allowPrerelease: true
+        securityContext: elevated
+      settings:
+        productId: Microsoft.VisualStudio.Product.BuildTools
+        channelId: VisualStudio.17.Release
+        vsConfigFile: '${WinGetConfigRoot}\.vsconfig'
+        includeRecommended: false
+    - resource: Microsoft.WinGet.DSC/WinGetPackage
+      directives:
+        description: Install the WebView2 Evergreen Runtime; the SDK is locked by Cargo.lock
+        allowPrerelease: true
+        securityContext: elevated
+      settings:
+        id: Microsoft.EdgeWebView2Runtime
+        source: winget

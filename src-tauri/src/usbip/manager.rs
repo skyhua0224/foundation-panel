@@ -93,7 +93,7 @@ pub(crate) fn install_disposition(
         }
         None => Ok(InstallDisposition::Install),
         Some(version) => Err(format!(
-            "USBIP-SETUP-008: USB/IP {version} is installed; clean the shared transport before installing {PINNED_VERSION}"
+            "USBIP-SETUP-008: USB/IP {version} is installed; it is externally managed; choose whether to replace it using Windows Installed apps before installing {PINNED_VERSION}"
         )),
     }
 }
@@ -160,19 +160,216 @@ fn consistent_version(
     Ok(found)
 }
 
+/// An explicit receipt identifies the slim layout independently of localized ARP text.
+/// usbip-slim-ms-reg-uninstall-20261117: InstallLocation / DisplayVersion.
+// panel-usbip-winreg-20261117: typed registry values, no shell parsing.
+fn slim_registration(key: &str, layout: &str) -> Result<bool, String> {
+    if !key.eq_ignore_ascii_case("AlkaidLabUSBip") {
+        return Ok(false);
+    }
+    if layout != "usbip-slim-v1" {
+        return Err("USBIP-SETUP-008: unsupported USB/IP installation layout".into());
+    }
+    Ok(true)
+}
+
+#[cfg(target_os = "windows")]
+pub(super) fn verify_slim_payload(root: &std::path::Path) -> Result<(), String> {
+    let receipt = root.join("payload.json");
+    verify_transport_file(&receipt, env!("SUNSHINE_USBIP_PAYLOAD_SHA256"))?;
+    let bytes = std::fs::read(&receipt)
+        .map_err(|error| format!("USBIP-EXEC-006: cannot read USB/IP receipt: {error}"))?;
+    // panel-usbip-serde-json-20261117, from_slice: parse the hash-pinned UTF-8 receipt.
+    let manifest: serde_json::Value = serde_json::from_slice(&bytes)
+        .map_err(|error| format!("USBIP-EXEC-006: invalid USB/IP receipt: {error}"))?;
+    let files = manifest["files"]
+        .as_object()
+        .ok_or("USBIP-EXEC-006: missing USB/IP file inventory")?;
+    for (name, record) in files {
+        // The receipt is hash-pinned above; retain this path boundary check as
+        // a separate invariant before using a receipt member as a file path.
+        if name
+            .split('/')
+            .any(|part| part.is_empty() || part == ".." || part.contains([':', '\\']))
+        {
+            return Err("USBIP-EXEC-006: invalid USB/IP receipt member".into());
+        }
+        let digest = record["sha256"]
+            .as_str()
+            .ok_or("USBIP-EXEC-006: missing USB/IP member hash")?;
+        verify_transport_file(&root.join(name), digest)?;
+    }
+    Ok(())
+}
+
+/// usbip-policy-reg-20261117: ARP version is not proof of origin.
+/// GUI/SDK, a different version or uncertainty always preserve external ownership.
+fn external_ownership(present: bool, compatible: bool, extras: bool, owned: bool) -> bool {
+    present && (extras || !compatible || !owned)
+}
+
+#[cfg(target_os = "windows")]
+pub(crate) fn externally_managed() -> bool {
+    let inspect = || -> Result<bool, String> {
+        let default_root = std::path::PathBuf::from(
+            std::env::var_os("ProgramW6432")
+                .or_else(|| std::env::var_os("ProgramFiles"))
+                .ok_or("Windows program directory unavailable")?,
+        )
+        .join("USBip");
+        let mut residual = false;
+        let hklm = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE);
+        for name in ["usbip2_ude", "usbip2_filter", "usbip2_vhci"] {
+            match hklm.open_subkey(format!(r"SYSTEM\CurrentControlSet\Services\{name}")) {
+                Ok(_) => residual = true,
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+                Err(e) => return Err(e.to_string()),
+            }
+        }
+        inspect_ownership(
+            &uninstall_entries()?,
+            &default_root,
+            &crate::sunshine::install_dir(),
+            residual,
+        )
+    };
+    inspect().unwrap_or(true)
+}
+
+// usbip-policy-winreg-20261117, get_value;
+// usbip-policy-rust-path-20261117, try_exists:
+// propagate permission errors instead of classifying an unreadable layout as absent.
+#[cfg(target_os = "windows")]
+fn inspect_ownership(
+    entries: &[UninstallEntry],
+    default_root: &std::path::Path,
+    host_root: &std::path::Path,
+    residual: bool,
+) -> Result<bool, String> {
+    let mut roots = vec![default_root.to_path_buf()];
+    for entry in entries {
+        roots.push(std::path::PathBuf::from(
+            entry
+                .key
+                .get_value::<String, _>("InstallLocation")
+                .map_err(|_| "USB/IP install location unavailable")?,
+        ));
+    }
+    let mut extras = false;
+    let mut present = !entries.is_empty() || residual;
+    for root in &roots {
+        for name in ["wusbip.exe", "include", "lib"] {
+            extras |= root.join(name).try_exists().map_err(|e| e.to_string())?;
+        }
+        for name in ["usbip.exe", "payload.json", "devnode.exe"] {
+            present |= root.join(name).try_exists().map_err(|e| e.to_string())?;
+        }
+    }
+    let version = consistent_version(entries.iter().map(entry_version))?;
+    let compatible = supported_version_installed(version.as_deref());
+    let same_root = roots.iter().all(|root| root == default_root);
+    let receipt = entries.len() == 1
+        && entries[0].slim
+        && same_root
+        && entries[0]
+            .key
+            .get_value::<String, _>("SourceSHA256")
+            .is_ok_and(|hash| hash == INSTALLER_SHA256);
+    let bundled = host_root
+        .join("scripts")
+        .join("usbip")
+        .join(format!("USBip-{PINNED_VERSION}-x64.exe"));
+    let legacy = !entries.is_empty()
+        && same_root
+        && entries.iter().all(|entry| !entry.slim)
+        && crate::native_components::install::sha256_file(&bundled, u64::MAX)
+            .is_ok_and(|hash| hash == INSTALLER_SHA256);
+    Ok(external_ownership(
+        present,
+        compatible,
+        extras,
+        receipt || legacy,
+    ))
+}
+
+#[cfg(not(target_os = "windows"))]
+pub(crate) fn externally_managed() -> bool {
+    false
+}
+
+/// Everything the ownership decision reads, as one string: the registered installations (name, version, location,
+/// layout), the driver services and the files that mark a full vendor installation. It changes when the
+/// installation does, so an answer derived from it (the host helper's `replaceable`) is reused only while it matches.
+#[cfg(target_os = "windows")]
+pub(super) fn ownership_fingerprint() -> String {
+    let mut parts = Vec::new();
+    match uninstall_entries() {
+        Ok(entries) => {
+            let mut rows: Vec<String> = entries
+                .iter()
+                .map(|entry| {
+                    let value = |name: &str| {
+                        entry
+                            .key
+                            .get_value::<String, _>(name)
+                            .unwrap_or_default()
+                    };
+                    format!(
+                        "{}|{}|{}|{}|{}",
+                        entry.display_name,
+                        value("DisplayVersion"),
+                        value("InstallLocation"),
+                        entry.slim,
+                        value("SourceSHA256")
+                    )
+                })
+                .collect();
+            rows.sort();
+            parts.push(rows.join(";"));
+        }
+        Err(error) => parts.push(format!("entries-error:{error}")),
+    }
+    let hklm = winreg::RegKey::predef(winreg::enums::HKEY_LOCAL_MACHINE);
+    for name in ["usbip2_ude", "usbip2_filter", "usbip2_vhci"] {
+        let present = hklm
+            .open_subkey(format!(r"SYSTEM\CurrentControlSet\Services\{name}"))
+            .is_ok();
+        parts.push(format!("{name}={present}"));
+    }
+    if let Some(root) = std::env::var_os("ProgramW6432").or_else(|| std::env::var_os("ProgramFiles"))
+    {
+        let root = std::path::PathBuf::from(root).join("USBip");
+        for name in ["wusbip.exe", "include", "lib", "usbip.exe", "payload.json", "devnode.exe"] {
+            parts.push(format!("{name}={}", root.join(name).exists()));
+        }
+    }
+    parts.join("#")
+}
+
 #[cfg(target_os = "windows")]
 pub(crate) struct UninstallEntry {
     pub(crate) key: winreg::RegKey,
     pub(crate) display_name: String,
+    pub(crate) slim: bool,
 }
 
 #[cfg(target_os = "windows")]
 pub(crate) fn uninstall_entries() -> Result<Vec<UninstallEntry>, String> {
     use winreg::RegKey;
-    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ, KEY_WOW64_32KEY, KEY_WOW64_64KEY};
+    use winreg::enums::HKEY_LOCAL_MACHINE;
 
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let uninstall = r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall";
+    read_uninstall_entries(
+        &RegKey::predef(HKEY_LOCAL_MACHINE),
+        r"SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall",
+    )
+}
+
+#[cfg(target_os = "windows")]
+fn read_uninstall_entries(
+    hklm: &winreg::RegKey,
+    uninstall: &str,
+) -> Result<Vec<UninstallEntry>, String> {
+    use winreg::enums::{KEY_READ, KEY_WOW64_32KEY, KEY_WOW64_64KEY};
     let mut entries = Vec::new();
     for view in [KEY_READ | KEY_WOW64_64KEY, KEY_READ | KEY_WOW64_32KEY] {
         let root = match hklm.open_subkey_with_flags(uninstall, view) {
@@ -200,8 +397,19 @@ pub(crate) fn uninstall_entries() -> Result<Vec<UninstallEntry>, String> {
             let display_name = key
                 .get_value::<String, _>("DisplayName")
                 .unwrap_or_default();
-            if version_from_display_name(&display_name).is_some() {
-                entries.push(UninstallEntry { key, display_name });
+            let layout = key
+                .get_value::<String, _>("InstallLayout")
+                .unwrap_or_default();
+            let slim = slim_registration(&name, &layout)?;
+            if slim
+                || name.eq_ignore_ascii_case("{199505b0-b93d-4521-a8c7-897818e0205a}_is1")
+                || version_from_display_name(&display_name).is_some()
+            {
+                entries.push(UninstallEntry {
+                    key,
+                    display_name,
+                    slim,
+                });
             }
         }
     }
@@ -269,6 +477,9 @@ pub(super) fn find_installation() -> Result<Installation, String> {
                     "USBIP-SETUP-002: the installed USB/IP executable path is unsafe".to_string(),
                 );
             }
+            if entry.slim {
+                verify_slim_payload(&root)?;
+            }
             if supported_version_installed(Some(&version)) {
                 verify_transport_file(&executable, env!("SUNSHINE_USBIP_TOOL_SHA256"))?;
             }
@@ -303,6 +514,110 @@ mod tests {
         );
         std::fs::remove_file(&file).unwrap();
         assert!(verify_transport_file(&file, expected).is_err());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn registry_and_file_layout_fixtures_preserve_external_installs() {
+        use winreg::{RegKey, enums::HKEY_CURRENT_USER};
+        let id = uuid::Uuid::new_v4().to_string();
+        let path = format!(r"Software\UsbipOwnershipTests\{id}");
+        let hkcu = RegKey::predef(HKEY_CURRENT_USER);
+        let work = std::env::temp_dir().join(format!("usbip-ownership-{id}"));
+        std::fs::create_dir_all(&work).unwrap();
+        let fixtures: serde_json::Value =
+            serde_json::from_str(include_str!("../../../tests/usbip-ownership-fixtures.json"))
+                .unwrap();
+        let payload = std::env::var_os("USBIP_LEGACY_FIXTURE_INSTALLER");
+        for f in fixtures.as_array().unwrap() {
+            let name = f["name"].as_str().unwrap();
+            let key_path = format!(r"{path}\{name}");
+            let root = work.join(name).join("USBip");
+            let host = work.join(name).join("host");
+            std::fs::create_dir_all(&root).unwrap();
+            let present = f["present"].as_bool().unwrap();
+            let slim = f["receipt"].as_bool().unwrap();
+            if present {
+                std::fs::write(root.join("usbip.exe"), b"fixture").unwrap();
+                let key_name = if slim {
+                    "AlkaidLabUSBip"
+                } else {
+                    "{199505b0-b93d-4521-a8c7-897818e0205a}_is1"
+                };
+                let (key, _) = hkcu
+                    .create_subkey(format!(r"{key_path}\{key_name}"))
+                    .unwrap();
+                key.set_value("DisplayVersion", &f["version"].as_str().unwrap())
+                    .unwrap();
+                key.set_value("InstallLocation", &root.to_str().unwrap())
+                    .unwrap();
+                if slim {
+                    key.set_value("InstallLayout", &"usbip-slim-v1").unwrap();
+                    key.set_value("SourceSHA256", &INSTALLER_SHA256).unwrap();
+                }
+            }
+            if f["extras"].as_bool().unwrap() {
+                std::fs::write(root.join("wusbip.exe"), b"fixture").unwrap();
+                std::fs::create_dir_all(root.join("include")).unwrap();
+                std::fs::create_dir_all(root.join("lib")).unwrap();
+                std::fs::write(root.join("lib").join("libusbip.lib"), b"fixture").unwrap();
+            }
+            if f["legacy"].as_bool().unwrap() {
+                let bundled = host
+                    .join("scripts")
+                    .join("usbip")
+                    .join(format!("USBip-{PINNED_VERSION}-x64.exe"));
+                std::fs::create_dir_all(bundled.parent().unwrap()).unwrap();
+                if let Some(ref payload) = payload {
+                    std::fs::copy(payload, &bundled).unwrap();
+                } else {
+                    std::fs::write(&bundled, b"unverified installer").unwrap();
+                }
+            }
+            let mut entries = read_uninstall_entries(&hkcu, &key_path).unwrap();
+            // HKCU Software is shared across registry views; deduplicate the
+            // intentionally identical fixture observations for the receipt case.
+            if slim {
+                entries.truncate(1);
+            }
+            let external = inspect_ownership(&entries, &root, &host, false).unwrap();
+            let expected =
+                f["ownership"] == "external" || (name == "legacy-owned" && payload.is_none());
+            assert_eq!(external, expected, "{name}");
+            println!("PASS registry-layout/{name}: external={external}");
+            hkcu.delete_subkey_all(&key_path).ok();
+        }
+        hkcu.delete_subkey_all(&path).ok();
+        std::fs::remove_dir_all(&work).unwrap();
+    }
+
+    #[test]
+    fn ownership_scenarios_preserve_user_installations() {
+        for (name, present, compatible, extras, owned, external) in [
+            ("external-full", true, true, true, false, true),
+            ("legacy-owned", true, true, false, true, false),
+            ("incompatible", true, false, false, true, true),
+            ("slim", true, true, false, true, false),
+            ("absent", false, false, false, false, false),
+            ("observed-full-double-install", true, true, true, true, true),
+            ("unknown-origin", true, true, false, false, true),
+            ("inspection-incomplete", true, false, false, false, true),
+        ] {
+            assert_eq!(
+                external_ownership(present, compatible, extras, owned),
+                external,
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn slim_receipt_is_recognized_without_a_vendor_display_name() {
+        assert!(slim_registration("AlkaidLabUSBip", "usbip-slim-v1").unwrap());
+        assert!(slim_registration("alkaidlabusbip", "usbip-slim-v1").unwrap());
+        assert!(!slim_registration("other", "usbip-slim-v1").unwrap());
+        assert!(slim_registration("AlkaidLabUSBip", "").is_err());
+        assert!(slim_registration("AlkaidLabUSBip", "future").is_err());
     }
 
     #[test]

@@ -1486,6 +1486,53 @@ export const en_GB = {
     }
   },
   "deviceHub": {
+    vbComponent: {
+      "title": "VB-CABLE virtual audio",
+      "device": "Device status",
+      "package": "Installation package",
+      "manage": "Manage component",
+      "check": "Check",
+      "download": "Download package",
+      "install": "Install",
+      "repair": "Repair",
+      "uninstall": "Uninstall",
+      "cleanup": "Clean up remnants",
+      "notChecked": "Not checked",
+      "packageReady": "Package ready and verified",
+      "packageMissing": "No verified package found",
+      "states": {
+        "missing": "Not installed",
+        "installed": "Driver installed",
+        "disabled": "Device disabled",
+        "unavailable": "Device unavailable; check its state first",
+        "pending": "Device removed but driver remains; you can continue the uninstall"
+      },
+      "separateHint": "Download the package first, then select Install. Administrator permission is required to install or uninstall.",
+      "installConfirm": "Install the VB-CABLE Pack43 driver from VB-Audio (x64 Windows only)? Close applications using audio devices first.",
+      "enableConfirm": "Repair and enable the VB-CABLE device disabled in Device Manager?",
+      "uninstallConfirm": "Uninstall the VB-CABLE driver and its devices? Close applications using this audio device first. Restarting the computer after uninstalling is recommended.",
+      "phases": {
+        "check": "Checking device…",
+        "download": "Downloading and verifying package…",
+        "install": "Installing driver…",
+        "enable": "Enabling device…",
+        "uninstall": "Uninstalling driver…"
+      },
+      "downloaded": "Package downloaded. Choose Install to continue.",
+      "installed": "Driver installed.",
+      "enabled": "Device enabled.",
+      "uninstalled": "The uninstall operation has finished. Restarting the computer is recommended.",
+      "restartSuggested": "Windows reports that this operation may require a restart. Save your work and restart when convenient.",
+      "checkFailed": "Check failed:",
+      "downloadFailed": "Download failed:",
+      "installFailed": "Installation failed:",
+      "enableFailed": "Enable failed:",
+      "uninstallFailed": "Uninstall failed:",
+      "operationTimeout": "The operation exceeded three minutes and may still be running. Check again later and avoid starting another operation.",
+      "operationBusy": "Another driver operation is still running. Try again later.",
+      "deviceBusy": "Windows is still using the VB-CABLE driver and cannot uninstall it. Close applications using this device and try again. A restart may be needed.",
+      "unsupportedArchitecture": "Pack43 can be installed on x64 Windows only. Other installed versions can still be checked and uninstalled."
+    },
     "eyebrow": "MANAGE / DEVICE HUB",
     "title": "Device Hub",
     "intro": "Manage controllers and microphone, the USB/IP transport, and USB passthrough. Streaming settings remain in the Web UI.",
@@ -1598,9 +1645,9 @@ export const en_GB = {
       },
       "vbCableDownload": "Download",
       "vbCableOpenDevmgmt": "Open Device Manager",
-      "vbCableInstall": "Install VB-CABLE",
+      "vbCableInstall": "Install virtual microphone",
       "vbCableEnable": "Enable VB-CABLE",
-      "vbCableInstallConfirm": "The host downloads the VB-CABLE driver from VB-Audio, checks the signature of its setup program and installs it silently with administrator rights. This adds a virtual audio device to Windows. Continue?",
+      "vbCableInstallConfirm": "The VB-CABLE virtual audio driver from VB-Audio will be installed. Continue?",
       "vbCableEnableConfirm": "The host enables the VB-CABLE device that is disabled in Device Manager (pnputil /enable-device). Continue?",
       "vbCableJobs": {
         "downloading": "Downloading VB-CABLE…",
@@ -1610,7 +1657,7 @@ export const en_GB = {
       },
       "vbCableErrors": {
         "download": "The download failed. Check the network and try again, or download it manually.",
-        "signature": "The setup program is not validly signed by VB-Audio. Installation was stopped.",
+        "signature": "Verification of the VB-CABLE installation files failed. Installation was stopped.",
         "admin": "Sunshine is not running with administrator rights, so it cannot install or enable drivers.",
         "failed": "That did not work: VB-CABLE is still unavailable. Open Device Manager to look, or install it manually."
       },
@@ -1826,7 +1873,7 @@ export const en_GB = {
     },
     "refused": {
       "3": "A value is outside its allowed range, so the host did not save it.",
-      "5": "These settings are not available in this Sunshine version and were not saved.",
+      "5": "These settings are unavailable now (the host has no such feature, or they need client support or a tuning channel) and were not saved. Each one says why.",
       "8": "Sunshine cannot write its configuration file. Check disk space and permissions.",
       "9": "The request was malformed, so the host did not save it.",
       "other": "The host refused this save."
@@ -1858,9 +1905,9 @@ export const en_GB = {
         "applied": "{name} preset applied; save to keep it."
       },
       "pending": {
-        "title": "Not implemented by the host yet",
-        "hint": "These options are not connected in this version.",
-        "reason": "Not available in this version",
+        "title": "Unavailable settings",
+        "hint": "These options are unavailable now; each one says why.",
+        "reason": "Unavailable",
         "count": "{count} options"
       },
       "advanced": "Advanced",
@@ -1904,7 +1951,7 @@ export const en_GB = {
       "discard": "Discard",
       "dirty_count": "{count} unsaved change(s)",
       "save_ok": "Saved {count} option(s).",
-      "save_partial": "Saved {applied}; {unavailable} not available yet and left unchanged.",
+      "save_partial": "Saved {applied}; {unavailable} unavailable and left unchanged.",
       "nothing_dirty": "No changes to save.",
       "reset_key": "Reset to default",
       "cancel": "Cancel",
@@ -1960,7 +2007,7 @@ export const en_GB = {
         "white": "White"
       },
       "title": "DualSense tuning",
-      "wired": "{wired} adjustable · {pending} not connected in this build yet"
+      "wired": "{wired} adjustable · {pending} unavailable"
     }
   },
   "controllersHub": {

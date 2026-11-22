@@ -24,18 +24,19 @@ static GATE: Mutex<Option<ClickGate>> = Mutex::new(None);
 static FAILURES: AtomicU32 = AtomicU32::new(0);
 const FAILURES_BEFORE_NATIVE: u32 = 2;
 /// How long a menu asked for while the window starts waits for its page (a cold WebView2 of a tray-only start).
-const WINDOW_WAIT: Duration = Duration::from_millis(5000);
+const WINDOW_WAIT: Duration = Duration::from_millis(12_000);
 
 /// Every item id of the native menu (menu.rs) except the containers: what the three menus can send back, and all that `tray_popup_act` accepts.
-pub(super) const ITEM_IDS: [&str; 43] = [
+pub(super) const ITEM_IDS: [&str; 46] = [
     "tray_status", "recover_service", "tray_notification_action", "open_main_panel", "connect_device", "download_client", "open_desktop", "auto_start", "open_sunshine", "vdd_settings", "vdd_create",
     "vdd_close", "vdd_toggle_keep_enabled", "vdd_toggle_headless_create", "reset_display", "show_toolbar", "host_performance", "rtss_control", "web_stream", "log_console", "debug_page", "lang_zh",
-    "lang_en", "lang_ja", "prevent_sleep", "restart_user_mode", "import_config", "export_config", "reset_config", "clear_cache", "check_update", "about", "star_project", "visit_project_sunshine",
-    "visit_project_moonlight", "visit_site", "visit_bilibili", "star_github", "sponsor_qiin", "sponsor_yundi339", "sponsor_skyhua", "restart", "shutdown",
+    "lang_en", "lang_ja", "prevent_sleep", "restart_user_mode", "import_config", "export_config", "reset_config", "clear_cache", "check_update", "about", "feedback", "star_project", "visit_project_sunshine",
+    "visit_project_moonlight", "visit_site", "visit_bilibili", "star_github", "sponsor_qiin", "sponsor_yundi339", "sponsor_skyhua", "sponsor_wechat", "sponsor_github", "restart", "shutdown",
 ];
 
-/// Whether the icon carries the native menu now: the person asked for it, the menu window failed twice in a row, or the window cannot show (it is switched off or could not be made). A window that is
-/// still starting does not count: a menu asked for meanwhile waits for it (`open_menu`).
+/// Whether the icon carries the native menu now: the person asked for it, the menu window failed twice in a row, or WebView2 would not make the window at all (it is switched off, or every attempt of
+/// `ctx_popup::schedule_create_after` failed: the last resort of a machine whose WebView2 is broken). The tray menu is the Material menu in every memory tier and at every pressure: the window stays
+/// up, and a click while it is still being made waits for it (`open_menu`) instead of taking the native menu.
 pub(super) fn use_native_menu() -> bool {
     wants_native(tray_prefs::current().force_native, FAILURES.load(Ordering::SeqCst), ctx_popup::health())
 }
@@ -116,7 +117,12 @@ pub(super) fn on_icon_event(event: TrayIconEvent) {
     let Some(app) = ctx_popup::app() else { return };
     let prefs = tray_prefs::current();
     match event {
-        TrayIconEvent::Click { button: MouseButton::Left, button_state: tauri::tray::MouseButtonState::Down, .. } => gate(|g| g.left_down()),
+        TrayIconEvent::Click { button: MouseButton::Left, button_state: tauri::tray::MouseButtonState::Down, .. } => {
+            gate(|g| g.left_down());
+            if matches!(prefs.action(Gesture::Click), Action::Panel) || matches!(prefs.action(Gesture::Double), Action::Panel) {
+                crate::mem_adaptive::prewarm_main(&app, "tray press");
+            }
+        },
         TrayIconEvent::Click { button: MouseButton::Left, button_state: tauri::tray::MouseButtonState::Up, rect, .. } => {
             let decision = gate(|g| g.left_up(&prefs, tray_prefs::double_click_wait()));
             run(&app, decision, physical_rect(&rect));
@@ -125,7 +131,10 @@ pub(super) fn on_icon_event(event: TrayIconEvent) {
             let decision = gate(|g| g.double_click(&prefs));
             run(&app, decision, physical_rect(&rect));
         }
+        // the pointer is on the icon (the events repeat while it moves): a main window that was let go for memory is made again now, hidden, so that the click that follows finds it
+        TrayIconEvent::Enter { .. } | TrayIconEvent::Move { .. } => crate::mem_adaptive::prewarm_main(&app, "tray hover"),
         TrayIconEvent::Click { button: MouseButton::Right, button_state: tauri::tray::MouseButtonState::Up, rect, .. } => {
+            crate::mem_adaptive::note_click();
             // with the native menu on the icon, the system shows it by itself on this very event
             match right_click_plan(use_native_menu(), NATIVE_ATTACHED.load(Ordering::SeqCst)) {
                 RightClick::Window => perform(&app, prefs.action(Gesture::Right), physical_rect(&rect), true),
@@ -183,6 +192,10 @@ fn open_menu(app: &AppHandle, variant: Variant, icon: PhysRect) {
             ctx_popup::mark_failed();
         }
         if ctx_popup::health() != ctx_popup::Health::Ready {
+            // WebView2 would not make the window yet: the click is answered by the native menu, and the window is tried again now
+            if ctx_popup::health() == ctx_popup::Health::Failed {
+                ctx_popup::schedule_create_after(&app, Duration::ZERO);
+            }
             let handle = app.clone();
             let _ = app.run_on_main_thread(move || apply_menu_mode(&handle));
             return;
@@ -290,6 +303,7 @@ pub(super) fn labels(s: &TrayStrings) -> Value {
     put("clear_cache", s.clear_cache);
     put("check_update", s.check_update);
     put("about", s.about);
+    put("feedback", s.feedback);
     put("star_project", s.star_project);
     put("visit_project_sunshine", s.visit_project_sunshine);
     put("visit_project_moonlight", s.visit_project_moonlight);
@@ -299,6 +313,8 @@ pub(super) fn labels(s: &TrayStrings) -> Value {
     put("sponsor_qiin", "qiin2333");
     put("sponsor_yundi339", "Yundi339");
     put("sponsor_skyhua", "skyhua0224");
+    put("sponsor_wechat", "微信赞赏 / WeChat");
+    put("sponsor_github", "GitHub Sponsors");
     put("restart", s.restart);
     put("shutdown", s.shutdown);
     Value::Object(m)
@@ -712,14 +728,14 @@ mod tests {
 
     #[test]
     fn the_item_ids_are_the_ids_menu_rs_builds() {
-        assert_eq!(ITEM_IDS.len(), 43);
+        assert_eq!(ITEM_IDS.len(), 46);
         for id in ITEM_IDS {
             assert!(MENU.contains(&format!("\"{id}\"")), "menu.rs has no '{id}'");
         }
         let mut sorted = ITEM_IDS.to_vec();
         sorted.sort();
         sorted.dedup();
-        assert_eq!(sorted.len(), 43, "no id twice");
+        assert_eq!(sorted.len(), ITEM_IDS.len(), "no id twice");
     }
 
     #[test]

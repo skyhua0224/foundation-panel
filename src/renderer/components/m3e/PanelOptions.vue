@@ -48,7 +48,7 @@ onMounted(async () => {
 })
 
 async function set(key, value) {
-  try { await saveDesktopSettings({ ...settings.value, [key]: value }) } catch (e) { notice.value = `${st.value.updateError || ''} ${e?.message || ''}`.trim() }
+  try { await saveDesktopSettings({ ...settings.value, [key]: value }) } catch (e) { notice.value = `${st.value.saveError || st.value.updateError || ''} ${e?.message || ''}`.trim() }
 }
 const startup = computed(() => [['autoStart', st.value.autoStart, st.value.autoStartDesc], ['startMinimized', st.value.startMinimized, st.value.startMinimizedDesc], ['autoStartSunshine', st.value.autoStartSunshine, st.value.autoStartSunshineDesc]])
 const notifications = computed(() => [['notifications', st.value.desktopNotifications, st.value.desktopNotificationsDesc], ['connectionNotify', st.value.connectionNotify, st.value.connectionNotifyDesc], ['updateNotify', st.value.updateNotify, st.value.updateNotifyDesc]])

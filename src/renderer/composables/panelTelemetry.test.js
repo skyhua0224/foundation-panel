@@ -51,3 +51,52 @@ test('the panel shell starts it once, tells it the page, and the host is the sin
   assert.match(shell, /SOURCE_KEY/)
   assert.doesNotMatch(shell, /firebase|google-analytics|gtag/i)
 })
+
+test('foundation-error-event forwards structured error codes without user text', async () => {
+  const calls = []
+  const listeners = new Map()
+  const store = new Map()
+  globalThis.sessionStorage = { getItem: (k) => store.get(k) ?? null, setItem: (k, v) => store.set(k, v) }
+  globalThis.localStorage = { getItem: () => null, setItem: () => {} }
+  try {
+    const panel = createPanelTelemetry({
+      getBase: async () => 'http://127.0.0.1:19999/',
+      getVersion: async () => '1.0.8',
+      fetchFn: async (_url, options) => { calls.push(JSON.parse(options.body)); return { ok: true, status: 200 } },
+      win: {
+        addEventListener(name, fn) { listeners.set(name, fn) },
+        removeEventListener(name, fn) { if (listeners.get(name) === fn) listeners.delete(name) },
+      },
+      doc: undefined,
+    })
+    await panel.start({ startMs: 50 })
+    listeners.get('foundation-error-event')?.({ detail: { component: 'usbip', code: 'usbip-setup-016.0xe0000247', severity: 'error' } })
+    await panel.stop()
+    const errorEvent = calls.flatMap((b) => b.events).find((e) => e.kind === 'error')
+    assert.deepEqual(errorEvent, {
+      kind: 'error',
+      name: 'error',
+      props: { component: 'usbip', code: 'usbip-setup-016.0xe0000247', severity: 'error', count: 1 },
+    })
+  } finally { delete globalThis.sessionStorage; delete globalThis.localStorage }
+})
+
+test('the update source of the start record comes from the native side, which never answers empty: the used source, else the setting', async () => {
+  globalThis.sessionStorage = { getItem: () => null, setItem: () => {} }
+  globalThis.localStorage = { getItem: () => null, setItem: () => {} }
+  try {
+    // the words of the contract: mirror, cnb, github, other (auto counts as other); the miss only when there is one
+    for (const [native, wire] of [['mirror', 'mirror'], ['github', 'github'], ['cnb', 'cnb'], ['auto', 'other']]) {
+      const calls = []
+      const panel = createPanelTelemetry({
+        getBase: async () => 'http://127.0.0.1:19999/', getVersion: async () => '1.0.0', getUpdateSource: async () => native, getUpdateSourceMiss: async () => (native === 'cnb' ? 'version_lag' : ''),
+        fetchFn: async (url, options) => { calls.push(JSON.parse(options.body)); return { ok: true, status: 200 } },
+        win: { addEventListener() {}, removeEventListener() {} }, doc: undefined,
+      })
+      await panel.start({ startMs: 100 })
+      await panel.stop()
+      assert.equal(calls[0].events[0].props.update_source, wire, native)
+      assert.equal(calls[0].events[0].props.update_source_miss, native === 'cnb' ? 'version_lag' : undefined, native)
+    }
+  } finally { delete globalThis.sessionStorage; delete globalThis.localStorage }
+})

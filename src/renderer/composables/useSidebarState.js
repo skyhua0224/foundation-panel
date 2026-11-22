@@ -1,8 +1,10 @@
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { ElMessage } from './notifyMessage.js'
+import { ElMessage, UPDATE_CHECK_MESSAGE } from './notifyMessage.js'
 import { useRouter, ROUTES } from './useRouter.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { formatMessage } from '../shared/format-message.js'
+import { CHANNEL_CHOSEN_KEY, CHANNEL_EVENT, rememberChannel } from './updateChannel.js'
+import { isCurrentVersionUnknown, isPrereleaseUnavailable, updateCheckFailureText } from './updateCheckError.js'
 
 const STORAGE_KEYS = {
   SKIPPED_VERSION: 'sunshine-skipped-version',
@@ -133,6 +135,9 @@ export function useSidebarState() {
   /**
    * 初始化 beta 更新偏好
    */
+  // the first-run guide chooses the channel too (updateChannel.js): the window follows
+  if (typeof window !== 'undefined') window.addEventListener(CHANNEL_EVENT, (event) => { includePrerelease.value = !!event.detail })
+
   const initIncludePrerelease = async () => {
     try {
       const invoke = await getInvoke()
@@ -157,7 +162,8 @@ export function useSidebarState() {
    */
   const setIncludePrerelease = async (value) => {
     includePrerelease.value = value
-    localStorage.setItem(STORAGE_KEYS.INCLUDE_PRERELEASE, value.toString())
+    // a storage that refuses (full) must not keep the native side from being saved
+    rememberChannel(value)
 
     try {
       const invoke = await getInvoke()
@@ -248,7 +254,9 @@ export function useSidebarState() {
       const { error } = payload
       if (error) {
         console.error('Update check failed:', error)
-        ElMessage.error(t.value.toolActions.checkUpdatesFailed)
+        const text = updateCheckFailureText(error, t.value.toolActions)
+        if (isPrereleaseUnavailable(error) || isCurrentVersionUnknown(error)) ElMessage.warning({ message: text, id: UPDATE_CHECK_MESSAGE })
+        else ElMessage.error({ message: text, id: UPDATE_CHECK_MESSAGE })
       }
     })
     cleanupFns.push(unlistenCheckResult)

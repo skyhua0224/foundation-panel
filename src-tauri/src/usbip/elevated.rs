@@ -73,6 +73,77 @@ pub(super) async fn run_elevated(_request: ElevatedRequest) -> Result<ElevatedRe
     Err("USBIP-SETUP-004: USB/IP passthrough is only supported on Windows".to_string())
 }
 
+/// The answer that tells the unelevated side a removal was accepted and finishes at the next restart.
+#[cfg(target_os = "windows")]
+pub(super) const RESTART_PENDING: &str = "restart_pending";
+
+/// The answer of an install or a replacement: the restart-pending answer when removed leftovers wait for the restart (it
+/// outranks the installer's own advice), `reboot_recommended` when only the installer asks, otherwise nothing.
+#[cfg(target_os = "windows")]
+fn restart_answer(leftovers_wait: bool, installer_asks: bool) -> String {
+    if leftovers_wait {
+        RESTART_PENDING.to_string()
+    } else if installer_asks {
+        "reboot_recommended".to_string()
+    } else {
+        String::new()
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn finish_message(finish: super::device::Finish) -> String {
+    match finish {
+        super::device::Finish::Done => String::new(),
+        super::device::Finish::RestartNeeded => RESTART_PENDING.to_string(),
+    }
+}
+
+// USB/IP maintenance and VB-CABLE both modify driver state. Keep the guard in
+// the elevated helper, so it survives the panel timing out or closing.
+#[cfg(target_os = "windows")]
+fn lock_transport_driver_operation(
+    request: &ElevatedRequest,
+) -> Result<Option<crate::vb_cable::DriverOperationGuard>, String> {
+    if !matches!(
+        request,
+        ElevatedRequest::Install
+            | ElevatedRequest::Cleanup
+            | ElevatedRequest::RemoveStale
+            | ElevatedRequest::ReplaceLegacy
+    ) {
+        return Ok(None);
+    }
+    crate::vb_cable::lock_driver_operation()
+        .map(Some)
+        .map_err(driver_operation_error)
+}
+
+#[cfg(target_os = "windows")]
+fn driver_operation_error(error: String) -> String {
+    if error.starts_with("VBCABLE-OP-BUSY:") {
+        "USBIP-SETUP-018: another component driver operation is still running".to_string()
+    } else {
+        format!("USBIP-UAC-002: unable to coordinate driver operations: {error}")
+    }
+}
+
+// Avoid prompting for UAC when another operation is already known to be busy.
+// The helper acquires the same guard again to close the race after this check.
+#[cfg(target_os = "windows")]
+pub(super) fn check_driver_operation() -> Result<(), String> {
+    let guard = crate::vb_cable::lock_driver_operation().map_err(|error| {
+        // A helper elevated under different administrator credentials can own
+        // the mutex without granting this unelevated account access to it.
+        if error.starts_with("VBCABLE-OP-ACCESS-DENIED:") {
+            "USBIP-SETUP-018: another component driver operation is still running".to_string()
+        } else {
+            driver_operation_error(error)
+        }
+    })?;
+    drop(guard);
+    Ok(())
+}
+
 /// Runs privileged operations over the invocation's authenticated pipe, revalidating inputs.
 /// Keeps local transport failures distinct from remote exporter errors in the response.
 #[cfg(target_os = "windows")]
@@ -93,6 +164,7 @@ async fn run_elevated_helper(token: uuid::Uuid, request: ElevatedRequest) -> i32
         if !crate::elevation::is_elevated() {
             return Err("USBIP-UAC-001: administrator authorization was not granted".to_string());
         }
+        let _driver_operation = lock_transport_driver_operation(&request)?;
         match request {
             ElevatedRequest::Install => {
                 super::install::ensure_no_active_session().await?;
@@ -102,25 +174,55 @@ async fn run_elevated_helper(token: uuid::Uuid, request: ElevatedRequest) -> i32
                 })?;
                 let result = super::install::ensure_pinned_usbip(&root)
                     .await
-                    .map_err(|error| format!("USBIP-SETUP-007: transport installation failed: {error}"))?;
-                let reboot_recommended =
-                    matches!(result, super::install::InstallResult::RebootRecommended);
+                    .map_err(|error| {
+                        if super::status::detail_error_code(&error).is_empty() {
+                            format!("USBIP-SETUP-007: transport installation failed: {error}")
+                        } else {
+                            error
+                        }
+                    })?;
+                // Controllers an older version left beside the new live one go now, so the person never meets "installed, not ready".
+                let restart_for_leftovers = super::device::sweep_stale_after_install().await
+                    == super::device::Finish::RestartNeeded;
+                let installer_asks = matches!(result, super::install::InstallResult::RebootRecommended);
                 Ok(ElevatedResponse {
                     success: true,
                     port: None,
-                    message: if reboot_recommended {
-                        "reboot_recommended".to_string()
-                    } else {
-                        String::new()
-                    },
+                    message: restart_answer(restart_for_leftovers, installer_asks),
+                })
+            }
+            ElevatedRequest::ReplaceLegacy => {
+                super::install::ensure_no_active_session().await?;
+                // The elevated process asks the host's helper itself: the window's earlier answer is not trusted.
+                if !super::install::host_replaceable_fresh().await {
+                    return Err("USBIP-REPLACE-001: this USB/IP installation cannot be replaced from here; nothing was changed".to_string());
+                }
+                let result = super::install::run_host_package("replace").await?;
+                let restart_for_leftovers = super::device::sweep_stale_after_install().await
+                    == super::device::Finish::RestartNeeded;
+                Ok(ElevatedResponse {
+                    success: true,
+                    port: None,
+                    message: restart_answer(
+                        restart_for_leftovers,
+                        matches!(result, super::install::InstallResult::RebootRecommended),
+                    ),
                 })
             }
             ElevatedRequest::Cleanup => {
-                super::device::cleanup_broken_transport().await?;
+                let finish = super::device::cleanup_broken_transport().await?;
                 Ok(ElevatedResponse {
                     success: true,
                     port: None,
-                    message: String::new(),
+                    message: finish_message(finish),
+                })
+            }
+            ElevatedRequest::RemoveStale => {
+                let finish = super::device::remove_stale_nodes().await?;
+                Ok(ElevatedResponse {
+                    success: true,
+                    port: None,
+                    message: finish_message(finish),
                 })
             }
             ElevatedRequest::Attach {
@@ -228,4 +330,68 @@ pub(crate) fn try_handle_elevated_command() -> Option<i32> {
         Err(_) => return Some(3),
     };
     Some(runtime.block_on(run_elevated_helper(token, request)))
+}
+
+#[cfg(all(test, target_os = "windows"))]
+mod tests {
+    use super::{ElevatedRequest, check_driver_operation, lock_transport_driver_operation};
+
+    #[test]
+    fn usbip_maintenance_and_vb_cable_share_the_driver_guard() {
+        use std::os::windows::process::CommandExt;
+        if std::env::var_os("SUNSHINE_TEST_DRIVER_GUARD_CHILD").is_some() {
+            assert!(
+                check_driver_operation()
+                    .unwrap_err()
+                    .starts_with("USBIP-SETUP-018:")
+            );
+            return;
+        }
+        let guard = crate::vb_cable::lock_driver_operation().expect("acquire VB-CABLE guard");
+        let child = std::process::Command::new(std::env::current_exe().unwrap())
+            .args([
+                "--exact",
+                "usbip::elevated::tests::usbip_maintenance_and_vb_cable_share_the_driver_guard",
+            ])
+            .env("SUNSHINE_TEST_DRIVER_GUARD_CHILD", "1")
+            .creation_flags(0x08000000)
+            .output()
+            .unwrap();
+        assert!(
+            child.status.success(),
+            "{}",
+            String::from_utf8_lossy(&child.stdout)
+        );
+        let (blocked, preflight, detach_is_unrelated) = std::thread::spawn(|| {
+            let blocked: Vec<_> = [
+                ElevatedRequest::Install,
+                ElevatedRequest::Cleanup,
+                ElevatedRequest::RemoveStale,
+                ElevatedRequest::ReplaceLegacy,
+            ]
+            .iter()
+            .map(|request| lock_transport_driver_operation(request).err())
+            .collect();
+            let preflight = check_driver_operation().err();
+            let detach_is_unrelated = matches!(
+                lock_transport_driver_operation(&ElevatedRequest::Detach { port: 1 }),
+                Ok(None)
+            );
+            (blocked, preflight, detach_is_unrelated)
+        })
+        .join()
+        .unwrap();
+        for error in blocked {
+            assert!(error.unwrap().starts_with("USBIP-SETUP-018:"));
+        }
+        assert!(preflight.unwrap().starts_with("USBIP-SETUP-018:"));
+        assert!(detach_is_unrelated);
+        drop(guard);
+        assert!(check_driver_operation().is_ok());
+        assert!(
+            lock_transport_driver_operation(&ElevatedRequest::Install)
+                .unwrap()
+                .is_some()
+        );
+    }
 }

@@ -234,6 +234,9 @@ fn uncloak_cold<R: Runtime>(window: &WebviewWindow<R>, why: &str) {
         #[cfg(target_os = "windows")]
         force_activate_window_win32(window);
     }
+    if window.is_visible().unwrap_or(false) {
+        crate::mem_adaptive::note_main_shown();
+    }
 }
 
 /// The page painted its first frame: the cloaked window shows it.
@@ -251,16 +254,17 @@ pub fn panel_activity() {
 /// Measurement instances only: the message Windows sends when the scale of the window's monitor changes, with the size the window gets at the new scale.
 /// An off-screen window gets none from the system, and the display of whoever uses the machine stays as it is.
 #[tauri::command]
-pub fn test_synthetic_dpi(window: tauri::WebviewWindow, dpi: u32) -> Result<(), String> {
+pub fn test_synthetic_dpi(window: tauri::WebviewWindow, dpi: u32, keep_pixels: Option<bool>) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     if !test_offscreen() {
         return Err("only a measurement instance takes a synthetic scale change".to_string());
     }
-    send_synthetic_dpi(&window, dpi)
+    send_synthetic_dpi(&window, dpi, keep_pixels.unwrap_or(false))
 }
 
 /// The message itself: used by the measurement instances above and by the developer page (dev_tools), which asks the person first.
-pub(crate) fn send_synthetic_dpi(window: &tauri::WebviewWindow, dpi: u32) -> Result<(), String> {
+/// `keep_pixels`: the suggested rectangle has the pixels the window has (what a display whose resolution and scale change together gives: the observed behaviour of a virtual display), not the DIPs.
+pub(crate) fn send_synthetic_dpi(window: &tauri::WebviewWindow, dpi: u32, keep_pixels: bool) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
         use windows::Win32::Foundation::{HWND, LPARAM, RECT, WPARAM};
@@ -272,14 +276,14 @@ pub(crate) fn send_synthetic_dpi(window: &tauri::WebviewWindow, dpi: u32) -> Res
         let known = CURRENT.swap(dpi, std::sync::atomic::Ordering::SeqCst);
         let (mut rect, old) = (RECT::default(), if known == 0 { unsafe { GetDpiForWindow(hwnd) }.max(1) } else { known });
         unsafe { GetWindowRect(hwnd, &mut rect) }.map_err(|e| e.to_string())?;
-        let size = |extent: i32| (i64::from(extent) * i64::from(dpi) / i64::from(old)) as i32;
+        let size = |extent: i32| if keep_pixels { extent } else { (i64::from(extent) * i64::from(dpi) / i64::from(old)) as i32 };
         let suggested = RECT { left: rect.left, top: rect.top, right: rect.left + size(rect.right - rect.left), bottom: rect.top + size(rect.bottom - rect.top) };
         unsafe { SendMessageW(hwnd, WM_DPICHANGED, Some(WPARAM(((dpi << 16) | dpi) as usize)), Some(LPARAM(&suggested as *const RECT as isize))) };
         Ok(())
     }
     #[cfg(not(target_os = "windows"))]
     {
-        let _ = (window, dpi);
+        let _ = (window, dpi, keep_pixels);
         Err("windows only".to_string())
     }
 }
@@ -407,7 +411,7 @@ pub fn show_and_activate_window<R: Runtime>(window: &WebviewWindow<R>) {
     log::info!("[cold] window {} shown", window.label());
     let cloaked = COLD_CLOAK.load(std::sync::atomic::Ordering::SeqCst) && window.label() == MAIN_WINDOW_ID;
     let _ = window.unminimize();
-    let _ = window.show();
+    let shown = window.show().is_ok();
     if cloaked {
         // the person sees the window when the page has painted; if that does not come, after the cap
         let capped = window.clone();
@@ -435,6 +439,9 @@ pub fn show_and_activate_window<R: Runtime>(window: &WebviewWindow<R>) {
         refresh_webview_surface(window);
     }
     crate::power::refresh_ecoqos_state(window.app_handle());
+    if shown && !cloaked && window.label() == MAIN_WINDOW_ID {
+        crate::mem_adaptive::note_main_shown();
+    }
 }
 
 /// 使用 Windows API 强制激活窗口
@@ -581,14 +588,8 @@ pub fn open_main_panel_page<R: Runtime>(app: &AppHandle<R>, page: &str) -> Resul
         });
         return Ok(());
     }
-    if app.get_webview_window(MAIN_WINDOW_ID).is_none() {
-        create_main_window(app).map_err(|error| error.to_string())?;
-    }
-    let window = app
-        .get_webview_window(MAIN_WINDOW_ID)
-        .ok_or_else(|| "main panel window is unavailable".to_string())?;
-    show_and_activate_window(&window);
-    crate::panel_page::open_page(&window, page);
+    crate::panel_page::open_page(app, page);
+    request_main_window(app, None)?;
     debug!("✅ main panel page requested: {page}");
     Ok(())
 }
@@ -621,6 +622,9 @@ pub fn open_debug_page<R: Runtime>(app: &AppHandle<R>) {
 pub fn create_main_window<R: Runtime>(
     app: &AppHandle<R>,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    if app.get_webview_window(MAIN_WINDOW_ID).is_none() {
+        crate::mem_adaptive::note_open_request(false, false);
+    }
     create_main_window_internal(app, true)
 }
 
@@ -632,6 +636,21 @@ pub fn create_main_window_hidden<R: Runtime>(
 }
 
 fn create_main_window_internal<R: Runtime>(
+    app: &AppHandle<R>,
+    visible: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let shared = crate::webview_env::is_shared();
+    match create_main_window_once(app, visible) {
+        // a window made from the shared environment failed and the environment was dropped: once more with an environment of its own
+        Err(error) if shared && !crate::webview_env::is_shared() => {
+            warn!("[webview-env] main-window: made again with its own environment after: {error}");
+            create_main_window_once(app, visible)
+        }
+        other => other,
+    }
+}
+
+fn create_main_window_once<R: Runtime>(
     app: &AppHandle<R>,
     visible: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -647,11 +666,14 @@ fn create_main_window_internal<R: Runtime>(
     crate::tray::mark_main_panel_loading();
     let panel = lifecycle::register(MAIN_WINDOW_ID, visible);
     let page_panel = panel.clone();
-    let builder = tauri::WebviewWindowBuilder::new(
+    // all windows of the panel are made from one WebView2 environment (webview_env.rs); a window that is made again after a memory release carries the state its predecessor left
+    // (view_state.rs) and applies it before the person sees it
+    let initialization_script = format!("{}\n{}", panel.initialization_script(), crate::view_state::main_window_script());
+    let builder = crate::webview_env::adopt(tauri::WebviewWindowBuilder::new(
         app,
         MAIN_WINDOW_ID,
         tauri::WebviewUrl::App("sunshine-frame.html".into()),
-    )
+    ))
     .title("Sunshine Control Panel")
     .inner_size(1280.0, 800.0)
     .min_inner_size(480.0, 560.0);
@@ -665,7 +687,7 @@ fn create_main_window_internal<R: Runtime>(
     .shadow(false)
     .visible(false)
     .disable_drag_drop_handler()
-    .initialization_script(panel.initialization_script())
+    .initialization_script(initialization_script)
     .on_page_load(move |window, payload| {
         if payload.event() == PageLoadEvent::Finished {
             page_panel.page_loaded(window);
@@ -674,10 +696,18 @@ fn create_main_window_internal<R: Runtime>(
     .build()
     .map_err(|e| {
         lifecycle::unregister(MAIN_WINDOW_ID, &panel);
-        format!("创建{}主窗口失败: {}", visibility_desc, e)
+        let shared = crate::webview_env::is_shared();
+        if shared {
+            // the shared environment may belong to a browser process that is gone: the next attempt makes its own
+            crate::webview_env::forget();
+        }
+        format!("创建{}主窗口失败: {}", visibility_desc, crate::webview_env::describe_failure("main-window", 1, shared, &e.to_string()))
     })?;
 
+    crate::webview_env::capture(&window);
     panel.attach(&window);
+    // a window that was let go for memory (mem_adaptive.rs) comes back where and as large as it was
+    crate::mem_adaptive::restore_bounds(&window);
 
     // 设置 DWM 圆角，让系统级合成器裁剪窗口圆角
     #[cfg(target_os = "windows")]
@@ -736,11 +766,11 @@ fn create_desktop_window_internal<R: Runtime>(
     let panel = lifecycle::register(DESKTOP_WINDOW_ID, visible);
     let page_panel = panel.clone();
 
-    let window = tauri::WebviewWindowBuilder::new(
+    let window = crate::webview_env::adopt(tauri::WebviewWindowBuilder::new(
         app,
         DESKTOP_WINDOW_ID,
         tauri::WebviewUrl::App("desktop/index.html".into()),
-    )
+    ))
     .title("Sunshine Desktop")
     .inner_size(1600.0, 900.0)
     .min_inner_size(1024.0, 600.0)
@@ -824,7 +854,13 @@ pub fn close_desktop_window<R: Runtime>(app: &AppHandle<R>) -> bool {
 }
 
 /// 激活主窗口
-pub fn activate_main_window(app: &tauri::AppHandle, target_url: Option<String>) {
+pub fn activate_main_window<R: Runtime>(app: &AppHandle<R>, target_url: Option<String>) {
+    if let Err(error) = request_main_window(app, target_url) {
+        error!("Failed to activate main panel: {error}");
+    }
+}
+
+fn request_main_window<R: Runtime>(app: &AppHandle<R>, mut target_url: Option<String>) -> Result<(), String> {
     debug!(
         "📱 activate_main_window 被调用，target_url: {:?}",
         target_url
@@ -832,14 +868,24 @@ pub fn activate_main_window(app: &tauri::AppHandle, target_url: Option<String>) 
 
     if closing::is_closing(MAIN_WINDOW_ID) {
         closing::after_closed(app, MAIN_WINDOW_ID, move |app| activate_main_window(&app, target_url));
-        return;
+        return Ok(());
+    }
+    let existing = app.get_webview_window(MAIN_WINDOW_ID);
+    crate::mem_adaptive::note_open_request(
+        existing.as_ref().is_some_and(|window| !window.is_visible().unwrap_or(true) || window.is_minimized().unwrap_or(false)),
+        existing.is_some(),
+    );
+    if crate::mem_adaptive::defer_open(&mut target_url) {
+        info!("[memadapt] the main window is being made ahead: it is shown when it is made");
+        return Ok(());
+    }
+    if target_url.is_none() && existing.is_some() && lifecycle::show_when_loaded(MAIN_WINDOW_ID) {
+        info!("[memadapt] the main window made ahead is still loading: it is shown when its page is ready");
+        return Ok(());
     }
     let created = if app.get_webview_window(MAIN_WINDOW_ID).is_none() {
         info!("主窗口尚未创建，正在从用户会话 agent 按需创建");
-        if let Err(e) = create_main_window(app) {
-            error!("❌ 按需创建主窗口失败: {}", e);
-            return;
-        }
+        create_main_window(app).map_err(|error| error.to_string())?;
         true
     } else {
         false
@@ -847,14 +893,13 @@ pub fn activate_main_window(app: &tauri::AppHandle, target_url: Option<String>) 
 
     // Cold windows are revealed by the page-load hook after WebView2 has a
     // composited first frame. The startup page reads any runtime URL itself.
-    if created {
-        return;
+    // (A window that a memory-release prewarm made in the meantime and that has loaded already is not cold: it is shown below.)
+    if created && lifecycle::show_when_loaded(MAIN_WINDOW_ID) {
+        return Ok(());
     }
 
-    let Some(window) = app.get_webview_window(MAIN_WINDOW_ID) else {
-        error!("❌ 主窗口创建后仍不可用");
-        return;
-    };
+    let window = app.get_webview_window(MAIN_WINDOW_ID)
+        .ok_or_else(|| "Main panel window is unavailable".to_string())?;
 
     debug!("📱 正在激活主窗口...");
 
@@ -873,10 +918,11 @@ pub fn activate_main_window(app: &tauri::AppHandle, target_url: Option<String>) 
     });
 
     debug!("✅ 窗口激活完成");
+    Ok(())
 }
 
 /// 导航到指定 URL
-fn navigate_to_url(window: &WebviewWindow, url: &str) {
+fn navigate_to_url<R: Runtime>(window: &WebviewWindow<R>, url: &str) {
     debug!("🔄 正在导航到: {}", url);
 
     let Ok(parsed_url) = url::Url::parse(url) else {
@@ -915,6 +961,7 @@ fn navigate_to_url(window: &WebviewWindow, url: &str) {
 #[cfg(target_os = "windows")]
 pub(crate) fn configure_webview_security<R: Runtime>(window: &WebviewWindow<R>) {
     let label = window.label().to_string();
+    let window_app = window.app_handle().clone();
     let _ = window.with_webview(move |webview| {
         // 引入 webview2-com 的 COM 接口类型
         use webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Settings4;
@@ -961,7 +1008,11 @@ pub(crate) fn configure_webview_security<R: Runtime>(window: &WebviewWindow<R>) 
                 }
             }
             // a WebView2 process that fails (renderer, GPU, browser) is recorded for the crash report
-            crate::crash::register_webview_failures(&core_webview);
+            let app = window_app.clone();
+            crate::crash::register_webview_failures(&core_webview, move || {
+                crate::exit_state::begin("webview restart");
+                app.restart()
+            });
             let Ok(settings) = core_webview.Settings() else {
                 log::warn!("⚠️ 无法获取 ICoreWebView2Settings [{}]", label);
                 return;
@@ -1153,6 +1204,25 @@ fn refresh_webview_surface<R: Runtime>(window: &WebviewWindow<R>) {
             let _ = controller.NotifyParentWindowPositionChanged();
         }
     });
+}
+
+/// The main window is being closed (its destruction is under way).
+pub(crate) fn main_window_closing() -> bool {
+    closing::is_closing(MAIN_WINDOW_ID)
+}
+
+/// Memory release (mem_adaptive.rs): the main window sits hidden in the tray, asleep (not minimized, not loading, not closing).
+pub(crate) fn main_window_sleeping<R: Runtime>(app: &AppHandle<R>) -> Option<WebviewWindow<R>> {
+    if closing::is_closing(MAIN_WINDOW_ID) || !lifecycle::is_background(MAIN_WINDOW_ID) {
+        return None;
+    }
+    let window = app.get_webview_window(MAIN_WINDOW_ID)?;
+    (!window.is_visible().unwrap_or(true) && !window.is_minimized().unwrap_or(true)).then_some(window)
+}
+
+/// Memory release: the main window goes through the same close as the title bar's × (hidden first, destroyed, logged); the next open makes it again.
+pub(crate) fn release_main_window<R: Runtime>(app: &AppHandle<R>) -> bool {
+    closing::close_window(app, MAIN_WINDOW_ID, "memory release")
 }
 
 /// The application is going down: every window is hidden first, so none is destroyed while the person can still see it

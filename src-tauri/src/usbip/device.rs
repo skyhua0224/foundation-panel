@@ -1,9 +1,8 @@
 //! Residual VHCI device detection and cleanup.
 //!
-//! The pinned USB/IP transport leaves ghost VHCI devnodes behind when the
-//! vendor uninstaller is interrupted or the upgrade path skips cleanup. This
-//! module enumerates those devices the same way `usbip.exe` does and removes
-//! the leftovers the installer tolerates but usbip.exe refuses to.
+//! An older usbip-win2 (0.9.7.x) uninstaller, an interrupted uninstall or an upgrade can leave host-controller devnodes
+//! behind. This module enumerates the live interfaces the way `usbip.exe` does, and removes the leftovers. The node model
+//! and the readiness rule are in `nodes.rs`; reading and removing a devnode is `devnode.rs`.
 
 #[cfg(target_os = "windows")]
 const VHCI_INTERFACE_GUID: windows::core::GUID =
@@ -87,120 +86,15 @@ fn split_multi_sz(buffer: &[u16]) -> Vec<String> {
         .collect()
 }
 
-/// Device interface symbolic links are laid out as
-/// `\\?\ROOT#USB#0001#{interface-guid}`; the portion before the GUID brace is
-/// the device instance ID with `#` separators.
-fn instance_id_from_interface_path(path: &str) -> Option<String> {
-    let body = path.strip_prefix(r"\\?\")?;
-    let head = body.split_once('{')?.0;
-    let head = head.strip_suffix('#')?;
-    if head.is_empty() {
-        return None;
-    }
-    Some(head.replace('#', "\\"))
-}
+#[cfg_attr(not(target_os = "windows"), allow(unused_imports))]
+pub(super) use super::nodes::{Residual, TransportNode, residual_kind, transport_not_ready};
 
-fn is_vhci_hardware_id(value: &str) -> bool {
-    value.eq_ignore_ascii_case(r"ROOT\USBIP_WIN2\UDE")
-}
-
-/// CONFIGFLAG_DISABLED from the Windows device-installation flags. A disabled
-/// devnode remains under Enum and does not publish a present VHCI interface, so
-/// usbip.exe does not treat it as a second host controller.
-const CONFIGFLAG_DISABLED: u32 = 0x0000_0001;
-
-/// One usbip-win2 host-controller devnode. Older installs use ROOT\USB; a
-/// later root uses ROOT\ALKAIDUSB. Both keep the same hardware ID.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct TransportNode {
-    pub instance_id: String,
-    pub disabled: bool,
-}
-
-/// Whether the transport must be reported not ready.
-///
-/// usbip.exe fails when more than one present VHCI interface exists. An enabled
-/// registry node with the usbip-win2 hardware ID and no present interface is the
-/// phantom an interrupted uninstall leaves behind, and that still blocks. A
-/// disabled node does not: it is the previous enumerator (ROOT\USB after the
-/// controller moved to ROOT\ALKAIDUSB, or the reverse) and the single present
-/// interface is the live controller. No recorded node and no present interface
-/// stays clear, matching the previous check.
-pub(super) fn transport_not_ready(interfaces: &[String], nodes: &[TransportNode]) -> bool {
-    if interfaces.len() > 1 {
-        return true;
-    }
-    if interfaces.is_empty() {
-        return !nodes.is_empty();
-    }
-    let live = instance_id_from_interface_path(&interfaces[0]);
-    nodes.iter().any(|node| {
-        !node.disabled
-            && live
-                .as_ref()
-                .is_none_or(|id| !node.instance_id.eq_ignore_ascii_case(id))
-    })
-}
-
-fn registry_optional<T>(result: std::io::Result<T>) -> Result<Option<T>, String> {
-    match result {
-        Ok(value) => Ok(Some(value)),
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(error) => Err(format!(
-            "USBIP-CLEAN-002: cannot inspect VHCI registry: {error}"
-        )),
-    }
-}
-/// Present interfaces are sufficient for normal operation checks, but an
-/// interrupted uninstall can leave a phantom ROOT\USB node with no interface.
-/// Read its immutable hardware ID so cleanup can remove only usbip-win2 nodes.
-#[cfg(target_os = "windows")]
-pub(super) fn enumerate_vhci_devnodes() -> Result<Vec<String>, String> {
-    Ok(read_transport_nodes(r"ROOT\USB")?
-        .into_iter()
-        .map(|node| node.instance_id)
-        .collect())
-}
-
-/// Host-controller nodes under either enumerator. Cleanup still removes only
-/// ROOT\USB phantoms plus whatever interface is present; this list is for the
-/// readiness decision and must see a controller that lives at ROOT\ALKAIDUSB.
+/// Host-controller nodes under either enumerator, each with whether it is in the device tree. The readiness decision
+/// needs both enumerators: the live controller can be at ROOT\ALKAIDUSB.
 #[cfg(target_os = "windows")]
 pub(super) fn enumerate_transport_nodes() -> Result<Vec<TransportNode>, String> {
-    let mut nodes = read_transport_nodes(r"ROOT\USB")?;
-    nodes.extend(read_transport_nodes(r"ROOT\ALKAIDUSB")?);
-    Ok(nodes)
-}
-
-#[cfg(target_os = "windows")]
-fn read_transport_nodes(enumerator: &str) -> Result<Vec<TransportNode>, String> {
-    use winreg::RegKey;
-    use winreg::enums::{HKEY_LOCAL_MACHINE, KEY_READ};
-
-    let hklm = RegKey::predef(HKEY_LOCAL_MACHINE);
-    let path = format!(r"SYSTEM\CurrentControlSet\Enum\{enumerator}");
-    let Some(root) = registry_optional(hklm.open_subkey_with_flags(&path, KEY_READ))? else {
-        return Ok(Vec::new());
-    };
-    let mut nodes = Vec::new();
-    for name in root.enum_keys() {
-        let name = name
-            .map_err(|error| format!("USBIP-CLEAN-002: cannot enumerate VHCI registry: {error}"))?;
-        let Some(key) = registry_optional(root.open_subkey_with_flags(&name, KEY_READ))? else {
-            continue;
-        };
-        let Some(hardware_ids) = registry_optional(key.get_value::<Vec<String>, _>("HardwareID"))?
-        else {
-            continue;
-        };
-        if hardware_ids.iter().any(|value| is_vhci_hardware_id(value)) {
-            let flags = registry_optional(key.get_value::<u32, _>("ConfigFlags"))?.unwrap_or(0);
-            nodes.push(TransportNode {
-                instance_id: format!(r"{enumerator}\{name}"),
-                disabled: (flags & CONFIGFLAG_DISABLED) != 0,
-            });
-        }
-    }
+    let mut nodes = super::devnode::read_transport_nodes(r"ROOT\USB")?;
+    nodes.extend(super::devnode::read_transport_nodes(r"ROOT\ALKAIDUSB")?);
     Ok(nodes)
 }
 
@@ -211,9 +105,9 @@ fn read_transport_nodes(enumerator: &str) -> Result<Vec<TransportNode>, String> 
 /// what Inno Setup and Windows itself assume when parsing the same string.
 #[cfg(target_os = "windows")]
 fn split_executable_command(command: &str) -> Option<(String, Vec<String>)> {
-    use windows::core::PCWSTR;
-    use windows::Win32::Foundation::{LocalFree, HLOCAL};
+    use windows::Win32::Foundation::{HLOCAL, LocalFree};
     use windows::Win32::UI::Shell::CommandLineToArgvW;
+    use windows::core::PCWSTR;
 
     let command = command.trim();
     if command.is_empty() {
@@ -222,9 +116,8 @@ fn split_executable_command(command: &str) -> Option<(String, Vec<String>)> {
     let mut wide: Vec<u16> = command.encode_utf16().collect();
     wide.push(0);
     let mut argument_count = 0;
-    let arguments_ptr = unsafe {
-        CommandLineToArgvW(PCWSTR::from_raw(wide.as_ptr()), &mut argument_count)
-    };
+    let arguments_ptr =
+        unsafe { CommandLineToArgvW(PCWSTR::from_raw(wide.as_ptr()), &mut argument_count) };
     if arguments_ptr.is_null() || argument_count <= 0 {
         return None;
     }
@@ -248,7 +141,7 @@ fn split_executable_command(command: &str) -> Option<(String, Vec<String>)> {
 }
 
 #[cfg(target_os = "windows")]
-fn find_usbip_uninstall_string() -> Result<Option<String>, String> {
+fn find_usbip_uninstall_string() -> Result<Option<(String, bool)>, String> {
     Ok(super::usbip_uninstall_entries()?
         .into_iter()
         .find_map(|entry| {
@@ -258,50 +151,195 @@ fn find_usbip_uninstall_string() -> Result<Option<String>, String> {
                 .ok()
                 .map(|value| value.trim().to_string())
                 .filter(|value| !value.is_empty())
+                .map(|value| (value, entry.slim))
         }))
+}
+
+/// How a cleanup ended: done, or accepted by Windows and finished at the next restart.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Finish {
+    Done,
+    RestartNeeded,
 }
 
 /// Runs inside the elevated helper. Order matters: the vendor uninstaller is
 /// the only supported way to retire the driver packages, service registration,
-/// and scheduled task; the devnode sweep afterwards only has to catch the
-/// nodes the vendor uninstaller silently failed to remove. An uninstaller
-/// failure never skips the sweep — leftover devnodes are the hard blocker for
-/// the next install — but it is still reported so the user can retry.
+/// and scheduled task; the devnode sweep afterwards catches the nodes the vendor
+/// uninstaller leaves behind (0.9.7.x does, and the host's helper reports success
+/// without touching nodes when no installation is registered any more). An
+/// uninstaller failure never skips the sweep on the paths that run the uninstaller
+/// here — leftover devnodes are the hard blocker for the next install — but it is
+/// still reported so the person can retry.
 #[cfg(target_os = "windows")]
-pub(super) async fn cleanup_broken_transport() -> Result<(), String> {
+pub(super) async fn cleanup_broken_transport() -> Result<Finish, String> {
+    if super::manager::externally_managed() {
+        return Err("USBIP-CLEAN-005: externally managed USB/IP is preserved; use Windows Installed apps if you choose to replace it".into());
+    }
     super::install::ensure_no_active_session()
         .await
         .map_err(|_| {
             "USBIP-CLEAN-001: finish the active Sunshine stream before cleaning up the transport"
                 .to_string()
         })?;
+    let helper = crate::sunshine::install_dir()
+        .join("scripts")
+        .join("usbip-package.ps1");
+    if helper.is_file() {
+        // The same helper serializes install/uninstall and completes the hub
+        // guard on cancellation. Never start a native sweep beside that child.
+        super::install::run_host_package("uninstall").await?;
+        // It answers success without touching devnodes when nothing is registered any more, which is exactly the state
+        // an old uninstaller leaves; the helper has finished, so the sweep no longer competes with it.
+        return sweep_devnodes(false).await;
+    }
+    let slim = super::usbip_uninstall_entries()?
+        .iter()
+        .any(|entry| entry.slim);
     let mut uninstall_error = None;
     if !super::usbip_uninstall_entries()?.is_empty() {
-        if let Err(error) = run_inno_uninstaller().await {
+        if let Err(error) = run_registered_uninstaller().await {
             uninstall_error = Some(error);
         }
     }
-    remove_vhci_devnodes().await?;
+    if slim {
+        // A standalone slim package's registered helper performs the entire
+        // cleanup. On timeout it still owns the lifecycle mutex.
+        return match uninstall_error {
+            Some(error) => Err(error),
+            None => sweep_devnodes(false).await,
+        };
+    }
+    let finish = sweep_devnodes(false).await?;
     remove_orphaned_driver_service("usbip2_ude", "usbip2_ude.sys")?;
     remove_orphaned_driver_service("usbip2_filter", "usbip2_filter.sys")?;
-    uninstall_error.map_or(Ok(()), Err)
+    uninstall_error.map_or(Ok(finish), Err)
+}
+
+/// Removes the leftover controllers and keeps the live one: the repair for a working transport that an older version
+/// left controllers behind. Runs inside the elevated helper.
+#[cfg(target_os = "windows")]
+pub(super) async fn remove_stale_nodes() -> Result<Finish, String> {
+    // No stream check: one live controller stays, so nothing a stream uses is touched. Only a transport with a live controller
+    // is repaired this way; with none, nothing says which node to keep, and the sweep says so.
+    sweep_devnodes(true).await
+}
+
+/// After an install or a replacement: the controllers an older version left beside the new live one are removed, so the
+/// person never meets "installed but not ready". Best effort and never an error: a leftover that stays is reported by the
+/// status with its own repair, and the install itself has succeeded.
+#[cfg(target_os = "windows")]
+pub(super) async fn sweep_stale_after_install() -> Finish {
+    match enumerate_vhci_interfaces() {
+        Ok(interfaces) if !interfaces.is_empty() => {
+            sweep_devnodes(true).await.unwrap_or(Finish::Done)
+        }
+        _ => Finish::Done,
+    }
+}
+
+/// Removes devnodes until none is left that should go. PnP teardown is asynchronous, so a node that is still listed is
+/// asked again for the whole polling budget; a node Windows accepted but keeps until the restart is set aside.
+/// `keep_live` keeps one live controller and removes the others; which one is chosen once, here, and every round leaves it alone.
+#[cfg(target_os = "windows")]
+pub(super) async fn sweep_devnodes(keep_live: bool) -> Result<Finish, String> {
+    use super::nodes::{
+        CleanupReason, NodeFailure, NodeRemoval, PENDING_DETAIL, classify_failures, cleanup_error,
+        describe_failure, pick_live, removal_targets,
+    };
+
+    let kept: Option<String> = if keep_live {
+        match pick_live(&enumerate_vhci_interfaces()?) {
+            Some(id) => Some(id),
+            None => {
+                return Err("USBIP-CLEAN-002: there is no live USB/IP controller to keep; clean the shared transport instead".to_string());
+            }
+        }
+    } else {
+        None
+    };
+    let mut pending: Vec<String> = Vec::new();
+    let mut failed: Vec<(String, Vec<NodeFailure>)> = Vec::new();
+    for _ in 0..CLEANUP_POLL_ATTEMPTS {
+        let interfaces = enumerate_vhci_interfaces()?;
+        let nodes = enumerate_transport_nodes()?;
+        let mut targets = removal_targets(&interfaces, &nodes, kept.as_deref());
+        targets.retain(|id| !pending.iter().any(|set_aside| set_aside.eq_ignore_ascii_case(id)));
+        failed.clear();
+        if targets.is_empty() {
+            break;
+        }
+        for instance_id in targets {
+            // Removal can be transiently vetoed while PnP is busy; keep
+            // sweeping and let the closing check decide the outcome instead
+            // of abandoning the remaining nodes and retries.
+            let owned = instance_id.clone();
+            let outcome = tokio::task::spawn_blocking(move || super::devnode::remove_devnode(&owned))
+                .await
+                .map_err(|error| format!("USBIP-CLEAN-002: the removal task failed: {error}"))?;
+            match outcome {
+                NodeRemoval::Removed => {}
+                NodeRemoval::RebootRequired => pending.push(instance_id),
+                NodeRemoval::Failed(steps) => failed.push((instance_id, steps)),
+            }
+        }
+        if !failed.is_empty() {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+        }
+    }
+    let interfaces = enumerate_vhci_interfaces()?;
+    let nodes = enumerate_transport_nodes()?;
+    let mut remaining = removal_targets(&interfaces, &nodes, kept.as_deref());
+    remaining.retain(|id| !pending.iter().any(|set_aside| set_aside.eq_ignore_ascii_case(id)));
+    // A node that failed in the last round and is gone by now is not a failure.
+    failed.retain(|(id, _)| remaining.iter().any(|left| left.eq_ignore_ascii_case(id)));
+    if remaining.is_empty() {
+        return Ok(if pending.is_empty() {
+            Finish::Done
+        } else {
+            Finish::RestartNeeded
+        });
+    }
+    // Something is still there. What Windows answered says what the person does next; the nodes that were accepted for the
+    // restart are named in the same error, so the caller keeps the restart marker for them as well.
+    let steps: Vec<NodeFailure> = failed
+        .iter()
+        .flat_map(|(_, steps)| steps.iter().cloned())
+        .collect();
+    let mut details: Vec<String> = failed
+        .iter()
+        .flat_map(|(id, steps)| steps.iter().map(|step| describe_failure(id, step)))
+        .collect();
+    details.extend(pending.iter().map(|id| format!("node={id} {PENDING_DETAIL}")));
+    details.extend(remaining.iter().map(|id| format!("node={id} still listed")));
+    let reason = if steps.is_empty() {
+        CleanupReason::Unknown
+    } else {
+        classify_failures(&steps)
+    };
+    Err(cleanup_error(reason, &details))
 }
 
 #[cfg(target_os = "windows")]
-async fn run_inno_uninstaller() -> Result<(), String> {
+async fn run_registered_uninstaller() -> Result<(), String> {
     use std::process::Stdio;
 
-    let uninstall_string = find_usbip_uninstall_string()?.ok_or_else(|| {
+    let (uninstall_string, slim) = find_usbip_uninstall_string()?.ok_or_else(|| {
         "USBIP-CLEAN-001: the USB/IP uninstaller registration is missing".to_string()
     })?;
     let (executable, arguments) = split_executable_command(&uninstall_string).ok_or_else(|| {
         "USBIP-CLEAN-001: the USB/IP uninstaller registration is invalid".to_string()
     })?;
     let mut command = tokio::process::Command::new(&executable);
+    command.args(arguments);
+    // PowerShell's registered slim command already includes -Action uninstall.
+    // Inno flags are valid only for the legacy upstream uninstaller.
+    if !slim {
+        command.args(INNO_UNINSTALL_FLAGS.split_whitespace());
+    }
     command
-        .args(arguments)
-        .args(INNO_UNINSTALL_FLAGS.split_whitespace())
-        .kill_on_drop(true)
+        // The slim helper must complete its guard transaction after UI cancellation.
+        // panel-usbip-tokio-20261117, Command::kill_on_drop.
+        .kill_on_drop(!slim)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .creation_flags(windows::Win32::System::Threading::CREATE_NO_WINDOW.0);
@@ -316,7 +354,7 @@ async fn run_inno_uninstaller() -> Result<(), String> {
     match finished {
         // Inno uninstallers exit 0 on success; any non-zero code means the
         // user cancelled or a fatal error occurred.
-        Ok(Ok(status)) if status.success() => {}
+        Ok(Ok(status)) if status.success() || (slim && status.code() == Some(3010)) => {}
         Ok(Ok(status)) => {
             return Err(format!(
                 "USBIP-CLEAN-001: the USB/IP uninstaller exited with {status}"
@@ -343,77 +381,6 @@ async fn wait_for_uninstall_registration_gone() -> Result<(), String> {
         tokio::time::sleep(std::time::Duration::from_secs(1)).await;
     }
     Err("USBIP-CLEAN-001: the USB/IP uninstaller did not remove its registration".to_string())
-}
-
-#[cfg(target_os = "windows")]
-async fn remove_vhci_devnodes() -> Result<(), String> {
-    // PnP teardown is asynchronous; reuse the full cleanup polling budget so a
-    // slow but successful device removal is not reported as a failure.
-    let mut last_error = None;
-    for _ in 0..CLEANUP_POLL_ATTEMPTS {
-        let interfaces = enumerate_vhci_interfaces()?;
-        let mut instance_ids = enumerate_vhci_devnodes()?;
-        instance_ids.extend(
-            interfaces
-                .iter()
-                .filter_map(|path| instance_id_from_interface_path(path)),
-        );
-        instance_ids.sort_unstable();
-        instance_ids.dedup();
-        if instance_ids.is_empty() {
-            return Ok(());
-        }
-        for instance_id in instance_ids {
-            // Removal can be transiently vetoed while PnP is busy; keep
-            // sweeping and let the closing emptiness check decide the
-            // outcome instead of abandoning the remaining nodes and retries.
-            if let Err(error) = uninstall_vhci_devnode(&instance_id) {
-                last_error = Some(error);
-            }
-        }
-        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-    }
-    if enumerate_vhci_interfaces()?.is_empty() && enumerate_vhci_devnodes()?.is_empty() {
-        Ok(())
-    } else {
-        Err(last_error.unwrap_or_else(|| {
-            "USBIP-CLEAN-002: residual USB/IP host controller devices could not be removed"
-                .to_string()
-        }))
-    }
-}
-
-#[cfg(target_os = "windows")]
-fn uninstall_vhci_devnode(instance_id: &str) -> Result<(), String> {
-    use windows::Win32::Devices::DeviceAndDriverInstallation::{
-        CM_LOCATE_DEVNODE_PHANTOM, CM_Locate_DevNodeW, CM_Uninstall_DevNode, CR_SUCCESS,
-    };
-    use windows::core::PCWSTR;
-
-    let encoded: Vec<u16> = instance_id.encode_utf16().chain(Some(0)).collect();
-    let mut devinst = 0u32;
-    let located = unsafe {
-        CM_Locate_DevNodeW(
-            &mut devinst,
-            PCWSTR(encoded.as_ptr()),
-            CM_LOCATE_DEVNODE_PHANTOM,
-        )
-    };
-    if located != CR_SUCCESS {
-        // The devnode can disappear between enumeration and this lookup while
-        // asynchronous PnP teardown completes. Treat it as already removed so
-        // the sweep continues; the sweep's final emptiness check still fails
-        // the cleanup if real leftovers remain.
-        return Ok(());
-    }
-    let uninstalled = unsafe { CM_Uninstall_DevNode(devinst, 0) };
-    if uninstalled != CR_SUCCESS {
-        return Err(format!(
-            "USBIP-CLEAN-002: residual device {instance_id} could not be removed (config error {})",
-            uninstalled.0
-        ));
-    }
-    Ok(())
 }
 
 #[cfg(target_os = "windows")]
@@ -452,116 +419,8 @@ fn remove_orphaned_driver_service(name: &str, expected_binary: &str) -> Result<(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "windows")]
     use super::*;
-    #[test]
-    fn only_missing_registry_values_are_treated_as_absent() {
-        assert_eq!(registry_optional(Ok(7)).unwrap(), Some(7));
-        assert_eq!(
-            registry_optional::<()>(Err(std::io::ErrorKind::NotFound.into())).unwrap(),
-            None
-        );
-        for kind in [
-            std::io::ErrorKind::PermissionDenied,
-            std::io::ErrorKind::Other,
-            std::io::ErrorKind::InvalidData,
-        ] {
-            assert!(registry_optional::<()>(Err(kind.into())).is_err());
-        }
-    }
-
-    #[test]
-    fn phantom_nodes_are_detected_alongside_a_live_interface() {
-        let interfaces =
-            vec![r"\\?\ROOT#USB#0001#{b4030c06-dc5f-4fcc-87eb-e5515a0935c0}".to_string()];
-        assert!(!transport_not_ready(
-            &interfaces,
-            &[node(r"root\usb\0001", false)]
-        ));
-        assert!(transport_not_ready(
-            &interfaces,
-            &[node(r"ROOT\USB\0001", false), node(r"ROOT\USB\0002", false)]
-        ));
-        assert!(transport_not_ready(&[], &[node(r"ROOT\USB\0002", false)]));
-        assert!(!transport_not_ready(&[], &[]));
-        assert!(transport_not_ready(
-            &[interfaces[0].clone(), interfaces[0].clone()],
-            &[]
-        ));
-    }
-
-    fn node(instance_id: &str, disabled: bool) -> TransportNode {
-        TransportNode {
-            instance_id: instance_id.to_string(),
-            disabled,
-        }
-    }
-
-    #[test]
-    fn a_disabled_previous_root_does_not_block_either_live_name() {
-        let alk =
-            vec![r"\\?\ROOT#ALKAIDUSB#0000#{b4030c06-dc5f-4fcc-87eb-e5515a0935c0}".to_string()];
-        assert!(!transport_not_ready(
-            &alk,
-            &[
-                node(r"ROOT\USB\0000", true),
-                node(r"ROOT\ALKAIDUSB\0000", false),
-            ]
-        ));
-        let usb = vec![r"\\?\ROOT#USB#0000#{b4030c06-dc5f-4fcc-87eb-e5515a0935c0}".to_string()];
-        assert!(!transport_not_ready(
-            &usb,
-            &[
-                node(r"ROOT\USB\0000", false),
-                node(r"ROOT\ALKAIDUSB\0000", true),
-            ]
-        ));
-    }
-
-    #[test]
-    fn a_broken_controller_still_blocks() {
-        assert!(transport_not_ready(&[], &[node(r"ROOT\USB\0000", true)]));
-        assert!(transport_not_ready(
-            &[],
-            &[node(r"ROOT\ALKAIDUSB\0000", true)]
-        ));
-        let live = vec![r"\\?\ROOT#USB#0001#{b4030c06-dc5f-4fcc-87eb-e5515a0935c0}".to_string()];
-        assert!(transport_not_ready(
-            &live,
-            &[node(r"ROOT\USB\0001", false), node(r"ROOT\USB\0002", false)]
-        ));
-        assert!(transport_not_ready(
-            &[live[0].clone(), live[0].clone()],
-            &[]
-        ));
-        assert!(!transport_not_ready(&[], &[]));
-    }
-
-    #[test]
-    fn derives_instance_ids_from_interface_paths() {
-        assert_eq!(
-            instance_id_from_interface_path(
-                r"\\?\ROOT#USB#0001#{b4030c06-dc5f-4fcc-87eb-e5515a0935c0}"
-            ),
-            Some("ROOT\\USB\\0001".to_string())
-        );
-        assert_eq!(
-            instance_id_from_interface_path(
-                r"\\?\ROOT#ALKAIDUSB#0000#{b4030c06-dc5f-4fcc-87eb-e5515a0935c0}"
-            ),
-            Some("ROOT\\ALKAIDUSB\\0000".to_string())
-        );
-        assert_eq!(instance_id_from_interface_path(r"\\?\ROOT#USB#0001"), None);
-        assert_eq!(instance_id_from_interface_path(r"\\?\#{guid}"), None);
-        assert_eq!(instance_id_from_interface_path("C:\\plain\\path"), None);
-    }
-
-    #[test]
-    fn recognizes_only_the_usbip_win2_vhci_hardware_id() {
-        assert!(is_vhci_hardware_id(r"ROOT\USBIP_WIN2\UDE"));
-        assert!(is_vhci_hardware_id(r"root\usbip_win2\ude"));
-        assert!(!is_vhci_hardware_id(r"ROOT\USB\0000"));
-        assert!(!is_vhci_hardware_id(r"ROOT\HIDMAESTRO_UDE"));
-    }
 
     #[cfg(target_os = "windows")]
     #[test]

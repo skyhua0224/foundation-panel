@@ -21,11 +21,24 @@ mod preferences;
 pub(crate) use preferences::{include_prerelease as get_include_prerelease, save_last_check_time};
 
 use metadata::{
-    ReleaseAsset, ReleaseCandidate, ReleaseCatalog, UpdateChannel, candidate_is_newer_than,
-    resolve_catalog, select_candidate,
+    ReleaseAsset, ReleaseCandidate, ReleaseCatalog, UpToDateNote, UpdateChannel, candidate_is_newer_than,
+    resolve_catalog, select_candidate, up_to_date_note,
 };
 
+/// The start of the error text of a manual check that could not say "up to date" because the prerelease information was unreachable;
+/// the panel shows its own sentence for it (it matches this prefix).
+pub(crate) const PRERELEASE_UNAVAILABLE_ERROR: &str = "prerelease_unavailable";
+/// The start of the error text of a check that could not read the installed version; the panel says so in its own words (it matches this prefix).
+pub(crate) const CURRENT_VERSION_UNKNOWN_ERROR: &str = "current_version_unknown";
 const UPDATER_HELPER_ARG: &str = "--updater-helper";
+/// The helper that waits for the installer runs from a copy of the Control Panel, never from the
+/// installed `sunshine-gui.exe`: the installer replaces that file, and a program running from it
+/// holds it open. The copy lives in `<install>\updates\updater-<pid>\`, a folder only administrators
+/// can write to. The installer ends the installed Control Panel by name and by path before it copies
+/// anything (it cannot replace a file in use); the copy has another name and another folder, so it
+/// survives that and can start the Control Panel again afterwards.
+const UPDATER_COPY_DIR_PREFIX: &str = "updater-";
+const UPDATER_COPY_EXE: &str = "sunshine-updater.exe";
 const UPDATE_RESULT_ARG: &str = "--update-result";
 
 // ========== 常量定义 ==========
@@ -50,6 +63,8 @@ struct UpdateDownloadStatus {
     filename: String,
     path: Option<String>,
     error: Option<String>,
+    /// Why the download did not come from Mirror酱 although it is the chosen source (`mirrorchyan::Miss::word`); None when it did, or when it was not chosen.
+    fallback_reason: Option<String>,
 }
 
 impl Default for UpdateDownloadStatus {
@@ -64,6 +79,7 @@ impl Default for UpdateDownloadStatus {
             filename: String::new(),
             path: None,
             error: None,
+            fallback_reason: None,
         }
     }
 }
@@ -118,6 +134,10 @@ pub struct UpdateInfo {
     /// `true` = 已是最新（只读浏览），`false`（默认）= 有可用更新
     #[serde(default)]
     pub is_latest: bool,
+    /// 仅在 `is_latest` 时有值：`installed_prerelease_no_newer`（当前是预发布版本，没有更新的版本）。
+    /// 预发布信息取不到时不返回“已是最新”，手动检查返回以 `prerelease_unavailable` 开头的错误。
+    #[serde(default)]
+    pub latest_note: Option<String>,
 }
 
 /// temp 目录中已下载安装包的缓存标记，用于跳过重复下载并免于被清理。
@@ -274,6 +294,7 @@ fn select_compatible_candidate(
             .as_ref()
             .filter(|candidate| selected_asset(candidate).is_some())
             .cloned(),
+        prerelease_unavailable: catalog.prerelease_unavailable.clone(),
     };
     select_candidate(&compatible_catalog, channel)
 }
@@ -291,6 +312,7 @@ fn create_update_info(candidate: &ReleaseCandidate) -> UpdateInfo {
         download_type: asset.map(|asset| asset.asset_type.clone()),
         release_page: candidate.release_page.clone(),
         is_latest: false,
+        latest_note: None,
     }
 }
 
@@ -301,6 +323,18 @@ fn note_seen_update(version: Option<String>) {
 }
 pub(crate) fn last_seen_update() -> Option<String> {
     SEEN_UPDATE.lock().unwrap_or_else(|p| p.into_inner()).clone()
+}
+
+/// The installed version, or the error of a check that cannot tell whether anything is newer (and so reports no update).
+fn known_current_version(read: Result<String, String>) -> Result<String, String> {
+    match read {
+        Ok(version) if !version.trim().is_empty() => Ok(version),
+        Ok(_) => Err(format!("{CURRENT_VERSION_UNKNOWN_ERROR}: empty")),
+        Err(error) => {
+            warn!("⚠️ 获取 Sunshine 版本失败，无法确认当前版本，不报告更新: {error}");
+            Err(format!("{CURRENT_VERSION_UNKNOWN_ERROR}: {error}"))
+        }
+    }
 }
 
 /// 检查更新核心逻辑。
@@ -329,13 +363,8 @@ async fn check_for_updates_in_channel(
     );
 
     // 获取当前 Sunshine 版本
-    let current_version = match get_current_sunshine_version().await {
-        Ok(ver) => ver,
-        Err(e) => {
-            warn!("⚠️ 获取 Sunshine 版本失败: {}, 使用默认版本 0.0.0", e);
-            "0.0.0".to_string()
-        }
-    };
+    // Without the installed version nothing can be compared: "0.0.0" made every release look like an update (a false "update available").
+    let current_version = known_current_version(get_current_sunshine_version().await)?;
 
     let catalog = resolve_catalog(channel).await?;
     let candidate = select_compatible_candidate(&catalog, channel)
@@ -354,9 +383,25 @@ async fn check_for_updates_in_channel(
 
     note_seen_update(candidate_is_newer_than(&current_version, &candidate).then(|| candidate.version.clone()));
     if !candidate_is_newer_than(&current_version, &candidate) {
+        let note = up_to_date_note(&current_version, &catalog, channel);
+        match (note, catalog.prerelease_unavailable.as_deref()) {
+            (Some(UpToDateNote::PrereleaseUnavailable), reason) => {
+                // Nothing newer was found, but the prerelease side could not be asked: "up to date" would be a claim the check cannot make.
+                let reason = reason.unwrap_or("unknown");
+                warn!("⚠️ 预发布信息此刻取不到，不能断言已是最新: {reason}");
+                if manual {
+                    return Err(format!("{PRERELEASE_UNAVAILABLE_ERROR}: {reason}"));
+                }
+            }
+            (Some(UpToDateNote::InstalledPrereleaseNoNewer), _) => {
+                info!("当前是预发布版本 {current_version}，没有更新的版本");
+            }
+            (None, _) => {}
+        }
         if manual {
             let mut info = create_update_info(&candidate);
             info.is_latest = true;
+            info.latest_note = note.map(|note| note.code().to_string());
             return Ok(Some(info));
         }
         return Ok(None);
@@ -418,10 +463,147 @@ pub fn try_run_updater_helper_from_args() -> bool {
             gui_exe_path: gui_exe_path.clone(),
             result_path: result_path.clone(),
         };
+        // Stage one runs from the installed file (it was started through UAC from there). It
+        // hands over to a copy and leaves, so that nothing keeps the installed file open.
+        let running_as_copy = std::env::current_exe()
+            .map(|path| is_updater_copy_path(&path))
+            .unwrap_or(false);
+        if !running_as_copy && start_updater_copy(&args).is_ok() {
+            return true;
+        }
         let _ = run_updater_helper(Path::new(state_path), &launch);
     }
 
     true
+}
+
+/// `<install>\updates\updater-<id>\sunshine-updater.exe`.
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn is_updater_copy_path(path: &Path) -> bool {
+    let name_matches = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.eq_ignore_ascii_case(UPDATER_COPY_EXE));
+    let folder = path.parent();
+    let folder_matches = folder
+        .and_then(|folder| folder.file_name())
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.to_ascii_lowercase().starts_with(UPDATER_COPY_DIR_PREFIX));
+    let updates_matches = folder
+        .and_then(|folder| folder.parent())
+        .and_then(|folder| folder.file_name())
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.eq_ignore_ascii_case("updates"));
+    name_matches && folder_matches && updates_matches
+}
+
+#[cfg(target_os = "windows")]
+fn updater_copies_root() -> PathBuf {
+    crate::sunshine::install_dir().join("updates")
+}
+
+/// Copy the running Control Panel and the libraries beside it into a new folder and start the copy
+/// with the same arguments.
+#[cfg(target_os = "windows")]
+fn start_updater_copy(args: &[String]) -> Result<(), String> {
+    use std::process::Command;
+
+    let current = std::env::current_exe().map_err(|error| format!("get current exe failed: {error}"))?;
+    let source_dir = current
+        .parent()
+        .ok_or_else(|| "the Control Panel has no folder".to_string())?;
+    let root = updater_copies_root();
+    fs::create_dir_all(&root).map_err(|error| format!("create updater folder failed: {error}"))?;
+    remove_old_updater_copies(&root);
+    let folder = root.join(format!("{UPDATER_COPY_DIR_PREFIX}{}", std::process::id()));
+    fs::create_dir_all(&folder).map_err(|error| format!("create updater copy folder failed: {error}"))?;
+    let copy = folder.join(UPDATER_COPY_EXE);
+    let result = (|| -> Result<(), String> {
+        fs::copy(&current, &copy).map_err(|error| format!("copy the Control Panel failed: {error}"))?;
+        // The libraries the program loads at start (WebView2Loader.dll) sit beside it.
+        for entry in fs::read_dir(source_dir)
+            .map_err(|error| format!("read the Control Panel folder failed: {error}"))?
+            .flatten()
+        {
+            let path = entry.path();
+            let is_library = path
+                .extension()
+                .and_then(|extension| extension.to_str())
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("dll"));
+            if is_library && path.is_file() {
+                if let Some(name) = path.file_name() {
+                    fs::copy(&path, folder.join(name))
+                        .map_err(|error| format!("copy a library failed: {error}"))?;
+                }
+            }
+        }
+        if file_sha256(&current)? != file_sha256(&copy)? {
+            return Err("the copy of the Control Panel does not match the original".to_string());
+        }
+        Command::new(&copy)
+            .args(args.iter().skip(1))
+            .spawn()
+            .map_err(|error| format!("start the updater copy failed: {error}"))?;
+        Ok(())
+    })();
+    if result.is_err() {
+        let _ = fs::remove_dir_all(&folder);
+    }
+    result
+}
+
+#[cfg(not(target_os = "windows"))]
+fn start_updater_copy(_args: &[String]) -> Result<(), String> {
+    Err("the updater copy is a Windows mechanism".to_string())
+}
+
+#[cfg_attr(not(target_os = "windows"), allow(dead_code))]
+fn file_sha256(path: &Path) -> Result<String, String> {
+    use sha2::Digest as _;
+    use std::io::Read as _;
+
+    let mut input = fs::File::open(path).map_err(|error| format!("open {path:?} failed: {error}"))?;
+    let mut hasher = sha2::Sha256::new();
+    let mut buffer = vec![0u8; 1024 * 1024];
+    loop {
+        let read = input
+            .read(&mut buffer)
+            .map_err(|error| format!("read {path:?} failed: {error}"))?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+/// Delete the copies of earlier updates. A copy that still runs cannot be deleted and stays.
+#[cfg(target_os = "windows")]
+fn remove_old_updater_copies(root: &Path) {
+    let Ok(entries) = fs::read_dir(root) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let is_copy = path.is_dir()
+            && path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| name.to_ascii_lowercase().starts_with(UPDATER_COPY_DIR_PREFIX));
+        if is_copy {
+            let _ = fs::remove_dir_all(&path);
+        }
+    }
+}
+
+/// The Control Panel calls this some time after it started: the update that left a copy has long
+/// finished then.
+pub(crate) fn clean_up_updater_copies_later() {
+    #[cfg(target_os = "windows")]
+    std::thread::spawn(|| {
+        std::thread::sleep(Duration::from_secs(90));
+        remove_old_updater_copies(&updater_copies_root());
+    });
 }
 
 pub fn emit_update_result_if_requested(app_handle: &AppHandle) {
@@ -573,6 +755,11 @@ fn run_updater_worker(state: UpdaterHelperState, hwnd: isize) {
         update_updater_panel(hwnd, 3, "更新完成", "正在重新打开 Sunshine 控制面板。");
     } else {
         update_updater_panel(hwnd, 3, "更新未完成", "正在重新打开控制面板并显示结果。");
+        // The helper stopped the service for the installer. An installer that refused or failed leaves
+        // the installation as it was, and nothing else starts the service again.
+        if !is_gui_component_installer(Path::new(&state.installer_path)) {
+            start_sunshine_after_failed_update();
+        }
     }
 
     let _ = write_updater_result(&state.result_path, &helper_result);
@@ -1354,6 +1541,19 @@ pub fn set_update_source(app: AppHandle, source: String) -> Result<bool, String>
     Ok(true)
 }
 
+/// Tauri命令：匿名使用统计里的 update_source 取值来源：最近一次真正用到的来源（mirror / cnb / github），
+/// 还没有下载过时是用户的设置（auto / cnb / github / mirror），永远不是空串。
+#[tauri::command]
+pub fn get_update_source_used(app: AppHandle) -> String {
+    preferences::used_update_source(&app)
+}
+
+/// Tauri命令：最近一次下载里首选来源（Mirror酱）没有用上的原因（version_lag / cdk_invalid / quota / network / no_cdk）；用上了或没选 Mirror酱 时是空串。
+#[tauri::command]
+pub fn get_update_source_miss(app: AppHandle) -> String {
+    preferences::update_source_miss(&app)
+}
+
 /// 读取安全存储中的 CDK；存储不可用或为空都按“无 CDK”处理。
 async fn read_stored_cdk() -> Option<String> {
     match tauri::async_runtime::spawn_blocking(|| cdk_store::read(mirrorchyan::CREDENTIAL_TARGET))
@@ -1442,6 +1642,7 @@ fn handle_auto_check_result<R: Runtime>(
 
 /// 启动时自动检查更新（如果距离上次检查超过4小时）
 pub fn check_for_updates_on_startup<R: Runtime + 'static>(app: AppHandle<R>) {
+    clean_up_updater_copies_later();
     let last_check_time = preferences::last_check_time(&app);
 
     if !should_auto_check(last_check_time) {
@@ -1566,6 +1767,33 @@ fn stop_sunshine_for_update() -> Result<(), String> {
                 std::io::Error::last_os_error()
             )),
         }
+    }
+}
+
+/// Start this installation's service again after an update that did not finish. Best effort: a
+/// service that is already running, or that is not this installation's, is left alone.
+#[cfg(target_os = "windows")]
+fn start_sunshine_after_failed_update() {
+    use windows::Win32::System::Services::*;
+    use windows::core::{Owned, PCWSTR, w};
+
+    let root = crate::sunshine::install_dir();
+    if !matches!(
+        crate::desktop_settings::sunshine_service_matches_install(&root),
+        Ok(true)
+    ) {
+        return;
+    }
+    unsafe {
+        let Ok(manager) = OpenSCManagerW(PCWSTR::null(), PCWSTR::null(), SC_MANAGER_CONNECT) else {
+            return;
+        };
+        let manager = Owned::new(manager);
+        let Ok(service) = OpenServiceW(*manager, w!("SunshineService"), SERVICE_START) else {
+            return;
+        };
+        let service = Owned::new(service);
+        let _ = StartServiceW(*service, None);
     }
 }
 
@@ -1783,6 +2011,10 @@ fn emit_download_progress(
     phase: DownloadPhase,
     source: Option<&str>,
 ) {
+    let fallback_reason = download_status()
+        .lock()
+        .ok()
+        .and_then(|status| status.fallback_reason.clone());
     let _ = window.emit(
         "download-progress",
         serde_json::json!({
@@ -1790,7 +2022,8 @@ fn emit_download_progress(
             "total": total,
             "downloaded": downloaded,
             "phase": phase,
-            "source": source
+            "source": source,
+            "fallbackReason": fallback_reason
         }),
     );
 }
@@ -1878,8 +2111,14 @@ fn download_candidates(
 /// 绝不写日志；文件内容仍按本项目 metadata 的 SHA-256 校验后才安装。
 async fn mirror_download_candidate(
     app_handle: &AppHandle,
-) -> Option<github_download::DownloadCandidate> {
-    let cdk = read_stored_cdk().await?;
+    target_version: Option<&str>,
+) -> (
+    Option<github_download::DownloadCandidate>,
+    Option<mirrorchyan::Miss>,
+) {
+    let Some(cdk) = read_stored_cdk().await else {
+        return (None, Some(mirrorchyan::Miss::NoCdk));
+    };
     let current_version = get_current_sunshine_version()
         .await
         .unwrap_or_else(|error| {
@@ -1896,11 +2135,21 @@ async fn mirror_download_candidate(
         "Mirror酱 检查（下载候选）: {}",
         mirrorchyan::log_summary(&answer)
     );
-    let url = mirrorchyan::download_url_of(&answer)?;
-    Some(github_download::DownloadCandidate {
+    // Mirror酱 syncs on a timer: its newest version can be older than the release to install. Its file would fail the SHA-256 of that release, so it is not tried.
+    if let Some(miss) = mirrorchyan::miss_of(&answer, target_version) {
+        info!(
+            "Mirror酱 不用于本次下载（原因: {}；Mirror酱 的版本: {}，要安装的版本: {}）",
+            miss.word(),
+            mirrorchyan::version_of(&answer).unwrap_or("-"),
+            target_version.unwrap_or("-")
+        );
+        return (None, Some(miss));
+    }
+    let candidate = mirrorchyan::download_url_of(&answer).map(|url| github_download::DownloadCandidate {
         name: "Mirror酱",
         url,
-    })
+    });
+    (candidate, None)
 }
 
 /// 下载更新文件（带真实进度报告）
@@ -1912,6 +2161,7 @@ pub async fn download_update(
     expected_size: Option<u64>,
     expected_sha256: Option<String>,
     asset_type: Option<String>,
+    target_version: Option<String>,
     app_handle: AppHandle,
 ) -> Result<serde_json::Value, DownloadCommandError> {
     validate_download_url(&url, Some(&filename)).map_err(|detail| {
@@ -1996,11 +2246,15 @@ pub async fn download_update(
 
     // 来源为 mirror 且 CDK 有效时，Mirror酱 的下载地址排在最前；
     // 任何失败（无 CDK、CDK 错误、离线、地址不合规）都静默回退 CNB → GitHub。
-    let mirror_candidate = if preferences::update_source(&app_handle) == "mirror" {
-        mirror_download_candidate(&app_handle).await
+    let mirror_chosen = preferences::update_source(&app_handle) == "mirror";
+    let (mirror_candidate, mut mirror_miss) = if mirror_chosen {
+        mirror_download_candidate(&app_handle, target_version.as_deref()).await
     } else {
-        None
+        (None, None)
     };
+    if let Some(miss) = mirror_miss {
+        set_download_status(|status| status.fallback_reason = Some(miss.word().to_string()));
+    }
     let candidates = download_candidates(mirror_candidate, &url, fallback_url.as_deref());
 
     let mut last_progress_percent = 0;
@@ -2176,6 +2430,14 @@ pub async fn download_update(
             .unwrap_or(outcome.downloaded),
     );
 
+    preferences::record_used_update_source(&app_handle, outcome.source);
+    // Mirror酱 was tried and the file still came from elsewhere: its download failed.
+    if mirror_chosen && mirror_miss.is_none() && outcome.source != "Mirror酱" {
+        mirror_miss = Some(mirrorchyan::Miss::Network);
+        info!("Mirror酱 的下载没有成功，已改用 {}", outcome.source);
+        set_download_status(|status| status.fallback_reason = Some(mirrorchyan::Miss::Network.word().to_string()));
+    }
+    preferences::record_update_source_miss(&app_handle, mirror_miss.map(mirrorchyan::Miss::word));
     info!(
         "✅ 下载完成: {} bytes，来源: {}",
         outcome.downloaded, outcome.source
@@ -2208,7 +2470,8 @@ pub async fn download_update(
     Ok(serde_json::json!({
         "success": true,
         "file_path": file_path.to_string_lossy().to_string(),
-        "source": outcome.source
+        "source": outcome.source,
+        "fallback_reason": mirror_miss.map(mirrorchyan::Miss::word)
     }))
 }
 
@@ -2376,6 +2639,7 @@ mod download_source_tests {
         let catalog = ReleaseCatalog {
             latest: Some(latest),
             pre_latest: Some(pre_without_asset),
+            prerelease_unavailable: None,
         };
 
         let selected =
@@ -2422,6 +2686,26 @@ mod download_source_tests {
             serialized["detail"],
             "diagnostic details stay out of the localized UI"
         );
+    }
+
+    #[test]
+    fn an_unreadable_installed_version_is_an_error_not_a_reason_to_offer_everything() {
+        assert_eq!(known_current_version(Ok("2026.1112.025657".to_string())).unwrap(), "2026.1112.025657");
+        for bad in [Err("host did not answer".to_string()), Ok(String::new()), Ok("  ".to_string())] {
+            let error = known_current_version(bad).unwrap_err();
+            assert!(error.starts_with(CURRENT_VERSION_UNKNOWN_ERROR), "{error}");
+        }
+        // the old fallback: 0.0.0 is older than every release, so every candidate looked like an update
+        let release = ReleaseCandidate {
+            version: "v2026.1112.25657.杂鱼".to_string(),
+            prerelease: false,
+            github_release_id: None,
+            published_at: None,
+            release_notes: String::new(),
+            release_page: String::new(),
+            assets: Vec::new(),
+        };
+        assert!(!candidate_is_newer_than("Unknown", &release));
     }
 }
 
@@ -2702,6 +2986,61 @@ fn launch_updater_helper(
     .map_err(|error| format!("launch updater helper elevated failed: {error}"))
 }
 
+/// Repair an incomplete install: download the installer of the newest release of the person's
+/// channel and run it over the installed copy, whatever version is installed. The same path as an
+/// update (download, helper copy, installer), so the Control Panel leaves while it runs and comes
+/// back afterwards.
+pub(crate) async fn repair_installation(app: AppHandle) -> Result<(), String> {
+    let channel = if get_include_prerelease(&app) {
+        UpdateChannel::StableAndPrerelease
+    } else {
+        UpdateChannel::StableOnly
+    };
+    let catalog = resolve_catalog(channel).await?;
+    let candidate = select_compatible_candidate(&catalog, channel)
+        .ok_or_else(|| format!("未找到包含 {} 更新资产的发布版本", preferred_asset_type()))?;
+    let info = create_update_info(&candidate);
+    let (Some(url), Some(name), Some(sha256), Some(kind)) = (
+        info.download_url.clone(),
+        info.download_name.clone(),
+        info.download_sha256.clone(),
+        info.download_type.clone(),
+    ) else {
+        return Err("the release has no installer to repair with".to_string());
+    };
+    let downloaded = download_update(
+        url,
+        info.download_fallback_url.clone(),
+        name,
+        info.download_size,
+        Some(sha256.clone()),
+        Some(kind),
+        Some(info.version.clone()),
+        app.clone(),
+    )
+    .await
+    .map_err(|error| error.detail)?;
+    let file_path = downloaded
+        .get("file_path")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| "the download did not report a file".to_string())?
+        .to_string();
+    install_update(
+        file_path,
+        Some(info.version),
+        info.download_size,
+        Some(sha256),
+        None,
+        app,
+    )
+    .await
+}
+
+#[tauri::command]
+pub async fn repair_installation_command(app: AppHandle) -> Result<(), String> {
+    repair_installation(app).await
+}
+
 /// 安装更新文件
 #[tauri::command]
 pub async fn install_update(
@@ -2768,6 +3107,10 @@ pub async fn install_update(
         // drops the guard and removes the unpublished state automatically.
         let _ = work_dir.keep();
         emit_install_progress(&app_handle, "installer-started", None, false);
+
+        // The panel leaves from here on (the delayed exit below, or the installer closing this process by
+        // name): WebView2 process endings from now on are part of the handoff, not failures to report.
+        crate::exit_state::begin("update handoff");
 
         info!("✅ 安装程序已静默启动，正在安装...");
 
@@ -2988,4 +3331,31 @@ pub fn start_update_checker<R: Runtime + 'static>(
 #[tauri::command]
 pub fn start_update_checker_when_ui_ready(app: tauri::AppHandle) -> Result<(), String> {
     start_update_checker(&app).map_err(|error| error.to_string())
+}
+
+// Windows path syntax: a backslash separates folders only on Windows.
+#[cfg(all(test, target_os = "windows"))]
+mod updater_copy_name_tests {
+    use super::*;
+
+    #[test]
+    fn only_the_helper_copy_in_the_updates_folder_counts_as_a_copy() {
+        let copy = Path::new(r"C:\Program Files\Sunshine\updates\updater-4242\sunshine-updater.exe");
+        assert!(is_updater_copy_path(copy));
+        assert!(!is_updater_copy_path(Path::new(
+            r"C:\Program Files\Sunshine\assets\gui\sunshine-gui.exe"
+        )));
+        assert!(!is_updater_copy_path(Path::new(
+            r"C:\Program Files\Sunshine\updates\sunshine-update-abc.exe"
+        )));
+        assert!(!is_updater_copy_path(Path::new(
+            r"C:\Program Files\Sunshine\other\updater-1\sunshine-updater.exe"
+        )));
+    }
+
+    #[test]
+    fn a_copy_never_has_the_name_the_installer_ends_by_name() {
+        // The installer ends sunshine-gui.exe by name; the copy has to outlive that.
+        assert_ne!(UPDATER_COPY_EXE.to_ascii_lowercase(), "sunshine-gui.exe");
+    }
 }

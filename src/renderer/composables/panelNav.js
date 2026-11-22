@@ -79,6 +79,7 @@ export function pageItems(t, rail, runtime = {}) {
       { id: ROUTES.NETWORK_OVERVIEW, icon: 'lan', tone: 'primary', label: c.system.network, text: lines.network },
       { id: ROUTES.DIAGNOSTICS, icon: 'stethoscope', tone: 'warn', label: runtime.diagTitle || c.system.diagnostics, text: lines.diagnostics },
       { id: ROUTES.DOCTOR, icon: 'health_and_safety', tone: 'success', label: runtime.doctorTitle || 'Health check', text: lines.doctor },
+      { id: ROUTES.RESET, icon: 'restart_alt', tone: 'warn', label: runtime.resetTitle || 'Restore default settings', text: lines.reset },
       { id: ROUTES.TOOLBOX, icon: 'build', tone: 'secondary', label: t.sidebar.toolbox, text: lines.toolbox },
       // the tools people come for have a row of their own: 系统 then the tool is two presses (inside the toolbox it was three)
       { id: ROUTES.LATENCY_CLOCK, icon: 'speed', tone: 'primary', label: t.sidebar.latencyClock, text: lines['latency-clock'] },

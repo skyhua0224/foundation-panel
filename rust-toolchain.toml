@@ -1,0 +1,4 @@
+# dev-env-rustup: The toolchain file.
+[toolchain]
+channel = "1.100.0"
+profile = "minimal"

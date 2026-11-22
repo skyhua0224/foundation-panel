@@ -144,17 +144,8 @@ pub async fn open_tool_window(app: AppHandle, tool_name: String) -> Result<(), S
     info!("Opening tool window: {}", tool_name);
 
     match tool_name.as_str() {
-        "main" => {
-            if let Some(window) = app.get_webview_window("main") {
-                windows::show_and_activate_window(&window);
-            }
-        }
-        "vdd" => {
-            if let Some(window) = app.get_webview_window("main") {
-                windows::show_and_activate_window(&window);
-                crate::panel_page::open_page(&window, "vdd");
-            }
-        }
+        "main" => windows::activate_main_window(&app, None),
+        "vdd" => windows::open_main_panel_page(&app, "vdd")?,
         "about" => {
             windows::open_about_window(&app)?;
         }
@@ -454,4 +445,16 @@ mod tests {
             "https://user:secret@assets.alkaidlab.com/toolbar-spritesheet.webp"
         ));
     }
+}
+
+/// True once when the previous run of the panel left a crash report behind (a panic, a native crash, a WebView2 failure): the window then asks whether to tell the developers.
+#[tauri::command]
+pub fn crash_recovered_ask() -> bool {
+    crate::crash::take_recovered()
+}
+
+/// The person answered the question about the report the previous run left behind (sent feedback or let it go): it is not asked again.
+#[tauri::command]
+pub fn crash_recovered_answered() {
+    crate::crash::mark_answered();
 }

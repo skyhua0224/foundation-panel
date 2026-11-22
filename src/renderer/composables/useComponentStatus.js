@@ -4,6 +4,7 @@ import { sunshine, vdd, vigem, vmouse } from '../tauri-adapter.js'
 import { enhancementActions, enhancementSources } from './useEnhancementComponents.js'
 import { sparxieActions } from './sparxieInstall.js'
 import { dualsenseStatusChannel, micStatusChannel, usbipStatusChannel, vigemStatusChannel } from './deviceStatusStore.js'
+import { loadVmouseSupport } from './useVmouse.js'
 
 // The component status of the control panel: the sources are the ones the panel already reads (the status channels of the device hub, the
 // VDD status, the host configuration through the local proxy). The page and the home cards read the one controller registered here;
@@ -57,7 +58,9 @@ export function useComponentStatus({ locale, go = {}, update = () => ({}), check
       vdd: async () => data(await vdd.getStatus()),
       usb: channel(usbipStatusChannel),
       vigem: channel(vigemStatusChannel),
-      mouse: async () => data(await vmouse.getStatus()),
+      // Windows 10 deliberately has no supported virtual-mouse payload. Check
+      // that capability first so the optional status probe is never started there.
+      mouse: async () => (await loadVmouseSupport()) ? data(await vmouse.getStatus()) : null,
       vulkan: async () => { try { const base = String((await sunshine.getProxyUrl()) || '').replace(/\/$/, ''); const r = await fetch(`${base}/api/vulkan-hdr-bridge`, { signal: AbortSignal.timeout(4000) }); return r.ok ? r.json() : null } catch { return null } },
       // what Sunshine has built in is not a component: these three checks feed the 手柄 page, the 编码器 page and 关于 / 软件更新
       dualsense: channel(dualsenseStatusChannel),

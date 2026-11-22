@@ -1,0 +1,6 @@
+# dev-env-mise: tools; dev-env-mise-rust: toolchain selection.
+[tools]
+node = "24.22.3"
+rust = "1.100.0"
+just = "1.59.0"
+"npm:corepack" = "0.36.0"

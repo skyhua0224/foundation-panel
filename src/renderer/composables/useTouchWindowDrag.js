@@ -5,6 +5,8 @@ import { getCurrentWindow } from '@tauri-apps/api/window'
 const DRAG_THRESHOLD = 4
 const DRAG_OPERATION_TIMEOUT_MS = 1000
 const RESTORE_RESIZE_TIMEOUT_MS = 500
+const DOUBLE_TAP_TIMEOUT_MS = 500
+const DOUBLE_TAP_DISTANCE_PX = 32
 
 /**
  * Shared touch/pen dragging for custom click-and-drag surfaces and title-bar fallbacks.
@@ -16,7 +18,7 @@ const RESTORE_RESIZE_TIMEOUT_MS = 500
  *
  * @param {{ value: boolean } | null} isMaximized reactive window state used by
  * the custom maximize button
- * @param {{ operationTimeoutMs?: number, restoreMaximized?: boolean, onMove?: Function, onFinish?: Function }} options gesture timing and caller-specific behavior
+ * @param {{ operationTimeoutMs?: number, restoreMaximized?: boolean, onMove?: Function, onFinish?: Function, onDoubleTap?: Function }} options gesture timing and caller-specific behavior
  */
 export function useTouchWindowDrag(isMaximized = null, options = {}) {
   const operationTimeoutMs = (
@@ -34,6 +36,9 @@ export function useTouchWindowDrag(isMaximized = null, options = {}) {
   let pointerTarget = null
   let hasMoved = false
   let dragEnding = false
+  let lastTapAt = 0
+  let lastTapX = 0
+  let lastTapY = 0
 
   let startClientX = 0
   let startClientY = 0
@@ -186,11 +191,11 @@ export function useTouchWindowDrag(isMaximized = null, options = {}) {
   }
 
   const removeListeners = () => {
+    // Moving the window can revoke capture in WebView2. The document-level
+    // pointerup/pointercancel listeners remain authoritative for the gesture.
     document.removeEventListener('pointermove', onPointerMove)
     document.removeEventListener('pointerup', onPointerEnd)
     document.removeEventListener('pointercancel', onPointerEnd)
-    document.removeEventListener('lostpointercapture', onCaptureLost)
-    window.removeEventListener?.('blur', onWindowBlur)
   }
 
   const clearDragState = (position = null) => {
@@ -519,6 +524,7 @@ export function useTouchWindowDrag(isMaximized = null, options = {}) {
 
     if (!hasMoved) options.onMove?.()
     hasMoved = true
+    lastTapAt = 0
     event.preventDefault()
 
     if (!initialPosition) return
@@ -530,16 +536,14 @@ export function useTouchWindowDrag(isMaximized = null, options = {}) {
     queueLatestPosition()
   }
 
-  function onCaptureLost(event) {
-    if (event.pointerId === pointerId && !dragEnding) clearDragState()
-  }
-  function onWindowBlur() {
-    if (pointerId !== null) clearDragState()
-  }
   async function onPointerEnd(event) {
     if (pointerId === null || event.pointerId !== pointerId) return
 
-    if (event.type === 'pointercancel') { clearDragState(); return }
+    if (event.type === 'pointercancel') {
+      lastTapAt = 0
+      clearDragState()
+      return
+    }
     const canUseFinalPoint = !settingPosition && !scaleRebasing && Number.isFinite(event.clientX) && Number.isFinite(event.clientY)
     if (canUseFinalPoint) {
       latestClientX = event.clientX
@@ -550,6 +554,25 @@ export function useTouchWindowDrag(isMaximized = null, options = {}) {
       }
     }
     if (canUseFinalPoint && hasMoved) updatePendingPosition()
+
+    if (pointerType === 'touch' || pointerType === 'pen') {
+      if (!hasMoved) {
+        const now = Date.now()
+        const closeInTime = now - lastTapAt <= DOUBLE_TAP_TIMEOUT_MS
+        const closeInSpace = Math.hypot(latestClientX - lastTapX, latestClientY - lastTapY) <= DOUBLE_TAP_DISTANCE_PX
+        if (lastTapAt > 0 && closeInTime && closeInSpace) {
+          lastTapAt = 0
+          void options.onDoubleTap?.()
+        } else {
+          lastTapAt = now
+          lastTapX = latestClientX
+          lastTapY = latestClientY
+        }
+      } else {
+        lastTapAt = 0
+      }
+    }
+
     const generation = dragGeneration
     const activePointerId = pointerId
     dragEnding = true
@@ -655,8 +678,6 @@ export function useTouchWindowDrag(isMaximized = null, options = {}) {
     document.addEventListener('pointermove', onPointerMove, { passive: false })
     document.addEventListener('pointerup', onPointerEnd)
     document.addEventListener('pointercancel', onPointerEnd)
-    document.addEventListener('lostpointercapture', onCaptureLost)
-    window.addEventListener?.('blur', onWindowBlur)
 
     let initialPromise
     initialPromise = prepareWindowPosition(pointerId, generation)

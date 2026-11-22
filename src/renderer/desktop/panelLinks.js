@@ -11,7 +11,7 @@ export const PANEL_LINKS = Object.freeze({
   displayModes: { page: 'display-modes', icon: 'monitor', tone: 'primary' },
   vdd: { page: 'vdd', icon: 'tv_gen', tone: 'tertiary' },
   vmouse: { page: 'input-drivers', icon: 'mouse', tone: 'secondary' },
-  liveSession: { page: 'live-session', icon: 'monitoring', tone: 'primary' },
+  liveSession: { page: 'live-session', icon: 'monitor_heart', tone: 'primary' },
   dpi: { page: 'desktop-scale', icon: 'aspect_ratio', tone: 'tertiary' },
   shortcuts: { page: 'shortcuts', icon: 'keyboard', tone: 'secondary' },
   logs: { page: 'logs', icon: 'stethoscope', tone: 'neutral' },

@@ -50,6 +50,10 @@ static LOADED_NOTIFY: tokio::sync::Notify = tokio::sync::Notify::const_new();
 /// The self test runs: the window stays cloaked and takes no focus (a measurement instance shows nothing on the desk of whoever uses the machine).
 static SELFTEST: AtomicBool = AtomicBool::new(false);
 static STATE: Mutex<Option<Open>> = Mutex::new(None);
+/// A background loop that keeps making the window after the attempts of the start are used up is running.
+static RECOVERING: AtomicBool = AtomicBool::new(false);
+/// One attempt loop at a time: two (the start and the first view of the main window both ask) would race to make the same window.
+static CREATING: AtomicBool = AtomicBool::new(false);
 
 /// A menu opened from the tray icon: where the icon is and which side of the monitor the taskbar is on. The window is placed beside the icon, away from the taskbar, on every `ready`.
 #[derive(Clone, Copy)]
@@ -116,7 +120,7 @@ pub enum Health {
     /// being made, or its page is loading: a menu asked for now waits for it
     Starting,
     Ready,
-    /// it could not be made, or was lost and could not be made again
+    /// it could not be made, or was lost and could not be made again, after every attempt of `schedule_create_after`
     Failed,
 }
 
@@ -159,12 +163,78 @@ pub fn schedule_create_after(app: &AppHandle, delay: Duration) {
         if !delay.is_zero() {
             tokio::time::sleep(delay).await;
         }
-        if let Err(error) = ensure_created(&app) {
-            warn!("[ctxpop] the menu window could not be created: {error}");
-            FAILED.store(true, Ordering::SeqCst);
-            // the tray's native menu takes the icon until a window can be made
-            crate::tray::refresh_menu_mode(&app);
+        create_with_retry(&app).await;
+    });
+}
+
+/// Makes the window, trying again while WebView2 refuses it with the invalid-state code (webview_env.rs: another browser process on the user data folder runs with other options, or the one of
+/// the panel before this one is still shutting down). Every failure is logged with the stage; when the attempts are used up the tray's native menu takes the icon (`Health::Failed`) and a slow
+/// loop keeps trying, so that the Material menu is back as soon as WebView2 lets the window be made.
+async fn create_with_retry(app: &AppHandle) {
+    if CREATING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    create_attempts(app).await;
+    CREATING.store(false, Ordering::SeqCst);
+}
+
+async fn create_attempts(app: &AppHandle) {
+    let started = Instant::now();
+    let mut attempt = 0;
+    loop {
+        let shared = crate::webview_env::is_shared();
+        match ensure_created(app) {
+            Ok(()) => {
+                crate::webview_env::note_success("tray-menu-window", attempt, shared, started);
+                return;
+            }
+            Err(error) => {
+                if shared {
+                    // an environment that belongs to a browser process that is gone must not be asked again
+                    crate::webview_env::forget();
+                }
+                match crate::webview_env::note_failure("tray-menu-window", attempt, shared, &error) {
+                    Some(wait) if !EXITING.load(Ordering::SeqCst) => {
+                        attempt += 1;
+                        tokio::time::sleep(wait).await;
+                    }
+                    _ => break,
+                }
+            }
         }
+    }
+    warn!("[ctxpop] the menu window could not be created: the native menu takes the icon until it can be");
+    FAILED.store(true, Ordering::SeqCst);
+    crate::tray::refresh_menu_mode(app);
+    recover_slowly(app);
+}
+
+/// After the attempts of the start failed: one more try every 20 s, up to 30 times (10 minutes), until a window is there.
+fn recover_slowly(app: &AppHandle) {
+    if RECOVERING.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    let app = app.clone();
+    tauri::async_runtime::spawn(async move {
+        for round in 1..=30 {
+            tokio::time::sleep(Duration::from_secs(20)).await;
+            if EXITING.load(Ordering::SeqCst) || app.get_webview_window(POPUP_LABEL).is_some() {
+                break;
+            }
+            match ensure_created(&app) {
+                Ok(()) => {
+                    info!("[webview-env] tray-menu-window: made by the slow retry (round {round})");
+                    break;
+                }
+                Err(error) => {
+                    if crate::webview_env::is_shared() {
+                        crate::webview_env::forget();
+                    }
+                    debug!("[webview-env] tray-menu-window: slow retry {round} failed: {error}");
+                }
+            }
+        }
+        RECOVERING.store(false, Ordering::SeqCst);
     });
 }
 
@@ -213,7 +283,7 @@ fn ensure_created(app: &AppHandle) -> Result<(), String> {
     }
     let started = Instant::now();
     LOADED.store(false, Ordering::SeqCst);
-    let window = tauri::WebviewWindowBuilder::new(app, POPUP_LABEL, tauri::WebviewUrl::App("ctxmenu/index.html".into()))
+    let window = crate::webview_env::adopt(tauri::WebviewWindowBuilder::new(app, POPUP_LABEL, tauri::WebviewUrl::App("ctxmenu/index.html".into())))
         .title("")
         .inner_size(MEASURE_WIDTH_CSS, 400.0)
         .resizable(false)
@@ -229,6 +299,7 @@ fn ensure_created(app: &AppHandle) -> Result<(), String> {
         .disable_drag_drop_handler()
         .build()
         .map_err(|e| e.to_string())?;
+    crate::webview_env::capture(&window);
     crate::windows::disable_context_menu(&window);
     #[cfg(target_os = "windows")]
     crate::windows::configure_webview_security(&window);
@@ -265,7 +336,7 @@ pub fn app() -> Option<AppHandle> {
 /// in the tray has the person's colours from the first menu.
 static THEME: Mutex<Value> = Mutex::new(Value::Null);
 fn theme_file() -> Option<std::path::PathBuf> {
-    dirs::config_dir().map(|dir| dir.join("Sunshine GUI").join("tray-theme.json"))
+    crate::test_isolation::config_dir().map(|dir| dir.join("Sunshine GUI").join("tray-theme.json"))
 }
 fn remember_theme(theme: &Value) {
     if theme.is_null() {
@@ -479,6 +550,9 @@ pub async fn open_tray(app: AppHandle, variant: crate::tray_prefs::Variant, menu
         }
     }
     info!("[ctxpop] tray menu {} shown {} ms after the click (edge {}, token {})", variant.as_str(), started.elapsed().as_millis(), edge.as_str(), token);
+    crate::mem_adaptive::note_menu_shown();
+    // "open the panel" is one tap away: a main window that was let go is made again now
+    crate::mem_adaptive::prewarm_main(&app, "tray menu opened");
     watch(app, token);
     Ok(true)
 }

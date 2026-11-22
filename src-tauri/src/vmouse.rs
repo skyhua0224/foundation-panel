@@ -25,6 +25,35 @@ pub struct VmouseStatus {
     pub config_enabled: bool,
 }
 
+/// The virtual mouse driver is only supported by the Windows 11 payload.
+/// Windows 10 is intentionally excluded even when a stale driver node is present.
+const MIN_SUPPORTED_WINDOWS_BUILD: u32 = 22000;
+
+fn vmouse_supported_for_build(build: Option<u32>) -> bool {
+    build.is_some_and(|build| build >= MIN_SUPPORTED_WINDOWS_BUILD)
+}
+
+/// Whether this host can use the virtual mouse driver.
+///
+/// Keep this separate from `get_vmouse_status`: unsupported Windows 10 hosts must
+/// not start the slower device probe just to decide whether to draw the UI.
+#[tauri::command]
+pub fn get_vmouse_support() -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        let build = crate::device_probe::windows_build_number();
+        if build.is_none() {
+            warn!("无法读取 Windows build，隐藏虚拟鼠标入口");
+        }
+        vmouse_supported_for_build(build)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        false
+    }
+}
+
 /// vmouse 驱动文件目录
 fn get_vmouse_tools_path() -> PathBuf {
     PathBuf::from(sunshine::get_sunshine_install_path())
@@ -246,6 +275,9 @@ fn read_vmouse_config() -> bool {
 /// 获取 vmouse 驱动状态
 #[tauri::command]
 pub async fn get_vmouse_status() -> Result<VmouseStatus, String> {
+    if !get_vmouse_support() {
+        return Err("虚拟鼠标驱动在此 Windows 版本不受支持".to_string());
+    }
     VMOUSE_STATUS
         .get(|| async {
             // PowerShell is waited for on the blocking pool, not on a worker of the async runtime
@@ -271,6 +303,9 @@ pub async fn get_vmouse_status() -> Result<VmouseStatus, String> {
 /// 安装 vmouse 驱动（复用 install-vmouse.bat）
 #[tauri::command]
 pub async fn install_vmouse_driver() -> Result<String, String> {
+    if !get_vmouse_support() {
+        return Err("虚拟鼠标驱动在此 Windows 版本不受支持".to_string());
+    }
     let _status_changes = VMOUSE_STATUS.invalidating();
     #[cfg(target_os = "windows")]
     {
@@ -303,6 +338,9 @@ pub async fn install_vmouse_driver() -> Result<String, String> {
 /// 卸载 vmouse 驱动（复用 uninstall-vmouse.bat）
 #[tauri::command]
 pub async fn uninstall_vmouse_driver() -> Result<String, String> {
+    if !get_vmouse_support() {
+        return Err("虚拟鼠标驱动在此 Windows 版本不受支持".to_string());
+    }
     let _status_changes = VMOUSE_STATUS.invalidating();
     #[cfg(target_os = "windows")]
     {
@@ -334,6 +372,9 @@ pub async fn uninstall_vmouse_driver() -> Result<String, String> {
 /// 设置 sunshine.conf 中的 virtual_mouse 配置
 #[tauri::command]
 pub async fn set_vmouse_config(enabled: bool) -> Result<String, String> {
+    if !get_vmouse_support() {
+        return Err("虚拟鼠标驱动在此 Windows 版本不受支持".to_string());
+    }
     let _status_changes = VMOUSE_STATUS.invalidating();
     // /api/config 是整表替换语义：读文件与 POST 之间必须与其他全表写者互斥，
     // 否则并发写者的字段会被旧快照覆盖丢失（见 controller_hub.rs 的锁约定）。
@@ -388,6 +429,15 @@ mod direct_read_tests {
         assert_eq!(vmouse_status_from_nodes(&[node(true, true, NodeState::Ok, true), node(true, true, NodeState::Ok, true)]), None);
         // a node that only its name calls a virtual mouse: the old query would have taken it
         assert_eq!(vmouse_status_from_nodes(&[node(false, true, NodeState::Missing, false)]), None);
+    }
+
+    #[test]
+    fn virtual_mouse_is_supported_only_on_windows_11_builds() {
+        assert!(!vmouse_supported_for_build(None));
+        assert!(!vmouse_supported_for_build(Some(19045)));
+        assert!(!vmouse_supported_for_build(Some(MIN_SUPPORTED_WINDOWS_BUILD - 1)));
+        assert!(vmouse_supported_for_build(Some(MIN_SUPPORTED_WINDOWS_BUILD)));
+        assert!(vmouse_supported_for_build(Some(26100)));
     }
 
     /// Run on a machine with the driver installed: `cargo test --bin sunshine-gui -- --ignored vmouse_direct_read_matches_powershell`.

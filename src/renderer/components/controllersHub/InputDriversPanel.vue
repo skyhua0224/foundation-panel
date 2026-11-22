@@ -9,25 +9,25 @@
             <MButton size="sm" :variant="vigemStatus.installed ? 'tonal' : 'filled'" :loading="ops.vigem" :disabled="refreshing || probeFailed.vigem" @click="confirmToggle('vigem')">{{ vigemStatus.installed ? t.controllersHub.peripherals.uninstall : t.controllersHub.peripherals.install }}</MButton>
           </template>
         </MItem>
-        <MItem icon="mouse" :tone="!probeFailed.vmouse && vmouseStatus.installed ? 'success' : ''" :title="t.controllersHub.peripherals.vmouse.title" :text="vmouseNotice">
+        <MItem v-if="vmouseSupported" icon="mouse" :tone="!probeFailed.vmouse && vmouseStatus.installed ? 'success' : ''" :title="t.controllersHub.peripherals.vmouse.title" :text="vmouseNotice">
           <template #trail>
             <MChip :tone="!probeFailed.vmouse && vmouseStatus.installed ? 'ok' : 'neutral'">{{ probeFailed.vmouse ? t.deviceHub.probeUnavailable : (vmouseStatus.installed ? t.controllersHub.peripherals.installed : t.controllersHub.peripherals.notInstalled) }}</MChip>
             <MButton size="sm" :variant="vmouseStatus.installed ? 'tonal' : 'filled'" :loading="ops.vmouse" :disabled="refreshing || probeFailed.vmouse" @click="confirmToggle('vmouse')">{{ vmouseStatus.installed ? t.controllersHub.peripherals.uninstall : t.controllersHub.peripherals.install }}</MButton>
           </template>
         </MItem>
-        <MItem icon="toggle_on" :title="t.stream.vmouseToggle">
+        <MItem v-if="vmouseSupported" icon="toggle_on" :title="t.stream.vmouseToggle">
           <template #trail><MButton size="sm" :variant="vmouseEnabled ? 'filled' : 'outlined'" :loading="vmouseConfigSaving" :disabled="refreshing || !vmouseStatusKnown" @click="toggleVmouse">{{ !vmouseStatusKnown ? t.stream.vmouseUnknown : vmouseEnabled ? t.stream.vmouseOn : t.stream.vmouseOff }}</MButton></template>
         </MItem>
       </MGroup>
       <!-- a driver being installed or removed: the wavy progress under the list (the button keeps its own busy state) -->
-      <MProgress v-for="d in ['vigem', 'vmouse'].filter((k) => ops[k])" :key="d" class="input-drivers__busy" :label="busyLabel(d)" />
+      <MProgress v-for="d in visibleDrivers.filter((k) => ops[k])" :key="d" class="input-drivers__busy" :label="busyLabel(d)" />
     </template>
   </MSection>
 </template>
 
 <script setup>
 import { MSection, MGroup, MItem, MChip, MButton, MSkeleton, MProgress } from 'foundation-ui/vue'
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { ElMessageBox } from '../../composables/notifyMessage.js'
 import { useInputDrivers } from '../../composables/useInputDrivers.js'
 import { formatMessage } from '../../shared/format-message.js'
@@ -39,8 +39,10 @@ const {
   vigemStatus, vmouseStatus, probeFailed, ops, initialized, refreshing,
   refreshAll, installVigem, uninstallVigem,
   installVmouse, uninstallVmouse,
-  vmouseEnabled, vmouseStatusKnown, vmouseNotice, vmouseConfigSaving, toggleVmouse,
+  vmouseSupported, vmouseEnabled, vmouseStatusKnown, vmouseNotice, vmouseConfigSaving, toggleVmouse,
 } = useInputDrivers(t)
+
+const visibleDrivers = computed(() => vmouseSupported.value ? ['vigem', 'vmouse'] : ['vigem'])
 
 // the label of the wave while a driver is installed or removed (the status is still the one before the operation)
 const busyLabel = (d) => { const p = t.value.controllersHub.peripherals; const installed = d === 'vigem' ? vigemStatus.installed : vmouseStatus.value.installed; return formatMessage(installed ? p.uninstallingDriver : p.installingDriver, { name: p[d].title }) }

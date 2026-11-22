@@ -22,6 +22,13 @@ test('Unavailable, ended, and unsupported sessions cannot appear enabled', () =>
   assert.equal(nrOverlayState({ nr_state: 'active', nr_toggle_supported: false }, true), 'blocked')
 })
 
+test('connected streams without a pipeline, unselected streams and app opt-outs have distinct states', () => {
+  assert.equal(nrOverlayState(null, true, true, 0), 'no_pipeline')
+  assert.equal(nrOverlayState(null, true, true, 2), 'choose_stream')
+  assert.equal(nrOverlayState({ nr_toggle_supported: false, nr_app_allowed: false }, true, true, 1), 'app_disabled')
+  assert.equal(nrOverlayState(null, true, false, 0), 'idle')
+})
+
 test('Saved opacity has safe defaults and keeps controls legible', () => {
   assert.equal(overlayOpacity(null), 62)
   assert.equal(overlayOpacity('invalid'), 62)

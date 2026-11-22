@@ -346,6 +346,8 @@ const INJECT_STYLES: &str = include_str!("../inject-styles.css");
 /// 注入的 JavaScript 脚本（编译时从文件读取）
 const INJECT_TRACES: &str = include_str!("../inject-traces.js");
 const INJECT_SCRIPT: &str = include_str!("../inject-script.js");
+/// Records the page's state (scroll, tabs, sections, drafts) for the window that is made again after a memory release; see inject-viewstate.js.
+const INJECT_VIEWSTATE: &str = crate::view_state::SCRIPT;
 
 /// 调皮的404页面（当Sunshine未启动时显示，编译时从文件读取）
 const ERROR_404_PAGE: &str = include_str!("../error-404.html");
@@ -1111,6 +1113,11 @@ async fn read_limited_response_bytes(
 /// 代理处理器
 async fn proxy_handler(req: Request) -> Response {
     let method = req.method().clone();
+    if crate::test_isolation::active()
+        && !matches!(method, axum::http::Method::GET | axum::http::Method::HEAD | axum::http::Method::OPTIONS)
+    {
+        return axum::http::StatusCode::METHOD_NOT_ALLOWED.into_response();
+    }
     let uri = req.uri().clone();
     let path = uri.path().to_string();
     let query = uri.query().unwrap_or("").to_string();
@@ -2011,6 +2018,7 @@ fn inject_theme_script(html: String) -> String {
     let inject_size = INJECT_STYLES.len()
         + INJECT_TRACES.len()
         + INJECT_SCRIPT.len()
+        + INJECT_VIEWSTATE.len()
         + production_flag.len()
         + 150;
     let mut result = String::with_capacity(html.len() + inject_size);
@@ -2024,6 +2032,8 @@ fn inject_theme_script(html: String) -> String {
     result.push_str(INJECT_TRACES);
     result.push_str("\n");
     result.push_str(INJECT_SCRIPT);
+    result.push_str("\n");
+    result.push_str(INJECT_VIEWSTATE);
     result.push_str("\n</script>\n");
     result.push_str(&html[pos..]);
 

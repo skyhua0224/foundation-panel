@@ -1,17 +1,21 @@
 <script setup>
+import { setVisibleInterval, clearVisibleInterval } from '../composables/pageVisibility.js'
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
-import { firstImage, micIsReady, padIsReady, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, coverKnown, heroArtReady, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, useNotify, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
+import { firstImage, micIsReady, padIsReady, startupProblems, parseErrorLog, MDriverGuardNotice, MPage, MIcon, MIconButton, MDialog, MButton, MHomeDash, MSupportSheet, coverKnown, heroArtReady, MAnnouncementStrip, MAnnouncementSheet, useAnnouncements, useGuideCard, useNotify, buildHomeModel, buildStartSteps, buildCards, guideCardData, downloadCardData, sponsorCardData, GUIDE_TARGET, homeTexts } from 'foundation-ui/vue'
 import { buildCatalogue, buildCatalogueDetails, useJourneyHome, useReleaseAssets, useStarCard, useSessionClock, useSystemInfo, reachProblemOf, registeredComponentStatus, createHistory, createHttpVddAdapter, createPairQr, createVddStore, saveSettingKey, vddStatusOf, recentKeys, rememberRecent, isLoopbackHost, createQueuedCalls, createSerialCalls } from 'foundation-ui/vue'
 import QRCode from 'qrcode'
 import { qrSvgDataUrl } from '../composables/qrSvg.js'
+import { audioDevicesChannel } from '../composables/deviceStatusStore.js'
 import { usePanelHome, seen, SETTLE_CAP_MS } from '../composables/usePanelHome.js'
 import { useHostReach } from '../composables/useHostReach.js'
+import { useDriverGuard } from '../composables/useDriverGuard.js'
 import { useGamepadType } from '../composables/useGamepadType.js'
-import { SPONSORS } from '../config/sponsors.js'
+import { SPONSORS, sponsorUrl } from '../config/sponsors.js'
 import { openExternalUrl, sunshine, vdd as vddApi, virtualMicrophone } from '../tauri-adapter.js'
 import { hostBase, hostFetch } from '../composables/hostBase.js'
 import { useI18n } from '../desktop/i18n/index.js'
 import { openBigScreenWithNotice } from '../composables/openBigScreen.js'
+import { pipelineAverages, perfExtras } from '../composables/liveSession.js'
 
 const props = defineProps({
   runtime: { type: Object, required: true },
@@ -77,7 +81,7 @@ const model = computed(() => {
   } : null
   const base = buildHomeModel({
     host: { name: state.config?.sunshine_name || 'Sunshine', version: state.version, uptimeMs: uptimeMs.value, running: state.loaded, update: props.updateAvailable ? h.value.update : '' },
-    session: s ? { ...s, fpsMeasured: perfSession.value?.frame_rates?.encoded?.fps ?? perfSession.value?.host_latency?.recent_fps, latencyMs: perfSession.value?.host_latency?.avg_ms } : null,
+    session: s ? { ...s, fpsMeasured: perfSession.value?.frame_rates?.encoded?.fps ?? perfSession.value?.host_latency?.recent_fps, latencyMs: perfSession.value?.host_latency?.avg_ms, ...pipelineAverages(perfSession.value) } : null,
     series: state.series, sys, encoder: state.config?.active_encoder || '',
     codecModes: state.config && state.config.hevc_mode !== undefined ? { hevc: state.config.hevc_mode, av1: state.config.av1_mode } : null,
     pads: { text: [modeLabel.value, dsLabel.value].filter(Boolean).join(' · ') || '–', word: dsLabel.value || modeLabel.value, ready: padIsReady(props.runtime.ds?.state) },
@@ -111,10 +115,12 @@ const sampleAll = () => {
   historyTick.value += 1
 }
 let sampler = 0
-onMounted(() => { sampleAll(); sampler = setInterval(sampleAll, SAMPLE_SEC * 1000) })
-onBeforeUnmount(() => clearInterval(sampler))
+onMounted(() => { sampleAll(); sampler = setVisibleInterval(sampleAll, SAMPLE_SEC * 1000) })
+onBeforeUnmount(() => clearVisibleInterval(sampler))
 // the address of the host API: a request waits for it (hostBase.js) instead of going to the panel's own origin with an empty prefix
 const base = () => hostBase(() => proxyUrl.value, () => sunshine.getProxyUrl())
+// the safe mode, the encoder check and a failure that lay in the graphics driver (the same component as the Web UI home)
+const { guard: driverGuard, dismiss: dismissDriver, retry: retryProbe } = useDriverGuard(base)
 // the shared virtual display control: the same store the settings use, here over the host API through the proxy and the tray commands
 const vddAdapter = createHttpVddAdapter({
   fetchJson: async (path, init) => (await hostFetch(base, path, init)).json(),
@@ -137,14 +143,15 @@ const catalogueInput = computed(() => {
   const p = perfSession.value
   return {
     sampleSec: SAMPLE_SEC, vddStore: state.vdd && state.vdd.installed !== false ? vddStore : null,
-    reach: hostReach.view.report, reachChecking: hostReach.view.status === 'loading',
+    reach: hostReach.view.report, reachChecking: hostReach.view.status === 'loading', reachStatus: hostReach.view.status, reachCause: hostReach.view.cause, reachHttp: hostReach.view.http, reachProgress: hostReach.view.progress,
     sysinfo: nics.info.value,
+    mic: props.runtime.mic,
     host: { version: state.version, update: props.updateAvailable ? h.value.update : '' },
-    session: s ? { ...s, fpsMeasured: p?.frame_rates?.encoded?.fps, latencyMs: p?.host_latency?.avg_ms, latencyP95Ms: p?.host_latency?.p95_ms, uptimeMs: sessionClock.uptimeMs.value ?? p?.uptime_ms ?? s.uptimeMs } : null,
+    session: s ? { ...s, fpsMeasured: p?.frame_rates?.encoded?.fps, latencyMs: p?.host_latency?.avg_ms, latencyP95Ms: p?.host_latency?.p95_ms, ...pipelineAverages(p), ...perfExtras(p), uptimeMs: sessionClock.uptimeMs.value ?? p?.uptime_ms ?? s.uptimeMs } : null,
     history: { samples: history.samples, sessions: history.sessions, days: history.days, last: () => history.last() },
     sys: model.value.info.some((i) => i.id === 'memory') && state.memory ? { memTotal: state.memory.system_total_memory, memAvail: state.memory.system_available_memory } : null,
     recent: recentKeys.value, canRuntime: canRuntime.value, ds5Keys: ds5Keys.value,
-    config: state.config, logText: state.logText, logs: state.errorLog, clients: state.clients ? state.clients.map((c) => ({ ...c, icon: 'devices' })) : null,
+    config: state.config, audio: audioDevicesChannel.data.value?.render || null, logText: state.logText, logs: state.errorLog, clients: state.clients ? state.clients.map((c) => ({ ...c, icon: 'devices' })) : null,
     apps: state.apps ? state.apps.map((a) => ({ id: a.name, name: a.name, cover: coverOf(a) })) : null,
     codecModes: state.config && state.config.hevc_mode !== undefined ? { hevc: state.config.hevc_mode, av1: state.config.av1_mode } : null,
     pads: { text: [modeLabel.value, dsLabel.value].filter(Boolean).join(' · ') || '–' }, usb: props.runtime.usb?.attached_devices ? props.runtime.usb.attached_devices.length : null,
@@ -163,7 +170,7 @@ const cards = computed(() => buildCards(model.value, { texts: T.value, catalogue
 const compRows = () => registeredComponentStatus()?.rows?.value || []
 const smartSignals = computed(() => ({
   pairedCount: state.clients ? state.clients.length : null, streaming: !!session.value, lastStreamAt: (void historyTick.value, history.last()?.end || 0), // ms since epoch of the end of the last finished session this interface saw (0: none): the smart overview's after-stream scenario runs 30 minutes from it
-  problems: 0, problemComponents: compRows().filter((r) => r.state === 'error' || r.state === 'warn').map((r) => r.id),
+  problems: startupProblems((parseErrorLog(state.logText, Infinity)?.rows || []).filter((r) => r.level === 'Fatal').map((r) => r.text), String(locale.value)).length, problemComponents: compRows().filter((r) => r.state === 'error' || r.state === 'warn').map((r) => r.id),
   recentErrors: (state.errorLog?.rows || state.errorLog || []).length || 0, isNew: isNew.value,
   wifiHost: nics.defaultNic.value?.type === 'wifi', linkSlowMbps: nics.defaultNic.value?.link_speed_mbps && nics.defaultNic.value.link_speed_mbps < 1000 ? nics.defaultNic.value.link_speed_mbps : 0,
   reachBad: reachProblem.value, updateAvailable: props.updateAvailable,
@@ -209,7 +216,7 @@ function onAction(a) {
     case 'detail-external': emit('open', 'check-update'); break
     case 'open-url': openExternalUrl(a.value); break
     case 'open-desktop': void openBigScreenWithNotice((m) => notify.snack(m), t.value.sidebar.openBigScreenFailed); break
-    case 'pair-qr-begin': pairQr.begin(); break
+    case 'pair-qr-begin': pairQr.begin(a.value === true); break
     case 'pair-qr-stop': pairQr.stop(); break
     case 'table-row': onTableRow(a.value); break
     case 'app': emit('open', 'apps'); break
@@ -222,8 +229,9 @@ function onAction(a) {
     case 'link': openExternalUrl(a.value); break
     case 'setting': saveSetting(a.value); break
     case 'runtime-bitrate': runtimeBitrate(a.value); break
+    case 'runtime-host-audio': setHostAudio(a.value); break
     case 'ds5-tune': ds5Tune(a.value); break
-    case 'sponsor': { const target = SPONSORS.find((x) => x.id === a.value); if (a.value === 'star') openExternalUrl('https://github.com/AlkaidLab/foundation-sunshine'); else if (target) openExternalUrl(target.url); else sponsorOpen.value = true; break }
+    case 'sponsor': { const target = SPONSORS.find((x) => x.id === a.value); if (a.value === 'star') openExternalUrl('https://github.com/AlkaidLab/foundation-sunshine'); else if (target) openExternalUrl(sponsorUrl(target, locale.value)); else sponsorOpen.value = true; break }
     default: break
   }
 }
@@ -234,6 +242,7 @@ const hostApi = {
 }
 // the QR code of the pairing card: a pairing window is open on the host only while the card shows it (the card asks and gives it back)
 const pairQr = createPairQr({
+  autoRenew: false,
   start: async () => { const d = await hostApi.postJson('/api/qr-pair', {}); if (String(d.status) !== 'true') throw new Error(d.error || 'qr'); return d },
   poll: () => hostApi.getJson('/api/qr-pair'),
   cancel: () => hostApi.postJson('/api/qr-pair/cancel', {}),
@@ -262,6 +271,14 @@ watch(() => !!rawSession.value, (live) => { if (live) loadDs5() }, { immediate: 
 const runtimeBitrate = createQueuedCalls(async ({ client, kbps }) => {
   try { const r = await hostFetch(base, `/api/runtime/bitrate?bitrate=${kbps}&clientname=${encodeURIComponent(client)}`); const d = await r.json().catch(() => ({})); say(r.ok && d.success !== false ? T.value.lbSent.replace('{client}', client) : T.value.lbFailed) } catch { say(T.value.lbFailed) }
 }, (a) => a.client)
+// the host audio of the running client is a tile (live-audio, foundation-ui): its switch sends the command of the stream, one command per client at a time in the order chosen (while one runs
+// only the newest choice waits, so the last choice wins); a refusal puts the switch back
+const setHostAudio = createQueuedCalls(async ({ client, enabled, failed }) => {
+  try {
+    const d = await hostApi.postJson('/api/runtime/audio', { clientname: client, enabled })
+    if (!d?.success) throw new Error(d?.status_message || 'host audio')
+  } catch (e) { failed?.(); say(e?.message || t.value.stream.msg.connectionError) }
+}, (a) => a.client)
 const ds5Tune = createQueuedCalls(async ({ key, value }) => {
   try { const d = await hostApi.postJson('/api/dualsense/tuning', { schema: 'ALK-DS5T/1', values: { [key]: value } }); if (d?.keys) ds5Keys.value = d.keys; else if (d?.status === false) say(T.value.dsFailed) } catch { say(T.value.dsFailed) }
 }, (a) => a.key)
@@ -280,7 +297,7 @@ const onTableRow = (row) => { if (row.tab === 'errors' || row.tab === 'sessions'
 const onLink = (to) => emit('open', to)
 
 const supportSections = computed(() => [
-  { title: h.value.sponsorTitle, items: SPONSORS.map((s) => ({ id: s.id, icon: 'favorite', title: s.label, url: s.url })) },
+  { title: h.value.sponsorTitle, items: SPONSORS.map((s) => ({ id: s.id, icon: 'favorite', title: s.label, url: sponsorUrl(s, locale.value) })) },
   { items: [
     { id: 'star', icon: 'star', title: h.value.star, url: 'https://github.com/AlkaidLab/foundation-sunshine' },
     { id: 'qq', icon: 'groups', title: h.value.qq, url: 'https://qm.qq.com/q/AfMQoyKrkc' },
@@ -294,6 +311,7 @@ const supportSections = computed(() => [
       <MButton v-if="edit" variant="tonal" icon="check" @click="edit = false">{{ h.done }}</MButton>
       <MIconButton v-else icon="edit" data-coach="home-edit" :label="h.edit" @click="edit = true" />
     </template>
+    <MDriverGuardNotice :guard="driverGuard" :locale="String(locale)" :open="openExternalUrl" @dismiss="dismissDriver" @retry="retryProbe" />
     <MAnnouncementStrip v-if="announcements.top.value" :item="announcements.top.value" :total="announcements.unread.value" :texts="announceTexts" @dismiss="announcements.dismiss" @open-url="openExternalUrl" @open-list="announceOpen = true" />
     <MHomeDash v-model:edit="edit" :cards="cards" :details="allDetails" :ctx="dashCtx" storage-key="panel-home" :texts="dashTexts" :config="state.config" :locale="locale" @action="onAction" />
     <MAnnouncementSheet v-model="announceOpen" :items="announcements.list.value" :title="homeTexts(locale).annTitle" :texts="announceTexts" :close-label="h.done" @dismiss="announcements.dismiss" @open-url="openExternalUrl" />

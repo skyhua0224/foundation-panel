@@ -163,6 +163,7 @@
 </template>
 
 <script setup>
+import { setVisibleInterval, clearVisibleInterval } from '../composables/pageVisibility.js'
 import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from '../composables/notifyMessage.js'
 import { MExpander, MVddDevice, displayTreeTexts, MPage, MGroup, MSection, MItem, MSwitchItem, MChoiceItem, MDialog, MValueItem, MSeg, MBanner, MFooter, MButton, MIconButton, MStatusPill, MProgress, MCheckItem, MPageLoading, useSubpage, vddPageTexts, vddTexts, vddOn } from 'foundation-ui/vue'
@@ -465,7 +466,7 @@ const vddStatusLabel = useVddStatusLabel(t, vddStatus)
 
 const stopCalibrationContextPolling = () => {
   if (calibrationContextPollTimer) {
-    clearInterval(calibrationContextPollTimer)
+    clearVisibleInterval(calibrationContextPollTimer)
     calibrationContextPollTimer = null
   }
 }
@@ -527,7 +528,7 @@ const startCalibrationContextPolling = () => {
   stopCalibrationContextPolling()
   if (activeSection.value !== 'calibration' || !vddReady.value) return
   loadCalibrationContext({ silent: true })
-  calibrationContextPollTimer = setInterval(() => loadCalibrationContext({ silent: true }), 2500)
+  calibrationContextPollTimer = setVisibleInterval(() => loadCalibrationContext({ silent: true }), 2500)
 }
 
 

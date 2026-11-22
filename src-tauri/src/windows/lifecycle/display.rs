@@ -44,6 +44,16 @@ struct Hook<R: Runtime> {
     next_token: AtomicU64,
     /// the cover window of the modes Adaptive and Snapshot
     cover: StdMutex<Cover>,
+    /// the size the person gave the window, in DIPs (the setting `keepWindowSizeOnDpiChange`)
+    keep: StdMutex<KeepDip>,
+}
+
+#[derive(Default)]
+struct KeepDip {
+    /// width and height in DIPs, as the person left them
+    dip: Option<(f64, f64)>,
+    /// a size that follows a change of scale is the system's, not the person's, until this moment
+    settle_until: Option<Instant>,
 }
 
 #[derive(Default)]
@@ -108,6 +118,8 @@ fn dip_wanted() -> bool {
 
 /// While WebView2 settles after a change of scale the page is covered (SUNSHINE_GUI_WEBVIEW_DPI_COVER = off | fixed | adaptive | snapshot; fast when unset, see dpi_cover):
 /// for 70 to 170 ms after the first right layout, WebView2 laid the page out for the old size at the new scale, whatever bounds mode or order of calls was used.
+/// The window gets its size in DIPs back after a change of the monitor's scale (KEEP_DIP_DEBOUNCE_MS of quiet)
+const KEEP_TIMER: usize = 0x5353_574B;
 const COVER_TIMER: usize = 0x5353_5743;
 const FADE_TIMER: usize = 0x5353_5744;
 /// the page tells that its layout matches the window (posted by `panel_dpi_settled`)
@@ -171,7 +183,7 @@ pub(super) fn install<R: Runtime>(window: &WebviewWindow<R>, panel: &Panel) {
             }
             *slot.lock().unwrap() = Some(MainThreadController(controller));
         });
-        let context = Box::into_raw(Box::new(Hook { window, panel, controller, dip, class_proc, covered: AtomicBool::new(false), warm: StdMutex::new(Warm { dirty: true, ..Default::default() }), last_dpi: AtomicU32::new(dpi_of_window), next_token: AtomicU64::new(0), cover: StdMutex::new(Cover::default()) }));
+        let context = Box::into_raw(Box::new(Hook { window, panel, controller, dip, class_proc, covered: AtomicBool::new(false), warm: StdMutex::new(Warm { dirty: true, ..Default::default() }), last_dpi: AtomicU32::new(dpi_of_window), next_token: AtomicU64::new(0), cover: StdMutex::new(Cover::default()), keep: StdMutex::new(KeepDip::default()) }));
         if !unsafe {
             SetWindowSubclass(
                 windows::Win32::Foundation::HWND(hwnd.0),
@@ -227,6 +239,7 @@ unsafe extern "system" fn callback<R: Runtime>(
         };
         sync_webview_to_client(hwnd, context);
         fit_cover(hwnd, context);
+        record_dip_size(hwnd, context);
         return result;
     }
     if message == WM_DPICHANGED {
@@ -234,6 +247,11 @@ unsafe extern "system" fn callback<R: Runtime>(
         let from = context.last_dpi.swap(dpi, AtomicOrdering::SeqCst);
         begin_cover(hwnd, context, from, dpi);
         apply_new_dpi(hwnd, context, wparam, lparam);
+        if keep_dip_wanted() && dpi != from {
+            // the person's size is kept in DIPs: the window is given it back once the scale has been quiet for KEEP_DIP_DEBOUNCE_MS (a flip between two scales is laid out once)
+            context.keep.lock().unwrap().settle_until = Some(Instant::now() + std::time::Duration::from_millis(u64::from(crate::dpi_scale_core::KEEP_DIP_DEBOUNCE_MS) + 150));
+            unsafe { windows::Win32::UI::WindowsAndMessaging::SetTimer(Some(hwnd), KEEP_TIMER, crate::dpi_scale_core::KEEP_DIP_DEBOUNCE_MS, None) };
+        }
     }
     match message {
         windows::Win32::UI::WindowsAndMessaging::WM_TIMER if wparam.0 == COVER_TIMER => {
@@ -246,6 +264,11 @@ unsafe extern "system" fn callback<R: Runtime>(
         }
         windows::Win32::UI::WindowsAndMessaging::WM_TIMER if wparam.0 == FADE_TIMER => {
             fade_tick(hwnd, context);
+            return windows::Win32::Foundation::LRESULT(0);
+        }
+        windows::Win32::UI::WindowsAndMessaging::WM_TIMER if wparam.0 == KEEP_TIMER => {
+            unsafe { let _ = windows::Win32::UI::WindowsAndMessaging::KillTimer(Some(hwnd), KEEP_TIMER); }
+            restore_dip_size(hwnd, context);
             return windows::Win32::Foundation::LRESULT(0);
         }
         windows::Win32::UI::WindowsAndMessaging::WM_TIMER if wparam.0 == WARM_TIMER => {
@@ -298,6 +321,7 @@ unsafe extern "system" fn callback<R: Runtime>(
             abort_cover(hwnd, context);
         } else {
             fit_cover(hwnd, context);
+            record_dip_size(hwnd, context);
         }
     }
     if matches!(message, WM_DISPLAYCHANGE | WM_DPICHANGED) {
@@ -602,6 +626,78 @@ fn end_cover<R: Runtime>(hwnd: windows::Win32::Foundation::HWND, context: &Hook<
             let _ = unsafe { controller.0.SetIsVisible(true) };
         }
     }
+}
+
+/// Whether a change of the monitor's scale gives the window its size in DIPs back: the setting `keepWindowSizeOnDpiChange` or SUNSHINE_GUI_DPI_KEEP_DIP = 1. Off by default.
+/// A virtual display that follows the resolution of the client switches between two scales (175 % and 300 %); Windows keeps the window's pixels and the page shrinks to the CSS size of the higher scale
+/// (1118 x 636 to 652 x 372). The size in DIPs is what the person gave the window.
+fn keep_dip_wanted() -> bool {
+    std::env::var("SUNSHINE_GUI_DPI_KEEP_DIP").map(|value| value == "1").unwrap_or_else(|_| crate::desktop_settings::load_desktop_settings_from_disk().keep_window_size_on_dpi_change)
+}
+
+/// The window's client size in DIPs at the DPI the panel last applied (the system's DPI of the window is not the one a synthetic change of the measurement instances set).
+fn current_dip<R: Runtime>(hwnd: windows::Win32::Foundation::HWND, context: &Hook<R>) -> Option<(f64, f64)> {
+    use windows::Win32::UI::WindowsAndMessaging::GetClientRect;
+    let mut client = windows::Win32::Foundation::RECT::default();
+    unsafe { GetClientRect(hwnd, &mut client) }.ok()?;
+    let dpi = context.last_dpi.load(AtomicOrdering::SeqCst).max(1);
+    (client.right > 0 && client.bottom > 0).then(|| (crate::dpi_scale_core::dip_of_pixels(client.right, dpi), crate::dpi_scale_core::dip_of_pixels(client.bottom, dpi)))
+}
+
+/// A size the person gave the window (a drag of the edge, the first show) is kept in DIPs; the sizes that follow a change of scale are the system's and are not.
+fn record_dip_size<R: Runtime>(hwnd: windows::Win32::Foundation::HWND, context: &Hook<R>) {
+    use windows::Win32::UI::WindowsAndMessaging::{IsIconic, IsZoomed};
+    if unsafe { IsZoomed(hwnd) }.as_bool() || unsafe { IsIconic(hwnd) }.as_bool() {
+        return;
+    }
+    let mut keep = context.keep.lock().unwrap();
+    if keep.settle_until.is_some_and(|until| Instant::now() < until) {
+        return;
+    }
+    if let Some(dip) = current_dip(hwnd, context) {
+        keep.dip = Some(dip);
+    }
+}
+
+/// The work area (pixels) of the monitor the window is on; a measurement instance (off-screen) may say what its display is (SUNSHINE_GUI_TEST_WORK_AREA = 3840x2160).
+fn work_area(hwnd: windows::Win32::Foundation::HWND) -> (i32, i32, i32, i32) {
+    use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MonitorFromWindow, MONITORINFO, MONITOR_DEFAULTTONEAREST};
+    if crate::windows::test_offscreen() {
+        if let Some((w, h)) = std::env::var("SUNSHINE_GUI_TEST_WORK_AREA").ok().and_then(|value| value.split_once('x').and_then(|(w, h)| Some((w.parse::<i32>().ok()?, h.parse::<i32>().ok()?)))) {
+            return (0, 0, w, h);
+        }
+    }
+    let monitor = unsafe { MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST) };
+    let mut info = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+    if unsafe { GetMonitorInfoW(monitor, &mut info) }.as_bool() {
+        (info.rcWork.left, info.rcWork.top, info.rcWork.right, info.rcWork.bottom)
+    } else {
+        (0, 0, 1920, 1080)
+    }
+}
+
+/// The scale has been quiet: the window gets the size in DIPs the person gave it, at the scale it has now, inside the work area of its monitor. A maximized or minimized window is the system's.
+fn restore_dip_size<R: Runtime>(hwnd: windows::Win32::Foundation::HWND, context: &Hook<R>) {
+    use windows::Win32::UI::WindowsAndMessaging::{GetWindowRect, IsIconic, IsZoomed, SetWindowPos, SWP_NOACTIVATE, SWP_NOZORDER};
+    if !keep_dip_wanted() || unsafe { IsZoomed(hwnd) }.as_bool() || unsafe { IsIconic(hwnd) }.as_bool() {
+        return;
+    }
+    let Some(dip) = context.keep.lock().unwrap().dip else { return };
+    let dpi = context.last_dpi.load(AtomicOrdering::SeqCst).max(1);
+    let work = work_area(hwnd);
+    let size = crate::dpi_scale_core::pixels_keeping_dip(dip, dpi, (work.2 - work.0, work.3 - work.1));
+    let mut rect = windows::Win32::Foundation::RECT::default();
+    if unsafe { GetWindowRect(hwnd, &mut rect) }.is_err() {
+        return;
+    }
+    if (rect.right - rect.left - size.0).abs() <= 2 && (rect.bottom - rect.top - size.1).abs() <= 2 {
+        return;
+    }
+    let (x, y) = crate::dpi_scale_core::corner_inside((rect.left, rect.top), size, work);
+    log::info!("[dpi-keep] {}x{} DIPs at {dpi} dpi: {}x{} px (was {}x{})", dip.0.round(), dip.1.round(), size.0, size.1, rect.right - rect.left, rect.bottom - rect.top);
+    // inside the settle time of the keep, whatever size this makes is not the person's
+    context.keep.lock().unwrap().settle_until = Some(Instant::now() + std::time::Duration::from_millis(400));
+    let _ = unsafe { SetWindowPos(hwnd, None, x, y, size.0, size.1, SWP_NOZORDER | SWP_NOACTIVATE) };
 }
 
 /// The new scale and, with it, the bounds of the size Windows suggests for the window (an undecorated window's client is its whole rectangle): the WebView never has

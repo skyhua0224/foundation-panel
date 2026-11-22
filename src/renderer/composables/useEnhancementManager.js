@@ -1,4 +1,4 @@
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElMessage, ElMessageBox } from './notifyMessage.js'
 import { open } from '@tauri-apps/plugin-dialog'
 import { openExternalUrl, sunshine } from '../tauri-adapter.js'
@@ -18,7 +18,10 @@ const emptyStatus = () => ({
 export function useEnhancementManager({ api, messages: text, runtimeName, onStatus }) {
   const status = ref(emptyStatus())
   const statusKnown = ref(false)
+  let disposed = false
+  onUnmounted(() => { disposed = true })
   const applyStatus = (data) => {
+    if (disposed) return
     status.value = { ...emptyStatus(), ...data }
     statusKnown.value = true
     onStatus?.(status.value)
@@ -150,16 +153,17 @@ export function useEnhancementManager({ api, messages: text, runtimeName, onStat
       // and asks once more after the other one has finished.
       let result = await api.setEnabled(enabled)
       if (!result.success && String(result.message || '').includes('hdr_save_busy')) {
-        ElMessage.info(text.value.saveBusy || '正在保存…')
+        ElMessage.info({ message: text.value.saveBusy || '正在保存…', id: 'enhancement-save' })
         await new Promise((resolve) => setTimeout(resolve, 1500))
         result = await api.setEnabled(enabled)
       }
       if (!result.success) throw new Error(result.message)
       applyStatus(result.data)
-      ElMessage.success(text.value.saveSuccess)
+      ElMessage.success({ message: text.value.saveSuccess, id: 'enhancement-save' })
     } catch (error) {
       operationError.value = String(error?.message || error)
       await refresh(true)
+      ElMessage.error(text.value.permissionSaveFailed || '功能设置未保存')
     } finally {
       operation.value = ''
     }

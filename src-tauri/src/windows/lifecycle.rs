@@ -19,6 +19,7 @@ use tauri::{AppHandle, Manager, Runtime, WebviewWindow, WindowEvent};
 #[cfg(target_os = "windows")]
 mod display;
 mod dpi_cover;
+mod occlusion;
 const DISPLAY_DEBOUNCE: Duration = Duration::from_millis(300);
 
 const STARTUP_GRACE: Duration = Duration::from_secs(90);
@@ -52,6 +53,8 @@ struct State {
     recoveries: u8,
     display_revision: u64,
     refresh_after: Option<Instant>,
+    /// Covered by other windows (occlusion.rs): the page is told it is hidden while it is.
+    occlusion: occlusion::Occlusion,
 }
 
 impl State {
@@ -66,6 +69,7 @@ impl State {
             recoveries: 0,
             display_revision: 0,
             refresh_after: None,
+            occlusion: occlusion::Occlusion::default(),
         }
     }
 
@@ -222,6 +226,22 @@ fn get(label: &str) -> Option<Panel> {
     PANELS.lock().unwrap().panels.get(label).cloned()
 }
 
+/// The page of `label` has been put to sleep (hidden, suspended): it was shown once and is not any more. A window that is still loading, or waiting to be shown for the first time, is not.
+/// A window that was made ahead of a click and is still loading is shown by the moment its page is ready. False when it has loaded already (then it is shown at once) or is not there.
+pub(crate) fn show_when_loaded(label: &str) -> bool {
+    let Some(panel) = get(label) else { return false };
+    let mut state = panel.state.lock().unwrap();
+    if state.phase == Phase::Loading {
+        state.show_on_load = true;
+        return true;
+    }
+    false
+}
+
+pub(crate) fn is_background(label: &str) -> bool {
+    get(label).is_some_and(|panel| panel.state.lock().unwrap().phase == Phase::Background)
+}
+
 impl Panel {
     pub(super) fn initialization_script(&self) -> String {
         include_str!("lifecycle.js")
@@ -241,6 +261,8 @@ impl Panel {
             WindowEvent::Focused(focused) => {
                 if *focused {
                     crate::proxy_server::reset_fast_fail();
+                    // an activated window is on top of the others
+                    panel.state.lock().unwrap().occlusion.clear();
                 }
                 reconcile(&handle, &panel);
             }
@@ -357,9 +379,11 @@ fn is_active<R: Runtime>(window: &WebviewWindow<R>) -> bool {
     window.is_visible().unwrap_or(true) && !window.is_minimized().unwrap_or(false)
 }
 
-fn notify_visibility<R: Runtime>(window: &WebviewWindow<R>, active: bool) {
+/// The page is told it is visible when the window is shown and not minimized and no other windows cover it.
+fn notify_visibility<R: Runtime>(window: &WebviewWindow<R>, panel: &Panel, active: bool) {
+    let visible = active && !panel.state.lock().unwrap().occlusion.occluded;
     let _ = window.eval(format!(
-        "if(window.__setWebviewVisibility)window.__setWebviewVisibility({active})"
+        "if(window.__setWebviewVisibility)window.__setWebviewVisibility({visible})"
     ));
 }
 
@@ -377,7 +401,7 @@ fn reconcile<R: Runtime>(window: &WebviewWindow<R>, panel: &Panel) {
             }
             state.reconcile(active, now)
         };
-        notify_visibility(&handle, active);
+        notify_visibility(&handle, &panel, active);
         match action {
             Some(Action::Resume(revision)) => {
                 log::debug!(
@@ -436,11 +460,15 @@ fn apply_render<R: Runtime>(window: &WebviewWindow<R>, panel: Panel, revision: u
                 panel.state.lock().unwrap().resume_failed(revision);
                 log::warn!("WebView resume failed: {error}");
             }
+            // Full performance again; a runtime without the interface keeps its default.
+            set_memory_target(&controller, false);
             return;
         }
         let core = controller
             .CoreWebView2()
             .and_then(|core| core.cast::<ICoreWebView2_3>());
+        // Hidden: let the engine drop caches it can rebuild (restored to Normal when shown).
+        set_memory_target(&controller, true);
         let callback_panel = panel.clone();
         let callback_controller = controller.clone();
         let completed = TrySuspendCompletedHandler::create(Box::new(move |result, suspended| {
@@ -452,6 +480,7 @@ fn apply_render<R: Runtime>(window: &WebviewWindow<R>, panel: Panel, revision: u
                 .suspend_completed(revision);
             if current && !succeeded {
                 let _ = callback_controller.SetIsVisible(true);
+                set_memory_target(&callback_controller, false);
             }
             Ok(())
         }));
@@ -462,6 +491,7 @@ fn apply_render<R: Runtime>(window: &WebviewWindow<R>, panel: Panel, revision: u
         if let Err(error) = result {
             if panel.state.lock().unwrap().suspend_completed(revision) {
                 let _ = controller.SetIsVisible(true);
+                set_memory_target(&controller, false);
             }
             log::warn!("WebView suspension failed: {error}");
         }
@@ -476,6 +506,40 @@ fn apply_render<R: Runtime>(window: &WebviewWindow<R>, panel: Panel, revision: u
     }
 }
 
+/// Lowers the engine's memory target while the panel is hidden and restores it when shown. Microsoft's WebView2
+/// performance guidance (Learn, "Performance best practices", ms.date 2026-01-12): "Set MemoryUsageTargetLevel =
+/// CoreWebView2MemoryUsageTargetLevel.Low on inactive WebViews to reduce memory usage ... When the WebView2 instance is
+/// again active, restore the target level to Normal". The interface is ICoreWebView2_19; an older runtime does not
+/// implement it, and the failed query is ignored (the panel then behaves exactly as before). It only changes how eagerly
+/// the engine releases its caches: it never reloads the page.
+#[cfg(target_os = "windows")]
+unsafe fn set_memory_target(
+    controller: &webview2_com::Microsoft::Web::WebView2::Win32::ICoreWebView2Controller,
+    low: bool,
+) {
+    use webview2_com::Microsoft::Web::WebView2::Win32::{
+        COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW, COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL,
+        ICoreWebView2_19,
+    };
+    use wv2_windows_core::Interface;
+    unsafe {
+        let Ok(core19) = controller
+            .CoreWebView2()
+            .and_then(|core| core.cast::<ICoreWebView2_19>())
+        else {
+            return;
+        };
+        let level = if low {
+            COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_LOW
+        } else {
+            COREWEBVIEW2_MEMORY_USAGE_TARGET_LEVEL_NORMAL
+        };
+        if let Err(error) = core19.SetMemoryUsageTargetLevel(level) {
+            log::debug!("WebView memory target not applied: {error}");
+        }
+    }
+}
+
 #[cfg(not(target_os = "windows"))]
 fn apply_render<R: Runtime>(window: &WebviewWindow<R>, panel: Panel, revision: u64, suspend: bool) {
     if suspend {
@@ -483,11 +547,50 @@ fn apply_render<R: Runtime>(window: &WebviewWindow<R>, panel: Panel, revision: u
     }
 }
 
+/// One look at every panel: is its window covered by other windows (occlusion.rs)? A change goes to the page.
+fn watch_occlusion(app: &AppHandle) {
+    let panels: Vec<_> = PANELS
+        .lock()
+        .unwrap()
+        .panels
+        .iter()
+        .map(|(label, panel)| (label.clone(), panel.clone()))
+        .collect();
+    for (label, panel) in panels {
+        let Some(window) = app.get_webview_window(&label) else {
+            continue;
+        };
+        let handle = window.clone();
+        let _ = window.run_on_main_thread(move || {
+            let active = is_active(&handle);
+            // a hidden or minimized window is asleep already: it is not asked
+            let covered = active && occlusion::covered(&handle);
+            let changed = panel.state.lock().unwrap().occlusion.observe(covered);
+            if let Some(occluded) = changed {
+                log::debug!(
+                    "Panel {} generation {} -> {}",
+                    handle.label(),
+                    panel.generation,
+                    if occluded { "covered" } else { "uncovered" }
+                );
+                notify_visibility(&handle, &panel, active);
+            }
+        });
+    }
+}
+
 pub(crate) fn start_monitor(app: AppHandle) -> tauri::async_runtime::JoinHandle<()> {
     tauri::async_runtime::spawn(async move {
         let mut interval = tokio::time::interval(Duration::from_secs(30));
+        let mut occlusion = tokio::time::interval(Duration::from_secs(1));
         loop {
-            interval.tick().await;
+            tokio::select! {
+                _ = occlusion.tick() => {
+                    watch_occlusion(&app);
+                    continue;
+                }
+                _ = interval.tick() => {}
+            }
             let panels: Vec<_> = PANELS
                 .lock()
                 .unwrap()

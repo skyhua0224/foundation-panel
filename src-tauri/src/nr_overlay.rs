@@ -82,7 +82,7 @@ fn snapshot(state: &OverlayState) -> SettingsStatus {
     }
 }
 fn path() -> Result<PathBuf, String> {
-    dirs::config_dir()
+    crate::test_isolation::config_dir()
         .map(|p| p.join("Sunshine GUI").join("enhancement-controls.json"))
         .ok_or("nr_settings_path".into())
 }
@@ -592,58 +592,7 @@ pub fn nr_overlay_is_visible(app: AppHandle) -> bool {
         .and_then(|w| w.is_visible().ok())
         .unwrap_or(false)
 }
-fn toggle_request(body: &serde_json::Value, target: Option<u64>) -> Result<(u64, bool), String> {
-    let pipelines = body["pipelines"].as_array().ok_or("nr_status_invalid")?;
-    let selected = if let Some(id) = target {
-        pipelines
-            .iter()
-            .find(|p| p["id"].as_u64() == Some(id))
-            .ok_or("nr_session_ended")?
-    } else if pipelines.len() == 1 {
-        &pipelines[0]
-    } else {
-        return Err(if pipelines.is_empty() {
-            "nr_no_session"
-        } else {
-            "nr_select_session"
-        }
-        .into());
-    };
-    if selected["nr_toggle_supported"] != true {
-        return Err("nr_toggle_unsupported".into());
-    }
-    let enabled = selected["nr_requested_enabled"]
-        .as_bool()
-        .ok_or("nr_status_invalid")?;
-    let state = selected["nr_state"].as_str().ok_or("nr_status_invalid")?;
-    let pending = matches!(state, "warming_up" | "stopping")
-        || (enabled && !matches!(state, "active" | "degraded"))
-        || (!enabled && state == "active")
-        || (enabled
-            && state == "active"
-            && [
-                "scale_percent",
-                "intensity",
-                "style",
-                "motion_quality",
-                "ui_correction",
-                "skin_structure_strength",
-                "auto_mask",
-            ]
-            .iter()
-            .any(|key| selected[format!("nr_requested_{key}")] != selected[format!("nr_{key}")]));
-    if pending {
-        return Err("nr_settings_pending".into());
-    }
-    Ok((
-        selected["id"]
-            .as_u64()
-            .filter(|id| *id > 0)
-            .ok_or("nr_status_invalid")?,
-        !enabled,
-    ))
-}
-async fn toggle_nr<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+async fn toggle_nr<R: Runtime>(_app: &AppHandle<R>) -> Result<(), String> {
     if TOGGLING.swap(true, Ordering::AcqRel) {
         return Ok(());
     }
@@ -654,19 +603,8 @@ async fn toggle_nr<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
         }
     }
     let _guard = Guard;
-    let target = STATE.lock().unwrap().target;
-    let body = crate::hdr_enhanced::nr_live_status().await?;
-    let (id, enabled) = toggle_request(&body, target)?;
-    // Recheck selection after the network read; never act on a newly selected stream.
-    if STATE.lock().unwrap().target != target {
-        return Err("nr_select_session".into());
-    }
-    crate::hdr_enhanced::nr_live_set_enabled(id, enabled, None, None, None, None, None, None, None)
-        .await?;
-    if let Err(error) = crate::hdr_enhanced::nr_live_remember(id).await {
-        log::warn!("NR shortcut applied but defaults were not saved: {error}");
-        let _ = app.emit("nr-save-error", id);
-    }
+    let config = crate::hdr_enhanced::get_config().await?;
+    crate::native_components::set_global_nr_enabled(!config.settings.nr_enabled).await?;
     Ok(())
 }
 
@@ -822,15 +760,5 @@ mod tests {
         assert_eq!(*fake.keys.borrow(), vec![overlay.id()]);
         assert!(!state.owned.contains_key(&taken.id()));
     }
-    #[test]
-    fn hidden_shortcut_never_redirects_an_expired_target() {
-        let p = serde_json::json!({"id":2,"nr_toggle_supported":true,"nr_requested_enabled":false,"nr_state":"disabled"});
-        assert_eq!(
-            toggle_request(&serde_json::json!({"pipelines":[p.clone()]}), None).unwrap(),
-            (2, true)
-        );
-        assert!(toggle_request(&serde_json::json!({"pipelines":[p.clone()]}), Some(1)).is_err());
-        assert!(toggle_request(&serde_json::json!({"pipelines":[p.clone(),p]}), None).is_err());
-        assert!(toggle_request(&serde_json::json!({"pipelines":[]}), None).is_err());
-    }
+
 }

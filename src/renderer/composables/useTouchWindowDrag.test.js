@@ -191,6 +191,35 @@ test('commits a quick touch drag after the initial window queries finish', async
   }
 })
 
+test('touch double tap toggles the window without starting a move', async () => {
+  let doubleTaps = 0
+  const environment = installDragEnvironment(async (command) => {
+    if (command === 'plugin:event|listen') return 1
+    if (command === 'plugin:event|unlisten') return null
+    if (command === 'plugin:window|outer_position') return { x: 0, y: 0 }
+    if (command === 'plugin:window|scale_factor') return 1
+    throw new Error(`Unexpected Tauri command: ${command}`)
+  })
+
+  try {
+    const { useTouchWindowDrag } = await import('./useTouchWindowDrag.js')
+    const drag = useTouchWindowDrag(null, {
+      restoreMaximized: false,
+      onDoubleTap: () => { doubleTaps += 1 },
+    })
+
+    startTouchDrag(drag.onTouchWindowDragStart, 1, 10, 20)
+    await environment.listeners.get('pointerup')({ pointerId: 1, clientX: 10, clientY: 20 })
+    startTouchDrag(drag.onTouchWindowDragStart, 2, 10, 20)
+    await environment.listeners.get('pointerup')({ pointerId: 2, clientX: 10, clientY: 20 })
+
+    assert.equal(doubleTaps, 1)
+    assert.equal(drag.active, false)
+  } finally {
+    environment.cleanup()
+  }
+})
+
 test('releases touch drag state when the initial window query never finishes', async () => {
   const never = new Promise(() => {})
   const committedPositions = []
@@ -536,7 +565,7 @@ test('pointer cancellation discards an uninitialized move and permits the next g
 })
 
 for (const signal of ['lostpointercapture', 'blur']) {
-  test(`shared drag releases capture and ignores delayed initialization after ${signal}`, async () => {
+  test(`shared drag stays active through ${signal} until pointerup`, async () => {
     const baseline = deferred(), finished = [], writes = []
     const environment = installDragEnvironment(async (command, args) => {
       if (command === 'plugin:event|listen') return 1
@@ -555,13 +584,14 @@ for (const signal of ['lostpointercapture', 'blur']) {
       const drag = useTouchWindowDrag(null, { restoreMaximized: false, onFinish: value => finished.push(value) })
       startTouchDrag(drag.onTouchWindowDragStart, 1, 10, 20)
       moveTouchDrag(environment.listeners, 1, 40, 50)
-      if (signal === 'blur') windowListeners.get('blur')()
-      else environment.listeners.get('lostpointercapture')({ pointerId: 1 })
+      if (signal === 'blur') assert.equal(windowListeners.has('blur'), false)
+      else assert.equal(environment.listeners.has('lostpointercapture'), false)
+      const end = environment.listeners.get('pointerup')({ pointerId: 1, clientX: 40, clientY: 50 })
       baseline.resolve({ x: 0, y: 0 })
-      await nextTask()
+      await end
       assert.equal(drag.active, false)
-      assert.deepEqual(writes, [])
-      assert.deepEqual(finished, [{ moved: true, position: null }])
+      assert.deepEqual(writes, [{ x: 30, y: 30 }])
+      assert.deepEqual(finished, [{ moved: true, position: { x: 30, y: 30 } }])
       assert.equal(environment.listeners.size, 0)
       assert.equal(windowListeners.size, 0)
     } finally { console.warn = warn; environment.cleanup() }

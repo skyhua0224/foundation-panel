@@ -805,11 +805,13 @@ mod collect {
             Err(_) => out.push(DriverFact { id: "vigem".into(), name: "ViGEmBus".into(), checked: true, probe_error: "no answer within 8 s".into(), ..Default::default() }),
             Ok(Err(_)) => out.push(DriverFact { id: "vigem".into(), name: "ViGEmBus".into(), ..Default::default() }),
         }
-        let vmouse_name = tr(lang, "Virtual mouse", "虚拟鼠标");
-        match tokio::time::timeout(Duration::from_secs(8), crate::vmouse::get_vmouse_status()).await {
-            Ok(Ok(s)) => out.push(DriverFact { id: "vmouse".into(), name: vmouse_name.clone(), checked: true, installed: s.installed, running: s.running, problem: None, version: String::new(), reboot: false, note: String::new(), required: false, probe_error: String::new() }),
-            Err(_) => out.push(DriverFact { id: "vmouse".into(), name: vmouse_name, checked: true, probe_error: "no answer within 8 s".into(), ..Default::default() }),
-            Ok(Err(_)) => out.push(DriverFact { id: "vmouse".into(), name: tr(lang, "Virtual mouse", "虚拟鼠标"), ..Default::default() }),
+        if crate::vmouse::get_vmouse_support() {
+            let vmouse_name = tr(lang, "Virtual mouse", "虚拟鼠标");
+            match tokio::time::timeout(Duration::from_secs(8), crate::vmouse::get_vmouse_status()).await {
+                Ok(Ok(s)) => out.push(DriverFact { id: "vmouse".into(), name: vmouse_name.clone(), checked: true, installed: s.installed, running: s.running, problem: None, version: String::new(), reboot: false, note: String::new(), required: false, probe_error: String::new() }),
+                Err(_) => out.push(DriverFact { id: "vmouse".into(), name: vmouse_name, checked: true, probe_error: "no answer within 8 s".into(), ..Default::default() }),
+                Ok(Err(_)) => out.push(DriverFact { id: "vmouse".into(), name: tr(lang, "Virtual mouse", "虚拟鼠标"), ..Default::default() }),
+            }
         }
         match tokio::time::timeout(Duration::from_secs(8), crate::usbip::usbip_get_status()).await {
             Ok(Ok(s)) if s.supported => out.push(DriverFact {

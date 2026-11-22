@@ -5,6 +5,7 @@ import { pickHardware } from './hardwareReadings.js'
 import { parseSessionLog, parseErrorLog, realSession } from 'foundation-ui/vue'
 import { readLogResponse } from 'foundation-ui/diagnostics'
 import { pollDelay, boostUntilFor, hasStartingSession } from './pollPlan.js'
+import { setVisibleInterval, clearVisibleInterval } from './pageVisibility.js'
 
 const HISTORY = 60
 const safe = async (fn, fallback = null) => { try { return await fn() } catch { return fallback } }
@@ -162,13 +163,15 @@ export function usePanelHome() {
     clearTimeout(capTimer)
     state.settled = true
     // the poll follows pollPlan.js: three seconds, one second for a few seconds after the panel is looked at again and while a session is starting
-    const loop = async () => { await fast(); timer = setTimeout(loop, pollDelay(Date.now(), boostUntil)) }
+    // A hidden page (covered, minimized, in the tray) does not poll: the loop ends, and the page being shown again restarts it at once (onSeen).
+    const loop = async () => { if (document.hidden) return; await fast(); timer = setTimeout(loop, pollDelay(Date.now(), boostUntil)) }
     nudge = (reason) => { boostUntil = boostUntilFor(Date.now(), reason, boostUntil); clearTimeout(timer); loop() }
     timer = setTimeout(loop, pollDelay(Date.now(), boostUntil))
     document.addEventListener('visibilitychange', onSeen); window.addEventListener('focus', onSeen)
-    t2 = setInterval(() => { slow(); hardware() }, 15000)
+    // the slow reads (history, hardware) also rest while hidden and are read once when the page is shown again
+    t2 = setVisibleInterval(() => { slow(); hardware() }, 15000, { resume: true })
   })
-  onBeforeUnmount(() => { clearTimeout(timer); clearTimeout(capTimer); clearInterval(t2); document.removeEventListener('visibilitychange', onSeen); window.removeEventListener('focus', onSeen) })
+  onBeforeUnmount(() => { clearTimeout(timer); clearTimeout(capTimer); clearVisibleInterval(t2); document.removeEventListener('visibilitychange', onSeen); window.removeEventListener('focus', onSeen) })
 
   // the session with the real name of its client (realSession: the placeholder 「Named Zako」 becomes the paired device's name, else the client family), the same rule in every tile
   const session = computed(() => realSession(state.sessions[0] || null, state.clients))

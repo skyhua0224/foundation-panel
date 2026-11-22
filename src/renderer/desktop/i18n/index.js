@@ -1,35 +1,62 @@
 import { ref, computed, watch } from 'vue'
 import { LOCALE_SYSTEM, choiceOf, readLocalePref, resolveSystemLocale, watchSystemLanguage, writeLocalePref } from 'foundation-ui/locale/localePref.js'
+import { withUsbipOwnership } from './usbipOwnership.js'
 import { zh } from './zh.js'
 import { en } from './en.js'
 import { DESKTOP_LOCALES, LOCALE_NAMES, documentLang, mergeLocale, normalizeDesktopLocale } from './merge.js'
-import { zh_TW } from './zh_TW.js'
-import { en_GB } from './en_GB.js'
-import { en_US } from './en_US.js'
-import { de } from './de.js'
-import { fr } from './fr.js'
-import { es } from './es.js'
-import { it } from './it.js'
-import { ja } from './ja.js'
-import { ko } from './ko.js'
-import { ru } from './ru.js'
-import { pt_BR } from './pt_BR.js'
-import { pt } from './pt.js'
-import { bg } from './bg.js'
-import { cs } from './cs.js'
-import { pl } from './pl.js'
-import { sv } from './sv.js'
-import { tr } from './tr.js'
-import { uk } from './uk.js'
-
 export { DESKTOP_LOCALES, LOCALE_NAMES, normalizeDesktopLocale }
-const bundles = { zh_TW, en_GB, en_US, de, fr, es, it, ja, ko, ru, pt_BR, pt, bg, cs, pl, sv, tr, uk }
+// English and Chinese are the fallbacks of every table (merge.js), so they stay in the entry; every other language is a file of its own,
+// read when the language is chosen (the window waits for it before it draws: i18nReady) and kept after.
+const loaders = {
+  zh_TW: () => import('./zh_TW.js').then((m) => m.zh_TW),
+  en_GB: () => import('./en_GB.js').then((m) => m.en_GB),
+  en_US: () => import('./en_US.js').then((m) => m.en_US),
+  de: () => import('./de.js').then((m) => m.de),
+  fr: () => import('./fr.js').then((m) => m.fr),
+  es: () => import('./es.js').then((m) => m.es),
+  it: () => import('./it.js').then((m) => m.it),
+  ja: () => import('./ja.js').then((m) => m.ja),
+  ko: () => import('./ko.js').then((m) => m.ko),
+  ru: () => import('./ru.js').then((m) => m.ru),
+  pt_BR: () => import('./pt_BR.js').then((m) => m.pt_BR),
+  pt: () => import('./pt.js').then((m) => m.pt),
+  bg: () => import('./bg.js').then((m) => m.bg),
+  cs: () => import('./cs.js').then((m) => m.cs),
+  pl: () => import('./pl.js').then((m) => m.pl),
+  sv: () => import('./sv.js').then((m) => m.sv),
+  tr: () => import('./tr.js').then((m) => m.tr),
+  uk: () => import('./uk.js').then((m) => m.uk),
+}
+const bundles = {}
+const pending = new Map()
 const merged = new Map()
+// Moves when a language arrives, so a table built from the fallbacks while it was missing is built again.
+const bundleVersion = ref(0)
+const hasBundle = (code) => code === 'en' || code === 'zh' || Object.hasOwn(bundles, code)
+/** Reads the file of one language (nothing for en and zh); a failed read leaves the fallbacks in place and can be asked again. */
+export function loadLocale(locale) {
+  const code = normalizeDesktopLocale(locale)
+  if (hasBundle(code) || !loaders[code]) return Promise.resolve(code)
+  if (!pending.has(code)) {
+    pending.set(code, loaders[code]().then((bundle) => {
+      bundles[code] = bundle
+      merged.delete(code)
+      bundleVersion.value += 1
+    }).catch((error) => {
+      console.warn(`Language ${code} could not be loaded:`, error)
+    }).finally(() => pending.delete(code)))
+  }
+  return pending.get(code).then(() => code)
+}
 const messagesFor = (locale) => {
   const code = normalizeDesktopLocale(locale)
+  // read here so a table that is shown re-evaluates when its language arrives
+  void bundleVersion.value
   if (merged.has(code)) return merged.get(code)
-  const table = mergeLocale(en, zh, code, bundles[code])
-  merged.set(code, table)
+  const table = withUsbipOwnership(mergeLocale(en, zh, code, bundles[code]), code)
+  // a table made without its language is the fallbacks only: it is not kept
+  if (hasBundle(code)) merged.set(code, table)
+  else void loadLocale(code)
   return table
 }
 const LOCALE_REQUEST_KEY = 'foundation-desktop-locale-request'
@@ -61,13 +88,14 @@ const currentLocale = ref(getDefaultLocale())
 // What the person chose: 跟随系统 (the default) or a language; `system` is stored as such and followed live
 const currentChoice = ref(choiceOf(readLocalePref(), storedExplicit(), systemDesktopLocale()))
 let localeRevision = 0
+/** Resolves when the language of this window is read: a window draws after it, so its first frame is already in its language. */
+export const i18nReady = loadLocale(currentLocale.value)
 
+// The language is applied once its file is read, so a switch never shows the other language in between; the stored choice is written at once.
 function updateCurrentLocale(locale, persist = false) {
   const normalized = normalizeDesktopLocale(locale)
   localeRevision += 1
-  if (normalized !== currentLocale.value) {
-    currentLocale.value = normalized
-  }
+  const revision = localeRevision
   if (persist) {
     try {
       localStorage.setItem('language', normalized)
@@ -75,6 +103,16 @@ function updateCurrentLocale(locale, persist = false) {
       // Keep the in-memory locale when storage is unavailable.
     }
   }
+  // the language that is shown but whose file never arrived is read again
+  if (normalized === currentLocale.value && hasBundle(normalized)) return Promise.resolve()
+  if (hasBundle(normalized)) {
+    currentLocale.value = normalized
+    return Promise.resolve()
+  }
+  return loadLocale(normalized).then(() => {
+    // a newer request wins: its own language is applied by it
+    if (revision === localeRevision) currentLocale.value = normalized
+  })
 }
 
 function createLocaleRequestId() {
@@ -161,10 +199,11 @@ async function listenTrayLocaleChanged() {
         currentChoice.value = normalizeDesktopLocale(eventLocale); writeLocalePref(currentChoice.value)
       }
 
-      updateCurrentLocale(eventLocale, true)
-      window.dispatchEvent(new CustomEvent('locale-changed', {
-        detail: { locale: normalizeDesktopLocale(eventLocale) },
-      }))
+      updateCurrentLocale(eventLocale, true).then(() => {
+        window.dispatchEvent(new CustomEvent('locale-changed', {
+          detail: { locale: normalizeDesktopLocale(eventLocale) },
+        }))
+      })
     })
   } catch {
     // 非 Tauri 环境，忽略
@@ -192,7 +231,8 @@ async function syncLocalePreferences(locale, requestId) {
 
 function requestLocaleChange(value) {
   const normalized = normalizeDesktopLocale(value)
-  if (normalized === currentLocale.value) return
+  // choosing the language that is shown still cancels a switch whose file is on its way
+  if (normalized === currentLocale.value && pending.size === 0 && hasBundle(normalized)) return
 
   const requestId = createLocaleRequestId()
   setLatestLocaleRequest(requestId)

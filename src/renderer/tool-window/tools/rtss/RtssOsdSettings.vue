@@ -3,7 +3,7 @@
     <template #action><MIconButton icon="refresh" :label="t.rtssTool.refresh" @click="load" /></template>
     <MGroup>
       <MSwitchItem :model-value="props.osd_enabled === 1" icon="layers" :title="t.rtssTool.osdEnabled" @update:model-value="(v) => setProp('OSD', v ? '1' : '0')" />
-      <MSwitchItem :model-value="props.show_own_stats === 1" icon="monitoring" :title="t.rtssTool.showOwnStats" @update:model-value="(v) => setProp('OSDShowOwnStatistics', v ? '1' : '0')" />
+      <MSwitchItem :model-value="props.show_own_stats === 1" icon="monitor_heart" :title="t.rtssTool.showOwnStats" @update:model-value="(v) => setProp('OSDShowOwnStatistics', v ? '1' : '0')" />
       <MItem stack icon="zoom_in" :title="t.rtssTool.osdZoom"><template #control><MChipSet :model-value="props.zoom" :label="t.rtssTool.osdZoom" :options="[1, 2, 3, 4].map((z) => ({ value: z, label: `${z}x` }))" @update:model-value="(z) => setProp('OnScreenDisplayZoom', String(z))" /></template></MItem>
       <MItem stack icon="picture_in_picture" :title="t.rtssTool.osdPosition">
         <template #control>

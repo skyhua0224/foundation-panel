@@ -4,7 +4,8 @@ import 'foundation-ui/all.css'
 import '../styles/global.less'
 import './desktop.less'
 import App from './DesktopApp.vue'
+import { i18nReady } from './i18n/index.js'
 
 const app = createApp(App)
-app.mount('#app')
+i18nReady.then(() => app.mount('#app'))
 

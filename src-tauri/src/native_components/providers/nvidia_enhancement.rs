@@ -218,7 +218,8 @@ fn build_status(
     let integrity_valid = manifest
         .as_ref()
         .is_some_and(|manifest| validate_version(&directory, manifest));
-    let enabled = selected_backend(&config.settings).as_deref() == Some(COMPONENT_ID);
+    let enabled = selected_backend(&config.settings).as_deref() == Some(COMPONENT_ID)
+        && (!IS_NR || config.settings.nr_enabled);
     let in_use = runtime_status
         .get("in_use")
         .and_then(serde_json::Value::as_bool)
@@ -764,16 +765,43 @@ pub async fn component_recover() -> Result<EnhancementComponentStatus, String> {
 }
 
 pub async fn component_set_enabled(enabled: bool) -> Result<EnhancementComponentStatus, String> {
+    status_for_config(save_component_enabled(enabled).await?).await
+}
+
+pub(crate) async fn save_component_enabled(enabled: bool) -> Result<crate::hdr_enhanced::ConfigState, String> {
     let _operation = COMPONENT_OPERATION
         .try_lock()
         .map_err(|_| "HDR-OP-001: another component operation is running".to_string())?;
-    let mut current = supported_config().await?;
-    if enabled && !current.settings.backends.contains_key(COMPONENT_ID) {
-        return Err("HDR-PKG-006: import the component before selecting it".to_string());
+    select_backend_config(supported_config, |current| crate::hdr_enhanced::save_config(current, None), enabled).await
+}
+
+async fn select_backend_config<Load, LoadFuture, Save, SaveFuture>(
+    mut load: Load,
+    mut save: Save,
+    enabled: bool,
+) -> Result<crate::hdr_enhanced::ConfigState, String>
+where
+    Load: FnMut() -> LoadFuture,
+    LoadFuture: std::future::Future<Output = Result<crate::hdr_enhanced::ConfigState, String>>,
+    Save: FnMut(crate::hdr_enhanced::ConfigState) -> SaveFuture,
+    SaveFuture: std::future::Future<Output = Result<crate::hdr_enhanced::ConfigState, String>>,
+{
+    // The toggle touches one field; another window may have saved since the
+    // read. Reload and re-apply only this component's selection instead of
+    // surfacing the conflict to the user.
+    for attempt in 0..3 {
+        let mut current = load().await?;
+        if enabled && !current.settings.backends.contains_key(COMPONENT_ID) {
+            return Err("HDR-PKG-006: import the component before selecting it".to_string());
+        }
+        if IS_NR { current.settings.nr_enabled = enabled; }
+        *selected_backend_mut(&mut current.settings) = enabled.then(|| COMPONENT_ID.to_string());
+        match save(current).await {
+            Err(error) if error.starts_with("HDR-CFG-006:") && attempt < 2 => continue,
+            result => return result,
+        }
     }
-    *selected_backend_mut(&mut current.settings) = enabled.then(|| COMPONENT_ID.to_string());
-    let saved = crate::hdr_enhanced::save_config(current, None).await?;
-    status_for_config(saved).await
+    unreachable!("the final save attempt always returns")
 }
 
 async fn clear_uninstalled_config<Load, LoadFuture, Save, SaveFuture>(
@@ -793,6 +821,7 @@ where
         if selected_backend(&current.settings).as_deref() == Some(COMPONENT_ID) {
             *selected_backend_mut(&mut current.settings) = None;
         }
+        if IS_NR { current.settings.nr_enabled = false; }
         current.settings.backends.remove(COMPONENT_ID);
         match save(current).await {
             Err(error) if error.starts_with("HDR-CFG-006:") && attempt < 2 => continue,
@@ -812,6 +841,7 @@ pub async fn component_uninstall() -> Result<EnhancementComponentStatus, String>
     if selected_backend(&current.settings).as_deref() == Some(COMPONENT_ID) {
         *selected_backend_mut(&mut current.settings) = None;
     }
+    if IS_NR { current.settings.nr_enabled = false; }
     // 先停止新会话使用；文件删除成功后再去掉版本记录，失败时仍保留卸载/修复入口。
     let saved = crate::hdr_enhanced::save_config(current, Some(&operation_id.id)).await;
     if let Err(error) = saved {
@@ -908,6 +938,7 @@ mod tests {
             schema_version: 2,
             selected_backend: Some("alkaidlab.nvidia_rtx_video".to_string()),
             selected_nr_backend: Some("alkaidlab.nvidia_dlssnr".to_string()),
+            nr_enabled: true,
             backends: Default::default(),
         };
         for id in [COMPONENT_ID, other] {
@@ -955,6 +986,7 @@ mod tests {
         } else {
             "alkaidlab.nvidia_dlssnr"
         };
+        assert_eq!(result.settings.nr_enabled, !IS_NR);
         assert_eq!(result.settings.backends[other].version, "2");
         let other_selection = if IS_NR {
             result.settings.selected_backend
@@ -962,6 +994,45 @@ mod tests {
             result.settings.selected_nr_backend
         };
         assert_eq!(other_selection.as_deref(), Some(other));
+    }
+
+    #[tokio::test]
+    async fn selection_reloads_after_conflict_and_keeps_other_component_edits() {
+        let loads = std::cell::Cell::new(0);
+        let saves = std::cell::Cell::new(0);
+        let result = select_backend_config(
+            || {
+                loads.set(loads.get() + 1);
+                let mut current = uninstall_config(loads.get());
+                *selected_backend_mut(&mut current.settings) = None;
+                std::future::ready(Ok(current))
+            },
+            |current| {
+                saves.set(saves.get() + 1);
+                std::future::ready(if saves.get() == 1 {
+                    Err("HDR-CFG-006: settings changed in another window".to_string())
+                } else {
+                    Ok(current)
+                })
+            },
+            true,
+        )
+        .await
+        .unwrap();
+        assert_eq!(loads.get(), 2);
+        let other = if IS_NR {
+            "alkaidlab.nvidia_rtx_video"
+        } else {
+            "alkaidlab.nvidia_dlssnr"
+        };
+        let (ours, theirs) = if IS_NR {
+            (result.settings.selected_nr_backend.as_deref(), result.settings.selected_backend.as_deref())
+        } else {
+            (result.settings.selected_backend.as_deref(), result.settings.selected_nr_backend.as_deref())
+        };
+        assert_eq!(ours, Some(COMPONENT_ID));
+        assert_eq!(theirs, Some(other));
+        assert_eq!(result.settings.backends[other].version, "2");
     }
 
     #[tokio::test]
@@ -1025,6 +1096,7 @@ mod tests {
                 schema_version: 1,
                 selected_backend: None,
                 selected_nr_backend: None,
+                nr_enabled: false,
                 backends: Default::default(),
             },
             etag: reqwest::header::HeaderValue::from_static("\"hdr-v1-test\""),
@@ -1043,6 +1115,7 @@ mod tests {
                 schema_version: 2,
                 selected_backend: None,
                 selected_nr_backend: None,
+                nr_enabled: false,
                 backends: Default::default(),
             },
             etag: reqwest::header::HeaderValue::from_static("\"hdr-v2-test\""),
@@ -1130,6 +1203,7 @@ mod tests {
                 schema_version: 1,
                 selected_backend: None,
                 selected_nr_backend: None,
+                nr_enabled: false,
                 backends: Default::default(),
             },
             etag: reqwest::header::HeaderValue::from_static("\"unused\""),

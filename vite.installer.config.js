@@ -8,8 +8,9 @@ import vuePlugin from '@vitejs/plugin-vue'
 import { defineConfig } from 'vite'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
+// dev-env-npm: preserve source aliases inside the integrity-locked package.
+const foundationUi = resolve(dirname(fileURLToPath(import.meta.resolve('foundation-ui'))), '..')
 const root = join(__dirname, 'src', 'renderer', 'installer')
-const foundationUi = process.env.FOUNDATION_UI_DIR || join(__dirname, '..', 'ds5-ui-m3e')
 const pagesRoot = join(foundationUi, 'src/vue/installer/MInstaller.vue')
 const installerRoot = existsSync(pagesRoot) ? pagesRoot : join(root, 'Placeholder.vue')
 
@@ -28,10 +29,10 @@ export default defineConfig(() => ({
   resolve: {
     dedupe: ['vue'],
     alias: [
-      { find: /^installer-root$/, replacement: installerRoot },
       { find: /^foundation-ui\/vue$/, replacement: join(foundationUi, 'src/vue/index.js') },
       { find: /^foundation-ui\/all\.css$/, replacement: join(foundationUi, 'src/css/all.css') },
       { find: /^foundation-ui\/(.*)$/, replacement: join(foundationUi, 'src/$1') },
+      { find: /^installer-root$/, replacement: installerRoot },
       { find: /^vue$/, replacement: join(__dirname, 'node_modules/vue/dist/vue.runtime.esm-bundler.js') },
     ],
   },

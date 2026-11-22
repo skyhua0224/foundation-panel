@@ -41,7 +41,8 @@ pub fn extended(current_until_ms: u64, now_ms: u64, for_ms: u64) -> u64 {
 
 /// Paths of the Web UI through the proxy that stop or restart the host.
 pub fn is_stop_request(method: &str, path: &str) -> bool {
-    method.eq_ignore_ascii_case("POST") && matches!(path, "/api/restart" | "/api/quit")
+    // 恢复默认设置 and 恢复上一次备份 restart the host as well: the panel expects that stop, it is not a crash
+    method.eq_ignore_ascii_case("POST") && matches!(path, "/api/restart" | "/api/quit" | "/api/config/reset" | "/api/config/reset/restore")
 }
 
 #[cfg(test)]
@@ -94,5 +95,10 @@ mod tests {
         assert!(!is_stop_request("GET", "/api/restart"));
         assert!(!is_stop_request("POST", "/api/pairing/pending"));
         assert!(!is_stop_request("POST", "/api/restart/other"));
+        // the reset and the restore of the host settings restart it; the list of backups does not
+        assert!(is_stop_request("POST", "/api/config/reset"));
+        assert!(is_stop_request("post", "/api/config/reset/restore"));
+        assert!(!is_stop_request("GET", "/api/config/reset"));
+        assert!(!is_stop_request("POST", "/api/config"));
     }
 }

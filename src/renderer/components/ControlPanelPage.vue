@@ -36,7 +36,7 @@
         <MGroup>
           <MItem icon="content_paste" :title="t.sidebar.clipboardSync">
             <template #trail>
-              <MChip :tone="clipboardSyncEnabled ? 'ok' : 'neutral'" :icon="clipboardSyncEnabled ? 'check_circle' : ''">{{ clipboardSyncEnabled ? t.sidebar.connected : t.sidebar.notConnected }}</MChip>
+              <MChip :tone="clipboardSyncEnabled ? 'ok' : clipboardSyncState === 'degraded' ? 'warn' : 'neutral'" :icon="clipboardSyncEnabled ? 'check_circle' : clipboardSyncState === 'degraded' ? 'warning' : ''">{{ clipboardSyncEnabled ? t.sidebar.connected : clipboardSyncState === 'degraded' ? t.sidebar.degraded : t.sidebar.notConnected }}</MChip>
               <MButton variant="outlined" size="sm" @click="actions.showClipboardSyncStatus">{{ t.sidebar.viewStatus }}</MButton>
             </template>
           </MItem>
@@ -47,7 +47,6 @@
           <MItem action icon="key" :title="t.sidebar.accountCredentials" @click="emit('webui-navigate', '/password')" />
         </MGroup>
       </MSection>
-      <MFeedbackAccount :locale="locale" />
       <MSection :title="t.sidebar.maintenance">
         <MGroup>
           <MItem icon="cleaning_services" :title="t.sidebar.coverCache" :text="t.sidebar.coverCacheDescription">
@@ -89,7 +88,7 @@
 
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { MPage, MSection, MGroup, MItem, MSourceList, MChoiceItem, MSeg, MChip, MButton, MIcon, MFieldItem, MBanner, MSupportSheet, useNotify, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard, doctorTexts, MFeedbackRow, MFeedbackAccount } from 'foundation-ui/vue'
+import { MPage, MSection, MGroup, MItem, MSourceList, MChoiceItem, MSeg, MChip, MButton, MIcon, MFieldItem, MBanner, MSupportSheet, useNotify, aboutTexts, coachTexts, guideTexts, homeTexts, remoteTexts, useGuideCard, doctorTexts, MFeedbackRow } from 'foundation-ui/vue'
 import { SPONSORS } from '../config/sponsors.js'
 import ShortcutsSheet from './m3e/ShortcutsSheet.vue'
 import { usePanelPart } from '../composables/panelParts.js'
@@ -113,6 +112,8 @@ const props = defineProps({
   includePrerelease: Boolean,
   currentVersion: { type: String, default: '' },
   clipboardSyncEnabled: Boolean,
+  /** the word of the sync state (clipboardStatusView.js): connected | degraded | ... */
+  clipboardSyncState: { type: String, default: 'unknown' },
   isAdmin: Boolean,
   actions: { type: Object, required: true },
 })

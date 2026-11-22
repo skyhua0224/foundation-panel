@@ -42,7 +42,7 @@ pub(crate) fn simulated_dpi(real_dpi: u32, percent: u32) -> Option<u32> {
 static OVERRIDES: Mutex<Option<Overrides>> = Mutex::new(None);
 
 fn path() -> Option<std::path::PathBuf> {
-    dirs::config_dir().map(|dir| dir.join("Sunshine GUI").join(FILE))
+    crate::test_isolation::config_dir().map(|dir| dir.join("Sunshine GUI").join(FILE))
 }
 
 fn current() -> Overrides {
@@ -127,7 +127,7 @@ fn real_dpi(_window: &tauri::WebviewWindow) -> u32 {
 pub fn dev_simulate_dpi(window: tauri::WebviewWindow, percent: u32) -> Result<(), String> {
     let dpi = simulated_dpi(real_dpi(&window), percent).ok_or("the scale must be between 50 and 400 percent")?;
     log::info!("[developer] simulated scale change to {dpi} dpi ({percent}%)");
-    crate::windows::send_synthetic_dpi(&window, dpi)
+    crate::windows::send_synthetic_dpi(&window, dpi, false)
 }
 
 /// DevTools of the main window. The embedded Web UI is a frame of the same page: pick its context in the console or the frame in Elements.
@@ -181,11 +181,20 @@ fn capture_data(json: &str) -> Result<String, String> {
     value.get("data").and_then(|d| d.as_str()).filter(|d| !d.is_empty()).map(str::to_string).ok_or_else(|| "the capture has no image".to_string())
 }
 
-/// A PNG of the whole window as WebView2 draws it (the embedded Web UI frame included), in base64: the report sheet attaches it, taken before the sheet is drawn. Asks WebView2 through the DevTools protocol.
+/// The PNG bytes of a `Page.captureScreenshot` answer: its `data` decoded from base64 (DevTools protocol text is the only form WebView2 gives). Decoded here, on a worker, so the page gets bytes over the binary IPC and not a megabyte string to decode again.
+fn capture_png(json: &str) -> Result<Vec<u8>, String> {
+    use base64::Engine;
+    let png = base64::engine::general_purpose::STANDARD.decode(capture_data(json)?).map_err(|e| e.to_string())?;
+    if png.starts_with(&[0x89, b'P', b'N', b'G']) { Ok(png) } else { Err("the capture is not a PNG".to_string()) }
+}
+
+/// A PNG of the whole window as WebView2 draws it (the embedded Web UI frame included), as bytes: the report sheet attaches it, taken before the sheet is drawn. Asks WebView2 through the DevTools protocol,
+/// with the encoder set for speed (the picture is encoded again after it is redacted, so its size here matters less than the wait).
 #[tauri::command]
-pub async fn dev_capture_window(window: tauri::WebviewWindow) -> Result<String, String> {
+pub async fn dev_capture_window(window: tauri::WebviewWindow) -> Result<tauri::ipc::Response, String> {
     #[cfg(target_os = "windows")]
     {
+        let started_at = std::time::Instant::now();
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<String, String>>();
         let tx = std::sync::Arc::new(std::sync::Mutex::new(Some(tx)));
         let on_start = tx.clone();
@@ -195,13 +204,14 @@ pub async fn dev_capture_window(window: tauri::WebviewWindow) -> Result<String, 
                 use windows::core::w;
                 let answer = tx.clone();
                 let handler = CallDevToolsProtocolMethodCompletedHandler::create(Box::new(move |result, json| {
-                    let out = result.map_err(|e| e.to_string()).and_then(|_| capture_data(&json));
+                    // the answer is handed on as it is; decoding it is not work for the window's thread
+                    let out = result.map_err(|e| e.to_string()).map(|_| json);
                     if let Some(tx) = answer.lock().unwrap().take() {
                         let _ = tx.send(out);
                     }
                     Ok(())
                 }));
-                let started = webview.controller().CoreWebView2().and_then(|core| core.CallDevToolsProtocolMethod(w!("Page.captureScreenshot"), w!("{\"format\":\"png\"}"), &handler));
+                let started = webview.controller().CoreWebView2().and_then(|core| core.CallDevToolsProtocolMethod(w!("Page.captureScreenshot"), w!("{\"format\":\"png\",\"optimizeForSpeed\":true}"), &handler));
                 if let Err(error) = started {
                     log::warn!("[developer] the window capture failed to start: {error}");
                     if let Some(tx) = on_start.lock().unwrap().take() {
@@ -210,7 +220,11 @@ pub async fn dev_capture_window(window: tauri::WebviewWindow) -> Result<String, 
                 }
             })
             .map_err(|e| e.to_string())?;
-        tokio::time::timeout(std::time::Duration::from_secs(5), rx).await.map_err(|_| "no answer from WebView2".to_string())?.map_err(|_| "the request was dropped".to_string())?
+        let json = tokio::time::timeout(std::time::Duration::from_secs(5), rx).await.map_err(|_| "no answer from WebView2".to_string())?.map_err(|_| "the request was dropped".to_string())??;
+        let answered = started_at.elapsed();
+        let png = tokio::task::spawn_blocking(move || capture_png(&json)).await.map_err(|e| e.to_string())??;
+        log::debug!("[developer] window capture: WebView2 answered in {} ms, {} bytes after decoding, {} ms in all", answered.as_millis(), png.len(), started_at.elapsed().as_millis());
+        Ok(tauri::ipc::Response::new(png))
     }
     #[cfg(not(target_os = "windows"))]
     {
@@ -250,6 +264,15 @@ mod tests {
         assert!(capture_data("{}").is_err());
         assert!(capture_data(r#"{"data":""}"#).is_err());
         assert!(capture_data("not json").is_err());
+    }
+
+    #[test]
+    fn the_capture_is_decoded_to_png_bytes_and_nothing_else_is_passed_on() {
+        // "iVBORw0KGgo=" is the PNG signature's first bytes (89 50 4E 47 0D 0A 1A 0A)
+        assert_eq!(capture_png(r#"{"data":"iVBORw0KGgo="}"#).unwrap(), vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a]);
+        assert!(capture_png(r#"{"data":"aGVsbG8="}"#).is_err(), "text that decodes but is not a PNG");
+        assert!(capture_png(r#"{"data":"!!not base64!!"}"#).is_err());
+        assert!(capture_png("{}").is_err());
     }
 
     #[test]

@@ -20,12 +20,16 @@ struct UpdatePreferences {
     /// 渲染层 foundation-ui/update 的 `SOURCE_KEY` 同款取值；旧文件缺省为 auto。
     #[serde(default = "default_update_source")]
     update_source: String,
+    /// 最近一次真正用到的来源（mirror / cnb / github，来自完成的下载）；空表示还没有下载过。
+    #[serde(default)]
+    used_update_source: String,
+    /// 最近一次下载里首选来源（Mirror酱）没有用上的原因，见 `mirrorchyan::Miss::word`；空表示用上了或没选 Mirror酱。
+    #[serde(default)]
+    update_source_miss: String,
 }
 
 fn preferences_path<R: Runtime>(app: &AppHandle<R>) -> Result<PathBuf, String> {
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
+    let app_data_dir = crate::test_isolation::app_data_dir(app)
         .map_err(|e| format!("获取应用数据目录失败: {e}"))?;
 
     if !app_data_dir.exists() {
@@ -182,6 +186,78 @@ pub(crate) fn update_source<R: Runtime>(app: &AppHandle<R>) -> &'static str {
         .unwrap_or("auto")
 }
 
+/// 下载候选的显示名（Mirror酱 / CNB / GitHub）对应的来源词；其他名字不记录。
+pub(crate) fn used_source_word(candidate_name: &str) -> Option<&'static str> {
+    match candidate_name {
+        "Mirror酱" => Some("mirror"),
+        "CNB" => Some("cnb"),
+        "GitHub" => Some("github"),
+        _ => None,
+    }
+}
+
+/// 来源统计该报的词：真正用过的来源优先，没有时是用户的设置（默认 auto）。
+pub(crate) fn source_to_report(used: &str, setting: &str) -> String {
+    UPDATE_SOURCES
+        .into_iter()
+        .find(|known| *known == used)
+        .or_else(|| UPDATE_SOURCES.into_iter().find(|known| *known == setting))
+        .unwrap_or("auto")
+        .to_string()
+}
+
+pub(crate) fn used_update_source<R: Runtime>(app: &AppHandle<R>) -> String {
+    ensure(app);
+    let used = app
+        .try_state::<Arc<Mutex<UpdatePreferences>>>()
+        .map(|preferences| preferences.lock().unwrap().used_update_source.clone())
+        .unwrap_or_default();
+    source_to_report(&used, update_source(app))
+}
+
+/// 记下一次完成的下载实际用到的来源；只在变化时写盘。
+pub(crate) fn record_used_update_source<R: Runtime>(app: &AppHandle<R>, candidate_name: &str) {
+    let Some(word) = used_source_word(candidate_name) else {
+        return;
+    };
+    ensure(app);
+    if let Some(preferences) = app.try_state::<Arc<Mutex<UpdatePreferences>>>() {
+        let snapshot = {
+            let mut preferences = preferences.lock().unwrap();
+            if preferences.used_update_source == word {
+                return;
+            }
+            preferences.used_update_source = word.to_string();
+            preferences.clone()
+        };
+        persist(app, &snapshot);
+    }
+}
+
+pub(crate) fn update_source_miss<R: Runtime>(app: &AppHandle<R>) -> String {
+    ensure(app);
+    app.try_state::<Arc<Mutex<UpdatePreferences>>>()
+        .map(|preferences| preferences.lock().unwrap().update_source_miss.clone())
+        .unwrap_or_default()
+}
+
+/// 记下这次下载里首选来源没有用上的原因（`None` 清除）；只在变化时写盘。
+pub(crate) fn record_update_source_miss<R: Runtime>(app: &AppHandle<R>, miss: Option<&str>) {
+    let word = miss.unwrap_or("");
+    ensure(app);
+    if let Some(preferences) = app.try_state::<Arc<Mutex<UpdatePreferences>>>() {
+        let snapshot = {
+            let mut preferences = preferences.lock().unwrap();
+            if preferences.update_source_miss == word {
+                return;
+            }
+            preferences.update_source_miss = word.to_string();
+            preferences.clone()
+        };
+        persist(app, &snapshot);
+    }
+}
+
 pub(crate) fn set_update_source<R: Runtime>(
     app: &AppHandle<R>,
     source: &str,
@@ -237,5 +313,30 @@ mod update_source_tests {
                 .and_then(|value| value.as_str()),
             Some("mirror")
         );
+    }
+
+    #[test]
+    fn the_download_names_map_to_source_words() {
+        assert_eq!(used_source_word("Mirror酱"), Some("mirror"));
+        assert_eq!(used_source_word("CNB"), Some("cnb"));
+        assert_eq!(used_source_word("GitHub"), Some("github"));
+        assert_eq!(used_source_word(""), None);
+        assert_eq!(used_source_word("something else"), None);
+    }
+
+    #[test]
+    fn the_reported_source_is_the_used_one_then_the_setting_then_auto_never_empty() {
+        assert_eq!(source_to_report("mirror", "github"), "mirror");
+        assert_eq!(source_to_report("", "github"), "github");
+        assert_eq!(source_to_report("", ""), "auto");
+        assert_eq!(source_to_report("bogus", "bogus"), "auto");
+    }
+
+    #[test]
+    fn an_old_preferences_file_has_no_used_source() {
+        let parsed: UpdatePreferences =
+            serde_json::from_str(r#"{ "last_check_time": 1, "include_prerelease": false }"#).unwrap();
+        assert_eq!(parsed.used_update_source, "");
+        assert_eq!(parsed.update_source_miss, "");
     }
 }
