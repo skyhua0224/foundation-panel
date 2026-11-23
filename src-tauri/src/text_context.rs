@@ -22,24 +22,23 @@ use windows::Win32::System::Ole::{
     SafeArrayAccessData, SafeArrayDestroy, SafeArrayGetLBound, SafeArrayGetUBound,
     SafeArrayUnaccessData,
 };
+use windows::Win32::System::Threading::{CreateEventW, SetEvent};
 use windows::Win32::UI::Accessibility::{
     CUIAutomation, HWINEVENTHOOK, IUIAutomation, IUIAutomationCacheRequest, IUIAutomationElement,
     IUIAutomationTextEditPattern, IUIAutomationTextPattern2, IUIAutomationValuePattern,
-    SetWinEventHook,
-    UIA_BoundingRectanglePropertyId, UIA_ControlTypePropertyId, UIA_EditControlTypeId,
-    UIA_HasKeyboardFocusPropertyId, UIA_IsEnabledPropertyId, UIA_IsOffscreenPropertyId,
-    UIA_DocumentControlTypeId, UIA_IsPasswordPropertyId, UIA_TextControlTypeId,
-    UIA_TextEditPatternId, UIA_TextPattern2Id, UIA_ValueIsReadOnlyPropertyId, UIA_ValuePatternId,
-    UnhookWinEvent,
+    SetWinEventHook, UIA_BoundingRectanglePropertyId, UIA_ClassNamePropertyId,
+    UIA_ControlTypePropertyId, UIA_CustomControlTypeId, UIA_DocumentControlTypeId,
+    UIA_EditControlTypeId, UIA_HasKeyboardFocusPropertyId, UIA_IsEnabledPropertyId,
+    UIA_IsOffscreenPropertyId, UIA_IsPasswordPropertyId, UIA_TextEditPatternId, UIA_TextPattern2Id,
+    UIA_ValueIsReadOnlyPropertyId, UIA_ValuePatternId, UnhookWinEvent,
 };
 use windows::Win32::UI::Shell::IFrameworkInputPane;
 use windows::Win32::UI::WindowsAndMessaging::{
-    DispatchMessageW, EVENT_OBJECT_FOCUS, EVENT_SYSTEM_FOREGROUND, GUITHREADINFO,
-    GetForegroundWindow, GetGUIThreadInfo, GetWindowThreadProcessId, MSG, MWMO_INPUTAVAILABLE,
-    MsgWaitForMultipleObjectsEx, PM_REMOVE, PeekMessageW, QS_ALLINPUT, TranslateMessage,
-    WINEVENT_OUTOFCONTEXT,
+    DispatchMessageW, EVENT_OBJECT_FOCUS, EVENT_SYSTEM_FOREGROUND, GUITHREADINFO, GetClassNameW,
+    GetForegroundWindow, GetGUIThreadInfo, GetWindowRect, GetWindowThreadProcessId, MSG,
+    MWMO_INPUTAVAILABLE, MsgWaitForMultipleObjectsEx, PM_REMOVE, PeekMessageW, QS_ALLINPUT,
+    TranslateMessage, WINEVENT_OUTOFCONTEXT,
 };
-use windows::Win32::System::Threading::{CreateEventW, SetEvent};
 use windows::core::{BOOL, GUID, PCWSTR};
 
 use crate::sunshine::{create_https_client, get_local_sunshine_url};
@@ -55,8 +54,9 @@ const EDITOR_CARET_POLL: Duration = Duration::from_millis(200);
 const RESCAN_DEBOUNCE: Duration = Duration::from_millis(40);
 // Some applications do not raise UIA focus events. During an active stream,
 // this watchdog refreshes the focused element so those windows can still
-// trigger the remote IME.
-const FOCUS_WATCHDOG_POLL: Duration = Duration::from_secs(2);
+// trigger the remote IME. Keep it below Sunshine's 1.2 s touch-to-focus
+// correlation window so a missed focus event can still match the touch.
+const FOCUS_WATCHDOG_POLL: Duration = Duration::from_millis(500);
 mod agent;
 pub use agent::{reconcile_streaming_state, set_enabled, start, stop};
 
@@ -137,6 +137,14 @@ struct FocusSignature {
     rect: WireRect,
     password: bool,
     editable: bool,
+    caret_rect: Option<WireRect>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct NativeFocus {
+    focus_class: Option<String>,
+    caret_class: Option<String>,
+    focus_rect: Option<WireRect>,
     caret_rect: Option<WireRect>,
 }
 
@@ -245,13 +253,14 @@ fn inspect_caret(element: &IUIAutomationElement) -> CaretState {
     if let Some(pattern) = pattern {
         let mut active = BOOL::default();
         if let Ok(range) = unsafe { pattern.GetCaretRange(&mut active) } {
-            if !active.as_bool() {
-                return CaretState::default();
+            if active.as_bool() {
+                let rect = unsafe { range.GetBoundingRectangles() }
+                    .ok()
+                    .and_then(|bounds| unsafe { take_last_bounding_rect(bounds) });
+                if rect.is_some() {
+                    return CaretState { active: true, rect };
+                }
             }
-            let rect = unsafe { range.GetBoundingRectangles() }
-                .ok()
-                .and_then(|bounds| unsafe { take_last_bounding_rect(bounds) });
-            return CaretState { active: true, rect };
         }
     }
     caret_from_win32().map_or_else(CaretState::default, |rect| CaretState {
@@ -300,8 +309,103 @@ fn caret_from_win32() -> Option<WireRect> {
     }
 }
 
+fn window_class_name(hwnd: HWND) -> Option<String> {
+    if hwnd.is_invalid() {
+        return None;
+    }
+    let mut class = [0u16; 256];
+    let length = unsafe { GetClassNameW(hwnd, &mut class) }.max(0) as usize;
+    (length > 0).then(|| String::from_utf16_lossy(&class[..length.min(class.len())]))
+}
+
+fn native_window_rect(hwnd: HWND) -> Option<WireRect> {
+    if hwnd.is_invalid() {
+        return None;
+    }
+    let mut rect = RECT::default();
+    unsafe { GetWindowRect(hwnd, &mut rect).ok()? };
+    let rect = WireRect::from(rect);
+    rect.visible().then_some(rect)
+}
+
+fn inspect_native_focus(event_thread: Option<u32>) -> Option<NativeFocus> {
+    unsafe {
+        let thread = event_thread
+            .filter(|thread| *thread != 0)
+            .unwrap_or_else(|| GetWindowThreadProcessId(GetForegroundWindow(), None));
+        if thread == 0 {
+            return None;
+        }
+        let mut info = GUITHREADINFO {
+            cbSize: std::mem::size_of::<GUITHREADINFO>() as u32,
+            ..Default::default()
+        };
+        if GetGUIThreadInfo(thread, &mut info).is_err() {
+            return None;
+        }
+
+        let caret_rect = (!info.hwndCaret.is_invalid())
+            .then(|| {
+                let mut top_left = POINT {
+                    x: info.rcCaret.left,
+                    y: info.rcCaret.top,
+                };
+                let mut bottom_right = POINT {
+                    x: info.rcCaret.right,
+                    y: info.rcCaret.bottom,
+                };
+                if !ClientToScreen(info.hwndCaret, &mut top_left).as_bool()
+                    || !ClientToScreen(info.hwndCaret, &mut bottom_right).as_bool()
+                {
+                    return None;
+                }
+                let rect = WireRect {
+                    left: top_left.x,
+                    top: top_left.y,
+                    right: bottom_right.x.max(top_left.x + 1),
+                    bottom: bottom_right.y.max(top_left.y + 1),
+                };
+                rect.visible().then_some(rect)
+            })
+            .flatten();
+
+        Some(NativeFocus {
+            focus_class: window_class_name(info.hwndFocus),
+            caret_class: window_class_name(info.hwndCaret),
+            focus_rect: native_window_rect(info.hwndFocus),
+            caret_rect,
+        })
+    }
+}
+
+fn is_native_text_class(class: &str) -> bool {
+    let class = class.trim().to_ascii_lowercase();
+    class == "edit"
+        || class.starts_with("richedit")
+        || class.starts_with("windowsforms10.edit")
+        || class == "scintilla"
+        || class == "mintty"
+        || class == "consolewindowclass"
+        || class == "cascadia_hosting_window_class"
+        || class.starts_with("chrome_renderwidgethosthwnd")
+        || (class.starts_with("qt") && class.ends_with("qwindowicon"))
+}
+
+fn native_text_evidence(native: Option<&NativeFocus>) -> bool {
+    let Some(native) = native else {
+        return false;
+    };
+    native.caret_rect.is_some()
+        && [native.focus_class.as_deref(), native.caret_class.as_deref()]
+            .into_iter()
+            .flatten()
+            .any(is_native_text_class)
+}
+
 fn is_confirmed_editor(
     control_type: i32,
+    is_scintilla: bool,
+    native_text: bool,
     value_read_only: Option<bool>,
     has_text_edit_pattern: bool,
     caret_active: bool,
@@ -314,7 +418,25 @@ fn is_confirmed_editor(
         return false;
     }
 
-    if control_type == UIA_EditControlTypeId.0 && value_read_only == Some(false) {
+    // Chromium and Qt providers may expose a contenteditable editor as a
+    // Custom control. TextEditPattern is the provider's explicit editability
+    // contract in that case, even when TextPattern2 has no caret range.
+    if control_type == UIA_CustomControlTypeId.0 && has_text_edit_pattern {
+        return true;
+    }
+
+    if is_scintilla && caret_active {
+        return true;
+    }
+
+    if native_text && caret_active {
+        return true;
+    }
+
+    if control_type == UIA_EditControlTypeId.0
+        && value_read_only != Some(true)
+        && (value_read_only == Some(false) || caret_active)
+    {
         return true;
     }
 
@@ -332,6 +454,7 @@ fn inspect_focused_element(
     automation: &IUIAutomation,
     cache: &IUIAutomationCacheRequest,
     generation: u64,
+    native: Option<&NativeFocus>,
 ) -> Option<(FocusSignature, Observation)> {
     // BuildCache fetches every property and pattern in one cross-process
     // round trip instead of one per Current* call.
@@ -347,6 +470,9 @@ fn inspect_focused_element(
         return None;
     }
     let control_type = unsafe { element.CachedControlType() }.ok()?.0;
+    let is_scintilla = unsafe { element.CachedClassName() }
+        .ok()
+        .is_some_and(|name| name.to_string().eq_ignore_ascii_case("Scintilla"));
     let password = unsafe { element.CachedIsPassword() }
         .map(|v| v.as_bool())
         .unwrap_or(false);
@@ -360,12 +486,16 @@ fn inspect_focused_element(
     }
     .is_ok();
     let should_inspect_caret = has_text_edit_pattern
-        || (control_type == UIA_EditControlTypeId.0 && value_read_only == Some(false));
+        || (control_type == UIA_EditControlTypeId.0 && value_read_only != Some(true))
+        || is_scintilla;
     let caret = should_inspect_caret
         .then(|| inspect_caret(&element))
         .unwrap_or_default();
+    let native_text = native_text_evidence(native);
     let editable = is_confirmed_editor(
         control_type,
+        is_scintilla,
+        native_text,
         value_read_only,
         has_text_edit_pattern,
         caret.active,
@@ -395,11 +525,46 @@ fn inspect_focused_element(
     Some((signature, observation))
 }
 
+fn inspect_native_focused_element(
+    native: Option<&NativeFocus>,
+    generation: u64,
+) -> Option<(FocusSignature, Observation)> {
+    let native = native?;
+    let caret_rect = native.caret_rect?;
+    if !native_text_evidence(Some(native)) {
+        return None;
+    }
+    let rect = native.focus_rect.or(Some(caret_rect))?;
+    let signature = FocusSignature {
+        control_type: -1,
+        rect,
+        password: false,
+        editable: true,
+        caret_rect: Some(caret_rect),
+    };
+    let observation = Observation {
+        version: 1,
+        agent_id: agent_id(),
+        generation,
+        source: "uia",
+        active: true,
+        editable: true,
+        password: false,
+        multiline: false,
+        pane_visible: false,
+        auto_show: false,
+        element_rect: Some(rect),
+        caret_rect: Some(caret_rect),
+    };
+    Some((signature, observation))
+}
+
 thread_local! {
     // Set from the WinEvent callback (which fires on this thread while
     // messages are pumped); the observer loop coalesces bursts into at most
     // one snapshot per debounce window.
     static RESCAN_AT: Cell<Option<Instant>> = Cell::new(None);
+    static RESCAN_THREAD: Cell<Option<u32>> = Cell::new(None);
 }
 
 unsafe extern "system" fn win_event_proc(
@@ -408,7 +573,7 @@ unsafe extern "system" fn win_event_proc(
     hwnd: HWND,
     _id_object: i32,
     _id_child: i32,
-    _thread: u32,
+    thread: u32,
     _time: u32,
 ) {
     // EVENT_OBJECT_FOCUS arrives with varying idObject values (OBJID_CLIENT
@@ -422,6 +587,7 @@ unsafe extern "system" fn win_event_proc(
             slot.set(Some(Instant::now()));
         }
     });
+    RESCAN_THREAD.with(|slot| slot.set((thread != 0).then_some(thread)));
 }
 
 fn pump_messages() {
@@ -500,8 +666,8 @@ fn observer_loop(generation: u64, stop: Arc<StopSignal>, shared: Arc<agent::Shar
         unsafe { CoCreateInstance(&FRAMEWORK_INPUT_PANE, None, CLSCTX_INPROC_SERVER).ok() };
     let automation: Option<IUIAutomation> =
         unsafe { CoCreateInstance(&CUIAutomation, None, CLSCTX_INPROC_SERVER).ok() };
-    let cancelled = stop.is_requested()
-        || !shared.ready(generation, pane.is_some(), automation.is_some());
+    let cancelled =
+        stop.is_requested() || !shared.ready(generation, pane.is_some(), automation.is_some());
     if cancelled {
         return;
     }
@@ -519,6 +685,7 @@ fn observer_loop(generation: u64, stop: Arc<StopSignal>, shared: Arc<agent::Shar
             let _ = request.AddProperty(UIA_IsOffscreenPropertyId);
             let _ = request.AddProperty(UIA_BoundingRectanglePropertyId);
             let _ = request.AddProperty(UIA_ControlTypePropertyId);
+            let _ = request.AddProperty(UIA_ClassNamePropertyId);
             let _ = request.AddProperty(UIA_IsPasswordPropertyId);
             let _ = request.AddProperty(UIA_ValueIsReadOnlyPropertyId);
             let _ = request.AddPattern(UIA_ValuePatternId);
@@ -617,37 +784,44 @@ fn observer_loop(generation: u64, stop: Arc<StopSignal>, shared: Arc<agent::Shar
         if need_snapshot {
             // Reset the polling deadline even when no snapshot is available.
             last_snapshot = now;
-            if let (Some(automation), Some(cache)) = (automation.as_ref(), cache.as_ref()) {
-                match inspect_focused_element(automation, cache, generation) {
-                    Some((signature, observation)) => {
-                        editor_focused = signature.editable;
-                        if previous_focus != Some(signature) {
-                            // Publish non-editable focus too. The core caches UIA as
-                            // level-triggered state, so explicit negative transitions
-                            // prevent a previously focused editor from going stale.
-                            shared.publish(observation);
-                            previous_focus = Some(signature);
-                        }
-                    }
-                    None if previous_focus.take().is_some() => {
-                        editor_focused = false;
-                        shared.publish(Observation {
-                            version: 1,
-                            agent_id: agent_id(),
-                            generation,
-                            source: "uia",
-                            active: false,
-                            editable: false,
-                            password: false,
-                            multiline: false,
-                            pane_visible: false,
-                            auto_show: false,
-                            element_rect: None,
-                            caret_rect: None,
-                        });
-                    }
-                    None => editor_focused = false,
+            let event_thread = RESCAN_THREAD.with(|slot| slot.take());
+            let native = inspect_native_focus(event_thread);
+            let focused = match (automation.as_ref(), cache.as_ref()) {
+                (Some(automation), Some(cache)) => {
+                    inspect_focused_element(automation, cache, generation, native.as_ref())
+                        .or_else(|| inspect_native_focused_element(native.as_ref(), generation))
                 }
+                _ => inspect_native_focused_element(native.as_ref(), generation),
+            };
+            match focused {
+                Some((signature, observation)) => {
+                    editor_focused = signature.editable;
+                    if previous_focus != Some(signature) {
+                        // Publish non-editable focus too. The core caches UIA as
+                        // level-triggered state, so explicit negative transitions
+                        // prevent a previously focused editor from going stale.
+                        shared.publish(observation);
+                        previous_focus = Some(signature);
+                    }
+                }
+                None if previous_focus.take().is_some() => {
+                    editor_focused = false;
+                    shared.publish(Observation {
+                        version: 1,
+                        agent_id: agent_id(),
+                        generation,
+                        source: "uia",
+                        active: false,
+                        editable: false,
+                        password: false,
+                        multiline: false,
+                        pane_visible: false,
+                        auto_show: false,
+                        element_rect: None,
+                        caret_rect: None,
+                    });
+                }
+                None => editor_focused = false,
             }
         }
 
@@ -697,9 +871,13 @@ async fn post_json(path: &str, body: &impl Serialize) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use windows::Win32::UI::Accessibility::{
+        UIA_CustomControlTypeId, UIA_PaneControlTypeId, UIA_TextControlTypeId,
+    };
 
     #[test]
     fn idle_or_missing_input_pane_does_not_leave_an_expired_poll_deadline() {
+        assert!(FOCUS_WATCHDOG_POLL < Duration::from_millis(1200));
         let start = Instant::now();
         let now = start + Duration::from_secs(60);
         assert_eq!(
@@ -726,20 +904,113 @@ mod tests {
 
     #[test]
     fn value_and_text_edit_evidence_confirm_editors() {
-        for (control_type, read_only, text_edit, caret_active, caret_rect, expected) in [
-            (UIA_EditControlTypeId.0, Some(false), false, false, false, true),
-            (UIA_EditControlTypeId.0, Some(true), true, true, true, false),
-            (UIA_EditControlTypeId.0, None, false, true, true, false),
-            (UIA_TextControlTypeId.0, None, true, true, false, true),
-            (UIA_DocumentControlTypeId.0, Some(true), true, true, true, false),
-            (UIA_DocumentControlTypeId.0, None, true, false, false, false),
-            (UIA_DocumentControlTypeId.0, None, true, true, false, false),
-            (UIA_DocumentControlTypeId.0, None, true, true, true, true),
-            (UIA_DocumentControlTypeId.0, None, false, false, false, false),
+        for (control_type, scintilla, read_only, text_edit, caret_active, caret_rect, expected) in [
+            (
+                UIA_EditControlTypeId.0,
+                false,
+                Some(false),
+                false,
+                false,
+                false,
+                true,
+            ),
+            (
+                UIA_EditControlTypeId.0,
+                false,
+                Some(true),
+                true,
+                true,
+                true,
+                false,
+            ),
+            (
+                UIA_EditControlTypeId.0,
+                false,
+                None,
+                false,
+                true,
+                true,
+                true,
+            ),
+            (
+                UIA_EditControlTypeId.0,
+                false,
+                None,
+                false,
+                false,
+                false,
+                false,
+            ),
+            (UIA_PaneControlTypeId.0, true, None, false, true, true, true),
+            (
+                UIA_PaneControlTypeId.0,
+                true,
+                None,
+                false,
+                false,
+                false,
+                false,
+            ),
+            (
+                UIA_TextControlTypeId.0,
+                false,
+                None,
+                true,
+                true,
+                false,
+                true,
+            ),
+            (
+                UIA_DocumentControlTypeId.0,
+                false,
+                Some(true),
+                true,
+                true,
+                true,
+                false,
+            ),
+            (
+                UIA_DocumentControlTypeId.0,
+                false,
+                None,
+                true,
+                false,
+                false,
+                false,
+            ),
+            (
+                UIA_DocumentControlTypeId.0,
+                false,
+                None,
+                true,
+                true,
+                false,
+                false,
+            ),
+            (
+                UIA_DocumentControlTypeId.0,
+                false,
+                None,
+                true,
+                true,
+                true,
+                true,
+            ),
+            (
+                UIA_DocumentControlTypeId.0,
+                false,
+                None,
+                false,
+                false,
+                false,
+                false,
+            ),
         ] {
             assert_eq!(
                 is_confirmed_editor(
                     control_type,
+                    scintilla,
+                    false,
                     read_only,
                     text_edit,
                     caret_active,
@@ -747,6 +1018,48 @@ mod tests {
                 ),
                 expected
             );
+        }
+    }
+
+    #[test]
+    fn custom_text_edit_provider_without_caret_is_editable() {
+        assert!(is_confirmed_editor(
+            UIA_CustomControlTypeId.0,
+            false,
+            false,
+            None,
+            true,
+            false,
+            false,
+        ));
+        assert!(!is_confirmed_editor(
+            UIA_CustomControlTypeId.0,
+            false,
+            false,
+            Some(true),
+            true,
+            false,
+            false,
+        ));
+    }
+
+    #[test]
+    fn native_text_classes_cover_common_editing_hosts() {
+        for class in [
+            "Edit",
+            "RichEdit50W",
+            "WindowsForms10.EDIT.app.0.141b42a_r9_ad1",
+            "Scintilla",
+            "mintty",
+            "ConsoleWindowClass",
+            "CASCADIA_HOSTING_WINDOW_CLASS",
+            "Chrome_RenderWidgetHostHWND1",
+            "Qt5152QWindowIcon",
+        ] {
+            assert!(is_native_text_class(class), "{class}");
+        }
+        for class in ["Button", "Static", "Chrome_WidgetWin_0"] {
+            assert!(!is_native_text_class(class), "{class}");
         }
     }
 
