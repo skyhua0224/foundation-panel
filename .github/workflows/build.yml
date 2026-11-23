@@ -427,6 +427,16 @@ jobs:
       - name: Build Tauri (release)
         run: cargo build --locked --manifest-path src-tauri/Cargo.toml --release --target x86_64-pc-windows-msvc
 
+      - name: Build the text-context probe (test candidate only)
+        run: cargo build --locked --manifest-path src-tauri/Cargo.toml --release --target x86_64-pc-windows-msvc --features text-context-probe --bin text-context-probe
+
+      - name: Upload the text-context probe
+        uses: actions/upload-artifact@v4
+        with:
+          name: text-context-probe
+          path: .panel-deps/target/x86_64-pc-windows-msvc/release/text-context-probe.exe
+          if-no-files-found: error
+
       - name: Install NSIS
         shell: pwsh
         run: choco install nsis -y --no-progress
