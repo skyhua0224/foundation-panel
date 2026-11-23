@@ -46,7 +46,7 @@ import UsbTransportPanel from './UsbTransportPanel.vue'
 const { t } = useI18n()
 const manualOpen = ref(false)
 const transport = useUsbTransport()
-const { status, statusLoaded, statusProbeFailed, attachedDevices, refreshStatus, friendlyError, transportBusy } = transport
+const { status, statusLoaded, statusProbeFailed, attachedDevices, refreshStatus, notifyError, transportBusy } = transport
 const discovering = ref(false)
 const discoveryDone = ref(false)
 const attachingBusId = ref('')
@@ -70,7 +70,7 @@ async function discover() {
   if (!result?.success) {
     remoteDevices.value = []
     await refreshStatus({ force: true, afterCurrent: true })
-    return ElMessage.error(friendlyError(result?.message))
+    return notifyError(result?.message)
   }
   remoteDevices.value = result.data || []
 }
@@ -94,7 +94,7 @@ async function attachDevice(device) {
   usbipStatusChannel.invalidate()
   if (!result?.success) {
     await refreshStatus({ force: true, afterCurrent: true })
-    return ElMessage.error(friendlyError(result?.message))
+    return notifyError(result?.message)
   }
   await refreshStatus({ force: true, afterCurrent: true })
   ElMessage.success(t.value.deviceHub.usb.attachSuccess)
@@ -115,7 +115,7 @@ async function detachDevice(device) {
   usbipStatusChannel.invalidate()
   if (!result?.success) {
     await refreshStatus({ force: true, afterCurrent: true })
-    return ElMessage.error(friendlyError(result?.message))
+    return notifyError(result?.message)
   }
   await refreshStatus({ force: true, afterCurrent: true })
   ElMessage.success(t.value.deviceHub.usb.detachSuccess)

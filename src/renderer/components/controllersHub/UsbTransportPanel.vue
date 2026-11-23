@@ -7,6 +7,11 @@
         </template>
       </MItem>
     </MGroup>
+    <MGroup v-if="fixOffered">
+      <MItem icon="build" :title="t.deviceHub.usb.fixTitle">
+        <template #trail><MButton size="sm" variant="primary" :loading="fixing" :disabled="transportBusy" @click="fixTransport()">{{ t.deviceHub.usb.fixAction }}</MButton></template>
+      </MItem>
+    </MGroup>
     <MNotice v-if="statusProbeFailed || (status.detail && status.installed)" tone="error">{{ friendlyError(status.detail) }}</MNotice>
     <MGroup v-if="statusLoaded && !statusProbeFailed && !status.externally_managed && status.supported && !status.ready && !needsCleanup">
       <MItem action icon="download" :title="t.deviceHub.usb.installTransport" :disabled="transportBusy || installing" @click="installTransport" />
@@ -26,9 +31,9 @@
     <MNotice v-if="status.cleanup_pending_restart" tone="warn">{{ t.deviceHub.usb.restartPending }}</MNotice>
     <MNotice v-else-if="status.install_pending_restart" tone="warn">{{ t.deviceHub.usb.installRestartPending }}</MNotice>
     <MNotice v-else-if="status.reboot_recommended" tone="warn">{{ t.deviceHub.usb.rebootRequired }}</MNotice>
-    <MGroup v-if="status.detail || status.last_install_error || status.last_cleanup_error">
+    <MGroup v-if="status.detail || status.last_install_error || status.last_cleanup_error || fixRaw">
       <MItem action icon="description" :title="t.deviceHub.usb.diagnosticDetails" @click="detailOpen = !detailOpen"><template #trail><MIcon :name="detailOpen ? 'keyboard_arrow_up' : 'keyboard_arrow_down'" /></template></MItem>
-      <MItem v-if="detailOpen" plain :title="''"><pre class="m-pre">{{ [status.detail, status.last_install_error ? t.deviceHub.usb.lastInstallError + ': ' + status.last_install_error : '', status.last_cleanup_error ? t.deviceHub.usb.lastCleanupError + ': ' + status.last_cleanup_error : ''].filter(Boolean).join('\n') }}</pre></MItem>
+      <MItem v-if="detailOpen" plain :title="''"><pre class="m-pre">{{ [fixRaw, status.detail, status.last_install_error ? t.deviceHub.usb.lastInstallError + ': ' + status.last_install_error : '', status.last_cleanup_error ? t.deviceHub.usb.lastCleanupError + ': ' + status.last_cleanup_error : ''].filter(Boolean).join('\n') }}</pre></MItem>
     </MGroup>
     <MGroup v-if="statusLoaded && status.supported && (status.detail || status.last_install_error || status.last_cleanup_error || status.vhci_residual || (status.installed && !status.ready))">
       <MItem action icon="download" :title="t.deviceHub.usb.exportDiagnostics" :disabled="exporting" @click="exportDiagnostics" />
@@ -48,5 +53,5 @@ import { useI18n } from '../../desktop/i18n/index.js'
 const { t } = useI18n()
 const detailOpen = ref(false)
 const { transport } = defineProps({ transport: { type: Object, required: true }, maintenance: Boolean })
-const { status, statusLoading, statusLoaded, statusProbeFailed, installing, cleaning, replacing, exporting, attachedDevices, needsCleanup, staleResidual, canReplaceLegacy, transportBusy, statusClass, statusTitle, friendlyError, refreshStatus, installTransport, cleanupResidual, removeStale, exportDiagnostics, replaceLegacy } = transport
+const { status, statusLoading, statusLoaded, statusProbeFailed, installing, cleaning, replacing, exporting, fixing, fixOffered, fixRaw, attachedDevices, needsCleanup, staleResidual, canReplaceLegacy, transportBusy, statusClass, statusTitle, friendlyError, refreshStatus, installTransport, cleanupResidual, removeStale, exportDiagnostics, replaceLegacy, fixTransport } = transport
 </script>

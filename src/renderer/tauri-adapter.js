@@ -166,6 +166,11 @@ export const usbip = {
     tcpPort,
   }),
   detach: (port) => wrapResult('usbip_detach', { port }),
+  // restarts Windows after 30 seconds the person can still cancel; the panel asks first
+  restartWindows: () => wrapResult('usbip_restart_windows'),
+  // when this Windows session started (seconds since the Unix epoch; 0 where unknown) and the verdict on the registered driver's signature
+  bootSecs: () => wrapResult('usbip_boot_secs'),
+  driverSignature: () => wrapResult('usbip_driver_signature'),
 }
 
 export const rtxHdr = {
@@ -208,6 +213,8 @@ export const sunshine = {
   setLocale: (locale) => invoke('set_sunshine_locale', { locale }),
   changeBitrate: (clientName, bitrate) => invoke('change_bitrate', { clientName, bitrate }),
   stopAllSessions: () => invoke('stop_all_sessions'),
+  // the live streams, or a rejection when the host cannot be asked (getActiveSessions answers an empty list then)
+  askActiveSessions: () => invoke('get_active_sessions'),
 }
 
 // ─── Sunshine 服务（SCM）────────────────────────────────
