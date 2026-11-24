@@ -244,6 +244,22 @@ fn keep_fixed_size(window: &WebviewWindow) {
         {
             return LRESULT(0);
         }
+        // The window is transparent (DWM blur-behind with an empty region) and has no frame of its own: whatever the
+        // system paints into its non-client area, or erases its background with, shows as a stray strip over the
+        // transparent margin. None of it is painted (WM_NCACTIVATE with lParam -1 stops the default handler from
+        // redrawing the frame).
+        const WM_ERASEBKGND: u32 = 0x0014;
+        const WM_NCPAINT: u32 = 0x0085;
+        const WM_NCACTIVATE: u32 = 0x0086;
+        if msg == WM_NCPAINT {
+            return LRESULT(0);
+        }
+        if msg == WM_ERASEBKGND {
+            return LRESULT(1);
+        }
+        if msg == WM_NCACTIVATE {
+            return unsafe { DefSubclassProc(hwnd, msg, wparam, LPARAM(-1)) };
+        }
         // The page owns the entire surface, including its title bar. Keep tao/WebView2 from restoring any
         // system caption or frame after the window has been created.
         if msg == WM_STYLECHANGING && wparam.0 as i32 == GWL_STYLE.0 {
