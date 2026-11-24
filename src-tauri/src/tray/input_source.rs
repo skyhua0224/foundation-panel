@@ -76,6 +76,21 @@ pub fn note_icon_event() {
     }
 }
 
+/// What the system says about the message being dispatched right now, as text for the log (diagnostics of the touch path: which messages of a gesture carry a device type).
+pub fn describe_message_source() -> String {
+    #[cfg(target_os = "windows")]
+    {
+        let mut message = ffi::InputMessageSource { device_type: 0, origin_id: 0 };
+        // SAFETY: a plain out-parameter of the documented layout, and a call without arguments.
+        let (ok, extra) = unsafe { (ffi::GetCurrentInputMessageSource(&mut message) != 0, ffi::GetMessageExtraInfo()) };
+        format!("source ok={} device={:#x} extra={:#x}", ok, message.device_type, extra as usize as u32)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        String::from("source n/a")
+    }
+}
+
 /// What the last click on the icon came from, if it was a moment ago.
 pub fn last_source() -> Source {
     match *LAST.lock().unwrap_or_else(|p| p.into_inner()) {

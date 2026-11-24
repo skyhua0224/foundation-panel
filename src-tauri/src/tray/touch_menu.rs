@@ -9,7 +9,7 @@
 //! mouse right-click delivers — so the usual event path (popup_input::on_icon_event) runs
 //! unchanged.
 
-use log::info;
+use log::{debug, info};
 use std::sync::atomic::{AtomicBool, AtomicIsize, AtomicU8, AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use windows::Win32::Foundation::{HWND, LPARAM, LRESULT, WPARAM};
@@ -95,6 +95,9 @@ unsafe extern "system" fn hook_proc(
         if message == TRAY_CALLBACK_MSG {
             let callback_kind = lparam.0 as u32;
             let state = TOUCH_STATE.load(Ordering::Acquire);
+            if state != TOUCH_IDLE || callback_kind == WM_RBUTTONUP || callback_kind == WM_LBUTTONUP {
+                debug!("[tray-touch] callback {:#x} state {} ({})", callback_kind, state, super::input_source::describe_message_source());
+            }
             if state == TOUCH_WAITING_FOR_REPLAY {
                 if callback_kind == WM_RBUTTONUP {
                     if TOUCH_LEFT_EATEN.swap(false, Ordering::AcqRel) {
@@ -123,6 +126,7 @@ unsafe extern "system" fn hook_proc(
             }
         }
         if message == WM_CONTEXTMENU {
+            debug!("[tray-touch] WM_CONTEXTMENU wparam {:#x} lparam {:#x} ({})", wparam.0, lparam.0, super::input_source::describe_message_source());
             // Replay the gesture as the tray callback a real mouse right-click delivers. The
             // touch release can be delivered before or after this queued message, so the callback
             // state above consumes that one release and leaves mouse clicks untouched.
