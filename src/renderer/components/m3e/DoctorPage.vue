@@ -1,5 +1,6 @@
 <template>
   <MDoctor
+    :product="PRODUCT_NAME"
     :sources="sources"
     :repair="repair"
     :can-repair="canRepair"
@@ -26,6 +27,7 @@ import { MDoctor, DOCTOR_LOCAL_GROUPS, doctorHostSource } from 'foundation-ui/vu
 import { useDiagnostics } from '../../composables/useDiagnostics.js'
 import { openExternalUrl, sunshine } from '../../tauri-adapter.js'
 import { useI18n } from '../../desktop/i18n/index.js'
+import { PRODUCT_NAME } from '../../config/brand.js'
 
 // 体检 of the control panel: the panel's own checks (doctor_local: the service, the installation, the processes and ports, the
 // drivers; they answer when Sunshine is down) and Sunshine's (GET /api/doctor through the proxy), on the shared page (MDoctor).

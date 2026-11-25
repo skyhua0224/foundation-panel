@@ -1,5 +1,6 @@
 <template>
   <MDiagnostics
+    :product="PRODUCT_NAME"
     :title="diagnosticsTexts(locale).title"
     :text="diag.text.value"
     :records="diag.records.value"
@@ -54,6 +55,7 @@
 </template>
 
 <script setup>
+import { PRODUCT_NAME } from '../../config/brand.js'
 import { setVisibleInterval, clearVisibleInterval } from '../../composables/pageVisibility.js'
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { invoke } from '@tauri-apps/api/core'

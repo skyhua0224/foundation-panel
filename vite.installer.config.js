@@ -31,6 +31,8 @@ export default defineConfig(() => ({
     alias: [
       { find: /^foundation-ui\/vue$/, replacement: join(foundationUi, 'src/vue/index.js') },
       { find: /^foundation-ui\/all\.css$/, replacement: join(foundationUi, 'src/css/all.css') },
+      // the brand artwork is its own directory at the package root, not under src/
+      { find: /^foundation-ui\/brand-assets$/, replacement: join(foundationUi, 'brand-assets/index.js') },
       { find: /^foundation-ui\/(.*)$/, replacement: join(foundationUi, 'src/$1') },
       { find: /^installer-root$/, replacement: installerRoot },
       { find: /^vue$/, replacement: join(__dirname, 'node_modules/vue/dist/vue.runtime.esm-bundler.js') },
